@@ -6,6 +6,7 @@
 // - Cantos: plugin "WP Chords" -> <wpchord nota="G"></wpchord> antes da sílaba.
 
 import { cleanLine, decodeEntities, normalize, stripTags } from './html.js';
+import { completarCifra } from '../chordpro.js';
 
 // Parser de HTML: DOMParser no navegador; no Node, registrado via setHtmlParser
 // (veja server/node-dom.js, que usa node-html-parser).
@@ -244,7 +245,13 @@ export function parseCanto(post) {
   const pdf = /href="([^"]+\.pdf)"/i.exec(post.html);
   const subt = root.querySelector('h3');
   let corpo;
-  if (body) corpo = wpChordsToChordPro(body);
+  let completadas = 0;
+  if (body) {
+    // a cifra costuma vir só na 1ª estrofe: repete a sequência de acordes nas demais
+    const r = completarCifra(wpChordsToChordPro(body));
+    corpo = r.texto;
+    completadas = r.completadas;
+  }
   else {
     // sem cifras: usa o texto do post
     const txt = all(root, 'p').map((p) => cleanLine(p.textContent)).filter(Boolean);
@@ -259,6 +266,7 @@ export function parseCanto(post) {
   if (yt) cabecalho.push(`{youtube: https://www.youtube.com/watch?v=${yt[1]}}`);
   if (pdf) cabecalho.push(`{pdf: ${pdf[1]}}`);
   if (post.capa) cabecalho.push(`{cover: ${post.capa}}`);
+  if (completadas) cabecalho.push(`{x_cifra_completada: ${completadas}}`);
   return {
     capa: post.capa || null,
     titulo,

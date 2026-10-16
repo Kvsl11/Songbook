@@ -56,3 +56,29 @@ test('converte ChordPro para acordes em cima e volta', async () => {
   // acordes colados (sem texto entre eles) não se sobrepõem
   assert.equal(chordProToChordsOverLyrics('[C][G]Lá'), 'C G\n  Lá');
 });
+
+test('completa a cifra das estrofes sem acordes a partir da estrofe cifrada', async () => {
+  const { completarCifra, temCifra } = await import('../public/js/chordpro.js');
+  const src = `{start_of_chorus}
+[D]Na casa do [A]Senhor
+{end_of_chorus}
+
+[D]Cantai ao Senhor um canto [A]novo
+[G]Cantai, ó terra in[D]teira
+
+Pois Deus é grande e digno de louvor
+Mais terrível que os outros deuses
+
+{start_of_chorus}
+Na casa do Senhor
+{end_of_chorus}`;
+  const r = completarCifra(src);
+  assert.equal(r.completadas, 2);
+  const linhas = r.texto.split('\n');
+  assert.match(linhas[7], /^\[D\]Pois Deus é grande e digno de \[A\]louvor$/);
+  assert.match(linhas[8], /^\[G\]Mais terrível que os outros \[D\]deuses$/);
+  assert.equal(linhas[11], '[D]Na casa do [A]Senhor');
+  assert.equal(temCifra(src), true);
+  assert.equal(temCifra('{title: X}\nSó letra'), false);
+  assert.equal(completarCifra('Só letra\nsem acordes').completadas, 0);
+});

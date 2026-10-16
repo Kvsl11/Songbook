@@ -25,6 +25,11 @@ Visual escuro inspirado no Spotify, com capas, cabeçalhos em degradê e player 
   fila, anterior/próxima); continua em tela cheia ao passar de música no repertório.
 - **Fila**: na música do repertório, mostra as próximas; arraste para reordenar, remova, edite ou pule.
   A página do repertório também reordena arrastando.
+- **Cifra completa**: quando a cifra original só tem acordes na 1ª estrofe, a mesma sequência é repetida
+  nas demais (com aviso para conferir ouvindo o vídeo); botão "Completar cifra" na música e no editor.
+  Músicas sem nenhum acorde mostram só a opção Letra.
+- **Dicas**: passar o mouse ou segurar o dedo num botão mostra o nome da função.
+- **Atualização automática**: o app busca sempre a versão mais nova e recarrega sozinho; a versão aparece em Ajustes.
 - **Editor de cifra**: acordes na linha de cima da letra (como num caderno) ou entre [colchetes]; campos de título, autor, tom e vídeo; prévia ao vivo; acordes do tom para
   inserir com um toque; transposição permanente; conversão de "cifra sobre a letra". Cantos vindos da
   busca ou da liturgia também podem ser editados (são salvos na biblioteca antes).

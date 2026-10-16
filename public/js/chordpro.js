@@ -221,3 +221,90 @@ export function chordProToChordsOverLyrics(src) {
   }
   return out.join('\n');
 }
+
+// ---------------------------------------------------------------- cifra
+export const temCifra = (src) => /\[[A-G][^\]]*\]/.test(String(src || ''));
+
+// Divide o ChordPro em blocos de letra (estrofes/refrões), guardando os índices das linhas.
+function blocosDeLetra(linhas) {
+  const blocos = [];
+  let atual = null;
+  let tipo = 'verse';
+  const fechar = () => { if (atual && atual.linhas.length) blocos.push(atual); atual = null; };
+  linhas.forEach((linha, i) => {
+    const dir = /^\s*\{\s*([^:}]+)/.exec(linha);
+    if (dir) {
+      const n = dir[1].trim().toLowerCase();
+      if (/^(soc|start_of_chorus)$/.test(n)) { fechar(); tipo = 'chorus'; }
+      else if (/^(eoc|end_of_chorus|eov|end_of_verse|eob|end_of_bridge)$/.test(n)) { fechar(); tipo = 'verse'; }
+      else if (/^(sov|start_of_verse|sob|start_of_bridge)$/.test(n)) { fechar(); tipo = /b/.test(n) ? 'bridge' : 'verse'; }
+      else fechar();
+      return;
+    }
+    if (!linha.trim()) { fechar(); return; }
+    if (!atual) atual = { tipo, linhas: [] };
+    atual.linhas.push(i);
+  });
+  fechar();
+  return blocos;
+}
+
+// Repete a sequência de acordes de uma estrofe cifrada nas estrofes que vieram sem acordes
+// (comum quando a cifra só é escrita na 1ª estrofe). Os acordes são posicionados na mesma
+// proporção da linha, no início da palavra mais próxima.
+export function completarCifra(src) {
+  const linhas = String(src || '').replace(/\r\n?/g, '\n').split('\n');
+  const blocos = blocosDeLetra(linhas);
+  const comAcordes = (b) => b.linhas.some((i) => /\[[^\]]+\]/.test(linhas[i]));
+  const modelos = blocos.filter(comAcordes);
+  if (!modelos.length) return { texto: src, completadas: 0 };
+  let completadas = 0;
+  blocos.forEach((bloco, bi) => {
+    if (comAcordes(bloco)) return;
+    const anteriores = blocos.slice(0, bi).filter(comAcordes).reverse();
+    const candidatos = [...anteriores, ...modelos];
+    const mesmoTipo = candidatos.filter((m) => m.tipo === bloco.tipo);
+    const modelo = mesmoTipo.find((m) => m.linhas.length === bloco.linhas.length) || mesmoTipo[0]
+      || candidatos.find((m) => m.linhas.length === bloco.linhas.length) || candidatos[0];
+    const linhasModelo = modelo.linhas.filter((i) => splitChordLine(linhas[i]).some((s) => s.text.trim()));
+    if (!linhasModelo.length) return;
+    let mudou = false;
+    bloco.linhas.forEach((li, k) => {
+      const alvo = linhas[li];
+      if (/^\s*\{/.test(alvo)) return;
+      const segs = splitChordLine(linhas[linhasModelo[k % linhasModelo.length]]);
+      let letraModelo = '';
+      const acordes = [];
+      for (const s of segs) {
+        if (s.chord) acordes.push({ chord: s.chord, at: letraModelo.length });
+        letraModelo += s.text;
+      }
+      if (!acordes.length) return;
+      // posição por palavra: 1ª palavra → 1ª, última → última, meio → proporcional
+      const inicios = (txt) => { const r = []; const re = /\S+/g; let m; while ((m = re.exec(txt))) r.push(m.index); return r; };
+      const pm = inicios(letraModelo);
+      const pa = inicios(alvo);
+      if (!pa.length) return;
+      const palavraDe = (at) => { let w = 0; pm.forEach((ini, j) => { if (ini <= at) w = j; }); return w; };
+      const posicoes = [];
+      for (const a of acordes) {
+        const w = palavraDe(a.at);
+        let alvoW;
+        if (pm.length <= 1 || w === 0) alvoW = 0;
+        else if (w === pm.length - 1) alvoW = pa.length - 1;
+        else alvoW = Math.round((w / (pm.length - 1)) * (pa.length - 1));
+        const ultimo = posicoes[posicoes.length - 1];
+        // dois acordes na mesma palavra: o segundo vai para a próxima palavra livre (ou fim da linha)
+        if (ultimo && alvoW <= ultimo.w) alvoW = ultimo.w + 1;
+        const pos = alvoW < pa.length ? pa[alvoW] : alvo.length;
+        posicoes.push({ pos, w: alvoW, chord: a.chord });
+      }
+      let nova = alvo;
+      for (const p of [...posicoes].reverse()) nova = nova.slice(0, p.pos) + `[${p.chord}]` + nova.slice(p.pos);
+      linhas[li] = nova;
+      mudou = true;
+    });
+    if (mudou) completadas++;
+  });
+  return { texto: linhas.join('\n'), completadas };
+}

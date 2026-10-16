@@ -649,3 +649,16 @@ dialog[open] { animation: pop 0.2s ease-out; }
 .tracks.fila .track .cover { width: 42px; height: 42px; }
 @media (max-width: 600px) { .track.set-item { gap: 8px; } .track .lead { gap: 6px; } }
 #content[wrap="off"] { white-space: pre; overflow-x: auto; }
+
+/* ============================================================ dicas e avisos */
+#tooltip {
+  position: fixed; left: 0; top: 0; z-index: 100; pointer-events: none; max-width: 240px;
+  background: #fff; color: #121212; font-size: 13px; font-weight: 700; padding: 6px 10px; border-radius: 6px;
+  box-shadow: var(--shadow); opacity: 0; transition: opacity 0.12s; white-space: normal;
+}
+#tooltip.show { opacity: 1; }
+:root[data-theme="light"] #tooltip { background: #282828; color: #fff; }
+button, a.icon-btn, .chip, .swatch { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.aviso { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin: 0 0 14px; border-radius: var(--radius); background: var(--accent-soft); color: var(--text); font-size: 13px; font-weight: 600; }
+.aviso .ic { color: var(--accent-ink); }
+.aviso span { flex: 1; min-width: 180px; }

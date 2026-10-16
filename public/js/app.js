@@ -1,6 +1,6 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
-import { chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord } from './chordpro.js';
+import { completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord } from './chordpro.js';
 import { icon, logo } from './icons.js';
 import { buscarCindy, getCanto, getMissa } from './fonte.js';
 
@@ -42,6 +42,62 @@ document.addEventListener('error', (e) => {
   box.style.setProperty('--h', hue(img.alt || img.src));
   img.replaceWith(document.createRange().createContextualFragment(icon('music', 24)));
 }, true);
+
+// ------------------------------------------------------------------ dicas (tooltips)
+// Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
+export const APP_VERSAO = '2026.10.16-12';
+const dica = document.createElement('div');
+dica.id = 'tooltip';
+dica.setAttribute('role', 'tooltip');
+document.body.append(dica);
+const ALVO_DICA = 'button, a.icon-btn, a.play-big, .swatch, [data-tip], .chip[title], .nav a, label.swatch';
+let dicaTimer = null;
+let dicaDeToque = false;
+
+function textoDica(el) {
+  if (el.title) { el.dataset.tip = el.title; el.removeAttribute('title'); } // evita a dica nativa duplicada
+  const t = el.dataset.tip || el.getAttribute('aria-label') || '';
+  const visivel = el.textContent.trim();
+  // botões que já mostram o mesmo texto não precisam de dica
+  return t && t.toLowerCase() !== visivel.toLowerCase() ? t : '';
+}
+function mostrarDica(el) {
+  const t = textoDica(el);
+  if (!t || !el.isConnected) return;
+  dica.textContent = t;
+  dica.classList.add('show');
+  const r = el.getBoundingClientRect();
+  const d = dica.getBoundingClientRect();
+  let top = r.top - d.height - 8;
+  if (top < 8) top = r.bottom + 8;
+  const left = Math.min(Math.max(8, r.left + r.width / 2 - d.width / 2), window.innerWidth - d.width - 8);
+  dica.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
+}
+function esconderDica() { clearTimeout(dicaTimer); dica.classList.remove('show'); }
+document.addEventListener('pointerover', (e) => {
+  if (e.pointerType !== 'mouse') return;
+  const el = e.target.closest(ALVO_DICA);
+  if (!el) return;
+  clearTimeout(dicaTimer);
+  dicaTimer = setTimeout(() => mostrarDica(el), 350);
+});
+document.addEventListener('pointerout', (e) => { if (e.pointerType === 'mouse' && e.target.closest(ALVO_DICA)) esconderDica(); });
+// toque: segurar o dedo ~0,5 s mostra a dica (e não dispara o botão)
+document.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse') { esconderDica(); return; }
+  const el = e.target.closest(ALVO_DICA);
+  if (!el || el.closest('[data-drag]')) return;
+  dicaDeToque = false;
+  clearTimeout(dicaTimer);
+  dicaTimer = setTimeout(() => { dicaDeToque = true; mostrarDica(el); }, 480);
+});
+const cancelarToque = () => { clearTimeout(dicaTimer); if (dicaDeToque) setTimeout(esconderDica, 1400); };
+document.addEventListener('pointerup', cancelarToque);
+document.addEventListener('pointercancel', () => { clearTimeout(dicaTimer); esconderDica(); });
+document.addEventListener('click', (e) => { if (dicaDeToque) { dicaDeToque = false; e.preventDefault(); e.stopPropagation(); } }, true);
+document.addEventListener('contextmenu', (e) => { if (e.target.closest(ALVO_DICA)) e.preventDefault(); });
+view.addEventListener('scroll', esconderDica, { passive: true });
+window.addEventListener('hashchange', esconderDica);
 
 // tarefas a desfazer ao trocar de tela (ex.: ouvintes do player)
 let limpezas = [];
@@ -675,7 +731,9 @@ function viewSong(id, ctx = {}) {
   const prefs = db.prefs();
   let { transpose = 0, capo = 0 } = song;
   let showChords = prefs.showChords;
-  let modo = prefs.modo === 'letra' ? 'letra' : 'cifra';
+  // música sem nenhum acorde: só existe a opção Letra
+  const semCifra = !temCifra(song.content);
+  let modo = semCifra || prefs.modo === 'letra' ? 'letra' : 'cifra';
   const save = () => { if (!isPreview) db.updateSong(song.id, { transpose, capo }); };
 
   const back = ctx.set ? `#/repertorio/${ctx.set.id}` : isPreview ? (song.back || '#/liturgia') : '#/biblioteca';
@@ -700,8 +758,10 @@ function viewSong(id, ctx = {}) {
            <a class="icon-btn" href="#/editar/${song.id}" aria-label="Editar" title="Editar cifra">${icon('edit', 22)}</a>`}
       <button class="icon-btn" id="btn-palco" aria-label="Só a letra (tela cheia)" title="Só a letra, tela cheia">${icon('expand', 22)}</button>
       ${ctx.set ? `<button class="icon-btn" id="btn-fila" aria-label="Fila do repertório" title="Fila: próximas músicas">${icon('queue', 24)}</button>` : ''}
-      <div class="seg-tabs"><button class="chip" data-modo="cifra" aria-pressed="${modo === 'cifra'}">Cifra</button><button class="chip" data-modo="letra" aria-pressed="${modo === 'letra'}">Letra</button></div>
+      <div class="seg-tabs">${semCifra ? '<span class="chip sm" title="Esta música não tem acordes">Só letra</span>'
+        : `<button class="chip" data-modo="cifra" aria-pressed="${modo === 'cifra'}" title="Mostrar a letra com os acordes">Cifra</button><button class="chip" data-modo="letra" aria-pressed="${modo === 'letra'}" title="Mostrar só a letra, sem acordes">Letra</button>`}</div>
     </div>
+    <div id="aviso-cifra"></div>
     <div class="song-toolbar" id="tools">
       <div class="seg" title="Transpor"><button data-act="t-" aria-label="Meio tom abaixo">${icon('minus', 16)}</button><span class="val" id="key"></span><button data-act="t+" aria-label="Meio tom acima">${icon('plus', 16)}</button></div>
       <div class="seg" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
@@ -717,7 +777,7 @@ function viewSong(id, ctx = {}) {
       ${ctx.set && ctx.index > 0 ? `<a class="icon-btn" href="#/repertorio/${ctx.set.id}/${ctx.index - 1}" aria-label="Música anterior" title="Anterior">${icon('back', 20)}</a>` : ''}
       <button class="icon-btn" data-palco="f-" aria-label="Diminuir letra" title="Diminuir letra">A−</button>
       <button class="icon-btn" data-palco="f+" aria-label="Aumentar letra" title="Aumentar letra">A+</button>
-      <button class="icon-btn" data-palco="cifra" aria-label="Alternar cifra/letra" title="Cifra / Letra">${icon('chord', 18)}</button>
+      ${semCifra ? '' : `<button class="icon-btn" data-palco="cifra" aria-label="Alternar cifra/letra" title="Cifra / Letra">${icon('chord', 18)}</button>`}
       ${ctx.set ? `<button class="icon-btn" data-palco="fila" aria-label="Fila" title="Fila">${icon('queue', 20)}</button>` : ''}
       ${ctx.set && ctx.index < ctx.set.items.length - 1 ? `<a class="icon-btn" href="#/repertorio/${ctx.set.id}/${ctx.index + 1}" aria-label="Próxima música" title="Próxima">${icon('next', 20)}</a>` : ''}
       <button class="icon-btn sair" data-palco="sair" aria-label="Sair da tela cheia" title="Sair (Esc)">${icon('x', 20)}</button>
@@ -744,6 +804,28 @@ function viewSong(id, ctx = {}) {
     $('#speed').innerHTML = `<small>Vel.</small>${db.prefs().scrollSpeed}`;
   };
   draw();
+
+  // aviso de cifra completada automaticamente / estrofes sem acordes
+  const avisoCifra = () => {
+    const box = $('#aviso-cifra');
+    if (!box) return;
+    const meta = renderSong(song.content).meta;
+    const faltam = !semCifra && completarCifra(song.content).completadas;
+    if (meta.x_cifra_completada) {
+      box.innerHTML = `<div class="aviso">${icon('sparkles', 18)}<span>A cifra original só tinha acordes em parte da música. Repeti a mesma sequência nas outras estrofes${song.youtube ? ' — confira ouvindo o vídeo' : ''}.</span></div>`;
+    } else if (faltam) {
+      box.innerHTML = `<div class="aviso">${icon('info', 18)}<span>${faltam} estrofe(s) sem acordes.</span><button class="btn small" id="btn-completar" title="Repete a sequência de acordes da estrofe cifrada nas estrofes sem acordes">${icon('sparkles', 15)} Completar cifra</button></div>`;
+      $('#btn-completar').onclick = () => {
+        const r = completarCifra(song.content);
+        song.content = r.texto.replace(/(\n\n)/, `\n{x_cifra_completada: ${r.completadas}}$1`);
+        if (isPreview) preview.content = song.content; else db.saveSong({ ...db.song(song.id), content: song.content });
+        toast(`Cifra completada em ${r.completadas} estrofe(s)`);
+        draw();
+        avisoCifra();
+      };
+    } else box.innerHTML = '';
+  };
+  avisoCifra();
 
   // modo "só a letra" (tela cheia)
   function entrarPalco() {
@@ -939,7 +1021,7 @@ const TEMPLATE_CORPO = `{start_of_verse: Estrofe 1}
 const CAMPOS_META = { title: /^(title|t)$/i, artist: /^(artist|a)$/i, key: /^key$/i, youtube: /^youtube$/i };
 
 // dados técnicos (fonte, capa, partitura…) ficam guardados, mas fora do texto editável
-const META_OCULTA = /^(subtitle|st|source|cover|pdf|capo|tempo|time|album|year|copyright)$/i;
+const META_OCULTA = /^(subtitle|st|source|cover|pdf|capo|tempo|time|album|year|copyright|x_[\w-]+)$/i;
 
 function separarMeta(content) {
   const meta = { title: '', artist: '', key: '', youtube: '', extras: [] };
@@ -1010,7 +1092,8 @@ function viewEditor(id) {
         <button class="chip" data-ins="{start_of_verse: }\\n\\n{end_of_verse}">${icon('plus', 14)} Estrofe</button>
         <button class="chip" data-ins="{chorus}">Repetir refrão</button>
         <button class="chip" data-ins="{comment: }">Comentário</button>
-        <button class="chip" id="conv" title="Converte texto com acordes em linha separada (Cifra Club etc.)">${icon('sparkles', 14)} Organizar cifra colada</button>
+        <button class="chip" id="completar" title="Repete a sequência de acordes da estrofe cifrada nas estrofes que estão sem acordes">${icon('sparkles', 14)} Completar cifra</button>
+        <button class="chip" id="conv" title="Organiza cifra colada de outro site (acordes numa linha, letra na outra)">${icon('sparkles', 14)} Organizar cifra colada</button>
       </div>
       <div class="row" style="gap:6px"><span class="muted" style="font-size:12px;font-weight:700">Como escrever os acordes:</span>
         <button class="chip" data-formato="acima" aria-pressed="${formato === 'acima'}">Na linha de cima da letra</button>
@@ -1067,6 +1150,13 @@ function viewEditor(id) {
     atualizar();
     toast(`Cifra transposta ${n > 0 ? '+' : '−'}½ tom`);
   }));
+  $('#completar').onclick = () => {
+    const r = completarCifra(corpoPro());
+    if (!r.completadas) { toast(temCifra(corpoPro()) ? 'Todas as estrofes já têm acordes' : 'Coloque os acordes em pelo menos uma estrofe'); return; }
+    ta.value = exibir(r.texto);
+    atualizar();
+    toast(`Acordes repetidos em ${r.completadas} estrofe(s) — confira`);
+  };
   $('#conv').onclick = () => { ta.value = exibir(corpoPro()); atualizar(); toast('Cifra organizada'); };
   view.querySelectorAll('[data-aba]').forEach((b) => (b.onclick = () => {
     const prev = b.dataset.aba === 'previa';
@@ -1429,7 +1519,7 @@ function viewSettings() {
 
     <div class="section-title">Sobre</div>
     <div class="settings-group">
-      <div class="setting"><span class="ico" style="background:none">${logo(40)}</span><div class="grow"><div class="t">Songbook Litúrgico</div>
+      <div class="setting"><span class="ico" style="background:none">${logo(40)}</span><div class="grow"><div class="t">Songbook Litúrgico <span class="chip sm" style="margin-left:6px">versão ${APP_VERSAO}</span></div>
         <div class="s">Cifras e letras com transposição, capotraste, rolagem automática, repertórios e referências no YouTube, integrado à Liturgia Diária da CNBB e aos cantos de cindyferrarezi.com.</div></div></div>
     </div>`;
   const nomeCor = () => {
@@ -1510,6 +1600,19 @@ window.addEventListener('hashchange', route);
 applyTheme();
 route();
 
+// Service worker: sempre procura a versão nova; quando ela assume, recarrega a página uma vez.
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  const tinhaControle = Boolean(navigator.serviceWorker.controller);
+  let recarregou = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!tinhaControle || recarregou) return;
+    recarregou = true;
+    sessionStorage.setItem('atualizado', '1');
+    location.reload();
+  });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+    reg.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+  }).catch(() => {});
 }
+if (sessionStorage.getItem('atualizado')) { sessionStorage.removeItem('atualizado'); setTimeout(() => toast(`App atualizado (versão ${APP_VERSAO})`), 400); }
