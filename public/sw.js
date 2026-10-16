@@ -1,6 +1,6 @@
 // Service worker: app shell em cache (offline) e API em "rede primeiro, cache como reserva".
-const VERSION = 'songbook-v1';
-const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/store.js', 'js/render.js', 'js/chordpro.js', 'icon.svg', 'manifest.webmanifest'];
+const VERSION = 'songbook-v2';
+const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/store.js', 'js/render.js', 'js/chordpro.js', 'js/icons.js', 'icon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
