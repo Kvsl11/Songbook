@@ -38,7 +38,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-17';
+export const APP_VERSAO = '2026.10.16-18';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -203,8 +203,9 @@ function capaRepertorio(set, cls = '') {
 }
 
 // ---------------------------------------------------------------- tema e cor de destaque
+export const COR_PADRAO = '#2747a3'; // azul-marinho
 const CORES_DESTAQUE = [
-  ['#1ed760', 'Verde'], ['#3b82f6', 'Azul'], ['#a855f7', 'Roxo'], ['#ec4899', 'Rosa'],
+  [COR_PADRAO, 'Azul-marinho'], ['#1ed760', 'Verde'], ['#3b82f6', 'Azul'], ['#a855f7', 'Roxo'], ['#ec4899', 'Rosa'],
   ['#ef4444', 'Vermelho'], ['#f97316', 'Laranja'], ['#e3b341', 'Dourado'], ['#06b6d4', 'Ciano'],
 ];
 // cor de destaque quando a opção "cor litúrgica do dia" está ativa
@@ -223,9 +224,12 @@ function temaEfetivo() {
 
 function corDestaque() {
   const { accent, litHoje } = db.prefs();
-  if (accent === 'liturgico') return COR_LIT_DESTAQUE[litHoje?.cor] || '#1ed760';
-  return /^#[\da-f]{6}$/i.test(accent || '') ? accent : '#1ed760';
+  if (accent === 'liturgico') return COR_LIT_DESTAQUE[litHoje?.cor] || COR_PADRAO;
+  return /^#[\da-f]{6}$/i.test(accent || '') ? accent : COR_PADRAO;
 }
+
+// a cor padrão deixou de ser o verde: quem estava com o verde antigo passa para o azul-marinho (uma vez)
+if (!db.prefs().corV2) { if ((db.prefs().accent || '#1ed760') === '#1ed760') db.setPref('accent', COR_PADRAO); db.setPref('corV2', true); }
 
 function applyTheme() {
   const { fontScale } = db.prefs();
@@ -605,7 +609,7 @@ function viewHome() {
     ${novas.length ? `<div class="shelf-head"><h2>Adicionadas recentemente</h2><a href="#/biblioteca">Biblioteca</a></div>
       <div class="shelf">${novas.map(tileMusica).join('')}</div>` : `
       <div class="empty"><div class="bubble">${icon('music', 34)}</div><h3>Comece sua biblioteca</h3>
-        <p>Monte o repertório da missa de hoje com as cifras da Cindy Ferrarezi, busque cantos ou importe arquivos ChordPro.</p>
+        <p>Monte o repertório da missa de hoje com as cifras da Cindy Ferrarezi e do Músicas para Missa, busque cantos ou importe arquivos ChordPro.</p>
         <div class="row"><a class="btn primary" href="#/editar/novo">Criar música</a><a class="btn" href="#/liturgia">Missa de hoje</a><a class="btn" href="#/buscar">Buscar cantos</a></div></div>`}`;
   ligarTiles(view);
 
@@ -857,7 +861,7 @@ function viewSong(id, ctx = {}) {
       <div class="seg" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
       <div class="seg" title="Rolagem automática"><button data-act="scroll" aria-pressed="false" aria-label="Rolagem automática" id="btn-scroll">${icon('play', 16)}</button><button data-act="s-" aria-label="Mais devagar">${icon('minus', 16)}</button><span class="val" id="speed"></span><button data-act="s+" aria-label="Mais rápido">${icon('plus', 16)}</button></div>
       <div class="seg"><button data-act="f-" aria-label="Diminuir letra" title="Diminuir letra">A−</button><button data-act="f+" aria-label="Aumentar letra" title="Aumentar letra">A+</button></div>
-      <div class="seg"><button data-act="chords" aria-pressed="${showChords}" title="Mostrar acordes" aria-label="Mostrar acordes">${icon('chord', 17)}</button><button data-act="cols" aria-pressed="${prefs.columns}" title="Duas colunas" aria-label="Duas colunas">${icon('columns', 17)}</button></div>
+      <div class="seg"><button data-act="chords" aria-pressed="${showChords}" title="Mostrar acordes" aria-label="Mostrar acordes">${icon('chord', 17)}</button><button data-act="cols" aria-pressed="${prefs.columns}" title="Letra em duas colunas (telas largas)" aria-label="Duas colunas">${icon('columns', 17)}</button></div>
     </div>
     <div class="song" id="song"></div>
     <div class="shelf-head"><h2>Referências</h2></div>
@@ -884,7 +888,7 @@ function viewSong(id, ctx = {}) {
     $('#song-meta').innerHTML = meta.join(' ');
     songEl.innerHTML = r.html;
     songEl.classList.toggle('no-chords', !showChords);
-    songEl.classList.toggle('columns', db.prefs().columns && modo === 'cifra');
+    songEl.classList.toggle('columns', Boolean(db.prefs().columns));
     // Cifra e Letra usam o mesmo painel estilo Spotify; na Cifra os acordes aparecem por cima
     songEl.classList.add('lyrics-mode');
     songEl.classList.toggle('with-chords', modo === 'cifra' && showChords);
@@ -1068,7 +1072,7 @@ function viewSong(id, ctx = {}) {
       case 'f-': db.setPref('fontScale', Math.max(0.6, +(p.fontScale - 0.1).toFixed(2))); applyTheme(); break;
       case 'f+': db.setPref('fontScale', Math.min(2.5, +(p.fontScale + 0.1).toFixed(2))); applyTheme(); break;
       case 'chords': showChords = !showChords; b.setAttribute('aria-pressed', String(showChords)); break;
-      case 'cols': db.setPref('columns', !p.columns); b.setAttribute('aria-pressed', String(!p.columns)); break;
+      case 'cols': db.setPref('columns', !p.columns); b.setAttribute('aria-pressed', String(!p.columns)); toast(p.columns ? 'Uma coluna' : 'Letra em duas colunas'); break;
       case 's-': db.setPref('scrollSpeed', Math.max(1, p.scrollSpeed - 1)); break;
       case 's+': db.setPref('scrollSpeed', Math.min(20, p.scrollSpeed + 1)); break;
       case 'scroll':
@@ -1389,11 +1393,18 @@ let recarregar = false;
 const escolhas = new Map(); // data -> { chave: valor }
 const LEITURAS = ['leitura1', 'leitura2', 'evangelho', 'sequencia'];
 
+// fonte preferida das sugestões: 'cindy' (Cindy Ferrarezi) ou 'mpm' (Músicas para Missa)
+const fontePreferida = () => (db.prefs().fonteSugestoes === 'mpm' ? 'mpm' : 'cindy');
+const daFonte = (c, f) => (f === 'mpm' ? c.fonte === 'mpm' : c.fonte !== 'mpm');
+// cantos da fonte preferida primeiro (mantendo a ordem dentro de cada fonte)
+const ordenarCantos = (cantos, f = fontePreferida()) => [...cantos].sort((a, b) => Number(daFonte(b, f)) - Number(daFonte(a, f)));
+
 function escolhaPadrao(parte) {
-  if (parte.chordpro && parte.chave === 'aclamacao') return parte.cantos[0]?.url || 'cnbb';
-  if (parte.chordpro) return parte.cantos.find((c) => !c.sugestao)?.url || parte.cantos[0]?.url || 'cnbb';
-  if (!parte.cantos.length || LEITURAS.includes(parte.chave) || parte.chave === 'oracao') return '';
-  return parte.cantos[0].url;
+  const cantos = ordenarCantos(parte.cantos);
+  if (parte.chordpro && parte.chave === 'aclamacao') return cantos[0]?.url || 'cnbb';
+  if (parte.chordpro) return cantos.find((c) => !c.sugestao)?.url || cantos[0]?.url || 'cnbb';
+  if (!cantos.length || LEITURAS.includes(parte.chave) || parte.chave === 'oracao') return '';
+  return cantos[0].url;
 }
 
 function leituraHTML(l) {
@@ -1469,11 +1480,17 @@ async function viewLiturgia(data) {
     if (v === 'cnbb') return 'Texto oficial (CNBB)';
     return cantoEscolhido(p)?.titulo || '';
   };
+  const contagem = (p) => {
+    const m = p.cantos.filter((c) => c.fonte === 'mpm').length;
+    const c = p.cantos.length - m;
+    return [c ? `${c} Cindy` : '', m ? `${m} MpM` : ''].filter(Boolean).join(' · ');
+  };
   const resumo = (p) => {
     const n = nomeEscolha(p);
-    if (n) return `<span class="sel">${esc(n)}</span>`;
+    const cont = p.cantos.length > 1 ? `<small class="cont">${contagem(p)}</small>` : '';
+    if (n) return `<span class="sel">${esc(n)}${cantoEscolhido(p)?.fonte === 'mpm' ? ' <span class="tag mpm">MpM</span>' : ''}</span>${cont}`;
     if (p.liturgia) return `<span>${esc(p.liturgia.referenciaCompleta || p.liturgia.referencia || '')}</span>`;
-    return `<span>${p.cantos.length ? `${p.cantos.length} sugestões` : 'Sem sugestões'}</span>`;
+    return `<span>${p.cantos.length ? contagem(p) : 'Sem sugestões'}</span>`;
   };
   const passoHTML = (p, num) => {
     if (LEITURAS.includes(p.chave)) return `<span class="step leitura">${icon('book', 18)}</span>`;
@@ -1503,6 +1520,10 @@ async function viewLiturgia(data) {
       : 'A Cindy Ferrarezi ainda não publicou o repertório desta data. Salmo e aclamação foram buscados pelo texto do dia.'}
       ${missa.mpm ? `<br>Mais sugestões de <a href="${esc(missa.mpm.url)}" target="_blank" rel="noopener">${esc(missa.mpm.titulo)}</a> · Músicas para Missa <span class="tag mpm">MpM</span>` : ''}
       ${lit.missas.length > 1 ? `<br>Hoje há ${lit.missas.length} formulários de missa; a estrutura usa o primeiro.` : ''}</div></div>
+    ${missa.mpm ? `<div class="fonte-pref"><span>Sugestão principal em cada parte:</span>
+      <button class="chip" data-fonte="cindy" aria-pressed="${fontePreferida() === 'cindy'}" title="Escolher primeiro as sugestões da Cindy Ferrarezi">Cindy Ferrarezi</button>
+      <button class="chip" data-fonte="mpm" aria-pressed="${fontePreferida() === 'mpm'}" title="Escolher primeiro as sugestões do Músicas para Missa">Músicas para Missa</button>
+      <small>Abra cada parte para ver todas as opções das duas fontes.</small></div>` : ''}
     ${missa.avisos.map((a) => `<div class="alert">${icon('info', 18)}<span>${esc(a)}</span></div>`).join('')}
     <div id="partes">${missa.partes.map((p) => `
       <details class="parte" data-chave="${p.chave}" ${['salmo', 'aclamacao'].includes(p.chave) ? 'open' : ''}>
@@ -1517,7 +1538,7 @@ async function viewLiturgia(data) {
           ${(p.chordpro || p.cantos.length) ? `<div class="opcoes-titulo">Escolha o canto</div><div class="opcoes">
             <label class="opcao"><input type="radio" name="op-${p.chave}" value="" ${!sel[p.chave] ? 'checked' : ''}><span class="lbl">Nenhum</span></label>
             ${p.chordpro ? `<label class="opcao"><input type="radio" name="op-${p.chave}" value="cnbb" ${sel[p.chave] === 'cnbb' ? 'checked' : ''}><div class="cover gen" style="--h:130">${icon('cross', 18)}</div><span class="lbl">Texto oficial (sem cifra)</span><span class="tag cnbb">CNBB</span><button class="icon-btn" data-ver="cnbb" aria-label="Ver">${icon('next', 18)}</button></label>` : ''}
-            ${p.cantos.map((c) => `<label class="opcao"><input type="radio" name="op-${p.chave}" value="${esc(c.url)}" ${sel[p.chave] === c.url ? 'checked' : ''}>${capa({ titulo: c.titulo, capa: c.capa })}<span class="lbl">${esc(c.titulo)}</span>${c.sugestao ? '<span class="tag">busca</span>' : ''}${c.fonte === 'mpm' ? '<span class="tag mpm" title="Sugestão do site Músicas para Missa">MpM</span>' : ''}<button class="icon-btn" data-ver="${esc(c.url)}" aria-label="Ver">${icon('next', 18)}</button></label>`).join('')}
+            ${ordenarCantos(p.cantos).map((c) => `<label class="opcao"><input type="radio" name="op-${p.chave}" value="${esc(c.url)}" ${sel[p.chave] === c.url ? 'checked' : ''}>${capa({ titulo: c.titulo, capa: c.capa })}<span class="lbl">${esc(c.titulo)}</span>${c.sugestao ? '<span class="tag">busca</span>' : ''}${c.fonte === 'mpm' ? '<span class="tag mpm" title="Sugestão do site Músicas para Missa">MpM</span>' : ''}<button class="icon-btn" data-ver="${esc(c.url)}" aria-label="Ver">${icon('next', 18)}</button></label>`).join('')}
           </div>` : ''}
         </div>
       </details>`).join('')}
@@ -1568,6 +1589,12 @@ async function viewLiturgia(data) {
     }
   });
   $('#montar').onclick = () => montarRepertorio(missa, sel, data);
+  $('#lit').querySelectorAll('[data-fonte]').forEach((b) => (b.onclick = () => {
+    db.setPref('fonteSugestoes', b.dataset.fonte);
+    escolhas.set(data, Object.fromEntries(missa.partes.map((p) => [p.chave, escolhaPadrao(p)])));
+    viewLiturgia(data);
+    toast(b.dataset.fonte === 'mpm' ? 'Usando primeiro as sugestões do Músicas para Missa' : 'Usando primeiro as sugestões da Cindy Ferrarezi');
+  }));
 }
 
 async function songFromChoice(parte, valor, lit) {
@@ -1618,7 +1645,7 @@ function viewSettings() {
   setTint('#333');
   setHeader('Ajustes', { back: '#/' });
   const p = db.prefs();
-  const accent = p.accent || '#1ed760';
+  const accent = p.accent || COR_PADRAO;
   const personalizada = /^#/.test(accent) && !CORES_DESTAQUE.some(([c]) => c === accent);
   view.innerHTML = `
     <h2 class="greet">Ajustes</h2>
@@ -1640,7 +1667,7 @@ function viewSettings() {
         ${CORES_DESTAQUE.map(([c, n]) => `<button class="swatch" style="--c:${c}" data-c="${c}" aria-pressed="${accent === c}" title="${n}" aria-label="${n}"></button>`).join('')}
         <button class="swatch lit" data-c="liturgico" aria-pressed="${accent === 'liturgico'}" title="Cor litúrgica do dia" aria-label="Cor litúrgica do dia"></button>
         <label class="swatch custom" style="--c:${personalizada ? accent : '#888'}" aria-pressed="${personalizada}" title="Escolher outra cor">
-          <input type="color" id="cor-livre" value="${personalizada ? accent : '#1ed760'}" aria-label="Escolher outra cor"></label>
+          <input type="color" id="cor-livre" value="${personalizada ? accent : COR_PADRAO}" aria-label="Escolher outra cor"></label>
       </div>
       <p class="swatch-label" id="cor-nome" style="margin:10px 0 0"></p>
     </div></div>
@@ -1664,7 +1691,7 @@ function viewSettings() {
         <div class="s">Cifras e letras com transposição, capotraste, rolagem automática, repertórios e referências no YouTube, integrado à Liturgia Diária da CNBB e aos cantos de cindyferrarezi.com.</div></div></div>
     </div>`;
   const nomeCor = () => {
-    const a = db.prefs().accent || '#1ed760';
+    const a = db.prefs().accent || COR_PADRAO;
     const txt = a === 'liturgico'
       ? `Cor litúrgica do dia${db.prefs().litHoje?.data === hojeISO() ? ` (hoje: ${db.prefs().litHoje.cor})` : ' (abra a Liturgia para atualizar)'}`
       : (CORES_DESTAQUE.find(([c]) => c === a)?.[1] || `Personalizada ${a}`);

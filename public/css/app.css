@@ -10,16 +10,16 @@
   --text: #ffffff;
   --muted: #b3b3b3;
   --subtle: #8a8a8a;
-  --accent: #1ed760;
-  --accent-2: #1fdf64;
-  --accent-deep: #0f8a3c;
-  --accent-soft: rgb(30 215 96 / 0.14);
-  --accent-ink: #1ed760;
-  --on-accent: #000;
-  --logo-ink: #0b2b17;
-  --chord: #1ed760;
+  --accent: #2747a3;
+  --accent-2: #3b58ac;
+  --accent-deep: #152759;
+  --accent-soft: rgb(39 71 163 / 0.16);
+  --accent-ink: #8b9fd6;
+  --on-accent: #fff;
+  --logo-ink: #070d1d;
+  --chord: #8b9fd6;
   --chorus-bg: rgb(255 255 255 / 0.05);
-  --chorus-bar: #1ed760;
+  --chorus-bar: #2747a3;
   --danger: #f15e6c;
   --danger-soft: rgb(241 94 108 / 0.14);
   --shadow: 0 8px 24px rgb(0 0 0 / 0.5);
@@ -37,16 +37,16 @@
 }
 :root[data-theme="light"] {
   --black: #e9e9e9; --bg: #ffffff; --bg-elev: #f6f6f6; --surface: #f1f1f1; --surface-2: #e8e8e8; --surface-3: #d4d4d4;
-  --border: #e3e3e3; --text: #121212; --muted: #5e5e5e; --subtle: #7a7a7a; --accent: #1aa34a; --accent-2: #17b350; --on-accent: #fff;
-  --chord: #128a3c; --chorus-bg: rgb(0 0 0 / 0.04); --chorus-bar: #1aa34a; --danger: #c62835; --danger-soft: #fdecee;
+  --border: #e3e3e3; --text: #121212; --muted: #5e5e5e; --subtle: #7a7a7a; --accent: #2747a3; --accent-2: #3b58ac; --on-accent: #fff;
+  --chord: #2747a3; --chorus-bg: rgb(0 0 0 / 0.04); --chorus-bar: #2747a3; --danger: #c62835; --danger-soft: #fdecee;
   --shadow: 0 8px 24px rgb(0 0 0 / 0.12); --shadow-lg: 0 16px 48px rgb(0 0 0 / 0.18); --lit-ink: #2e7d32;
   color-scheme: light;
 }
 @media (prefers-color-scheme: light) {
   :root[data-theme="auto"] {
     --black: #e9e9e9; --bg: #ffffff; --bg-elev: #f6f6f6; --surface: #f1f1f1; --surface-2: #e8e8e8; --surface-3: #d4d4d4;
-    --border: #e3e3e3; --text: #121212; --muted: #5e5e5e; --subtle: #7a7a7a; --accent: #1aa34a; --accent-2: #17b350; --on-accent: #fff;
-    --chord: #128a3c; --chorus-bg: rgb(0 0 0 / 0.04); --chorus-bar: #1aa34a; --danger: #c62835; --danger-soft: #fdecee;
+    --border: #e3e3e3; --text: #121212; --muted: #5e5e5e; --subtle: #7a7a7a; --accent: #2747a3; --accent-2: #3b58ac; --on-accent: #fff;
+    --chord: #2747a3; --chorus-bg: rgb(0 0 0 / 0.04); --chorus-bar: #2747a3; --danger: #c62835; --danger-soft: #fdecee;
     --shadow: 0 8px 24px rgb(0 0 0 / 0.12); --shadow-lg: 0 16px 48px rgb(0 0 0 / 0.18); --lit-ink: #2e7d32;
     color-scheme: light;
   }
@@ -366,7 +366,9 @@ a.chip.sm { cursor: pointer; }
 .song.lyrics-mode.with-chords .lyrics-only .chord { display: none; }
 .song.lyrics-mode.with-chords .section:not(.chorus) { color: rgb(255 255 255 / 0.85); }
 @media (min-width: 900px) { .song.lyrics-mode.with-chords { font-size: calc(26px * var(--font-scale)); } }
-@media (min-width: 1100px) { .song.lyrics-mode.with-chords.columns { column-count: 2; column-gap: 48px; } }
+/* duas colunas: só em telas largas (tablet deitado/computador); no celular o botão some */
+@media (min-width: 700px) { .song.lyrics-mode.columns { column-count: 2; column-gap: 48px; } .song.lyrics-mode.columns .section { break-inside: avoid; } }
+@media (max-width: 699px) { .song-toolbar [data-act="cols"] { display: none; } }
 .song.lyrics-mode .chunk { display: inline; white-space: pre-wrap; }
 .song.lyrics-mode .line { display: block; min-height: 0; }
 @media (min-width: 900px) { .song.lyrics-mode { border-radius: var(--radius); margin: 0; font-size: calc(32px * var(--font-scale)); padding: 36px 40px; } }
@@ -564,7 +566,7 @@ label.setting { cursor: pointer; }
   background: #fff; color: #000; padding: 10px 16px; border-radius: 8px; font-weight: 600; font-size: 14px; box-shadow: var(--shadow-lg); transition: 0.2s;
 }
 #toast.show { opacity: 1; transform: translateX(-50%); }
-#toast .ic { color: #1aa34a; }
+#toast .ic { color: var(--accent-ink); }
 @media (min-width: 900px) { #toast { bottom: 30px; } }
 
 dialog { border: 0; padding: 0; background: var(--surface); color: var(--text); width: calc(100% - 32px); max-width: 460px; border-radius: 12px; box-shadow: var(--shadow-lg); }
@@ -680,7 +682,7 @@ button, a.icon-btn, .chip, .swatch { -webkit-touch-callout: none; -webkit-user-s
   body.imprimindo > *:not(#print-area) { display: none !important; }
   body.imprimindo #print-area { display: block; }
 }
-.pdf { --pdf-cor: #0e6b47; --pdf-fs: 12.5pt; font-family: Figtree, system-ui, sans-serif; color: #111; font-size: var(--pdf-fs); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.pdf { --pdf-cor: #1f3a8a; --pdf-fs: 12.5pt; font-family: Figtree, system-ui, sans-serif; color: #111; font-size: var(--pdf-fs); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .pdf-pequena { --pdf-fs: 10.5pt; } .pdf-grande { --pdf-fs: 15pt; }
 .pdf-capa { break-after: page; }
 .pdf-capa .pdf-marca { font-size: 9pt; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--pdf-cor); }
@@ -720,3 +722,6 @@ button, a.icon-btn, .chip, .swatch { -webkit-touch-callout: none; -webkit-user-s
 .pdf-opcoes label.check { display: flex; gap: 10px; align-items: center; font-weight: 600; cursor: pointer; }
 .pdf-opcoes label.check input { width: 18px; height: 18px; accent-color: var(--accent); }
 .pdf-opcoes small { color: var(--muted); }
+.fonte-pref { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -4px 0 16px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.fonte-pref small { flex-basis: 100%; font-weight: 500; }
+.parte summary .n .cont { display: block; color: var(--subtle); font-size: 11.5px; font-weight: 600; margin-top: 1px; }

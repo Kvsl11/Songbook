@@ -62,14 +62,18 @@ export function icon(name, size = 20, extra = '') {
 
 // Logo do app: livro de cifras aberto com nota musical e cruz, na cor de destaque.
 export function logo(size = 32) {
+  // livro aberto com uma nota musical cuja haste forma uma cruz
   return `<svg class="logo" width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true">
-    <defs><linearGradient id="lg-a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--accent-2, #1fdf64)"/><stop offset="1" stop-color="var(--accent-deep, #0f8a3c)"/></linearGradient></defs>
-    <rect width="64" height="64" rx="16" fill="url(#lg-a)"/>
-    <path d="M12 20c6-3 13-3 19 1v27c-6-4-13-4-19-1z" fill="#fff" opacity=".95"/>
-    <path d="M52 20c-6-3-13-3-19 1v27c6-4 13-4 19-1z" fill="#fff" opacity=".8"/>
-    <path d="M42 26v13" stroke="var(--logo-ink, #0b2b17)" stroke-width="2.6" stroke-linecap="round"/>
-    <path d="M42 26l5 1.6" stroke="var(--logo-ink, #0b2b17)" stroke-width="2.6" stroke-linecap="round"/>
-    <circle cx="39.3" cy="39.6" r="3.2" fill="var(--logo-ink, #0b2b17)"/>
-    <path d="M21.5 26v13M17.5 30.5h8" stroke="var(--logo-ink, #0b2b17)" stroke-width="2.6" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="lg-a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f7be8"/><stop offset="1" stop-color="#1a2d6e"/></linearGradient>
+    <radialGradient id="lg-b" cx=".2" cy=".1" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".3"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="url(#lg-a)"/>
+  <rect width="64" height="64" rx="18" fill="url(#lg-b)"/>
+  <path d="M36.5 9.5v23" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M31.5 15.5h10" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>
+  <ellipse cx="31.4" cy="33" rx="5.9" ry="4.7" transform="rotate(-20 31.4 33)" fill="#fff"/>
+  <path d="M9.5 44.2c7.6-3.6 15.2-3.6 21.2.6v9.6c-6-4.2-13.6-4.2-21.2-.6z" fill="#fff"/>
+  <path d="M54.5 44.2c-7.6-3.6-15.2-3.6-21.2.6v9.6c6-4.2 13.6-4.2 21.2-.6z" fill="#fff" fill-opacity=".72"/>
   </svg>`;
 }

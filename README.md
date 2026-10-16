@@ -7,7 +7,7 @@ ofertório, comunhão etc.).
 
 ## Funcionalidades
 
-Visual escuro inspirado no Spotify, com capas, cabeçalhos em degradê e player embutido:
+Visual escuro moderno (cor padrão azul-marinho), com capas, cabeçalhos em degradê e player embutido:
 
 - **Início**: saudação, atalhos, a liturgia de hoje, seus repertórios, tocadas e adicionadas recentemente.
 - **Buscar**: seções da missa (Entrada, Salmos, Aclamação, Comunhão, Maria, Natal…) e busca online
@@ -40,7 +40,7 @@ Visual escuro inspirado no Spotify, com capas, cabeçalhos em degradê e player 
 - **Editor de cifra**: acordes na linha de cima da letra (como num caderno) ou entre [colchetes]; campos de título, autor, tom e vídeo; prévia ao vivo; acordes do tom para
   inserir com um toque; transposição permanente; conversão de "cifra sobre a letra". Cantos vindos da
   busca ou da liturgia também podem ser editados (são salvos na biblioteca antes).
-- **Personalização**: modo escuro, claro ou automático; 8 cores de destaque, cor livre ou a
+- **Personalização**: modo escuro, claro ou automático; cor padrão azul-marinho, outras 8 cores de destaque, cor livre ou a
   **cor litúrgica do dia**; menu lateral recolhível no computador.
 - Importa `.cho/.chopro/.pro/.txt` (inclusive "cifra sobre a letra"), exporta e faz backup. PWA instalável e offline.
 
@@ -54,7 +54,8 @@ Visual escuro inspirado no Spotify, com capas, cabeçalhos em degradê e player 
 | **Cifra Club** | outras versões de cifra | link de busca; a cifra copiada é colada no editor ("Organizar cifra colada") |
 
 As sugestões das fontes são misturadas em cada parte da missa (as do Músicas para Missa aparecem com a
-etiqueta **MpM**). Quando uma versão não tem cifra, o app procura a mesma música com acordes nas outras fontes.
+etiqueta **MpM**). Na Liturgia, "Sugestão principal em cada parte" escolhe qual fonte vem marcada primeiro
+(Cindy Ferrarezi ou Músicas para Missa); cada parte mostra quantas opções há de cada fonte. Quando uma versão não tem cifra, o app procura a mesma música com acordes nas outras fontes.
 
 ### Liturgia Diária (aba ✝)
 
