@@ -333,9 +333,9 @@ a.chip.sm { cursor: pointer; }
 .song.lyrics-mode .section.chorus { background: none; border: 0; padding: 0; color: #fff; }
 .song.lyrics-mode .section:not(.chorus) { color: rgb(255 255 255 / 0.62); }
 .song.lyrics-mode .section-label { color: rgb(255 255 255 / 0.55); font-size: 12px; letter-spacing: 0.14em; }
-/* modo Cifra no mesmo painel: acordes por cima da letra, em cor clara de destaque */
+/* modo Cifra no mesmo painel: acordes por cima da letra, num tom claro da própria cor do fundo */
 .song.lyrics-mode.with-chords { font-size: calc(19px * var(--font-scale)); line-height: 1.25; }
-.song.lyrics-mode.with-chords .chord { display: block; color: color-mix(in srgb, var(--accent) 55%, #fff); font-size: 0.78em; font-weight: 800; min-height: 1.2em; padding-right: 0.35em; }
+.song.lyrics-mode.with-chords .chord { display: block; color: color-mix(in srgb, var(--tint) 42%, #fff); font-size: 0.78em; font-weight: 800; min-height: 1.2em; padding-right: 0.35em; }
 .song.lyrics-mode.with-chords .line.chords-only { display: flex; }
 .song.lyrics-mode.with-chords .comment { display: block; color: rgb(255 255 255 / 0.6); font-weight: 600; font-size: 0.75em; }
 .song.lyrics-mode.with-chords .chunk { display: inline-flex; flex-direction: column; white-space: pre-wrap; max-width: 100%; }
