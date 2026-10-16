@@ -1,0 +1,17 @@
+{
+  "name": "songbook-liturgico",
+  "version": "0.1.0",
+  "description": "Songbook estilo SongbookPro com liturgia diária (CNBB) e cantos cifrados (Cindy Ferrarezi)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "node-html-parser": "^6.1.13"
+  }
+}

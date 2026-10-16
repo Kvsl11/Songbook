@@ -1,0 +1,14 @@
+{
+  "name": "Songbook Litúrgico",
+  "short_name": "Songbook",
+  "description": "Cifras, repertórios e liturgia diária para ministérios de música",
+  "start_url": "./#/",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f4ef",
+  "theme_color": "#1f2a44",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
