@@ -45,7 +45,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-14';
+export const APP_VERSAO = '2026.10.16-15';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -133,7 +133,23 @@ function setHeader(title, { back = null, actions = [], eyebrow = '' } = {}) {
 function setTab(name) {
   document.querySelectorAll('.nav a[data-tab]').forEach((a) => a.classList.toggle('active', a.dataset.tab === name));
 }
-const setTint = (cor) => document.documentElement.style.setProperty('--tint', cor);
+// --tint: cor de fundo da página; --tint-cifra: mesma cor, mais viva e clara, para os acordes
+function matizDe(cor) {
+  const h = /^hsl\(\s*([\d.]+)/.exec(cor);
+  if (h) return Number(h[1]);
+  const m = /^#?([\da-f]{6})$/i.exec(cor);
+  if (!m) return 140;
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), d = max - Math.min(r, g, b);
+  if (!d) return 140;
+  const x = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return Math.round(x * 60 + 360) % 360;
+}
+const setTint = (cor) => {
+  const st = document.documentElement.style;
+  st.setProperty('--tint', cor);
+  st.setProperty('--tint-cifra', `hsl(${matizDe(cor)} 90% 72%)`);
+};
 
 function download(name, text, type = 'text/plain') {
   const a = document.createElement('a');
@@ -770,11 +786,8 @@ function viewSong(id, ctx = {}) {
   const save = () => { if (!isPreview) db.updateSong(song.id, { transpose, capo }); };
 
   const back = ctx.set ? `#/repertorio/${ctx.set.id}` : isPreview ? (song.back || '#/liturgia') : '#/biblioteca';
-  setHeader(song.title, { back, eyebrow: ctx.set ? `${ctx.index + 1} de ${ctx.set.items.length} · ${ctx.set.name}` : '', actions: [
-    ...(isPreview ? [] : [{ icon: 'edit', label: 'Editar cifra', href: '#/editar/' + song.id }]),
-    ...(ctx.set ? [{ icon: 'queue', label: 'Fila do repertório', onClick: () => verFila() }] : []),
-    { icon: 'expand', label: 'Só a letra, tela cheia (Esc para sair)', onClick: () => entrarPalco() },
-  ] });
+  // editar, fila e tela cheia ficam só na barra de ações abaixo da capa (sem repetir no topo)
+  setHeader(song.title, { back, eyebrow: ctx.set ? `${ctx.index + 1} de ${ctx.set.items.length} · ${ctx.set.name}` : '' });
 
   const kind = ctx.label || (/^salmo/i.test(song.title) ? 'Salmo' : /aclama|aleluia/i.test(song.title) ? 'Aclamação' : 'Cifra');
   const fonte = song.source && /^https?:/.test(song.source) ? host(song.source) : song.source?.startsWith('cnbb:') ? 'Liturgia Diária – CNBB' : '';
