@@ -23,8 +23,8 @@ Visual escuro moderno (cor padrão azul-marinho), com capas, cabeçalhos em degr
   avançar/voltar por gesto, setas ou pedal (PageUp/PageDown).
 - **Só a letra (tela cheia)**: esconde tudo menos a letra, com controles flutuantes (A−/A+, cifra/letra,
   fila, anterior/próxima); continua em tela cheia ao passar de música no repertório.
-- **Fila**: na música do repertório, mostra as próximas; arraste para reordenar, remova, edite ou pule.
-  A página do repertório também reordena arrastando.
+- **Fila**: na música do repertório, mostra as próximas; segure uma música e arraste para reordenar, remova, edite ou pule.
+  A página do repertório também reordena assim (no computador, clique e arraste a linha).
 - **Cifra completa**: quando a cifra original só tem acordes na 1ª estrofe, a mesma sequência é repetida
   nas demais (com aviso para conferir ouvindo o vídeo); botão "Completar cifra" na música e no editor.
   Músicas sem nenhum acorde mostram só a opção Letra.

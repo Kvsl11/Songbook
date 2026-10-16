@@ -39,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-24';
+export const APP_VERSAO = '2026.10.16-25';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -80,7 +80,7 @@ document.addEventListener('pointerout', (e) => { if (e.pointerType === 'mouse' &
 document.addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'mouse') { esconderDica(); return; }
   const el = e.target.closest(ALVO_DICA);
-  if (!el || el.closest('[data-drag]')) return;
+  if (!el || (el.closest('.set-item') && !el.closest('.acts'))) return; // segurar a linha da música é para arrastar
   dicaDeToque = false;
   clearTimeout(dicaTimer);
   dicaTimer = setTimeout(() => { dicaDeToque = true; mostrarDica(el); }, 480);
@@ -551,44 +551,98 @@ async function addToSetDialog(songId, label = '') {
 
 // ------------------------------------------------------------ arrastar e soltar
 
-// Reordena itens de uma lista arrastando pela alça [data-drag] (mouse e toque).
+// Reordena itens de uma lista arrastando a própria linha (mouse e toque).
+// Toque: segure a linha ~0,35 s e arraste (um toque rápido continua abrindo a música; deslizar rola a tela).
+// Mouse: clique e arraste. Botões da linha (editar, remover) não iniciam o arraste.
 function ativarArrastar(lista, aoSoltar) {
-  lista.addEventListener('pointerdown', (e) => {
-    const alca = e.target.closest('[data-drag]');
-    if (!alca || !lista.contains(alca)) return;
-    const item = alca.closest('li');
-    e.preventDefault();
-    const itens = () => [...lista.children].filter((x) => x.matches('li'));
+  let ignorarClique = false;
+  const itens = () => [...lista.children].filter((x) => x.matches('li'));
+  const rolador = () => lista.closest('main, dialog .tracks, .dlg .tracks') || view;
+  const linhaDe = (alvo) => {
+    const item = alvo.closest('li');
+    if (!item || !lista.contains(item) || alvo.closest('[data-rm], [data-editar], [data-play], input, select')) return null;
+    return item;
+  };
+  lista.addEventListener('contextmenu', (e) => { if (e.target.closest('li')) e.preventDefault(); });
+  lista.addEventListener('click', (e) => { if (ignorarClique) { e.preventDefault(); e.stopPropagation(); ignorarClique = false; } }, true);
+  lista.addEventListener('dragstart', (e) => e.preventDefault()); // sem o "arrastar link" nativo
+
+  // sessão de arraste de um item: começa, acompanha o Y e termina
+  function sessao(item) {
     const inicio = itens().indexOf(item);
-    const rolador = lista.closest('main, dialog .tracks, .dlg .tracks') || view;
+    let ultimoY = 0;
     item.classList.add('arrastando');
-    let raf = null;
-    let ultimoY = e.clientY;
-    const rolar = () => {
-      const r = rolador.getBoundingClientRect();
-      if (ultimoY < r.top + 60) rolador.scrollTop -= 10;
-      else if (ultimoY > r.bottom - 60) rolador.scrollTop += 10;
+    lista.classList.add('reordenando');
+    navigator.vibrate?.(15);
+    const r = rolador();
+    let raf = requestAnimationFrame(function rolar() {
+      const b = r.getBoundingClientRect();
+      if (ultimoY && ultimoY < b.top + 60) r.scrollTop -= 10;
+      else if (ultimoY > b.bottom - 60) r.scrollTop += 10;
       raf = requestAnimationFrame(rolar);
+    });
+    return {
+      mover(y) {
+        ultimoY = y;
+        const alvo = itens().find((x) => x !== item && y < x.getBoundingClientRect().top + x.getBoundingClientRect().height / 2);
+        if (alvo) { if (alvo !== item.nextElementSibling) lista.insertBefore(item, alvo); } else if (item !== lista.lastElementChild) lista.appendChild(item);
+      },
+      fim() {
+        cancelAnimationFrame(raf);
+        item.classList.remove('arrastando');
+        lista.classList.remove('reordenando');
+        ignorarClique = true;
+        setTimeout(() => { ignorarClique = false; }, 400);
+        const final = itens().indexOf(item);
+        if (final !== inicio) aoSoltar(inicio, final);
+      },
     };
-    raf = requestAnimationFrame(rolar);
+  }
+
+  // toque: eventos de toque (continuam mesmo quando o navegador cancela os de ponteiro)
+  let toque = null; // { item, x0, y0, timer, s }
+  lista.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 1) return;
+    const item = linhaDe(e.target);
+    if (!item) return;
+    const t = e.touches[0];
+    toque = { item, x0: t.clientX, y0: t.clientY, s: null };
+    toque.timer = setTimeout(() => { if (toque) toque.s = sessao(item); }, 350);
+  }, { passive: false });
+  lista.addEventListener('touchmove', (e) => {
+    if (!toque) return;
+    const t = e.touches[0];
+    if (toque.s) { if (e.cancelable) e.preventDefault(); toque.s.mover(t.clientY); return; }
+    if (Math.hypot(t.clientX - toque.x0, t.clientY - toque.y0) > 10) { clearTimeout(toque.timer); toque = null; } // é rolagem
+  }, { passive: false });
+  const fimToque = (e) => {
+    if (!toque) return;
+    clearTimeout(toque.timer);
+    if (toque.s) { if (e.cancelable) e.preventDefault(); toque.s.fim(); }
+    toque = null;
+  };
+  lista.addEventListener('touchend', fimToque, { passive: false });
+  lista.addEventListener('touchcancel', fimToque);
+
+  // mouse: clique e arraste
+  lista.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || e.button > 0) return;
+    const item = linhaDe(e.target);
+    if (!item) return;
+    const x0 = e.clientX, y0 = e.clientY;
+    let s = null;
     const mover = (ev) => {
-      ultimoY = ev.clientY;
-      const alvo = itens().find((x) => x !== item && ev.clientY < x.getBoundingClientRect().top + x.getBoundingClientRect().height / 2);
-      if (alvo) { if (alvo !== item.nextElementSibling) lista.insertBefore(item, alvo); } else if (item !== lista.lastElementChild) lista.appendChild(item);
+      if (!s) { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return; s = sessao(item); }
+      s.mover(ev.clientY);
     };
-    const soltar = () => {
-      cancelAnimationFrame(raf);
-      item.classList.remove('arrastando');
+    const fim = () => {
       window.removeEventListener('pointermove', mover);
-      window.removeEventListener('pointerup', soltar);
-      window.removeEventListener('pointercancel', soltar);
-      const fim = itens().indexOf(item);
-      if (fim !== inicio) aoSoltar(inicio, fim);
+      window.removeEventListener('pointerup', fim);
+      s?.fim();
     };
     // escuta na janela: mover o item no DOM faz o navegador soltar a captura do ponteiro
     window.addEventListener('pointermove', mover);
-    window.addEventListener('pointerup', soltar);
-    window.addEventListener('pointercancel', soltar);
+    window.addEventListener('pointerup', fim);
   });
 }
 
@@ -598,7 +652,7 @@ const mover = (arr, de, para) => { const [x] = arr.splice(de, 1); arr.splice(par
 function linhaItemRepertorio(set, it, i, { atual = -1, fila = false } = {}) {
   const s = db.song(it.songId);
   return `<li class="track set-item ${i === atual ? 'atual' : ''}" data-i="${i}">
-    <span class="lead"><button class="icon-btn drag" data-drag aria-label="Arrastar para reordenar" title="Arrastar">${icon('grip', 18)}</button>${capa(s || {})}</span>
+    <span class="lead">${capa(s || {})}</span>
     <a class="info" href="#/repertorio/${set.id}/${i}" ${fila ? 'data-ir' : ''}><div class="t ${i === atual ? 'playing' : ''}">${i === atual ? icon('music', 13, 'style="display:inline;vertical-align:-1px;margin-right:4px"') : ''}${esc(s?.title || '(música removida)')}</div>
       <div class="s">${esc(it.label || s?.artist || '')}${s?.youtube ? ` ${icon('youtube', 13)}` : ''}</div></a>
     ${s?.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '<span></span>'}
@@ -1511,7 +1565,7 @@ function viewSet(id) {
       <button class="icon-btn danger" id="del" aria-label="Excluir repertório" title="Excluir">${icon('trash', 22)}</button>
       <div class="seg-tabs" style="min-width:190px">${campoData('set-date', set.date, 'Data do repertório')}</div>
     </div>
-    ${set.items.length ? `<p class="muted" style="font-size:13px;margin:0 0 4px">Arraste pela alça ${icon('grip', 13, 'style="display:inline;vertical-align:-2px"')} para mudar a ordem.</p>
+    ${set.items.length ? `<p class="muted" style="font-size:13px;margin:0 0 4px">Para mudar a ordem, segure uma música e arraste (no computador, clique e arraste).</p>
     <ul class="tracks">${set.items.map((it, i) => linhaItemRepertorio(set, it, i)).join('')}</ul>` : `<div class="empty"><div class="bubble">${icon('music', 30)}</div><h3>Repertório vazio</h3><p>Adicione músicas da sua biblioteca ou crie uma do zero.</p>
       <div class="row"><a class="btn primary" href="#/editar/novo/${id}">${icon('edit', 16)} Criar música</a></div></div>`}`;
   ligarCampoData('set-date', (v) => { set.date = v; db.saveSet(set); });
