@@ -45,7 +45,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-13';
+export const APP_VERSAO = '2026.10.16-14';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -318,9 +318,11 @@ const linhaMusica = (s, extra = '') => `
   <li class="track clickable" data-id="${s.id}" style="grid-template-columns:auto 1fr auto">
     ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
 
+// Escolhe uma música da biblioteca; devolve o id, ou 'nova' para criar uma do zero
 function pickSong() {
   return openDialog(`
     <h3>Adicionar música</h3>
+    <button class="btn primary" data-nova style="justify-self:start">${icon('edit', 16)} Criar música do zero</button>
     <label class="field">${icon('search', 18)}<input class="search" type="search" placeholder="Buscar na biblioteca"></label>
     <ul class="tracks"></ul>
     <div class="acts"><button class="btn ghost" data-no>Fechar</button></div>`,
@@ -335,6 +337,7 @@ function pickSong() {
     $('input', dlg).oninput = (e) => draw(e.target.value);
     list.onclick = (e) => { const li = e.target.closest('li[data-id]'); if (li) done(li.dataset.id); };
     $('[data-no]', dlg).onclick = () => done(null);
+    $('[data-nova]', dlg).onclick = () => done('nova');
   });
 }
 
@@ -544,7 +547,7 @@ function viewHome() {
       <div class="shelf">${novas.map(tileMusica).join('')}</div>` : `
       <div class="empty"><div class="bubble">${icon('music', 34)}</div><h3>Comece sua biblioteca</h3>
         <p>Monte o repertório da missa de hoje com as cifras da Cindy Ferrarezi, busque cantos ou importe arquivos ChordPro.</p>
-        <div class="row"><a class="btn primary" href="#/liturgia">Missa de hoje</a><a class="btn" href="#/buscar">Buscar cantos</a></div></div>`}`;
+        <div class="row"><a class="btn primary" href="#/editar/novo">Criar música</a><a class="btn" href="#/liturgia">Missa de hoje</a><a class="btn" href="#/buscar">Buscar cantos</a></div></div>`}`;
   ligarTiles(view);
 
   getMissa(hoje).then((m) => {
@@ -686,15 +689,17 @@ async function viewCategoria(id, nome) {
 function viewLibrary(filtro = 'musicas') {
   setTab('biblioteca');
   setTint('#2b3d4f');
-  setHeader('Sua biblioteca', { actions: [{ icon: 'upload', label: 'Importar arquivos', onClick: openImport }] });
+  setHeader('Sua biblioteca', { actions: [{ icon: 'edit', label: 'Criar música do zero', href: '#/editar/novo' }, { icon: 'upload', label: 'Importar arquivos', onClick: openImport }] });
   const FILTROS = [['musicas', 'Músicas'], ['repertorios', 'Repertórios'], ['video', 'Com vídeo'], ['proprias', 'Cifras próprias']];
   view.innerHTML = `
     <h2 class="greet">Sua biblioteca</h2>
     <div class="chips">${FILTROS.map(([k, n]) => `<a class="chip" href="#/biblioteca/${k}" aria-pressed="${k === filtro}">${n}</a>`).join('')}</div>
+    <div class="actions-row" style="margin:4px 0 14px"><a class="btn small primary" href="#/editar/novo" title="Escrever título, estrutura, letra e cifra">${icon('edit', 15)} Criar música do zero</a><button class="btn small" id="lib-novo-rep">${icon('plus', 15)} Novo repertório</button></div>
     <div id="lib"></div>
     <button class="fab" aria-label="${filtro === 'repertorios' ? 'Novo repertório' : 'Nova música'}">${icon('plus', 24)}<span>${filtro === 'repertorios' ? 'Novo repertório' : 'Nova música'}</span></button>`;
   const lib = $('#lib');
   $('.fab').onclick = () => (filtro === 'repertorios' ? novoRepertorio() : (location.hash = '#/editar/novo'));
+  $('#lib-novo-rep').onclick = novoRepertorio;
   if (filtro === 'repertorios') {
     const sets = db.sets();
     lib.innerHTML = sets.length ? `<ul class="tracks">${sets.map((s) => `
@@ -702,7 +707,7 @@ function viewLibrary(filtro = 'musicas') {
         <a class="info" href="#/repertorio/${s.id}"><div class="t">${esc(s.name)}</div><div class="s">Repertório · ${fmtData(s.date)} · ${s.items.length} músicas</div></a>
         <span class="acts">${s.items.length ? `<a class="icon-btn" href="#/repertorio/${s.id}/0" aria-label="Tocar">${icon('play', 16)}</a>` : ''}</span></li>`).join('')}</ul>`
       : `<div class="empty"><div class="bubble">${icon('list', 32)}</div><h3>Crie seu primeiro repertório</h3><p>Monte o da missa de hoje automaticamente ou crie uma lista do zero.</p>
-        <div class="row"><a class="btn primary" href="#/liturgia">Missa de hoje</a></div></div>`;
+        <div class="row"><a class="btn primary" href="#/editar/novo">Criar música</a><a class="btn" href="#/liturgia">Missa de hoje</a></div></div>`;
     lib.onclick = (e) => { const li = e.target.closest('li[data-href]'); if (li && !e.target.closest('a')) location.hash = li.dataset.href; };
     return;
   }
@@ -712,7 +717,7 @@ function viewLibrary(filtro = 'musicas') {
   lib.innerHTML = songs.length ? `<ul class="tracks">${songs.map((s) => linhaMusica(s, `<span class="acts">${s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : ''}${s.youtube ? `<button class="icon-btn" data-play="${s.id}" aria-label="Tocar referência">${icon('play', 16)}</button>` : ''}</span>`)).join('')}</ul>`
     : `<div class="empty"><div class="bubble">${icon('music', 32)}</div><h3>${db.songs().length ? 'Nada nesta lista' : 'Sua biblioteca está vazia'}</h3>
       <p>Busque cantos, monte a missa do dia ou importe arquivos ChordPro.</p>
-      <div class="row"><a class="btn primary" href="#/liturgia">Missa de hoje</a><a class="btn" href="#/buscar">Buscar</a><button class="btn" id="imp">Importar</button></div></div>`;
+      <div class="row"><a class="btn primary" href="#/editar/novo">Criar música</a><a class="btn" href="#/liturgia">Missa de hoje</a><a class="btn" href="#/buscar">Buscar</a><button class="btn" id="imp">Importar</button></div></div>`;
   $('#imp')?.addEventListener('click', openImport);
   lib.onclick = (e) => {
     const p = e.target.closest('[data-play]');
@@ -902,6 +907,7 @@ function viewSong(id, ctx = {}) {
     if (r.editar) { sairPalco(); location.hash = '#/editar/' + r.editar; return; }
     if (r.adicionar) {
       const songId = await pickSong();
+      if (songId === 'nova') { sairPalco(); location.hash = '#/editar/novo/' + set.id; return; }
       if (songId) { set.items.push({ songId, label: '' }); db.saveSet(set); toast('Adicionada ao fim da fila'); }
       viewSetSong(set.id, set.items[r.atual]?.songId === song.id ? r.atual : ctx.index);
       $('#btn-fila')?.click();
@@ -1056,13 +1062,22 @@ document.addEventListener('fullscreenchange', () => { if (!document.fullscreenEl
 
 // ------------------------------------------------------------- editor
 
-const TEMPLATE_CORPO = `{start_of_verse: Estrofe 1}
-[C]Escreva a letra com os [G]acordes entre [Am]colchetes
+// estrutura inicial de uma música nova (o usuário troca pelo próprio texto)
+const TEMPLATE_CORPO = `{start_of_chorus: Refrão}
+[C]Escreva aqui o re[G]frão
+{end_of_chorus}
+
+{start_of_verse: Estrofe 1}
+[C]Primeira estrofe, com os a[Am]cordes
 {end_of_verse}
 
-{start_of_chorus}
-[F]Refrão aqui [G]
-{end_of_chorus}
+{chorus}
+
+{start_of_verse: Estrofe 2}
+Segunda estrofe (use "Completar cifra" para repetir os acordes)
+{end_of_verse}
+
+{chorus}
 `;
 
 // diretivas que viram campos do formulário do editor
@@ -1105,9 +1120,10 @@ function acordesDoTom(tom) {
   return [grau(0, ''), grau(2, 'm'), grau(4, 'm'), grau(5, ''), grau(7, ''), grau(9, 'm'), grau(7, '7')];
 }
 
-function viewEditor(id) {
+function viewEditor(id, setId) {
   setTab('biblioteca');
   const isNew = id === 'novo';
+  const setDestino = isNew && setId ? db.set(setId) : null; // música nova já vai para este repertório
   const song = isNew ? { content: `{title: }\n\n${TEMPLATE_CORPO}` } : db.song(id);
   if (!song) return viewNotFound();
   setTint(corDaMusica(song.title || 'nova'));
@@ -1123,8 +1139,8 @@ function viewEditor(id) {
       location.hash = '#/biblioteca';
     } });
   }
-  const voltar = isNew ? '#/biblioteca' : '#/musica/' + id;
-  setHeader(isNew ? 'Nova música' : 'Editar cifra', { back: voltar, actions, eyebrow: isNew ? '' : song.title });
+  const voltar = setDestino ? '#/repertorio/' + setDestino.id : isNew ? '#/biblioteca' : '#/musica/' + id;
+  setHeader(isNew ? 'Nova música' : 'Editar cifra', { back: voltar, actions, eyebrow: setDestino ? 'Para: ' + setDestino.name : isNew ? '' : song.title });
   view.innerHTML = `
     <h2 class="greet">${isNew ? 'Nova música' : 'Editar cifra'}</h2>
     <div class="editor">
@@ -1133,11 +1149,14 @@ function viewEditor(id) {
         <label>Autor / intérprete<input class="input" id="f-artist" value="${esc(meta.artist)}" placeholder="Ex.: Pe. Zezinho"></label>
         <label>Tom<input class="input" id="f-key" value="${esc(meta.key)}" placeholder="Ex.: G, Em, Bb"></label>
         <label>Vídeo de referência (YouTube)<input class="input" id="f-yt" value="${esc(meta.youtube)}" placeholder="https://www.youtube.com/watch?v=…"></label>
+        ${setDestino ? `<label class="full">Parte da missa no repertório “${esc(setDestino.name)}”<select class="input" id="f-parte">
+          <option value="">(sem parte)</option>${PARTES_MISSA.map((n) => `<option>${esc(n)}</option>`).join('')}</select></label>` : ''}
       </div>
       <div class="barra">
         <div class="seg" title="Transpor a cifra inteira (altera o texto)"><button data-tr="-1" aria-label="Meio tom abaixo">${icon('minus', 16)}</button><span class="val"><small>Transpor</small>cifra</span><button data-tr="1" aria-label="Meio tom acima">${icon('plus', 16)}</button></div>
         <button class="chip" data-ins="{start_of_chorus}\\n\\n{end_of_chorus}">${icon('plus', 14)} Refrão</button>
         <button class="chip" data-ins="{start_of_verse: }\\n\\n{end_of_verse}">${icon('plus', 14)} Estrofe</button>
+        <button class="chip" data-ins="{start_of_bridge: Ponte}\\n\\n{end_of_bridge}">${icon('plus', 14)} Ponte</button>
         <button class="chip" data-ins="{chorus}">Repetir refrão</button>
         <button class="chip" data-ins="{comment: }">Comentário</button>
         <button class="chip" id="completar" title="Repete a sequência de acordes da estrofe cifrada nas estrofes que estão sem acordes">${icon('sparkles', 14)} Completar cifra</button>
@@ -1215,10 +1234,20 @@ function viewEditor(id) {
   $('#save').onclick = () => {
     if (!campo('title').value.trim()) { toast('Dê um título à música'); campo('title').focus(); return; }
     const saved = db.saveSong({ ...song, content: montar() });
-    toast('Música salva');
+    if (setDestino) {
+      setDestino.items.push({ songId: saved.id, label: $('#f-parte')?.value || '' });
+      db.saveSet(setDestino);
+      desenharLateral();
+      toast(`Música criada e adicionada a “${setDestino.name}”`);
+      location.hash = '#/repertorio/' + setDestino.id;
+      return;
+    }
+    toast(isNew ? 'Música criada' : 'Música salva');
     location.hash = '#/musica/' + saved.id;
   };
 }
+
+const PARTES_MISSA = ['Entrada', 'Ato Penitencial', 'Glória', 'Salmo Responsorial', 'Aclamação ao Evangelho', 'Apresentação das Oferendas', 'Santo', 'Cordeiro de Deus', 'Comunhão', 'Ação de Graças', 'Canto Final', 'Outro'];
 
 // ------------------------------------------------------------- repertórios
 
@@ -1242,17 +1271,20 @@ function viewSet(id) {
         <div class="meta"><b>${dataPorExtenso(set.date)}</b><span>· ${set.items.length} música(s)</span></div></div></section>
     <div class="actions-row">
       ${set.items.length ? `<a class="play-big" href="#/repertorio/${id}/0" aria-label="Tocar repertório" title="Tocar">${icon('play', 24)}</a>` : ''}
-      <button class="icon-btn" id="add" aria-label="Adicionar música" title="Adicionar música">${icon('plus', 24)}</button>
+      <button class="icon-btn" id="add" aria-label="Adicionar música da biblioteca" title="Adicionar música da biblioteca">${icon('plus', 24)}</button>
+      <a class="btn small" href="#/editar/novo/${id}" title="Escrever uma música nova (letra, cifra, estrutura) e já colocar neste repertório">${icon('edit', 15)} Criar música</a>
       <button class="icon-btn" id="ren" aria-label="Renomear" title="Renomear">${icon('edit', 22)}</button>
       <button class="icon-btn" id="exp" aria-label="Exportar" title="Exportar repertório">${icon('download', 22)}</button>
       <button class="icon-btn danger" id="del" aria-label="Excluir repertório" title="Excluir">${icon('trash', 22)}</button>
       <div class="seg-tabs" style="min-width:190px">${campoData('set-date', set.date, 'Data do repertório')}</div>
     </div>
     ${set.items.length ? `<p class="muted" style="font-size:13px;margin:0 0 4px">Arraste pela alça ${icon('grip', 13, 'style="display:inline;vertical-align:-2px"')} para mudar a ordem.</p>
-    <ul class="tracks">${set.items.map((it, i) => linhaItemRepertorio(set, it, i)).join('')}</ul>` : `<div class="empty"><div class="bubble">${icon('music', 30)}</div><h3>Repertório vazio</h3><p>Adicione músicas da sua biblioteca.</p></div>`}`;
+    <ul class="tracks">${set.items.map((it, i) => linhaItemRepertorio(set, it, i)).join('')}</ul>` : `<div class="empty"><div class="bubble">${icon('music', 30)}</div><h3>Repertório vazio</h3><p>Adicione músicas da sua biblioteca ou crie uma do zero.</p>
+      <div class="row"><a class="btn primary" href="#/editar/novo/${id}">${icon('edit', 16)} Criar música</a></div></div>`}`;
   ligarCampoData('set-date', (v) => { set.date = v; db.saveSet(set); });
   $('#add').onclick = async () => {
     const songId = await pickSong();
+    if (songId === 'nova') { location.hash = '#/editar/novo/' + id; return; }
     if (!songId) return;
     set.items.push({ songId, label: '' });
     db.saveSet(set);
@@ -1638,7 +1670,7 @@ function route() {
     case 'biblioteca': return viewLibrary(b);
     case 'repertorios': return viewLibrary('repertorios');
     case 'musica': return viewSong(b, { tocar: c === 'tocar' });
-    case 'editar': return viewEditor(b);
+    case 'editar': return viewEditor(b, c);
     case 'repertorio': return c !== undefined ? viewSetSong(b, Number(c)) : viewSet(b);
     case 'liturgia': return viewLiturgia(b);
     case 'ajustes': return viewSettings();

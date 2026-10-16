@@ -30,6 +30,9 @@ Visual escuro inspirado no Spotify, com capas, cabeçalhos em degradê e player 
   Músicas sem nenhum acorde mostram só a opção Letra.
 - **Dicas**: passar o mouse ou segurar o dedo num botão mostra o nome da função.
 - **Atualização automática**: o app busca sempre a versão mais nova e recarrega sozinho; a versão aparece em Ajustes.
+- **Criar música do zero**: botão "Criar música do zero" na Biblioteca e "Criar música" no repertório (e na fila / em "Adicionar").
+  O editor já abre com um modelo (refrão, estrofes, ponte) para preencher título, autor, tom, vídeo, letra e cifra;
+  criando a partir de um repertório, você escolhe a parte da missa e a música entra direto nele.
 - **Editor de cifra**: acordes na linha de cima da letra (como num caderno) ou entre [colchetes]; campos de título, autor, tom e vídeo; prévia ao vivo; acordes do tom para
   inserir com um toque; transposição permanente; conversão de "cifra sobre a letra". Cantos vindos da
   busca ou da liturgia também podem ser editados (são salvos na biblioteca antes).
