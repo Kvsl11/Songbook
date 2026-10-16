@@ -3,7 +3,6 @@ import { esc, renderSong } from './render.js';
 import { chordsOverLyricsToChordPro, toChordPro, transposeChordPro, transposeKey, transposeChord } from './chordpro.js';
 import { icon, logo } from './icons.js';
 import { buscarCindy, getCanto, getMissa } from './fonte.js';
-import * as player from './player.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const view = $('#view');
@@ -126,7 +125,7 @@ const ytBusca = (t) => `https://www.youtube.com/results?search_query=${encodeURI
 // capa de uma música/canto: imagem da Cindy, miniatura do YouTube ou capa gerada
 function capa(item = {}, { ic = 'music', cls = '' } = {}) {
   const titulo = item.title || item.titulo || '';
-  const src = item.cover || item.capa || (item.youtube ? player.thumb(item.youtube) : '');
+  const src = item.cover || item.capa || (item.youtube ? `https://i.ytimg.com/vi/${item.youtube}/mqdefault.jpg` : '');
   if (src) return `<div class="cover ${cls}"><img src="${esc(src)}" alt="${esc(titulo)}" loading="lazy"></div>`;
   return `<div class="cover gen ${cls}" style="--h:${hue(titulo)}">${icon(ic, 24)}</div>`;
 }
@@ -203,9 +202,17 @@ function lembrarCorLiturgica(data, cor) {
   if (db.prefs().accent === 'liturgico') applyTheme();
 }
 
-function tocarReferencia(song, href) {
+// abre a música já tocando o vídeo de referência na seção "Referências"
+function tocarReferencia(song) {
   if (!song.youtube) { window.open(ytBusca(`${song.title} ${song.artist || ''}`), '_blank', 'noopener'); return; }
-  player.tocar({ id: song.youtube, titulo: song.title, subtitulo: song.artist || 'Referência no YouTube', capa: song.cover || null, href });
+  location.hash = `#/musica/${song.id}/tocar`;
+}
+
+// endereço do player do YouTube embutido (enablejsapi permite pausar/tocar pelo botão verde)
+function ytEmbed(id) {
+  const p = new URLSearchParams({ autoplay: '1', playsinline: '1', enablejsapi: '1', rel: '0', modestbranding: '1' });
+  if (/^https?:/.test(location.origin)) p.set('origin', location.origin);
+  return `https://www.youtube.com/embed/${encodeURIComponent(id)}?${p}`;
 }
 
 // barra lateral (desktop): repertórios
@@ -342,7 +349,7 @@ function ligarTiles(box) {
     if (!b) return;
     e.preventDefault();
     if (b.dataset.href) location.hash = b.dataset.href;
-    else { const s = db.song(b.dataset.play); if (s) tocarReferencia(s, '#/musica/' + s.id); }
+    else { const s = db.song(b.dataset.play); if (s) tocarReferencia(s); }
   });
 }
 
@@ -537,7 +544,7 @@ function viewLibrary(filtro = 'musicas') {
   $('#imp')?.addEventListener('click', openImport);
   lib.onclick = (e) => {
     const p = e.target.closest('[data-play]');
-    if (p) { const s = db.song(p.dataset.play); tocarReferencia(s, '#/musica/' + s.id); return; }
+    if (p) { const s = db.song(p.dataset.play); if (s) tocarReferencia(s); return; }
     const li = e.target.closest('li[data-id]');
     if (li) location.hash = '#/musica/' + li.dataset.id;
   };
@@ -567,7 +574,6 @@ function viewSong(id, ctx = {}) {
   let showChords = prefs.showChords;
   let modo = prefs.modo === 'letra' ? 'letra' : 'cifra';
   const save = () => { if (!isPreview) db.updateSong(song.id, { transpose, capo }); };
-  const aqui = location.hash;
 
   const back = ctx.set ? `#/repertorio/${ctx.set.id}` : isPreview ? (song.back || '#/liturgia') : '#/biblioteca';
   setHeader(song.title, { back, eyebrow: ctx.set ? `${ctx.index + 1} de ${ctx.set.items.length} · ${ctx.set.name}` : '', actions: [
@@ -625,8 +631,8 @@ function viewSong(id, ctx = {}) {
   // referências: vídeo, fonte, partitura, outras versões
   const refs = [];
   if (song.youtube) {
-    refs.push(`<button class="video-card" id="video-ref"><img src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt="" loading="lazy">
-      <span class="vplay"><span>${icon('play', 26)}</span></span><span class="vtitle">${esc(song.title)}<small>Ouvir a referência no player</small></span></button>`);
+    refs.push(`<div class="video-ref" id="video-box"><button class="video-card" id="video-ref" aria-label="Tocar o vídeo de referência"><img src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt="" loading="lazy">
+      <span class="vplay"><span>${icon('play', 26)}</span></span><span class="vtitle">${esc(song.title)}<small>Toque para assistir aqui</small></span></button></div>`);
   }
   const cards = [];
   if (song.source && /^https?:/.test(song.source)) cards.push(`<a class="ref-card" href="${esc(song.source)}" target="_blank" rel="noopener">${song.cover ? capa(song) : `<span class="ico">${icon('link', 22)}</span>`}<span><b>Cifra original</b><small>${esc(host(song.source))}</small></span></a>`);
@@ -636,17 +642,43 @@ function viewSong(id, ctx = {}) {
   cards.push(`<a class="ref-card" href="${esc(ytBusca(song.title))}" target="_blank" rel="noopener"><span class="ico">${icon('search', 22)}</span><span><b>Outras versões</b><small>Buscar no YouTube</small></span></a>`);
   $('#refs').innerHTML = refs.join('') + `<div class="refs-grid">${cards.join('')}</div>`;
 
-  const play = () => tocarReferencia(song, aqui);
-  $('#btn-play').onclick = play;
-  $('#video-ref')?.addEventListener('click', play);
-  const sync = () => {
-    const b = $('#btn-play');
-    if (!b || !song.youtube) return;
-    const st = player.estado();
-    b.innerHTML = icon(st.id === song.youtube && st.tocando ? 'pause' : 'play', 24);
+  // vídeo de referência: toca embutido aqui mesmo, na seção "Referências"
+  let estadoVideo = 'parado'; // parado | tocando | pausado
+  const iconePlay = () => { const b = $('#btn-play'); if (b && song.youtube) b.innerHTML = icon(estadoVideo === 'tocando' ? 'pause' : 'play', 24); };
+  const comandoVideo = (func) => $('#video-box iframe')?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*');
+  const iniciarVideo = (rolar = true) => {
+    const box = $('#video-box');
+    if (!box) return;
+    box.innerHTML = `<div class="video-embed"><iframe src="${ytEmbed(song.youtube)}" title="${esc(song.title)}"
+      allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
+      <p class="video-alt">Se o vídeo não abrir aqui, <a href="https://www.youtube.com/watch?v=${esc(song.youtube)}" target="_blank" rel="noopener">assista no YouTube ${icon('external', 13)}</a></p>`;
+    const f = box.querySelector('iframe');
+    f.addEventListener('load', () => f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'));
+    estadoVideo = 'tocando';
+    iconePlay();
+    if (rolar) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
-  sync();
-  aoSair(player.aoMudar(sync));
+  const ouvirVideo = (e) => {
+    let host = '';
+    try { host = new URL(e.origin).hostname; } catch { return; }
+    if (!/(^|\.)youtube(-nocookie)?\.com$/.test(host)) return;
+    try {
+      const st = (typeof e.data === 'string' ? JSON.parse(e.data) : e.data)?.info?.playerState;
+      if (st === 1) estadoVideo = 'tocando'; else if (st === 2 || st === 0) estadoVideo = 'pausado'; else return;
+      iconePlay();
+    } catch { /* mensagem de outro formato */ }
+  };
+  window.addEventListener('message', ouvirVideo);
+  aoSair(() => window.removeEventListener('message', ouvirVideo));
+
+  $('#btn-play').onclick = () => {
+    if (!song.youtube) { tocarReferencia(song); return; }
+    if (estadoVideo === 'parado') iniciarVideo();
+    else if (estadoVideo === 'tocando') { comandoVideo('pauseVideo'); estadoVideo = 'pausado'; iconePlay(); }
+    else { comandoVideo('playVideo'); estadoVideo = 'tocando'; iconePlay(); }
+  };
+  $('#video-ref')?.addEventListener('click', () => iniciarVideo(false));
+  if (ctx.tocar && song.youtube) setTimeout(() => iniciarVideo(), 60);
 
   const salvarPrevia = () => {
     const existing = db.songBySource(song.source);
@@ -1271,7 +1303,6 @@ function route() {
   limpezas.forEach((fn) => fn());
   limpezas = [];
   document.body.classList.remove('performance');
-  if (window.innerWidth < 900) player.recolherVideo();
   const [a, b, c, d] = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   view.scrollTop = 0;
   topbar.classList.remove('scrolled');
@@ -1281,7 +1312,7 @@ function route() {
     case 'buscar': return b === 'categoria' ? viewCategoria(c, d || 'Seção') : viewSearch();
     case 'biblioteca': return viewLibrary(b);
     case 'repertorios': return viewLibrary('repertorios');
-    case 'musica': return viewSong(b);
+    case 'musica': return viewSong(b, { tocar: c === 'tocar' });
     case 'editar': return viewEditor(b);
     case 'repertorio': return c !== undefined ? viewSetSong(b, Number(c)) : viewSet(b);
     case 'liturgia': return viewLiturgia(b);

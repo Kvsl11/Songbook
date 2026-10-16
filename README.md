@@ -17,8 +17,8 @@ Visual escuro inspirado no Spotify, com capas, cabeçalhos em degradê e player 
   (letra grande, estilo Spotify), transposição, capotraste, rolagem automática, tamanho da letra,
   duas colunas, modo apresentação e cartões de referência (vídeo, cifra original, partitura em PDF,
   outras versões no YouTube).
-- **Player persistente**: o vídeo de referência continua tocando enquanto você navega
-  (mini player no celular; barra inferior e janela de vídeo no computador).
+- **Vídeo de referência embutido**: o vídeo do YouTube toca na própria seção "Referências" da música,
+  ao tocar na miniatura ou no botão verde (que também pausa/retoma).
 - **Repertórios** com cara de playlist: capa em mosaico, tocar em sequência, reordenar,
   avançar/voltar por gesto, setas ou pedal (PageUp/PageDown).
 - **Editor de cifra**: campos de título, autor, tom e vídeo; prévia ao vivo; acordes do tom para

@@ -30,7 +30,6 @@
   --lit-cor: #2e7d32;
   --lit-ink: #4cc163;
   --nav-h: 64px;
-  --player-h: 0px;
   --sans: "Figtree", "Circular", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --serif: "Source Serif 4", Georgia, serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -64,7 +63,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .ic { flex: none; display: block; }
 [hidden] { display: none !important; }
 img { display: block; }
-body.has-player { --player-h: 64px; }
 
 /* ============================================================ layout */
 .shell { display: flex; height: 100dvh; }
@@ -72,7 +70,7 @@ body.has-player { --player-h: 64px; }
 main {
   --gutter: 16px;
   flex: 1; overflow-y: auto; outline: none; position: relative;
-  padding: 64px var(--gutter) calc(var(--nav-h) + var(--player-h) + 48px + env(safe-area-inset-bottom));
+  padding: 64px var(--gutter) calc(var(--nav-h) + 48px + env(safe-area-inset-bottom));
 }
 /* fundo em degradê no topo de cada página, na cor da capa/tela */
 main::before {
@@ -95,13 +93,11 @@ main > * { position: relative; z-index: 1; }
 .nav a { display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: var(--muted); font-size: 11px; font-weight: 600; padding-top: 8px; }
 .nav a em { font-style: normal; }
 .nav a.active { color: var(--text); }
-body.performance .nav, body.performance .topbar, body.performance .player { display: none; }
+body.performance .nav, body.performance .topbar { display: none; }
 
 @media (min-width: 900px) {
   :root { --nav-h: 0px; }
-  body.has-player { --player-h: 0px; }
-  .shell { gap: 8px; padding: 8px; height: calc(100dvh - var(--bar-h, 0px)); }
-  body.has-player .shell { --bar-h: 80px; }
+  .shell { gap: 8px; padding: 8px; height: 100dvh; }
   .main-col { border-radius: var(--radius); }
   main { --gutter: max(24px, calc((100% - 1100px) / 2)); padding-bottom: 48px; }
   .side { display: flex; flex-direction: column; gap: 8px; width: 300px; flex: none; }
@@ -349,7 +345,12 @@ a.chip.sm { cursor: pointer; }
 .ref-card span { min-width: 0; }
 .ref-card b { display: block; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ref-card small { display: block; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.video-card { position: relative; display: block; border-radius: var(--radius); overflow: hidden; aspect-ratio: 16 / 9; background: #000; border: 0; padding: 0; cursor: pointer; width: 100%; max-width: 560px; margin-bottom: 12px; }
+.video-ref { max-width: 640px; margin-bottom: 12px; }
+.video-embed { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius); overflow: hidden; background: #000; box-shadow: var(--shadow); }
+.video-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.video-alt { margin: 8px 2px 0; font-size: 13px; color: var(--muted); }
+.video-alt a { color: var(--accent-ink); font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+.video-card { position: relative; display: block; border-radius: var(--radius); overflow: hidden; aspect-ratio: 16 / 9; background: #000; border: 0; padding: 0; cursor: pointer; width: 100%; }
 .video-card img { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; transition: 0.25s; }
 .video-card:hover img { opacity: 1; transform: scale(1.02); }
 .video-card .vplay { position: absolute; inset: 0; display: grid; place-items: center; }
@@ -496,39 +497,6 @@ label.setting { cursor: pointer; }
 .fonte { font-size: 12px; color: var(--subtle); margin: 24px 2px 0; line-height: 1.6; }
 .fonte a { color: var(--muted); }
 
-/* ============================================================ player do YouTube */
-.player {
-  position: fixed; z-index: 40; left: 8px; right: 8px; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 2px);
-  border-radius: 10px; background: color-mix(in srgb, var(--accent-deep) 35%, #1c1c1c); color: #fff; box-shadow: var(--shadow-lg);
-}
-.pl-bar { display: flex; align-items: center; gap: 10px; height: 64px; padding: 0 6px 0 8px; }
-/* o vídeo fica embutido na barra, no lugar da capa */
-.pl-video { width: 86px; height: 48px; flex: none; border-radius: 6px; overflow: hidden; background: #000; transition: none; }
-.pl-video iframe { width: 100%; height: 100%; border: 0; display: block; }
-.pl-video.grande {
-  position: fixed; z-index: 41; left: 8px; right: 8px; width: auto; height: auto; aspect-ratio: 16 / 9;
-  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 74px); border-radius: 10px; box-shadow: var(--shadow-lg);
-}
-.pl-info { flex: 1; min-width: 0; display: block; text-decoration: none; }
-.pl-info b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pl-info small { display: flex; align-items: center; gap: 4px; font-size: 12px; color: rgb(255 255 255 / 0.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pl-ctrl { display: flex; align-items: center; gap: 0; }
-.pl-ctrl .icon-btn { color: #fff; width: 36px; height: 36px; }
-.pl-ctrl .icon-btn:hover { background: rgb(255 255 255 / 0.12); }
-.pl-ctrl .icon-btn[aria-pressed="true"] { color: var(--accent); }
-.pl-play { width: 40px; height: 40px; border-radius: 50%; border: 0; background: #fff; color: #000; display: grid; place-items: center; cursor: pointer; margin: 0 2px; flex: none; }
-.pl-play:hover { transform: scale(1.06); }
-@media (max-width: 380px) { .pl-ctrl a.icon-btn { display: none; } }
-@media (min-width: 900px) {
-  .player { left: 0; right: 0; bottom: 0; border-radius: 0; height: 80px; background: var(--black); box-shadow: none; }
-  :root[data-theme="light"] .player { background: #181818; }
-  .pl-bar { height: 80px; padding: 0 16px; gap: 14px; }
-  .pl-video { width: 112px; height: 63px; }
-  .pl-video.grande { left: auto; right: 16px; bottom: 92px; width: 480px; }
-  .pl-info { max-width: 40%; }
-  .pl-ctrl { margin-left: auto; gap: 6px; }
-}
-
 /* ============================================================ estados, toast, diálogos */
 .skeleton { position: relative; overflow: hidden; background: var(--surface-2); border-radius: var(--radius); }
 .skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.06), transparent); animation: shimmer 1.3s infinite; }
@@ -546,24 +514,24 @@ label.setting { cursor: pointer; }
 .empty .row { justify-content: center; }
 
 .fab {
-  position: fixed; z-index: 25; right: 16px; bottom: calc(var(--nav-h) + var(--player-h) + 16px + env(safe-area-inset-bottom));
+  position: fixed; z-index: 25; right: 16px; bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));
   height: 52px; min-width: 52px; padding: 0 18px; border-radius: 999px; border: 0; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800;
   background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow-lg); transition: transform 0.15s;
 }
 .fab span { display: none; }
 .fab:hover { transform: scale(1.05); }
-@media (min-width: 900px) { .fab { right: 32px; bottom: calc(var(--bar-h, 0px) + 32px); } .fab span { display: inline; } }
+@media (min-width: 900px) { .fab { right: 32px; bottom: 32px; } .fab span { display: inline; } }
 
 #toast {
-  position: fixed; left: 50%; bottom: calc(var(--nav-h) + var(--player-h) + 24px + env(safe-area-inset-bottom)); z-index: 60;
+  position: fixed; left: 50%; bottom: calc(var(--nav-h) + 24px + env(safe-area-inset-bottom)); z-index: 60;
   transform: translateX(-50%) translateY(12px); opacity: 0; pointer-events: none;
   display: flex; gap: 8px; align-items: center; max-width: calc(100vw - 32px);
   background: #fff; color: #000; padding: 10px 16px; border-radius: 8px; font-weight: 600; font-size: 14px; box-shadow: var(--shadow-lg); transition: 0.2s;
 }
 #toast.show { opacity: 1; transform: translateX(-50%); }
 #toast .ic { color: #1aa34a; }
-@media (min-width: 900px) { #toast { bottom: calc(var(--bar-h, 0px) + 30px); } body.has-player #toast { bottom: 110px; } }
+@media (min-width: 900px) { #toast { bottom: 30px; } }
 
 dialog { border: 0; padding: 0; background: var(--surface); color: var(--text); width: calc(100% - 32px); max-width: 460px; border-radius: 12px; box-shadow: var(--shadow-lg); }
 dialog::backdrop { background: rgb(0 0 0 / 0.7); }
