@@ -650,7 +650,14 @@ dialog { max-height: calc(100dvh - 24px); overflow-y: auto; overflow-x: hidden; 
 
 /* celular: controles da cifra quebram em linhas (sem rolagem lateral escondida) */
 @media (max-width: 700px) {
-  .song-toolbar { position: static; flex-wrap: wrap; justify-content: center; overflow: visible; margin-left: 0; margin-right: 0; padding: 0 0 6px; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  /* celular: todos os controles numa linha só, compactos; se a tela for estreita demais, desliza para o lado */
+  .song-toolbar { position: static; flex-wrap: nowrap; justify-content: safe center; overflow-x: auto; gap: 6px; margin-left: 0; margin-right: 0; padding: 0 0 6px; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .song-toolbar .seg { height: 38px; padding: 2px; gap: 0; }
+  .song-toolbar .seg button { height: 34px; min-width: 30px; padding: 0 6px; }
+  .song-toolbar .seg .val { min-width: 34px; font-size: 13px; }
+  .song-toolbar .seg .val small { font-size: 8px; }
+  .song-toolbar .seg .tom-btn { padding: 0 6px 0 4px; gap: 1px; }
+  .song-toolbar .seg .tom-btn .val { min-width: 28px; }
   .actions-row .seg-tabs:has(.date-field) { flex-basis: 100%; margin-left: 0; }
 }
 
