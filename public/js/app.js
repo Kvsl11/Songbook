@@ -65,6 +65,24 @@ const somaDias = (iso, n) => {
   d.setDate(d.getDate() + n);
   return d.toISOString().slice(0, 10);
 };
+const DIAS_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const dataPorExtenso = (iso) => (iso ? `${DIAS_SEMANA[new Date(iso + 'T12:00:00').getDay()]}, ${fmtData(iso)}` : 'Escolher data');
+
+// Campo de data sempre exibido como dd/mm/aaaa: o <input type="date"> nativo mostra o
+// formato do idioma do aparelho (ex.: mm/dd/aaaa), então ele fica invisível por cima
+// do texto formatado e só serve para abrir o calendário.
+function campoData(id, valor, rotulo = 'Data') {
+  return `<label class="date-field">${icon('calendar', 18)}<span class="date-text" id="${id}-texto">${esc(dataPorExtenso(valor))}</span>
+    <input class="date-native" type="date" id="${id}" value="${esc(valor || '')}" aria-label="${esc(rotulo)}"></label>`;
+}
+function ligarCampoData(id, onChange) {
+  const input = $('#' + id);
+  input.addEventListener('click', () => { try { input.showPicker(); } catch { /* navegador sem showPicker */ } });
+  input.addEventListener('change', () => {
+    $('#' + id + '-texto').textContent = dataPorExtenso(input.value);
+    onChange(input.value);
+  });
+}
 const hue = (s) => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
 const inicial = (s) => (String(s).normalize('NFD').replace(/[^\p{L}\p{N}]/gu, '')[0] || '#').toUpperCase();
 const avatar = (title) => `<span class="avatar" style="--h:${hue(title)}">${esc(inicial(title))}</span>`;
@@ -473,7 +491,7 @@ function viewSet(id) {
   });
   view.innerHTML = `
     <div class="row" style="margin:4px 0 6px">
-      <label class="field" style="flex:1;min-width:180px">${icon('calendar', 18)}<input class="search" type="date" id="set-date" value="${esc(set.date || '')}" aria-label="Data"></label>
+      <div style="flex:1;min-width:180px">${campoData('set-date', set.date, 'Data do repertório')}</div>
       ${set.items.length ? `<a class="btn primary" href="#/repertorio/${id}/0">${icon('play', 16)} Tocar</a>` : ''}
       <button class="btn" id="add">${icon('plus', 18)} Música</button>
     </div>
@@ -489,7 +507,7 @@ function viewSet(id) {
           <button class="icon-btn danger" data-rm aria-label="Remover">${icon('x', 18)}</button>
         </span></li>`;
     }).join('')}</ul>` : `<div class="empty"><div class="bubble">${icon('music', 30)}</div><h3>Repertório vazio</h3><p>Adicione músicas da sua biblioteca.</p></div>`}`;
-  $('#set-date').onchange = (e) => { set.date = e.target.value; db.saveSet(set); };
+  ligarCampoData('set-date', (v) => { set.date = v; db.saveSet(set); eyebrowEl.textContent = `Repertório · ${fmtData(v)}`; });
   $('#add').onclick = async () => {
     const songId = await pickSong();
     if (!songId) return;
@@ -578,12 +596,12 @@ async function viewLiturgia(data) {
   view.innerHTML = `
     <div class="date-bar">
       <a class="icon-btn" href="#/liturgia/${somaDias(data, -1)}" aria-label="Dia anterior">${icon('back', 20)}</a>
-      <label class="field">${icon('calendar', 18)}<input type="date" value="${data}" id="dt" aria-label="Data"></label>
+      ${campoData('dt', data, 'Data da liturgia')}
       <a class="icon-btn" href="#/liturgia/${somaDias(data, 1)}" aria-label="Próximo dia">${icon('next', 20)}</a>
       ${ehHoje ? '' : `<a class="btn" href="#/liturgia/${hojeISO()}">Hoje</a>`}
     </div>
     <div id="lit">${skeletonLiturgia()}</div>`;
-  $('#dt').onchange = (e) => e.target.value && (location.hash = '#/liturgia/' + e.target.value);
+  ligarCampoData('dt', (v) => v && (location.hash = '#/liturgia/' + v));
 
   let missa = missaCache.get(data);
   try {
