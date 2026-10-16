@@ -58,8 +58,15 @@ html, body { margin: 0; height: 100%; }
 body { background: var(--black); color: var(--text); font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
 a { color: inherit; }
 button, input, select, textarea { font: inherit; color: inherit; }
-button { -webkit-tap-highlight-color: transparent; }
-:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+/* sem o retângulo azul do Android ao tocar: o retorno do toque segue o formato de cada elemento */
+* { -webkit-tap-highlight-color: transparent; }
+:focus:not(:focus-visible) { outline: none; }
+:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+@media (hover: none) {
+  .btn:active, .icon-btn:active, .chip:active, .seg button:active, .play-big:active, .swatch:active, .theme-card:active, .tom:active, .pptx-tipo:active { transform: scale(0.94); }
+  .tile:active, .quick a:active, .track:active, .opcao:active, .parte summary:active, .setting:active, .nav a:active, .source:active, .set-nav a:active, .video-card:active { transform: scale(0.98); opacity: 0.85; }
+  .btn, .icon-btn, .chip, .seg button, .play-big, .swatch, .theme-card, .tom, .pptx-tipo, .tile, .quick a, .track, .opcao, .parte summary, .setting, .nav a, .source, .set-nav a, .video-card { transition: transform 0.12s ease, opacity 0.12s ease; }
+}
 .ic { flex: none; display: block; }
 [hidden] { display: none !important; }
 img { display: block; }
