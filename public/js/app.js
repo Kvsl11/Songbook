@@ -39,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-40';
+export const APP_VERSAO = '2026.10.16-41';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2111,16 +2111,30 @@ async function viewFontes() {
   setHeader('Fontes litúrgicas', { back: '#/oracoes' });
   view.innerHTML = `<h2 class="greet">Fontes litúrgicas</h2>
     <p class="muted" style="margin:-6px 0 14px">Hinários da CNBB, salmos, partituras, documentos da Igreja e formação para músicos — reunidos por <a href="https://sites.google.com/view/juniormusicacatolica/m%C3%BAsica-lit%C3%BArgica-para-missa" target="_blank" rel="noopener">Junior Música Católica</a>.</p>
+    <label class="field" style="margin-bottom:14px">${icon('search', 18)}<input class="search" id="busca-fonte" type="search" placeholder="Buscar link (ex.: salmos, hinário, IGMR, partitura)"></label>
     <div id="fontes"><div class="loading-note"><span class="spin"></span>Carregando…</div></div>`;
   let d;
   try { d = await diretorioJunior(); } catch {
     $('#fontes').innerHTML = '<p class="muted">Ainda não disponível. Tente mais tarde (a lista é copiada uma vez por dia).</p>';
     return;
   }
-  $('#fontes').innerHTML = d.paginas.map((p) => `
-    <h3 class="fontes-pag">${esc(tituloBonitoPagina(p.titulo))}</h3>
-    ${p.secoes.map((sec) => `<details class="cat-oracoes" ${/liturgia diária|hinários|salmos|fórmulas/i.test(sec.titulo) ? 'open' : ''}><summary><b>${esc(sec.titulo)}</b><span class="chip sm">${sec.links.length}</span>${icon('down', 18)}</summary>
-      <ul class="lista-oracoes">${sec.links.map((l) => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener">${icon(ICONE_LINK[l.tipo] || 'external', 16)}<span>${esc(l.texto)}</span><small>${esc(host(l.url))}</small></a></li>`).join('')}</ul></details>`).join('')}`).join('');
+  // busca: cada palavra precisa aparecer no nome do link, na seção ou no endereço
+  const desenhar = (termo = '') => {
+    // sem o plural ("salmos" acha "salmo")
+    const palavras = normalizar(termo).split(' ').filter(Boolean).map((w) => (w.length > 4 ? w.replace(/(e?s)$/, '') : w));
+    const casa = (...txt) => { const n = normalizar(txt.join(' ')); return palavras.every((w) => n.includes(w)); };
+    let total = 0;
+    const html = d.paginas.map((p) => {
+      const secoes = p.secoes.map((sec) => ({ ...sec, links: sec.links.filter((l) => casa(l.texto, sec.titulo, host(l.url))) })).filter((sec) => sec.links.length);
+      if (!secoes.length) return '';
+      return `<h3 class="fontes-pag">${esc(tituloBonitoPagina(p.titulo))}</h3>
+        ${secoes.map((sec) => { total += sec.links.length; return `<details class="cat-oracoes" ${palavras.length || /liturgia diária|hinários|salmos|fórmulas/i.test(sec.titulo) ? 'open' : ''}><summary><b>${esc(sec.titulo)}</b><span class="chip sm">${sec.links.length}</span>${icon('down', 18)}</summary>
+          <ul class="lista-oracoes">${sec.links.map((l) => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener">${icon(ICONE_LINK[l.tipo] || 'external', 16)}<span>${esc(l.texto)}</span><small>${esc(host(l.url))}</small></a></li>`).join('')}</ul></details>`; }).join('')}`;
+    }).join('');
+    $('#fontes').innerHTML = palavras.length ? (total ? `<p class="muted" style="margin:0 0 10px">${total} link(s) encontrado(s)</p>${html}` : '<p class="muted">Nenhum link encontrado. Tente outra palavra.</p>') : html;
+  };
+  desenhar();
+  $('#busca-fonte').addEventListener('input', (e) => desenhar(e.target.value));
 }
 const tituloBonitoPagina = (t) => t.charAt(0) + t.slice(1).toLowerCase().replace(/\bcnbb\b/g, 'CNBB').replace(/\(preces\)/, '(Preces)');
 
