@@ -42,7 +42,7 @@ preciso servidor. O GitHub publica a pasta `public/` automaticamente pelo workfl
 2. Em **Build and deployment → Source**, escolha **GitHub Actions**.
 3. Abra a aba **Actions** → **Publicar no GitHub Pages** → **Run workflow** (ou faça qualquer push).
 4. Quando terminar, o link aparece no resumo do workflow e em Settings → Pages:
-   **https://kvsl11.github.io/Songbook-/**
+   **https://kvsl11.github.io/Songbook/** (o endereço segue o nome do repositório no GitHub)
 
 No celular, abra o link e use **"Adicionar à tela inicial"** para instalar como app.
 
