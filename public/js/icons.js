@@ -56,6 +56,19 @@ const P = {
   gauge: '<path d="M12 14l4-4"/><path d="M3.3 19a10 10 0 1 1 17.4 0"/>',
 };
 
+// versões preenchidas (aba selecionada no menu, como no Spotify)
+const CHEIOS = {
+  home: '<path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" fill="currentColor"/>',
+  search: '<circle cx="11" cy="11" r="7" stroke-width="3.2"/><path d="M21 21l-4.3-4.3" stroke-width="3.2"/>',
+  library: '<rect x="3" y="3" width="3" height="18" rx="1" fill="currentColor" stroke="none"/><rect x="8" y="3" width="3" height="18" rx="1" fill="currentColor" stroke="none"/><path d="M13.2 4.6l2.9-.9 5 15.7-2.9.9z" fill="currentColor" stroke-width="1.2"/>',
+  cross: '<path d="M12 2v20M6 8h12" stroke-width="3.6"/>',
+  book: '<path d="M2 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8z" fill="currentColor"/>',
+};
+// ícone do menu: contorno quando normal, preenchido quando a aba está selecionada
+export function iconeMenu(name, size = 22) {
+  return CHEIOS[name] ? `<span class="ic-off">${icon(name, size)}</span><span class="ic-on">${icon(name, size).replace(P[name], CHEIOS[name])}</span>` : icon(name, size);
+}
+
 export function icon(name, size = 20, extra = '') {
   return `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${P[name] || ''}</svg>`;
 }

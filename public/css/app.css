@@ -840,3 +840,10 @@ body.performance .convite-instalar { display: none; }
 .legenda-rub { font-size: 12.5px; color: var(--muted); }
 .legenda-rub .rub { color: #c9a25e; }
 .fontes-pag { margin: 22px 0 10px; font-size: 18px; }
+
+/* menu: ícone preenchido na aba selecionada (como no Spotify) */
+.nav a .ic-off, .nav a .ic-on { display: inline-flex; }
+.nav a .ic-on, .nav a.active .ic-off { display: none; }
+.nav a.active .ic-on { display: inline-flex; }
+.nav a.active { color: var(--text); }
+.nav a.active em { font-weight: 800; }

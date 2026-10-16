@@ -1,7 +1,7 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
 import { completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord } from './chordpro.js';
-import { icon, logo } from './icons.js';
+import { icon, iconeMenu, logo } from './icons.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
 import { buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
@@ -15,7 +15,7 @@ const backBtn = $('#btn-back');
 const topbar = $('.topbar');
 
 backBtn.innerHTML = icon('back', 20);
-document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = icon(el.dataset.icon, 22); });
+document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = el.closest('.nav') ? iconeMenu(el.dataset.icon, 22) : icon(el.dataset.icon, 22); });
 $('#brand-logo').innerHTML = logo(36);
 
 // menu lateral recolhível (computador)
@@ -39,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-41';
+export const APP_VERSAO = '2026.10.16-42';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
