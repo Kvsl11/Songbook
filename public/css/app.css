@@ -95,7 +95,7 @@ main > * { position: relative; z-index: 1; }
 .nav a.active { color: var(--text); }
 /* modo "só a letra" (tela cheia): esconde tudo menos a letra e os controles flutuantes */
 body.performance .nav, body.performance .topbar, body.performance .side { display: none !important; }
-body.performance main > *:not(#song):not(.palco-ctrl) { display: none !important; }
+body.performance main > *:not(#song):not(.palco-ctrl):not(.rolagem) { display: none !important; }
 body.performance main::before { display: none; }
 body.performance main { padding: 0 0 110px; background: color-mix(in srgb, var(--tint) 75%, #000); }
 body.performance .shell { padding: 0; gap: 0; }
@@ -728,3 +728,35 @@ button, a.icon-btn, .chip, .swatch { -webkit-touch-callout: none; -webkit-user-s
 .pptx-partes { display: grid; gap: 10px; max-height: 46vh; overflow: auto; }
 .pptx-partes label { display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .pptx-partes select { width: 100%; }
+
+/* tom: botão único que abre a tabela de tons */
+.seg .tom-btn { gap: 4px; padding: 0 12px 0 6px; display: inline-flex; align-items: center; }
+.seg .tom-btn .val { min-width: 34px; }
+.song-toolbar.sem-cifra .so-cifra { display: none; }
+.tons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.tons .tom { position: relative; height: 54px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text); font: 800 18px var(--sans); cursor: pointer; display: grid; place-content: center; line-height: 1.05; }
+.tons .tom:hover { background: var(--surface-3); }
+.tons .tom small { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.tons .tom.orig { border-color: var(--accent-ink); }
+.tons .tom[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.tons .tom[aria-pressed="true"] small { color: inherit; opacity: 0.85; }
+
+/* rolagem automática: barra de velocidade na parte de baixo */
+.rolagem {
+  position: fixed; z-index: 40; left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--nav-h) + 12px + env(safe-area-inset-bottom)); width: min(520px, calc(100% - 24px));
+  display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-lg); border: 1px solid var(--border);
+}
+.rolagem[hidden] { display: none !important; }
+@media (min-width: 900px) { .rolagem { bottom: 24px; } }
+body.performance .rolagem { bottom: 92px; }
+.rol-barra { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rol-barra span { min-width: 20px; text-align: center; font-weight: 800; font-size: 14px; }
+.rol-barra input[type="range"] {
+  -webkit-appearance: none; appearance: none; flex: 1; min-width: 0; height: 8px; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(90deg, var(--accent) 0 var(--p, 10%), var(--surface-3) var(--p, 10%) 100%);
+}
+.rol-barra input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgb(0 0 0 / 0.4); }
+.rol-barra input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgb(0 0 0 / 0.4); }

@@ -13,8 +13,8 @@ Visual escuro moderno (cor padrão azul-marinho), com capas, cabeçalhos em degr
 - **Buscar**: seções da missa (Entrada, Salmos, Aclamação, Comunhão, Maria, Natal…) e busca online
   nos cantos cifrados de cindyferrarezi.com, com as capas do site.
 - **Biblioteca**: músicas e repertórios, com filtros (com vídeo, cifras próprias).
-- **Música**: capa, botão verde para ouvir a **referência no YouTube**, abas **Cifra** e **Letra**
-  (letra grande, estilo Spotify), transposição, capotraste, rolagem automática, tamanho da letra,
+- **Música**: capa, botão verde para ouvir a **referência no YouTube**, botão **#** que liga a cifra ou deixa só a letra
+  (letra grande, estilo Spotify), **tabela de tons** para trocar o tom com um toque, capotraste, rolagem automática (o ícone liga e mostra embaixo uma barra de velocidade), tamanho da letra,
   duas colunas, modo apresentação e cartões de referência (vídeo, cifra original, partitura em PDF,
   outras versões no YouTube).
 - **Vídeo de referência embutido**: o vídeo do YouTube toca na própria seção "Referências" da música,

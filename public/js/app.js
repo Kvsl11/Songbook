@@ -39,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-21';
+export const APP_VERSAO = '2026.10.16-22';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -891,10 +891,11 @@ function viewSong(id, ctx = {}) {
   setTint(corDaMusica(song.title));
   const prefs = db.prefs();
   let { transpose = 0, capo = 0 } = song;
-  let showChords = prefs.showChords;
-  // música sem nenhum acorde: só existe a opção Letra
+  // música sem nenhum acorde: só existe a letra. O botão # liga/desliga a cifra (sem ele, só a letra).
   const semCifra = !temCifra(song.content);
-  let modo = semCifra || prefs.modo === 'letra' ? 'letra' : 'cifra';
+  let comCifra = !semCifra && prefs.modo !== 'letra' && prefs.showChords !== false;
+  // tom de referência: o do {key} ou, se não houver, o primeiro acorde da música
+  const tomBase = renderSong(song.content).key || song.key || (/\[([A-G][#b]?m?)(?![a-z])/.exec(song.content || '') || [])[1] || '';
   const save = () => { if (!isPreview) db.updateSong(song.id, { transpose, capo }); };
 
   const back = ctx.set ? `#/repertorio/${ctx.set.id}` : isPreview ? (song.back || '#/liturgia') : '#/biblioteca';
@@ -917,18 +918,23 @@ function viewSong(id, ctx = {}) {
       <button class="icon-btn" id="btn-palco" aria-label="Só a letra (tela cheia)" title="Só a letra, tela cheia">${icon('expand', 22)}</button>
       <button class="icon-btn" id="btn-pdf" aria-label="Exportar PDF" title="Exportar em PDF (com ou sem cifra)">${icon('file', 22)}</button>
       ${ctx.set ? `<button class="icon-btn" id="btn-fila" aria-label="Fila do repertório" title="Fila: próximas músicas">${icon('queue', 24)}</button>` : ''}
-      <div class="seg-tabs">${semCifra ? '<span class="chip sm" title="Esta música não tem acordes">Só letra</span>'
-        : `<button class="chip" data-modo="cifra" aria-pressed="${modo === 'cifra'}" title="Mostrar a letra com os acordes">Cifra</button><button class="chip" data-modo="letra" aria-pressed="${modo === 'letra'}" title="Mostrar só a letra, sem acordes">Letra</button>`}</div>
+      ${semCifra ? '<div class="seg-tabs"><span class="chip sm" title="Esta música não tem acordes">Só letra</span></div>' : ''}
     </div>
     <div id="aviso-cifra"></div>
     <div class="song-toolbar" id="tools">
-      <div class="seg" title="Transpor"><button data-act="t-" aria-label="Meio tom abaixo">${icon('minus', 16)}</button><span class="val" id="key"></span><button data-act="t+" aria-label="Meio tom acima">${icon('plus', 16)}</button></div>
-      <div class="seg" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
-      <div class="seg" title="Rolagem automática"><button data-act="scroll" aria-pressed="false" aria-label="Rolagem automática" id="btn-scroll">${icon('play', 16)}</button><button data-act="s-" aria-label="Mais devagar">${icon('minus', 16)}</button><span class="val" id="speed"></span><button data-act="s+" aria-label="Mais rápido">${icon('plus', 16)}</button></div>
+      <div class="seg so-cifra"><button class="tom-btn" data-act="tom" aria-label="Escolher o tom" title="Escolher o tom"><span class="val" id="key"></span>${icon('down', 14)}</button></div>
+      <div class="seg so-cifra" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
+      <div class="seg"><button data-act="scroll" aria-pressed="false" aria-label="Rolagem automática" title="Rolagem automática (ajuste a velocidade na barra)" id="btn-scroll">${icon('gauge', 18)}</button></div>
       <div class="seg"><button data-act="f-" aria-label="Diminuir letra" title="Diminuir letra">A−</button><button data-act="f+" aria-label="Aumentar letra" title="Aumentar letra">A+</button></div>
-      <div class="seg"><button data-act="chords" aria-pressed="${showChords}" title="Mostrar acordes" aria-label="Mostrar acordes">${icon('chord', 17)}</button><button data-act="cols" aria-pressed="${prefs.columns}" title="Letra em duas colunas (telas largas)" aria-label="Duas colunas">${icon('columns', 17)}</button></div>
+      <div class="seg">${semCifra ? '' : `<button data-act="chords" aria-pressed="${comCifra}" title="Cifra: ligado mostra os acordes; desligado, só a letra" aria-label="Mostrar cifra">${icon('chord', 17)}</button>`}<button data-act="cols" aria-pressed="${prefs.columns}" title="Letra em duas colunas (telas largas)" aria-label="Duas colunas">${icon('columns', 17)}</button></div>
     </div>
     <div class="song" id="song"></div>
+    <div class="rolagem" id="rolagem" hidden>
+      <button class="icon-btn" data-rol="-" aria-label="Mais devagar" title="Mais devagar">${icon('minus', 18)}</button>
+      <div class="rol-barra"><input type="range" id="rol-vel" min="1" max="20" step="1" value="${prefs.scrollSpeed}" aria-label="Velocidade da rolagem"><span id="rol-num"></span></div>
+      <button class="icon-btn" data-rol="+" aria-label="Mais rápido" title="Mais rápido">${icon('plus', 18)}</button>
+      <button class="icon-btn" data-rol="parar" aria-label="Parar rolagem" title="Parar">${icon('pause', 18)}</button>
+    </div>
     <div class="shelf-head"><h2>Referências</h2></div>
     <div id="refs"></div>
     <div class="set-nav" id="set-nav"></div>
@@ -952,15 +958,15 @@ function viewSong(id, ctx = {}) {
     if (fonte) meta.push(`<span>${esc(fonte)}</span>`);
     $('#song-meta').innerHTML = meta.join(' ');
     songEl.innerHTML = r.html;
-    songEl.classList.toggle('no-chords', !showChords);
+    songEl.classList.toggle('no-chords', !comCifra);
     songEl.classList.toggle('columns', Boolean(db.prefs().columns));
     // Cifra e Letra usam o mesmo painel estilo Spotify; na Cifra os acordes aparecem por cima
     songEl.classList.add('lyrics-mode');
-    songEl.classList.toggle('with-chords', modo === 'cifra' && showChords);
-    $('#tools').hidden = modo === 'letra';
-    $('#key').innerHTML = `<small>Tom</small>${r.key ? esc(r.key) : (transpose ? (transpose > 0 ? '+' : '') + transpose : '—')}`;
+    songEl.classList.toggle('with-chords', comCifra);
+    $('#tools').classList.toggle('sem-cifra', !comCifra);
+    const tomAtual = tomBase ? transposeKey(tomBase, transpose) : '';
+    $('#key').innerHTML = `<small>Tom</small>${tomAtual ? esc(tomAtual) : (transpose ? (transpose > 0 ? '+' : '') + transpose : '—')}`;
     $('#capo').innerHTML = `<small>Capo</small>${capo || '—'}`;
-    $('#speed').innerHTML = `<small>Vel.</small>${db.prefs().scrollSpeed}`;
   };
   draw();
 
@@ -1020,7 +1026,7 @@ function viewSong(id, ctx = {}) {
     if (b.dataset.palco === 'sair') sairPalco();
     if (b.dataset.palco === 'f-') { db.setPref('fontScale', Math.max(0.6, +(p.fontScale - 0.1).toFixed(2))); applyTheme(); }
     if (b.dataset.palco === 'f+') { db.setPref('fontScale', Math.min(2.5, +(p.fontScale + 0.1).toFixed(2))); applyTheme(); }
-    if (b.dataset.palco === 'cifra') view.querySelector(`[data-modo="${modo === 'cifra' ? 'letra' : 'cifra'}"]`)?.click();
+    if (b.dataset.palco === 'cifra') view.querySelector('[data-act="chords"]')?.click();
     if (b.dataset.palco === 'fila') verFila();
   });
   if (sessionStorage.getItem('palco') === '1') entrarPalco(); // continua em tela cheia ao trocar de música
@@ -1111,32 +1117,72 @@ function viewSong(id, ctx = {}) {
   $('#btn-save')?.addEventListener('click', () => { location.hash = '#/musica/' + salvarPrevia().id; });
   $('#btn-edit-prev')?.addEventListener('click', () => { location.hash = '#/editar/' + salvarPrevia().id; });
   $('#btn-add')?.addEventListener('click', () => addToSetDialog(song.id));
-  view.querySelectorAll('[data-modo]').forEach((b) => (b.onclick = () => {
-    modo = b.dataset.modo;
-    db.setPref('modo', modo);
-    view.querySelectorAll('[data-modo]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    draw();
-  }));
-
+  // rolagem automática: o ícone liga e abre a barra de velocidade embaixo (esquerda devagar, direita rápido)
   const btnScroll = $('#btn-scroll');
-  const setScrollBtn = (on) => { btnScroll.setAttribute('aria-pressed', String(on)); btnScroll.innerHTML = icon(on ? 'pause' : 'play', 16); };
+  const barra = $('#rolagem');
+  const vel = $('#rol-vel');
+  const mostrarVel = () => {
+    const v = db.prefs().scrollSpeed;
+    vel.value = v;
+    vel.style.setProperty('--p', ((v - 1) / 19) * 100 + '%');
+    $('#rol-num').textContent = v;
+  };
+  const setScrollBtn = (on) => { btnScroll.setAttribute('aria-pressed', String(on)); barra.hidden = !on; if (on) mostrarVel(); };
   const tick = () => {
     view.scrollTop += db.prefs().scrollSpeed * 0.25;
     if (view.scrollTop + view.clientHeight >= view.scrollHeight - 1) { stopScroll(); setScrollBtn(false); return; }
     scrollTimer = requestAnimationFrame(tick);
   };
+  vel.addEventListener('input', () => { db.setPref('scrollSpeed', Number(vel.value)); mostrarVel(); });
+  barra.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-rol]');
+    if (!b) return;
+    const v = db.prefs().scrollSpeed;
+    if (b.dataset.rol === 'parar') { stopScroll(); setScrollBtn(false); return; }
+    db.setPref('scrollSpeed', Math.max(1, Math.min(20, v + (b.dataset.rol === '+' ? 1 : -1))));
+    mostrarVel();
+  });
+
+  // tabela de tons (como no Cifra Club): toca no tom e a cifra muda
+  async function escolherTom() {
+    if (!tomBase) { toast('Esta música não informa o tom'); return; }
+    const menor = /m$/.test(tomBase);
+    const opcoes = Array.from({ length: 12 }, (_, i) => {
+      const t = ((i + 18) % 12) - 6; // -6..5, igual à transposição salva
+      return { t, nome: transposeKey(tomBase, t) };
+    });
+    const ORDEM = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'];
+    opcoes.sort((a, b) => ORDEM.indexOf(a.nome.replace(/m$/, '')) - ORDEM.indexOf(b.nome.replace(/m$/, '')));
+    const atual = ((transpose % 12) + 18) % 12 - 6;
+    const r = await openDialog(`
+      <h3>Escolher o tom</h3>
+      <p>Tom original: <b>${esc(tomBase)}</b>${menor ? ' (menor)' : ''}</p>
+      <div class="tons">${opcoes.map((o) => `<button class="tom ${o.t === 0 ? 'orig' : ''}" data-t="${o.t}" aria-pressed="${o.t === atual}">${esc(o.nome)}${o.t === 0 ? '<small>original</small>' : ''}</button>`).join('')}</div>
+      <div class="acts"><button class="btn ghost" data-no>Fechar</button></div>`,
+    (dlg, done) => {
+      $('.tons', dlg).onclick = (e) => { const b = e.target.closest('[data-t]'); if (b) done(Number(b.dataset.t)); };
+      $('[data-no]', dlg).onclick = () => done(null);
+    });
+    if (r === null) return;
+    transpose = r;
+    save();
+    draw();
+  }
   $('#tools').onclick = (e) => {
     const b = e.target.closest('button[data-act]');
     if (!b) return;
     const p = db.prefs();
     switch (b.dataset.act) {
-      case 't-': transpose = ((transpose - 1 + 18) % 12) - 6; save(); break;
-      case 't+': transpose = ((transpose + 1 + 18) % 12) - 6; save(); break;
+      case 'tom': escolherTom(); return;
       case 'c-': capo = Math.max(0, capo - 1); save(); break;
       case 'c+': capo = Math.min(11, capo + 1); save(); break;
       case 'f-': db.setPref('fontScale', Math.max(0.6, +(p.fontScale - 0.1).toFixed(2))); applyTheme(); break;
       case 'f+': db.setPref('fontScale', Math.min(2.5, +(p.fontScale + 0.1).toFixed(2))); applyTheme(); break;
-      case 'chords': showChords = !showChords; b.setAttribute('aria-pressed', String(showChords)); break;
+      case 'chords':
+        comCifra = !comCifra;
+        db.setPref('modo', comCifra ? 'cifra' : 'letra');
+        b.setAttribute('aria-pressed', String(comCifra));
+        break;
       case 'cols': {
         // prefs() devolve o próprio objeto salvo: guarda o novo valor antes de gravar
         const duas = !p.columns;
@@ -1145,8 +1191,6 @@ function viewSong(id, ctx = {}) {
         toast(duas ? 'Letra em duas colunas' : 'Uma coluna');
         break;
       }
-      case 's-': db.setPref('scrollSpeed', Math.max(1, p.scrollSpeed - 1)); break;
-      case 's+': db.setPref('scrollSpeed', Math.min(20, p.scrollSpeed + 1)); break;
       case 'scroll':
         if (scrollTimer) { stopScroll(); setScrollBtn(false); } else { setScrollBtn(true); tick(); }
         return;
@@ -1748,7 +1792,7 @@ function viewSettings() {
 
     <div class="section-title">Cifras</div>
     <div class="settings-group">
-      <label class="setting"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Mostrar acordes</div><div class="s">Desligue para usar só a letra (coral, telão)</div></div><input type="checkbox" class="switch" id="chords" ${p.showChords ? 'checked' : ''}></label>
+      <label class="setting"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Mostrar acordes</div><div class="s">Desligue para usar só a letra (coral, telão)</div></div><input type="checkbox" class="switch" id="chords" ${p.modo !== 'letra' && p.showChords !== false ? 'checked' : ''}></label>
       <label class="setting"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns ? 'checked' : ''}></label>
     </div>
 
@@ -1808,7 +1852,7 @@ function viewSettings() {
   infoModelo();
   $('#pptx-enviar').onclick = async () => { if (await enviarModeloPptx()) infoModelo(); };
   $('#pptx-apagar').onclick = async () => { if (await ask({ title: 'Remover o modelo?', text: 'O arquivo sai deste aparelho; os repertórios continuam.', ok: 'Remover', danger: true })) { await apagarModelo(); infoModelo(); } };
-  $('#chords').onchange = (e) => db.setPref('showChords', e.target.checked);
+  $('#chords').onchange = (e) => { db.setPref('modo', e.target.checked ? 'cifra' : 'letra'); db.setPref('showChords', true); };
   $('#cols').onchange = (e) => db.setPref('columns', e.target.checked);
   $('#exp').onclick = () => download(`songbook-backup-${hojeISO()}.json`, db.exportAll(), 'application/json');
   $('#imp').onclick = openImport;
