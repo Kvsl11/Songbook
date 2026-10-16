@@ -1,4 +1,6 @@
-# Publica a pasta public/ no GitHub Pages a cada push.
+# Publica a pasta public/ no GitHub Pages a cada push e uma vez por dia.
+# Na publicação, copia do musicasparamissa.com.br as sugestões e cifras das próximas datas
+# (o site não permite acesso direto pelo navegador).
 # Antes do primeiro uso: Settings → Pages → Build and deployment → Source: "GitHub Actions".
 name: Publicar no GitHub Pages
 
@@ -6,6 +8,8 @@ on:
   push:
     branches: [main, master, ccr-59dd75f2-oirnca]
   workflow_dispatch:
+  schedule:
+    - cron: '23 7 * * *' # todo dia às 04h23 (Brasília)
 
 permissions:
   contents: read
@@ -36,6 +40,19 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Cache das cifras do Músicas para Missa
+        uses: actions/cache@v4
+        with:
+          path: .mpm-cache
+          key: mpm-${{ github.run_id }}
+          restore-keys: mpm-
+      - name: Copiar sugestões e cifras do Músicas para Missa
+        continue-on-error: true # se o site estiver fora do ar, o app é publicado mesmo assim
+        timeout-minutes: 25
+        run: node scripts/mpm-sync.mjs --dias 12 --max 700
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

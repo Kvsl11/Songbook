@@ -1,12 +1,13 @@
-// Junta a liturgia oficial (CNBB) com as sugestões de cantos (Cindy Ferrarezi)
-// numa estrutura única de "partes da missa".
+// Junta a liturgia oficial (CNBB) com as sugestões de cantos (Cindy Ferrarezi e
+// Músicas para Missa) numa estrutura única de "partes da missa".
 
 import { getLiturgia } from './cnbb.js';
 import { buscarPorTexto, buscarRepertorio, capasPorUrl, getRepertorio } from './cindy.js';
-import { normalize } from './html.js';
+import { normalize, tituloBonito } from './html.js';
+import { sugestoesDoDia, urlMusica } from './mpm.js';
 
 export const PARTES = [
-  { chave: 'entrada', nome: 'Entrada', re: /entrada/ },
+  { chave: 'entrada', nome: 'Entrada', re: /entrada|abertura/ },
   { chave: 'sinal', nome: 'Sinal da Cruz', re: /sinal da cruz/ },
   { chave: 'ato', nome: 'Ato Penitencial', re: /ato penitencial|kyrie|senhor tende/ },
   { chave: 'gloria', nome: 'Glória', re: /hino de louvor|gloria/ },
@@ -21,7 +22,7 @@ export const PARTES = [
   { chave: 'oracao', nome: 'Oração Eucarística', re: /oraco?e?s? eucaristica/ },
   { chave: 'cordeiro', nome: 'Cordeiro de Deus', re: /cordeiro|agnus/ },
   { chave: 'comunhao', nome: 'Comunhão', re: /comunhao/ },
-  { chave: 'final', nome: 'Canto Final', re: /final|envio/ },
+  { chave: 'final', nome: 'Canto Final', re: /^final|canto final|envio/ },
 ];
 
 export function chaveDaParte(nome) {
@@ -87,6 +88,18 @@ export function montarEstrutura(lit, repertorio, extras = {}) {
     porChave.set(chave, atual);
   }
 
+  // sugestões do Músicas para Missa entram depois das da Cindy, marcadas com a fonte
+  for (const p of extras.mpm?.partes || []) {
+    const chave = chaveDaParte(p.parte);
+    if (!chave || !p.cantos.length || /vela|coroa do advento/i.test(p.parte)) continue;
+    const atual = porChave.get(chave) || { cantos: [], texto: [] };
+    for (const c of p.cantos) {
+      const url = urlMusica(c.slug);
+      if (!atual.cantos.some((x) => x.url === url)) atual.cantos.push({ titulo: tituloBonito(c.titulo), url, fonte: 'mpm' });
+    }
+    porChave.set(chave, atual);
+  }
+
   const partes = [];
   for (const def of PARTES) {
     const daCindy = porChave.get(def.chave);
@@ -116,20 +129,21 @@ export async function getMissa(date, fetchImpl) {
   const missa = lit.missas[0] || {};
   const avisos = [];
 
-  const [rep, salmo, acl] = await Promise.all([
+  const [rep, salmo, acl, mpm] = await Promise.all([
     buscarRepertorio(lit, fetchImpl).then(async (busca) => {
       if (!busca.candidatos.length) return { busca, repertorio: null };
       return { busca, repertorio: await getRepertorio(busca.candidatos[0].url, fetchImpl) };
     }).catch((e) => (avisos.push('Repertório (Cindy): ' + e.message), { busca: null, repertorio: null })),
     missa.salmo ? buscarPorTexto(missa.salmo.refrao, 'salmo', fetchImpl).catch((e) => (avisos.push('Salmo (Cindy): ' + e.message), [])) : [],
     missa.aclamacao ? buscarPorTexto(missa.aclamacao.versiculo, 'aclamacao', fetchImpl).catch((e) => (avisos.push('Aclamação (Cindy): ' + e.message), [])) : [],
+    sugestoesDoDia(date, fetchImpl).catch(() => null),
   ]);
 
   const relevantes = (lista) => lista.filter((c) => c.score >= 2).slice(0, 4);
-  const partes = montarEstrutura(lit, rep.repertorio, { salmo: relevantes(salmo), aclamacao: relevantes(acl) });
+  const partes = montarEstrutura(lit, rep.repertorio, { salmo: relevantes(salmo), aclamacao: relevantes(acl), mpm });
 
   // capas (imagem destacada de cada post) para exibir nas opções
-  const semCapa = partes.flatMap((p) => p.cantos).filter((c) => !c.capa).map((c) => c.url);
+  const semCapa = partes.flatMap((p) => p.cantos).filter((c) => !c.capa && !c.fonte).map((c) => c.url);
   if (semCapa.length) {
     try {
       const capas = await capasPorUrl(semCapa, fetchImpl);
@@ -141,6 +155,7 @@ export async function getMissa(date, fetchImpl) {
     liturgia: lit,
     repertorio: rep.repertorio ? { titulo: rep.repertorio.titulo, url: rep.repertorio.url } : null,
     buscaRepertorio: rep.busca,
+    mpm: mpm ? { titulo: mpm.titulo, url: mpm.url } : null,
     partes,
     avisos,
   };

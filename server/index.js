@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { getLiturgia } from '../public/js/lib/cnbb.js';
 import { buscarCantos, buscarPorTexto, getCanto, getRepertorio } from '../public/js/lib/cindy.js';
 import { getMissa } from '../public/js/lib/missa.js';
+import { getMusicaMpm } from '../public/js/lib/mpm.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const PORT = Number(process.env.PORT || 3000);
@@ -44,6 +45,7 @@ const routes = {
     if (!isDate(d)) throw Object.assign(new Error('data inválida (use AAAA-MM-DD)'), { status: 400 });
     return cached('missa:' + d, () => getMissa(d));
   },
+  '/api/mpm/musica': (q) => cached('mpm:' + q.get('url'), () => getMusicaMpm(q.get('url'))),
   '/api/cindy/canto': (q) => cached('canto:' + q.get('url'), () => getCanto(q.get('url'))),
   '/api/cindy/repertorio': (q) => cached('rep:' + q.get('url'), () => getRepertorio(q.get('url'))),
   '/api/cindy/busca': async (q) => {

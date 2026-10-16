@@ -5,6 +5,7 @@
 
 import { getMissa as getMissaDireto } from './lib/missa.js';
 import { buscarCantos as buscarDireto, getCanto as getCantoDireto } from './lib/cindy.js';
+import { ehMpm, getMusicaMpm } from './lib/mpm.js';
 
 const PREFIXO = 'songbook.cache.';
 const VALIDADE = 12 * 3600e3;
@@ -73,7 +74,17 @@ export function getMissa(data, opts) {
 }
 
 export function getCanto(url) {
+  if (ehMpm(url)) return obter('mpm:' + url, () => getMusicaMpm(url), 'api/mpm/musica?url=' + encodeURIComponent(url));
   return obter('canto:' + url, () => getCantoDireto(url), 'api/cindy/canto?url=' + encodeURIComponent(url));
+}
+
+// índice das cifras do Músicas para Missa copiadas para o app (gerado diariamente)
+let indiceMpm = null;
+export async function indiceMusicasParaMissa() {
+  if (!indiceMpm) {
+    indiceMpm = fetch(new URL('data/mpm/indice.json', document.baseURI)).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+  }
+  return indiceMpm;
 }
 
 export function buscarCindy(termo, { categoria } = {}) {

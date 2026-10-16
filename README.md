@@ -37,6 +37,18 @@ Visual escuro inspirado no Spotify, com capas, cabeçalhos em degradê e player 
   **cor litúrgica do dia**; menu lateral recolhível no computador.
 - Importa `.cho/.chopro/.pro/.txt` (inclusive "cifra sobre a letra"), exporta e faz backup. PWA instalável e offline.
 
+### Fontes de cantos
+
+| Fonte | O que traz | Como o app acessa |
+|---|---|---|
+| **CNBB** (liturgia oficial) | leituras, salmo, aclamação | direto do navegador (API com CORS) |
+| **Cindy Ferrarezi** | repertório por missa, cifras, capas, vídeos | direto do navegador (WordPress com CORS) |
+| **Músicas para Missa** | sugestões por data e por parte da missa, cifras, vídeos | cópia diária feita pelo GitHub Actions (`scripts/mpm-sync.mjs`) em `data/mpm/`, porque o site não permite acesso direto |
+| **Cifra Club** | outras versões de cifra | link de busca; a cifra copiada é colada no editor ("Organizar cifra colada") |
+
+As sugestões das fontes são misturadas em cada parte da missa (as do Músicas para Missa aparecem com a
+etiqueta **MpM**). Quando uma versão não tem cifra, o app procura a mesma música com acordes nas outras fontes.
+
 ### Liturgia Diária (aba ✝)
 
 1. Escolha a data e o app consulta a **Liturgia Diária da CNBB**: celebração, cor litúrgica, ano,

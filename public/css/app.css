@@ -662,3 +662,7 @@ button, a.icon-btn, .chip, .swatch { -webkit-touch-callout: none; -webkit-user-s
 .aviso { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin: 0 0 14px; border-radius: var(--radius); background: var(--accent-soft); color: var(--text); font-size: 13px; font-weight: 600; }
 .aviso .ic { color: var(--accent-ink); }
 .aviso span { flex: 1; min-width: 180px; }
+
+.opcao .tag.mpm, .source .tag.mpm { background: rgb(134 42 21 / 0.35); color: #ffb39d; }
+:root[data-theme="light"] .opcao .tag.mpm, :root[data-theme="light"] .source .tag.mpm { background: #fbe3dc; color: #862a15; }
+.source .tag { font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 4px; }

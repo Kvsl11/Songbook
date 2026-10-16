@@ -2,7 +2,7 @@ import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
 import { completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord } from './chordpro.js';
 import { icon, logo } from './icons.js';
-import { buscarCindy, getCanto, getMissa } from './fonte.js';
+import { buscarCindy, getCanto, getMissa, indiceMusicasParaMissa } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const view = $('#view');
@@ -45,7 +45,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-12';
+export const APP_VERSAO = '2026.10.16-13';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -627,13 +627,26 @@ function viewSearch() {
         <div class="cat-grid">${CATEGORIAS.map(([n, id, ic], i) => `<a class="cat" href="#/buscar/categoria/${id}/${encodeURIComponent(n)}" style="--h:${(i * 47 + 200) % 360}">${esc(n)}${icon(ic, 60)}</a>`).join('')}</div>`;
       return;
     }
+    const meu = ++seq;
     const t = term.toLowerCase();
     const locais = db.songs().filter((s) => (s.title + ' ' + s.artist + ' ' + s.content).toLowerCase().includes(t)).slice(0, 8);
     res.innerHTML = `
       ${locais.length ? `<div class="shelf-head"><h2>Na sua biblioteca</h2></div><ul class="tracks">${locais.map((s) => linhaMusica(s, s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '')).join('')}</ul>` : ''}
       <div class="shelf-head"><h2>Cantos cifrados</h2><a href="https://cindyferrarezi.com/?s=${encodeURIComponent(term)}" target="_blank" rel="noopener">cindyferrarezi.com</a></div>
-      <div id="online"><div class="loading-note"><span class="spin"></span>Buscando…</div></div>`;
-    const meu = ++seq;
+      <div id="online"><div class="loading-note"><span class="spin"></span>Buscando…</div></div>
+      <div id="mpm-res"></div>
+      <div class="shelf-head"><h2>Cifra Club</h2></div>
+      <a class="ref-card" style="max-width:420px" href="https://www.cifraclub.com.br/?q=${encodeURIComponent(term)}" target="_blank" rel="noopener"><span class="ico">${icon('chord', 22)}</span><span><b>Procurar “${esc(term)}” no Cifra Club</b><small>Copie a cifra e cole no editor (Organizar cifra colada)</small></span></a>`;
+    // Músicas para Missa: índice local das cifras copiadas
+    indiceMusicasParaMissa().then((indice) => {
+      const box = $('#mpm-res');
+      if (!box || meu !== seq) return;
+      const n = normalizar(term);
+      const achadas = indice.filter((m) => normalizar(m.titulo + ' ' + (m.artista || '')).includes(n)).slice(0, 12);
+      if (!achadas.length) return;
+      box.innerHTML = `<div class="shelf-head"><h2>Músicas para Missa</h2><a href="https://musicasparamissa.com.br/" target="_blank" rel="noopener">musicasparamissa.com.br</a></div>
+        <ul class="tracks">${achadas.map((m) => linhaCindy({ titulo: m.titulo + (m.artista ? ` (${m.artista})` : ''), url: `https://musicasparamissa.com.br/musica/${m.slug}/`, data: '' }).replace('cindyferrarezi.com · ', `Músicas para Missa${m.temCifra ? ' · com cifra' : ' · só letra'} `)).join('')}</ul>`;
+    });
     clearTimeout(timer);
     timer = setTimeout(async () => {
       try {
@@ -710,6 +723,21 @@ function viewLibrary(filtro = 'musicas') {
 }
 
 // ------------------------------------------------------------- música
+
+// Mistura de fontes: procura a mesma música com acordes no Músicas para Missa e na Cindy Ferrarezi
+async function buscarAlternativas(titulo) {
+  const limpo = titulo.replace(/\s*[–—-]\s*.*$/, '').replace(/\(.*?\)/g, '').trim() || titulo;
+  const alvo = normalizar(limpo);
+  const parecido = (t) => { const a = new Set(alvo.split(' ').filter((x) => x.length > 2)); const b = normalizar(t).split(' '); return a.size && b.filter((x) => a.has(x)).length / a.size; };
+  const res = [];
+  const indice = await indiceMusicasParaMissa();
+  for (const m of indice) if (m.temCifra && parecido(m.titulo) >= 0.75) res.push({ titulo: m.titulo, artista: m.artista, url: `https://musicasparamissa.com.br/musica/${m.slug}/`, fonte: 'mpm' });
+  try {
+    for (const c of (await buscarCindy(limpo)).slice(0, 6)) if (parecido(c.titulo) >= 0.75) res.push({ titulo: c.titulo, url: c.url, fonte: 'cindy' });
+  } catch { /* busca online opcional */ }
+  return res.slice(0, 4);
+}
+const normalizar = (t) => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 
 let scrollTimer = null;
 function stopScroll() { cancelAnimationFrame(scrollTimer); scrollTimer = null; }
@@ -811,7 +839,26 @@ function viewSong(id, ctx = {}) {
     if (!box) return;
     const meta = renderSong(song.content).meta;
     const faltam = !semCifra && completarCifra(song.content).completadas;
-    if (meta.x_cifra_completada) {
+    if (semCifra) {
+      box.innerHTML = `<div class="aviso">${icon('info', 18)}<span>Esta versão não tem cifra. <span id="alternativas">Procurando versões com acordes…</span></span>
+        <a class="btn small" href="https://www.cifraclub.com.br/?q=${encodeURIComponent(song.title)}" target="_blank" rel="noopener" title="Procurar a cifra no Cifra Club">${icon('chord', 15)} Cifra Club</a></div>`;
+      buscarAlternativas(song.title).then((alts) => {
+        const el = $('#alternativas');
+        if (!el) return;
+        el.innerHTML = alts.length ? 'Versões com acordes: ' + alts.map((a, i) => `<a href="#" data-alt="${i}" style="color:var(--accent-ink);font-weight:800">${esc(a.titulo)}${a.artista ? ' (' + esc(a.artista) + ')' : ''}</a>`).join(', ')
+          : 'Não achei outra versão com acordes nas fontes do app.';
+        el.onclick = async (e) => {
+          const a = e.target.closest('[data-alt]');
+          if (!a) return;
+          e.preventDefault();
+          try {
+            const c = await getCanto(alts[Number(a.dataset.alt)].url);
+            preview = { id: 'previa', content: c.chordpro, source: c.url, transpose: 0, capo: 0, back: location.hash };
+            location.hash = '#/musica/previa';
+          } catch (err) { toast('Erro: ' + err.message); }
+        };
+      });
+    } else if (meta.x_cifra_completada) {
       box.innerHTML = `<div class="aviso">${icon('sparkles', 18)}<span>A cifra original só tinha acordes em parte da música. Repeti a mesma sequência nas outras estrofes${song.youtube ? ' — confira ouvindo o vídeo' : ''}.</span></div>`;
     } else if (faltam) {
       box.innerHTML = `<div class="aviso">${icon('info', 18)}<span>${faltam} estrofe(s) sem acordes.</span><button class="btn small" id="btn-completar" title="Repete a sequência de acordes da estrofe cifrada nas estrofes sem acordes">${icon('sparkles', 15)} Completar cifra</button></div>`;
@@ -881,6 +928,7 @@ function viewSong(id, ctx = {}) {
   if (song.pdf) cards.push(`<a class="ref-card" href="${esc(song.pdf)}" target="_blank" rel="noopener"><span class="ico">${icon('file', 22)}</span><span><b>Partitura</b><small>PDF</small></span></a>`);
   if (song.youtube) cards.push(`<a class="ref-card" href="https://www.youtube.com/watch?v=${esc(song.youtube)}" target="_blank" rel="noopener"><span class="ico">${icon('youtube', 22)}</span><span><b>Abrir no YouTube</b><small>Vídeo de referência</small></span></a>`);
   cards.push(`<a class="ref-card" href="${esc(ytBusca(song.title))}" target="_blank" rel="noopener"><span class="ico">${icon('search', 22)}</span><span><b>Outras versões</b><small>Buscar no YouTube</small></span></a>`);
+  cards.push(`<a class="ref-card" href="https://www.cifraclub.com.br/?q=${encodeURIComponent(song.title)}" target="_blank" rel="noopener" title="Abre a busca do Cifra Club; para trazer a cifra, copie e cole no editor (Organizar cifra colada)"><span class="ico">${icon('chord', 22)}</span><span><b>Cifra Club</b><small>Procurar outra cifra</small></span></a>`);
   $('#refs').innerHTML = refs.join('') + `<div class="refs-grid">${cards.join('')}</div>`;
 
   // vídeo de referência: toca embutido aqui mesmo, na seção "Referências"
@@ -1363,6 +1411,7 @@ async function viewLiturgia(data) {
     <div class="source"><span class="ico">${icon('sparkles', 18)}</span><div>${missa.repertorio
       ? `Sugestões de cantos de <a href="${esc(missa.repertorio.url)}" target="_blank" rel="noopener">${esc(missa.repertorio.titulo)}</a> · Cindy Ferrarezi`
       : 'A Cindy Ferrarezi ainda não publicou o repertório desta data. Salmo e aclamação foram buscados pelo texto do dia.'}
+      ${missa.mpm ? `<br>Mais sugestões de <a href="${esc(missa.mpm.url)}" target="_blank" rel="noopener">${esc(missa.mpm.titulo)}</a> · Músicas para Missa <span class="tag mpm">MpM</span>` : ''}
       ${lit.missas.length > 1 ? `<br>Hoje há ${lit.missas.length} formulários de missa; a estrutura usa o primeiro.` : ''}</div></div>
     ${missa.avisos.map((a) => `<div class="alert">${icon('info', 18)}<span>${esc(a)}</span></div>`).join('')}
     <div id="partes">${missa.partes.map((p) => `
@@ -1378,7 +1427,7 @@ async function viewLiturgia(data) {
           ${(p.chordpro || p.cantos.length) ? `<div class="opcoes-titulo">Escolha o canto</div><div class="opcoes">
             <label class="opcao"><input type="radio" name="op-${p.chave}" value="" ${!sel[p.chave] ? 'checked' : ''}><span class="lbl">Nenhum</span></label>
             ${p.chordpro ? `<label class="opcao"><input type="radio" name="op-${p.chave}" value="cnbb" ${sel[p.chave] === 'cnbb' ? 'checked' : ''}><div class="cover gen" style="--h:130">${icon('cross', 18)}</div><span class="lbl">Texto oficial (sem cifra)</span><span class="tag cnbb">CNBB</span><button class="icon-btn" data-ver="cnbb" aria-label="Ver">${icon('next', 18)}</button></label>` : ''}
-            ${p.cantos.map((c) => `<label class="opcao"><input type="radio" name="op-${p.chave}" value="${esc(c.url)}" ${sel[p.chave] === c.url ? 'checked' : ''}>${capa({ titulo: c.titulo, capa: c.capa })}<span class="lbl">${esc(c.titulo)}</span>${c.sugestao ? '<span class="tag">busca</span>' : ''}<button class="icon-btn" data-ver="${esc(c.url)}" aria-label="Ver">${icon('next', 18)}</button></label>`).join('')}
+            ${p.cantos.map((c) => `<label class="opcao"><input type="radio" name="op-${p.chave}" value="${esc(c.url)}" ${sel[p.chave] === c.url ? 'checked' : ''}>${capa({ titulo: c.titulo, capa: c.capa })}<span class="lbl">${esc(c.titulo)}</span>${c.sugestao ? '<span class="tag">busca</span>' : ''}${c.fonte === 'mpm' ? '<span class="tag mpm" title="Sugestão do site Músicas para Missa">MpM</span>' : ''}<button class="icon-btn" data-ver="${esc(c.url)}" aria-label="Ver">${icon('next', 18)}</button></label>`).join('')}
           </div>` : ''}
         </div>
       </details>`).join('')}
@@ -1420,7 +1469,9 @@ async function viewLiturgia(data) {
       preview = { ...(await songFromChoice(p, b.dataset.ver, lit)), back: '#/liturgia/' + data };
       location.hash = '#/musica/previa';
     } catch (err) {
-      toast('Erro: ' + err.message);
+      // cifra do Músicas para Missa ainda não copiada para o app: abre no site
+      if (/musicasparamissa/.test(b.dataset.ver)) { window.open(b.dataset.ver, '_blank', 'noopener'); toast('Abrindo no site Músicas para Missa'); }
+      else toast('Erro: ' + err.message);
     } finally {
       b.disabled = false;
       b.innerHTML = original;
