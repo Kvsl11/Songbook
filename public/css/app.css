@@ -93,7 +93,25 @@ main > * { position: relative; z-index: 1; }
 .nav a { display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: var(--muted); font-size: 11px; font-weight: 600; padding-top: 8px; }
 .nav a em { font-style: normal; }
 .nav a.active { color: var(--text); }
-body.performance .nav, body.performance .topbar { display: none; }
+/* modo "só a letra" (tela cheia): esconde tudo menos a letra e os controles flutuantes */
+body.performance .nav, body.performance .topbar, body.performance .side { display: none !important; }
+body.performance main > *:not(#song):not(.palco-ctrl) { display: none !important; }
+body.performance main::before { display: none; }
+body.performance main { padding: 0 0 110px; background: color-mix(in srgb, var(--tint) 75%, #000); }
+body.performance .shell { padding: 0; gap: 0; }
+body.performance .main-col { border-radius: 0; }
+body.performance #song.lyrics-mode { margin: 0; border-radius: 0; min-height: 100%; padding-top: calc(28px + env(safe-area-inset-top)); max-width: none; }
+@media (min-width: 900px) { body.performance #song.lyrics-mode { padding-left: max(40px, calc((100% - 1000px) / 2)); padding-right: max(40px, calc((100% - 1000px) / 2)); } }
+.palco-ctrl { display: none; }
+body.performance .palco-ctrl {
+  display: flex; position: fixed; z-index: 50; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom));
+  gap: 2px; padding: 6px; border-radius: 999px; background: rgb(0 0 0 / 0.55); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  opacity: 0.55; transition: opacity 0.2s;
+}
+body.performance .palco-ctrl:hover, body.performance .palco-ctrl:focus-within { opacity: 1; }
+.palco-ctrl .icon-btn { color: #fff; font-weight: 800; font-size: 14px; width: 42px; height: 42px; }
+.palco-ctrl .icon-btn:hover { background: rgb(255 255 255 / 0.15); }
+.palco-ctrl .sair { background: rgb(255 255 255 / 0.18); }
 
 @media (min-width: 900px) {
   :root { --nav-h: 0px; }
@@ -619,3 +637,15 @@ dialog[open] { animation: pop 0.2s ease-out; }
   .song-toolbar { position: static; flex-wrap: wrap; justify-content: center; overflow: visible; margin-left: 0; margin-right: 0; padding: 0 0 6px; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .actions-row .seg-tabs:has(.date-field) { flex-basis: 100%; margin-left: 0; }
 }
+
+/* ============================================================ arrastar e soltar / fila */
+.track.set-item { grid-template-columns: auto 1fr auto auto; }
+.track .drag { width: 32px; height: 40px; border-radius: 6px; cursor: grab; touch-action: none; color: var(--subtle); }
+.track .drag:active { cursor: grabbing; }
+.track.arrastando { background: var(--surface-2); box-shadow: var(--shadow-lg); position: relative; z-index: 5; opacity: 0.95; }
+.track.atual { background: var(--accent-soft); }
+.tracks.fila { max-height: 58vh; overflow: auto; }
+.tracks.fila .track { margin: 0; }
+.tracks.fila .track .cover { width: 42px; height: 42px; }
+@media (max-width: 600px) { .track.set-item { gap: 8px; } .track .lead { gap: 6px; } }
+#content[wrap="off"] { white-space: pre; overflow-x: auto; }

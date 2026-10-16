@@ -21,7 +21,11 @@ Visual escuro inspirado no Spotify, com capas, cabeçalhos em degradê e player 
   ao tocar na miniatura ou no botão verde (que também pausa/retoma).
 - **Repertórios** com cara de playlist: capa em mosaico, tocar em sequência, reordenar,
   avançar/voltar por gesto, setas ou pedal (PageUp/PageDown).
-- **Editor de cifra**: campos de título, autor, tom e vídeo; prévia ao vivo; acordes do tom para
+- **Só a letra (tela cheia)**: esconde tudo menos a letra, com controles flutuantes (A−/A+, cifra/letra,
+  fila, anterior/próxima); continua em tela cheia ao passar de música no repertório.
+- **Fila**: na música do repertório, mostra as próximas; arraste para reordenar, remova, edite ou pule.
+  A página do repertório também reordena arrastando.
+- **Editor de cifra**: acordes na linha de cima da letra (como num caderno) ou entre [colchetes]; campos de título, autor, tom e vídeo; prévia ao vivo; acordes do tom para
   inserir com um toque; transposição permanente; conversão de "cifra sobre a letra". Cantos vindos da
   busca ou da liturgia também podem ser editados (são salvos na biblioteca antes).
 - **Personalização**: modo escuro, claro ou automático; 8 cores de destaque, cor livre ou a

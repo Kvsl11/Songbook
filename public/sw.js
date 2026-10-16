@@ -1,5 +1,5 @@
 // Service worker: app shell em cache (offline) e API em "rede primeiro, cache como reserva".
-const VERSION = 'songbook-v9';
+const VERSION = 'songbook-v11';
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/store.js', 'js/render.js', 'js/chordpro.js', 'js/icons.js', 'js/fonte.js', 'js/lib/html.js', 'js/lib/cnbb.js', 'js/lib/cindy.js', 'js/lib/missa.js', 'icon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {

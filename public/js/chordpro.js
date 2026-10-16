@@ -198,3 +198,26 @@ export function transposeChordPro(src, semitones, preferFlats = false) {
   return String(src).replace(/\[([^\]]+)\]/g, (_, c) => `[${transposeChord(c, semitones, preferFlats)}]`)
     .replace(/\{\s*key\s*:\s*([^}]+)\}/i, (_, k) => `{key: ${transposeKey(k.trim(), semitones)}}`);
 }
+
+// Converte ChordPro para "acordes na linha de cima da letra" (para editar como texto comum).
+// Diretivas como {start_of_chorus} ficam como estão.
+export function chordProToChordsOverLyrics(src) {
+  const out = [];
+  for (const line of String(src || '').replace(/\r\n?/g, '\n').split('\n')) {
+    if (/^\s*\{.*\}\s*$/.test(line) || !/\[[^\]]*\]/.test(line)) { out.push(line); continue; }
+    let acordes = '';
+    let letra = '';
+    for (const seg of splitChordLine(line)) {
+      if (seg.chord !== null && seg.chord !== '') {
+        // acorde na coluna da sílaba; se colidir com o anterior, anda para a direita
+        const col = Math.max(letra.length, acordes.length ? acordes.length + 1 : 0);
+        acordes = acordes.padEnd(col, ' ') + seg.chord;
+        if (col > letra.length && seg.text) letra = letra.padEnd(col, ' ');
+      }
+      letra += seg.text;
+    }
+    out.push(acordes.replace(/\s+$/, ''));
+    if (letra.trim()) out.push(letra.replace(/\s+$/, ''));
+  }
+  return out.join('\n');
+}

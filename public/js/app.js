@@ -1,6 +1,6 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
-import { chordsOverLyricsToChordPro, toChordPro, transposeChordPro, transposeKey, transposeChord } from './chordpro.js';
+import { chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord } from './chordpro.js';
 import { icon, logo } from './icons.js';
 import { buscarCindy, getCanto, getMissa } from './fonte.js';
 
@@ -308,6 +308,109 @@ async function addToSetDialog(songId, label = '') {
   toast(`Adicionada a “${set.name}”`);
 }
 
+// ------------------------------------------------------------ arrastar e soltar
+
+// Reordena itens de uma lista arrastando pela alça [data-drag] (mouse e toque).
+function ativarArrastar(lista, aoSoltar) {
+  lista.addEventListener('pointerdown', (e) => {
+    const alca = e.target.closest('[data-drag]');
+    if (!alca || !lista.contains(alca)) return;
+    const item = alca.closest('li');
+    e.preventDefault();
+    const itens = () => [...lista.children].filter((x) => x.matches('li'));
+    const inicio = itens().indexOf(item);
+    const rolador = lista.closest('main, dialog .tracks, .dlg .tracks') || view;
+    item.classList.add('arrastando');
+    let raf = null;
+    let ultimoY = e.clientY;
+    const rolar = () => {
+      const r = rolador.getBoundingClientRect();
+      if (ultimoY < r.top + 60) rolador.scrollTop -= 10;
+      else if (ultimoY > r.bottom - 60) rolador.scrollTop += 10;
+      raf = requestAnimationFrame(rolar);
+    };
+    raf = requestAnimationFrame(rolar);
+    const mover = (ev) => {
+      ultimoY = ev.clientY;
+      const alvo = itens().find((x) => x !== item && ev.clientY < x.getBoundingClientRect().top + x.getBoundingClientRect().height / 2);
+      if (alvo) { if (alvo !== item.nextElementSibling) lista.insertBefore(item, alvo); } else if (item !== lista.lastElementChild) lista.appendChild(item);
+    };
+    const soltar = () => {
+      cancelAnimationFrame(raf);
+      item.classList.remove('arrastando');
+      window.removeEventListener('pointermove', mover);
+      window.removeEventListener('pointerup', soltar);
+      window.removeEventListener('pointercancel', soltar);
+      const fim = itens().indexOf(item);
+      if (fim !== inicio) aoSoltar(inicio, fim);
+    };
+    // escuta na janela: mover o item no DOM faz o navegador soltar a captura do ponteiro
+    window.addEventListener('pointermove', mover);
+    window.addEventListener('pointerup', soltar);
+    window.addEventListener('pointercancel', soltar);
+  });
+}
+
+const mover = (arr, de, para) => { const [x] = arr.splice(de, 1); arr.splice(para, 0, x); };
+
+// linha de um item de repertório (página do repertório e fila)
+function linhaItemRepertorio(set, it, i, { atual = -1, fila = false } = {}) {
+  const s = db.song(it.songId);
+  return `<li class="track set-item ${i === atual ? 'atual' : ''}" data-i="${i}">
+    <span class="lead"><button class="icon-btn drag" data-drag aria-label="Arrastar para reordenar" title="Arrastar">${icon('grip', 18)}</button>${capa(s || {})}</span>
+    <a class="info" href="#/repertorio/${set.id}/${i}" ${fila ? 'data-ir' : ''}><div class="t ${i === atual ? 'playing' : ''}">${i === atual ? icon('music', 13, 'style="display:inline;vertical-align:-1px;margin-right:4px"') : ''}${esc(s?.title || '(música removida)')}</div>
+      <div class="s">${esc(it.label || s?.artist || '')}${s?.youtube ? ` ${icon('youtube', 13)}` : ''}</div></a>
+    ${s?.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '<span></span>'}
+    <span class="acts">
+      ${s ? `<a class="icon-btn" href="#/editar/${s.id}" aria-label="Editar cifra" title="Editar" data-editar>${icon('edit', 17)}</a>` : ''}
+      <button class="icon-btn danger" data-rm aria-label="Remover do repertório" title="Remover">${icon('x', 18)}</button>
+    </span></li>`;
+}
+
+// Fila do repertório: ver as próximas, arrastar para reordenar, remover, editar, pular
+function abrirFila(set, atualIdx) {
+  let atual = atualIdx;
+  return openDialog(`
+    <div class="row" style="flex-wrap:nowrap"><div style="flex:1;min-width:0"><h3>Fila</h3><p style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(set.name)}</p></div>
+      <button class="btn small" data-add>${icon('plus', 16)} Música</button></div>
+    <ul class="tracks fila"></ul>
+    <div class="acts"><button class="btn ghost" data-no>Fechar</button></div>`,
+  (dlg, done) => {
+    const ul = $('ul', dlg);
+    const desenhar = () => {
+      ul.innerHTML = set.items.map((it, i) => linhaItemRepertorio(set, it, i, { atual, fila: true })).join('')
+        || '<li class="empty" style="padding:20px">Fila vazia</li>';
+      ul.querySelector('.atual')?.scrollIntoView({ block: 'nearest' });
+    };
+    desenhar();
+    ativarArrastar(ul, (de, para) => {
+      mover(set.items, de, para);
+      if (atual === de) atual = para;
+      else if (de < atual && para >= atual) atual--;
+      else if (de > atual && para <= atual) atual++;
+      db.saveSet(set);
+      desenhar();
+    });
+    ul.addEventListener('click', (e) => {
+      const li = e.target.closest('li[data-i]');
+      if (!li) return;
+      const i = Number(li.dataset.i);
+      if (e.target.closest('[data-rm]')) {
+        set.items.splice(i, 1);
+        if (i < atual) atual--;
+        else if (i === atual) atual = Math.min(atual, set.items.length - 1);
+        db.saveSet(set);
+        desenhar();
+        return;
+      }
+      if (e.target.closest('[data-editar]')) { e.preventDefault(); done({ editar: set.items[i].songId }); return; }
+      if (e.target.closest('[data-ir]')) { e.preventDefault(); done({ ir: i }); }
+    });
+    $('[data-add]', dlg).onclick = () => done({ adicionar: true });
+    $('[data-no]', dlg).onclick = () => done({ fechou: true });
+  }).then((r) => ({ ...(r || {}), atual }));
+}
+
 // ------------------------------------------------------------ importação
 
 async function importFiles(files) {
@@ -578,7 +681,8 @@ function viewSong(id, ctx = {}) {
   const back = ctx.set ? `#/repertorio/${ctx.set.id}` : isPreview ? (song.back || '#/liturgia') : '#/biblioteca';
   setHeader(song.title, { back, eyebrow: ctx.set ? `${ctx.index + 1} de ${ctx.set.items.length} · ${ctx.set.name}` : '', actions: [
     ...(isPreview ? [] : [{ icon: 'edit', label: 'Editar cifra', href: '#/editar/' + song.id }]),
-    { icon: 'expand', label: 'Modo apresentação (Esc para sair)', onClick: () => document.body.classList.toggle('performance') },
+    ...(ctx.set ? [{ icon: 'queue', label: 'Fila do repertório', onClick: () => verFila() }] : []),
+    { icon: 'expand', label: 'Só a letra, tela cheia (Esc para sair)', onClick: () => entrarPalco() },
   ] });
 
   const kind = ctx.label || (/^salmo/i.test(song.title) ? 'Salmo' : /aclama|aleluia/i.test(song.title) ? 'Aclamação' : 'Cifra');
@@ -594,6 +698,8 @@ function viewSong(id, ctx = {}) {
            <button class="icon-btn" id="btn-edit-prev" aria-label="Editar cifra" title="Salvar e editar a cifra">${icon('edit', 22)}</button>`
         : `<button class="icon-btn" id="btn-add" aria-label="Adicionar a repertório" title="Adicionar a repertório">${icon('plus', 24)}</button>
            <a class="icon-btn" href="#/editar/${song.id}" aria-label="Editar" title="Editar cifra">${icon('edit', 22)}</a>`}
+      <button class="icon-btn" id="btn-palco" aria-label="Só a letra (tela cheia)" title="Só a letra, tela cheia">${icon('expand', 22)}</button>
+      ${ctx.set ? `<button class="icon-btn" id="btn-fila" aria-label="Fila do repertório" title="Fila: próximas músicas">${icon('queue', 24)}</button>` : ''}
       <div class="seg-tabs"><button class="chip" data-modo="cifra" aria-pressed="${modo === 'cifra'}">Cifra</button><button class="chip" data-modo="letra" aria-pressed="${modo === 'letra'}">Letra</button></div>
     </div>
     <div class="song-toolbar" id="tools">
@@ -606,7 +712,16 @@ function viewSong(id, ctx = {}) {
     <div class="song" id="song"></div>
     <div class="shelf-head"><h2>Referências</h2></div>
     <div id="refs"></div>
-    <div class="set-nav" id="set-nav"></div>`;
+    <div class="set-nav" id="set-nav"></div>
+    <div class="palco-ctrl" id="palco-ctrl">
+      ${ctx.set && ctx.index > 0 ? `<a class="icon-btn" href="#/repertorio/${ctx.set.id}/${ctx.index - 1}" aria-label="Música anterior" title="Anterior">${icon('back', 20)}</a>` : ''}
+      <button class="icon-btn" data-palco="f-" aria-label="Diminuir letra" title="Diminuir letra">A−</button>
+      <button class="icon-btn" data-palco="f+" aria-label="Aumentar letra" title="Aumentar letra">A+</button>
+      <button class="icon-btn" data-palco="cifra" aria-label="Alternar cifra/letra" title="Cifra / Letra">${icon('chord', 18)}</button>
+      ${ctx.set ? `<button class="icon-btn" data-palco="fila" aria-label="Fila" title="Fila">${icon('queue', 20)}</button>` : ''}
+      ${ctx.set && ctx.index < ctx.set.items.length - 1 ? `<a class="icon-btn" href="#/repertorio/${ctx.set.id}/${ctx.index + 1}" aria-label="Próxima música" title="Próxima">${icon('next', 20)}</a>` : ''}
+      <button class="icon-btn sair" data-palco="sair" aria-label="Sair da tela cheia" title="Sair (Esc)">${icon('x', 20)}</button>
+    </div>`;
 
   const songEl = $('#song');
   const draw = () => {
@@ -629,6 +744,48 @@ function viewSong(id, ctx = {}) {
     $('#speed').innerHTML = `<small>Vel.</small>${db.prefs().scrollSpeed}`;
   };
   draw();
+
+  // modo "só a letra" (tela cheia)
+  function entrarPalco() {
+    document.body.classList.add('performance');
+    if (document.fullscreenEnabled && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+    songEl.scrollIntoView({ block: 'start' });
+  }
+  $('#btn-palco').onclick = entrarPalco;
+  $('#palco-ctrl').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-palco]');
+    if (!b) return;
+    const p = db.prefs();
+    if (b.dataset.palco === 'sair') sairPalco();
+    if (b.dataset.palco === 'f-') { db.setPref('fontScale', Math.max(0.6, +(p.fontScale - 0.1).toFixed(2))); applyTheme(); }
+    if (b.dataset.palco === 'f+') { db.setPref('fontScale', Math.min(2.5, +(p.fontScale + 0.1).toFixed(2))); applyTheme(); }
+    if (b.dataset.palco === 'cifra') view.querySelector(`[data-modo="${modo === 'cifra' ? 'letra' : 'cifra'}"]`)?.click();
+    if (b.dataset.palco === 'fila') verFila();
+  });
+  if (sessionStorage.getItem('palco') === '1') entrarPalco(); // continua em tela cheia ao trocar de música
+
+  // fila do repertório
+  async function verFila() {
+    if (!ctx.set) return;
+    const set = db.set(ctx.set.id);
+    const r = await abrirFila(set, ctx.index);
+    if (r.ir !== undefined) { location.hash = `#/repertorio/${set.id}/${r.ir}`; return; }
+    if (r.editar) { sairPalco(); location.hash = '#/editar/' + r.editar; return; }
+    if (r.adicionar) {
+      const songId = await pickSong();
+      if (songId) { set.items.push({ songId, label: '' }); db.saveSet(set); toast('Adicionada ao fim da fila'); }
+      viewSetSong(set.id, set.items[r.atual]?.songId === song.id ? r.atual : ctx.index);
+      $('#btn-fila')?.click();
+      return;
+    }
+    // a ordem mudou: atualiza a posição desta música sem recarregar a página
+    if (!set.items.length) { location.hash = '#/repertorio/' + set.id; return; }
+    if (set.items[r.atual]?.songId === song.id) {
+      if (r.atual !== ctx.index) history.replaceState(null, '', `#/repertorio/${set.id}/${r.atual}`);
+      viewSetSong(set.id, r.atual);
+    } else location.hash = `#/repertorio/${set.id}/${Math.min(r.atual, set.items.length - 1)}`;
+  }
+  $('#btn-fila')?.addEventListener('click', verFila);
 
   // referências: vídeo, fonte, partitura, outras versões
   const refs = [];
@@ -756,9 +913,16 @@ document.addEventListener('keydown', (e) => {
   if (/input|textarea|select/i.test(e.target.tagName) || $('dialog[open]')) return;
   if (e.key === 'PageDown') { view.scrollBy({ top: view.clientHeight * 0.8, behavior: 'smooth' }); e.preventDefault(); }
   if (e.key === 'PageUp') { view.scrollBy({ top: -view.clientHeight * 0.8, behavior: 'smooth' }); e.preventDefault(); }
-  if (e.key === 'Escape') document.body.classList.remove('performance');
+  if (e.key === 'Escape') sairPalco();
   keyHandler?.(e);
 });
+
+function sairPalco() {
+  document.body.classList.remove('performance');
+  sessionStorage.removeItem('palco');
+  if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+}
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('performance')) sairPalco(); });
 
 // ------------------------------------------------------------- editor
 
@@ -774,13 +938,17 @@ const TEMPLATE_CORPO = `{start_of_verse: Estrofe 1}
 // diretivas que viram campos do formulário do editor
 const CAMPOS_META = { title: /^(title|t)$/i, artist: /^(artist|a)$/i, key: /^key$/i, youtube: /^youtube$/i };
 
+// dados técnicos (fonte, capa, partitura…) ficam guardados, mas fora do texto editável
+const META_OCULTA = /^(subtitle|st|source|cover|pdf|capo|tempo|time|album|year|copyright)$/i;
+
 function separarMeta(content) {
-  const meta = { title: '', artist: '', key: '', youtube: '' };
+  const meta = { title: '', artist: '', key: '', youtube: '', extras: [] };
   const corpo = [];
   for (const linha of String(content || '').split('\n')) {
     const m = /^\s*\{\s*([^:}]+?)\s*:\s*(.*?)\s*\}\s*$/.exec(linha);
     const campo = m && Object.keys(CAMPOS_META).find((k) => CAMPOS_META[k].test(m[1]));
     if (campo) meta[campo] = m[2];
+    else if (m && META_OCULTA.test(m[1])) meta.extras.push(linha.trim());
     else corpo.push(linha);
   }
   while (corpo.length && !corpo[0].trim()) corpo.shift();
@@ -793,6 +961,7 @@ function juntarMeta(meta, corpo) {
   if (meta.artist) cab.push(`{artist: ${meta.artist}}`);
   if (meta.key) cab.push(`{key: ${meta.key}}`);
   if (meta.youtube) cab.push(`{youtube: ${meta.youtube}}`);
+  cab.push(...(meta.extras || []));
   return cab.join('\n') + (cab.length ? '\n\n' : '') + corpo.replace(/^\n+/, '');
 }
 
@@ -813,6 +982,7 @@ function viewEditor(id) {
   if (!song) return viewNotFound();
   setTint(corDaMusica(song.title || 'nova'));
   const { meta, corpo } = separarMeta(song.content);
+  let formato = db.prefs().formatoEditor === 'colchetes' ? 'colchetes' : 'acima';
   const actions = [];
   if (!isNew) {
     actions.push({ icon: 'download', label: 'Exportar .cho', onClick: () => download((song.title || 'cifra').replace(/[^\w\- ]+/g, '') + '.cho', montar()) });
@@ -840,20 +1010,42 @@ function viewEditor(id) {
         <button class="chip" data-ins="{start_of_verse: }\\n\\n{end_of_verse}">${icon('plus', 14)} Estrofe</button>
         <button class="chip" data-ins="{chorus}">Repetir refrão</button>
         <button class="chip" data-ins="{comment: }">Comentário</button>
-        <button class="chip" id="conv" title="Converte texto com acordes em linha separada (Cifra Club etc.)">${icon('sparkles', 14)} Cifra sobre letra → ChordPro</button>
+        <button class="chip" id="conv" title="Converte texto com acordes em linha separada (Cifra Club etc.)">${icon('sparkles', 14)} Organizar cifra colada</button>
       </div>
+      <div class="row" style="gap:6px"><span class="muted" style="font-size:12px;font-weight:700">Como escrever os acordes:</span>
+        <button class="chip" data-formato="acima" aria-pressed="${formato === 'acima'}">Na linha de cima da letra</button>
+        <button class="chip" data-formato="colchetes" aria-pressed="${formato === 'colchetes'}">Entre [colchetes]</button></div>
       <div class="chord-pal" id="pal"></div>
       <div class="tabs-mob"><button class="chip" data-aba="editar" aria-pressed="true">${icon('edit', 14)} Editar</button><button class="chip" data-aba="previa" aria-pressed="false">${icon('eye', 14)} Prévia</button></div>
       <div class="editor-split">
-        <textarea id="content" spellcheck="false" aria-label="Letra e acordes">${esc(corpo)}</textarea>
+        <textarea id="content" spellcheck="false" aria-label="Letra e acordes" wrap="off">${esc(formato === 'acima' ? chordProToChordsOverLyrics(corpo) : corpo)}</textarea>
         <div class="editor-prev" id="prev" hidden><div class="song" id="prev-song"></div></div>
       </div>
-      <p class="muted" style="font-size:13px;margin:0">Escreva os acordes entre colchetes antes da sílaba: <code>[G]Senhor, tende pie[D]dade</code>. Toque num acorde acima para inseri-lo onde está o cursor.</p>
+      <p class="muted" style="font-size:13px;margin:0" id="dica"></p>
       <div class="row"><a class="btn ghost" href="${voltar}">Cancelar</a><span class="spacer"></span><button class="btn primary" id="save">${icon('check', 18)} Salvar</button></div>
     </div>`;
   const ta = $('#content');
   const campo = (k) => $('#f-' + k);
-  const montar = () => juntarMeta({ title: campo('title').value.trim(), artist: campo('artist').value.trim(), key: campo('key').value.trim(), youtube: campo('yt').value.trim() }, ta.value);
+  // nos dois formatos o texto é normalizado para ChordPro ao salvar (linhas só de acordes viram [acordes])
+  const corpoPro = () => chordsOverLyricsToChordPro(ta.value);
+  const exibir = (pro) => (formato === 'acima' ? chordProToChordsOverLyrics(pro) : pro);
+  const montar = () => juntarMeta({ title: campo('title').value.trim(), artist: campo('artist').value.trim(), key: campo('key').value.trim(), youtube: campo('yt').value.trim(), extras: meta.extras }, corpoPro());
+  const DICAS = {
+    acima: 'Escreva os acordes na linha de cima, alinhados com a sílaba (como num caderno de cifras):<br><code>Am        G<br>Senhor, tende piedade</code>',
+    colchetes: 'Escreva os acordes entre colchetes antes da sílaba: <code>[G]Senhor, tende pie[D]dade</code>. Linhas só com acordes também são aceitas.',
+  };
+  const dica = () => { $('#dica').innerHTML = DICAS[formato] + ' Toque num acorde acima para inseri-lo onde está o cursor.'; };
+  dica();
+  view.querySelectorAll('[data-formato]').forEach((b) => (b.onclick = () => {
+    if (b.dataset.formato === formato) return;
+    const pro = corpoPro();
+    formato = b.dataset.formato;
+    db.setPref('formatoEditor', formato);
+    ta.value = exibir(pro);
+    view.querySelectorAll('[data-formato]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    dica();
+    atualizar();
+  }));
   let t;
   const atualizar = () => {
     clearTimeout(t);
@@ -866,16 +1058,16 @@ function viewEditor(id) {
 
   const inserir = (txt) => { ta.focus(); ta.setRangeText(txt, ta.selectionStart, ta.selectionEnd, 'end'); atualizar(); };
   $('#pal').addEventListener('mousedown', (e) => e.preventDefault()); // mantém o cursor no texto
-  $('#pal').addEventListener('click', (e) => { const b = e.target.closest('[data-acorde]'); if (b) inserir(`[${b.dataset.acorde}]`); });
+  $('#pal').addEventListener('click', (e) => { const b = e.target.closest('[data-acorde]'); if (b) inserir(formato === 'acima' ? `${b.dataset.acorde} ` : `[${b.dataset.acorde}]`); });
   view.querySelectorAll('[data-ins]').forEach((b) => (b.onclick = () => inserir('\n' + b.dataset.ins.replace(/\\n/g, '\n') + '\n')));
   view.querySelectorAll('[data-tr]').forEach((b) => (b.onclick = () => {
     const n = Number(b.dataset.tr);
-    ta.value = transposeChordPro(ta.value, n);
+    ta.value = exibir(transposeChordPro(corpoPro(), n));
     if (campo('key').value.trim()) campo('key').value = transposeKey(campo('key').value.trim(), n);
     atualizar();
     toast(`Cifra transposta ${n > 0 ? '+' : '−'}½ tom`);
   }));
-  $('#conv').onclick = () => { ta.value = chordsOverLyricsToChordPro(ta.value); atualizar(); toast('Convertido para ChordPro'); };
+  $('#conv').onclick = () => { ta.value = exibir(corpoPro()); atualizar(); toast('Cifra organizada'); };
   view.querySelectorAll('[data-aba]').forEach((b) => (b.onclick = () => {
     const prev = b.dataset.aba === 'previa';
     $('#prev').hidden = !prev;
@@ -918,18 +1110,8 @@ function viewSet(id) {
       <button class="icon-btn danger" id="del" aria-label="Excluir repertório" title="Excluir">${icon('trash', 22)}</button>
       <div class="seg-tabs" style="min-width:190px">${campoData('set-date', set.date, 'Data do repertório')}</div>
     </div>
-    ${set.items.length ? `<ul class="tracks">${set.items.map((it, i) => {
-      const s = db.song(it.songId);
-      return `<li class="track set-item" data-i="${i}">
-        <span class="lead"><span class="n">${i + 1}</span>${capa(s || {})}</span>
-        <a class="info" href="#/repertorio/${id}/${i}"><div class="t">${esc(s?.title || '(música removida)')}</div><div class="s">${esc(it.label || s?.artist || '')}${s?.youtube ? ` ${icon('youtube', 13)}` : ''}</div></a>
-        ${s?.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '<span></span>'}
-        <span class="acts">
-          <button class="icon-btn" data-mv="-1" aria-label="Subir" ${i === 0 ? 'disabled' : ''}>${icon('up', 18)}</button>
-          <button class="icon-btn" data-mv="1" aria-label="Descer" ${i === set.items.length - 1 ? 'disabled' : ''}>${icon('down', 18)}</button>
-          <button class="icon-btn danger" data-rm aria-label="Remover">${icon('x', 18)}</button>
-        </span></li>`;
-    }).join('')}</ul>` : `<div class="empty"><div class="bubble">${icon('music', 30)}</div><h3>Repertório vazio</h3><p>Adicione músicas da sua biblioteca.</p></div>`}`;
+    ${set.items.length ? `<p class="muted" style="font-size:13px;margin:0 0 4px">Arraste pela alça ${icon('grip', 13, 'style="display:inline;vertical-align:-2px"')} para mudar a ordem.</p>
+    <ul class="tracks">${set.items.map((it, i) => linhaItemRepertorio(set, it, i)).join('')}</ul>` : `<div class="empty"><div class="bubble">${icon('music', 30)}</div><h3>Repertório vazio</h3><p>Adicione músicas da sua biblioteca.</p></div>`}`;
   ligarCampoData('set-date', (v) => { set.date = v; db.saveSet(set); });
   $('#add').onclick = async () => {
     const songId = await pickSong();
@@ -945,20 +1127,18 @@ function viewSet(id) {
       db.deleteSet(id); desenharLateral(); toast('Repertório excluído'); location.hash = '#/biblioteca/repertorios';
     }
   };
-  $('.tracks')?.addEventListener('click', (e) => {
-    const li = e.target.closest('li[data-i]');
-    if (!li) return;
-    const i = Number(li.dataset.i);
-    const mv = e.target.closest('[data-mv]');
-    if (mv) {
-      const j = i + Number(mv.dataset.mv);
-      if (j < 0 || j >= set.items.length) return;
-      [set.items[i], set.items[j]] = [set.items[j], set.items[i]];
-    } else if (e.target.closest('[data-rm]')) set.items.splice(i, 1);
-    else return;
-    db.saveSet(set);
-    viewSet(id);
-  });
+  const ul = view.querySelector('.tracks');
+  if (ul) {
+    ativarArrastar(ul, (de, para) => { mover(set.items, de, para); db.saveSet(set); viewSet(id); });
+    ul.addEventListener('click', (e) => {
+      const li = e.target.closest('li[data-i]');
+      if (!li || !e.target.closest('[data-rm]')) return;
+      set.items.splice(Number(li.dataset.i), 1);
+      db.saveSet(set);
+      toast('Removida do repertório');
+      viewSet(id);
+    });
+  }
 }
 
 function exportSet(set) {
@@ -1304,7 +1484,9 @@ function route() {
   keyHandler = null;
   limpezas.forEach((fn) => fn());
   limpezas = [];
-  document.body.classList.remove('performance');
+  // em tela cheia, continua nela ao passar para outra música do repertório
+  const palco = document.body.classList.contains('performance') && /^#\/repertorio\/[^/]+\/\d+/.test(location.hash);
+  if (palco) sessionStorage.setItem('palco', '1'); else sairPalco();
   const [a, b, c, d] = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   view.scrollTop = 0;
   topbar.classList.remove('scrolled');

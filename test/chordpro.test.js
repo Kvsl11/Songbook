@@ -46,3 +46,13 @@ test('converte cifra sobre a letra em ChordPro', () => {
   assert.equal(chordsOverLyricsToChordPro(src),
     '{comment: Intro}\n[G]  [D]\n\n[G]Senhor, [D]tende piedade\nde [Em]nós   [C]');
 });
+
+test('converte ChordPro para acordes em cima e volta', async () => {
+  const { chordProToChordsOverLyrics } = await import('../public/js/chordpro.js');
+  const pro = '{start_of_chorus}\n[G]Senhor, [D]tende piedade\n{end_of_chorus}\n[Em]Cristo, [C]tende';
+  const acima = chordProToChordsOverLyrics(pro);
+  assert.equal(acima, '{start_of_chorus}\nG       D\nSenhor, tende piedade\n{end_of_chorus}\nEm      C\nCristo, tende');
+  assert.equal(chordsOverLyricsToChordPro(acima), pro);
+  // acordes colados (sem texto entre eles) não se sobrepõem
+  assert.equal(chordProToChordsOverLyrics('[C][G]Lá'), 'C G\n  Lá');
+});
