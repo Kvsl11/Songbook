@@ -3,8 +3,8 @@
 // O site https://www.cnbb.org.br/liturgia-diaria/ incorpora a aplicação Next.js
 // https://liturgiadiaria.edicoescnbb.com.br, que consome a API
 // GET https://api-liturgia.edicoescnbb.com.br/contents/in/date/AAAA-MM-DD
-// A API recusa (403) chamadas sem o Referer do próprio site, por isso o acesso
-// é feito pelo servidor e não diretamente pelo navegador.
+// A API libera CORS (*) mas recusa (403) chamadas sem cabeçalho Referer. O
+// navegador envia o Referer sozinho; no Node ele é informado explicitamente.
 
 import { cleanLine, decodeEntities, normalize, stripTags } from './html.js';
 
@@ -12,9 +12,10 @@ export const CNBB_API = 'https://api-liturgia.edicoescnbb.com.br/contents/in/dat
 const REFERER = 'https://liturgiadiaria.edicoescnbb.com.br/';
 
 export async function fetchCnbbRaw(date, fetchImpl = fetch) {
-  const res = await fetchImpl(CNBB_API + date, {
-    headers: { Referer: REFERER, 'User-Agent': 'Mozilla/5.0 (Songbook Liturgico)', Accept: 'application/json' },
-  });
+  const noNavegador = typeof window !== 'undefined';
+  const res = await fetchImpl(CNBB_API + date, noNavegador
+    ? { referrerPolicy: 'strict-origin-when-cross-origin' }
+    : { headers: { Referer: REFERER, 'User-Agent': 'Mozilla/5.0 (Songbook Liturgico)', Accept: 'application/json' } });
   if (!res.ok) throw new Error(`CNBB respondeu ${res.status} para ${date}`);
   const json = await res.json();
   if (!json || !json.content) throw new Error(`Liturgia de ${date} indisponível`);

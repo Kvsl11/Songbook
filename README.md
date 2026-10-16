@@ -32,9 +32,26 @@ Recursos inspirados no SongbookPro (reimplementados do zero, sem código do app 
 4. Para o salmo e a aclamação existe ainda a versão **"Texto oficial da CNBB"** (sem cifra), gerada em ChordPro.
 5. **Montar repertório da missa** baixa as cifras escolhidas, salva na biblioteca e cria o repertório do dia.
 
-## Como rodar
+## Como usar (link público pelo GitHub Pages)
 
-Requer Node.js 20+.
+O app roda **inteiro no navegador**: a API da CNBB e o WordPress da Cindy liberam CORS, então não é
+preciso servidor. O GitHub publica a pasta `public/` automaticamente pelo workflow
+`.github/workflows/pages.yml`.
+
+1. No GitHub, abra o repositório → **Settings** → **Pages**.
+2. Em **Build and deployment → Source**, escolha **GitHub Actions**.
+3. Abra a aba **Actions** → **Publicar no GitHub Pages** → **Run workflow** (ou faça qualquer push).
+4. Quando terminar, o link aparece no resumo do workflow e em Settings → Pages:
+   **https://kvsl11.github.io/Songbook-/**
+
+No celular, abra o link e use **"Adicionar à tela inicial"** para instalar como app.
+
+> Se o repositório for privado, o GitHub Pages exige um plano pago (Pro/Team). Com o plano gratuito,
+> o repositório precisa ser público.
+
+## Rodar localmente (opcional)
+
+Requer Node.js 20+. O servidor também expõe uma API `/api/*`, usada como reserva se a busca direta falhar.
 
 ```bash
 npm install
@@ -42,18 +59,18 @@ npm start            # http://localhost:3000  (PORT=8080 npm start para outra po
 npm test
 ```
 
-No celular, abra o endereço do servidor e use "Adicionar à tela inicial" para instalar como app (PWA).
-
 ## Arquitetura
 
 ```
 server/
-  index.js        servidor HTTP: arquivos estáticos + API /api/*  (cache em memória de 6h)
-  lib/cnbb.js     cliente/parser da Liturgia Diária da CNBB
-  lib/cindy.js    cliente do WordPress da Cindy Ferrarezi: busca, repertório (abas), cifras -> ChordPro
-  lib/missa.js    junta CNBB + Cindy na estrutura de partes da missa
+  index.js        servidor opcional: arquivos estáticos + API /api/* (cache em memória de 6h)
+  node-dom.js     registra o node-html-parser para os módulos compartilhados
 public/
   index.html, css/app.css, sw.js, manifest.webmanifest
+  js/lib/cnbb.js  cliente/parser da Liturgia Diária da CNBB          (navegador e Node)
+  js/lib/cindy.js cliente do WordPress da Cindy: busca, repertório, cifras -> ChordPro (navegador e Node)
+  js/lib/missa.js junta CNBB + Cindy na estrutura de partes da missa
+  js/fonte.js     busca direta + cache local, com o servidor como reserva
   js/chordpro.js  parser ChordPro, transposição, conversão "cifra sobre a letra" (usado também no servidor)
   js/render.js    ChordPro -> HTML
   js/store.js     biblioteca/repertórios/preferências em localStorage
@@ -76,8 +93,8 @@ test/             testes com node:test
 - **CNBB**: `https://www.cnbb.org.br/liturgia-diaria/` incorpora a aplicação Next.js
   `liturgiadiaria.edicoescnbb.com.br`. No bundle JavaScript dela está a chamada
   `GET https://api-liturgia.edicoescnbb.com.br/contents/in/date/AAAA-MM-DD`, que devolve
-  `{ content: { date, title, color, details, leituras, body } }` em HTML. A API responde **403** sem o
-  cabeçalho `Referer` do próprio site, por isso é consultada pelo servidor (e não direto do navegador).
+  `{ content: { date, title, color, details, leituras, body } }` em HTML. A API libera CORS (`*`), mas
+  responde **403** sem cabeçalho `Referer`. O navegador já envia um sozinho; no Node ele é informado.
   No `body`, títulos de seção vêm em `<font color="red">`, referências em `tomato`/`#ff6666`,
   e os marcadores `R.`/`V.` delimitam refrão, estrofes e versículo.
 - **Cindy Ferrarezi**: site WordPress com a API pública `/wp-json/wp/v2/posts` (busca, categorias, slug).

@@ -5,8 +5,18 @@
 //   cada aba lista links para os cantos daquela parte da missa.
 // - Cantos: plugin "WP Chords" -> <wpchord nota="G"></wpchord> antes da sílaba.
 
-import { parse } from 'node-html-parser';
 import { cleanLine, decodeEntities, normalize, stripTags } from './html.js';
+
+// Parser de HTML: DOMParser no navegador; no Node, registrado via setHtmlParser
+// (veja server/node-dom.js, que usa node-html-parser).
+let parseDoc = typeof DOMParser !== 'undefined' ? (html) => new DOMParser().parseFromString(html, 'text/html') : null;
+export function setHtmlParser(fn) { parseDoc = fn; }
+function parse(html) {
+  if (!parseDoc) throw new Error('Nenhum parser de HTML registrado');
+  return parseDoc(html);
+}
+const all = (el, sel) => Array.from(el.querySelectorAll(sel));
+const blockText = (el) => stripTags(el.innerHTML.replace(/<br\s*\/?>|<\/(p|div|h\d|li|tr)>/gi, '\n'));
 
 export const CINDY = 'https://cindyferrarezi.com';
 
@@ -16,7 +26,8 @@ export const CATEGORIAS = {
   aclamacao: [12703301],
 };
 
-const UA = { 'User-Agent': 'Mozilla/5.0 (Songbook Liturgico)', Accept: 'application/json' };
+const NO_NAVEGADOR = typeof window !== 'undefined';
+const UA = NO_NAVEGADOR ? { Accept: 'application/json' } : { 'User-Agent': 'Mozilla/5.0 (Songbook Liturgico)', Accept: 'application/json' };
 
 // O site limita requisições (HTTP 429): enfileira as chamadas e tenta de novo com espera.
 let fila = Promise.resolve();
@@ -128,24 +139,24 @@ const IGNORAR_LINK = /\.(pdf|jpg|png)$|\/(contato|doe-qualquer-valor|wp-content)
 export function parseRepertorio(html) {
   const root = parse(html);
   const partes = [];
-  for (const btn of root.querySelectorAll('.e-n-tab-title')) {
-    const nome = cleanLine(btn.querySelector('.e-n-tab-title-text')?.text || btn.text);
+  for (const btn of all(root, '.e-n-tab-title')) {
+    const nome = cleanLine(btn.querySelector('.e-n-tab-title-text')?.textContent || btn.textContent);
     const id = btn.getAttribute('aria-controls');
     const box = id && root.getElementById(id);
     if (!nome || !box || /^(missal|gradual)$/i.test(nome)) continue;
     const cantos = [];
     const vistos = new Set();
-    for (const a of box.querySelectorAll('a')) {
+    for (const a of all(box, 'a')) {
       const href = a.getAttribute('href') || '';
       if (!/^https:\/\/cindyferrarezi\.com\/20\d\d\//.test(href) || IGNORAR_LINK.test(href) || vistos.has(href)) continue;
-      a.querySelectorAll('svg,style').forEach((n) => n.remove());
-      const titulo = cleanLine(decodeEntities(a.text));
+      all(a, 'svg,style').forEach((n) => n.remove());
+      const titulo = cleanLine(a.textContent);
       if (!titulo) continue;
       vistos.add(href);
       cantos.push({ titulo, url: href });
     }
-    box.querySelectorAll('a,svg,style,script,button').forEach((n) => n.remove());
-    const texto = box.structuredText.split('\n').map((l) => cleanLine(decodeEntities(l))).filter(Boolean);
+    all(box, 'a,svg,style,script,button').forEach((n) => n.remove());
+    const texto = blockText(box).split('\n').map(cleanLine).filter(Boolean);
     // remove duplicatas consecutivas (o Elementor repete blocos aninhados)
     const linhas = texto.filter((l, i) => l !== texto[i - 1]);
     partes.push({ parte: nome, cantos, texto: linhas });
@@ -205,12 +216,12 @@ export function parseCanto(post) {
   if (body) corpo = wpChordsToChordPro(body);
   else {
     // sem cifras: usa o texto do post
-    const txt = root.querySelectorAll('p').map((p) => cleanLine(decodeEntities(p.text))).filter(Boolean);
+    const txt = all(root, 'p').map((p) => cleanLine(p.textContent)).filter(Boolean);
     corpo = txt.join('\n\n');
   }
   const titulo = post.titulo.replace(/\s+[–-]\s+(Cindy Ferrarezi)$/i, '');
   const cabecalho = [`{title: ${titulo}}`];
-  if (subt) cabecalho.push(`{subtitle: ${cleanLine(decodeEntities(subt.text))}}`);
+  if (subt) cabecalho.push(`{subtitle: ${cleanLine(subt.textContent)}}`);
   const k = /\[([A-G][#b]?m?)/.exec(corpo);
   if (k) cabecalho.push(`{key: ${k[1]}}`);
   cabecalho.push(`{source: ${post.url}}`);

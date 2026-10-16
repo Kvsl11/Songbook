@@ -2,6 +2,7 @@ import { db } from './store.js';
 import { esc, renderSong } from './render.js';
 import { chordsOverLyricsToChordPro, toChordPro } from './chordpro.js';
 import { icon } from './icons.js';
+import { getCanto, getMissa } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const view = $('#view');
@@ -23,13 +24,6 @@ function toast(msg, ms = 2600) {
   t.classList.add('show');
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => t.classList.remove('show'), ms);
-}
-
-async function api(path) {
-  const res = await fetch(path);
-  const data = await res.json().catch(() => ({ erro: `HTTP ${res.status}` }));
-  if (!res.ok || data.erro) throw new Error(data.erro || `HTTP ${res.status}`);
-  return data;
 }
 
 function setHeader(title, { back = null, actions = [], eyebrow = '' } = {}) {
@@ -536,6 +530,7 @@ function viewSetSong(id, index) {
 
 const CORES = { verde: '#2e7d32', roxo: '#6a1b9a', branco: '#b8952b', vermelho: '#c62828', rosa: '#d0467f', preto: '#2b2b2b', azul: '#1565c0' };
 const missaCache = new Map();
+let recarregar = false;
 const escolhas = new Map(); // data -> { chave: valor }
 const LEITURAS = ['leitura1', 'leitura2', 'evangelho', 'sequencia'];
 
@@ -578,7 +573,7 @@ async function viewLiturgia(data) {
   const ehHoje = data === hojeISO();
   setHeader('Liturgia Diária', {
     eyebrow: ehHoje ? 'Hoje' : fmtData(data),
-    actions: [{ icon: 'refresh', label: 'Recarregar', onClick: () => { missaCache.delete(data); viewLiturgia(data); } }],
+    actions: [{ icon: 'refresh', label: 'Recarregar', onClick: () => { missaCache.delete(data); recarregar = true; viewLiturgia(data); } }],
   });
   view.innerHTML = `
     <div class="date-bar">
@@ -593,7 +588,8 @@ async function viewLiturgia(data) {
   let missa = missaCache.get(data);
   try {
     if (!missa) {
-      missa = await api('/api/missa?data=' + data);
+      missa = await getMissa(data, { forcar: recarregar });
+      recarregar = false;
       missaCache.set(data, missa);
     }
   } catch (e) {
@@ -710,7 +706,7 @@ async function viewLiturgia(data) {
 
 async function songFromChoice(parte, valor, lit) {
   if (valor === 'cnbb') return { id: 'previa', content: parte.chordpro, source: `cnbb:${lit.data}:${parte.chave}`, transpose: 0, capo: 0 };
-  const c = await api('/api/cindy/canto?url=' + encodeURIComponent(valor));
+  const c = await getCanto(valor);
   return { id: 'previa', content: c.chordpro, source: c.url, transpose: 0, capo: 0 };
 }
 

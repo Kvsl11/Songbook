@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCanto, parseRepertorio, score, slugFromUrl, titulosAlvo, wpChordsToChordPro } from '../server/lib/cindy.js';
-import { chaveDaParte, montarEstrutura, salmoChordPro } from '../server/lib/missa.js';
+import '../server/node-dom.js';
+import { parseCanto, parseRepertorio, score, slugFromUrl, titulosAlvo, wpChordsToChordPro } from '../public/js/lib/cindy.js';
+import { chaveDaParte, montarEstrutura, salmoChordPro } from '../public/js/lib/missa.js';
 
 test('converte WP Chords em ChordPro, com refrão em negrito', () => {
   const html = `<wpchords><br />

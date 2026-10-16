@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseLiturgia } from '../server/lib/cnbb.js';
+import { parseLiturgia } from '../public/js/lib/cnbb.js';
 
 // Estrutura idêntica à resposta de api-liturgia.edicoescnbb.com.br (texto abreviado/fictício).
 const verso = (n, t) => `<div><div style="display: flex;flex-direction:row;align-items:flex-start"><div style="text-align: left; min-width: 30px; font-size: 12px; color: #FF0000">${n}</div><div><div style="flex: 1"><div>${t}</div></div></div></div></div>`;

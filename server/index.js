@@ -1,13 +1,14 @@
 // Servidor do Songbook Litúrgico: arquivos estáticos (PWA) + API proxy para
 // a Liturgia Diária da CNBB e os cantos de cindyferrarezi.com.
 
+import './node-dom.js';
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getLiturgia } from './lib/cnbb.js';
-import { buscarPorTexto, getCanto, getRepertorio, wpPosts } from './lib/cindy.js';
-import { getMissa } from './lib/missa.js';
+import { getLiturgia } from '../public/js/lib/cnbb.js';
+import { buscarPorTexto, getCanto, getRepertorio, wpPosts } from '../public/js/lib/cindy.js';
+import { getMissa } from '../public/js/lib/missa.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const PORT = Number(process.env.PORT || 3000);
