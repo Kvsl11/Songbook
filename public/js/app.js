@@ -38,7 +38,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-18';
+export const APP_VERSAO = '2026.10.16-19';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1072,7 +1072,14 @@ function viewSong(id, ctx = {}) {
       case 'f-': db.setPref('fontScale', Math.max(0.6, +(p.fontScale - 0.1).toFixed(2))); applyTheme(); break;
       case 'f+': db.setPref('fontScale', Math.min(2.5, +(p.fontScale + 0.1).toFixed(2))); applyTheme(); break;
       case 'chords': showChords = !showChords; b.setAttribute('aria-pressed', String(showChords)); break;
-      case 'cols': db.setPref('columns', !p.columns); b.setAttribute('aria-pressed', String(!p.columns)); toast(p.columns ? 'Uma coluna' : 'Letra em duas colunas'); break;
+      case 'cols': {
+        // prefs() devolve o próprio objeto salvo: guarda o novo valor antes de gravar
+        const duas = !p.columns;
+        db.setPref('columns', duas);
+        b.setAttribute('aria-pressed', String(duas));
+        toast(duas ? 'Letra em duas colunas' : 'Uma coluna');
+        break;
+      }
       case 's-': db.setPref('scrollSpeed', Math.max(1, p.scrollSpeed - 1)); break;
       case 's+': db.setPref('scrollSpeed', Math.min(20, p.scrollSpeed + 1)); break;
       case 'scroll':
