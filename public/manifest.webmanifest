@@ -7,7 +7,7 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#121212",
+  "background_color": "#1a9fbb",
   "theme_color": "#121212",
   "lang": "pt-BR",
   "categories": [
@@ -16,31 +16,31 @@
   ],
   "icons": [
     {
-      "src": "icon-192-v3.png",
+      "src": "icon-192-v4.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icon-512-v3.png",
+      "src": "icon-512-v4.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icon-maskable-192-v3.png",
+      "src": "icon-maskable-192-v4.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "icon-maskable-512-v3.png",
+      "src": "icon-maskable-512-v4.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "icon-palheta.svg",
+      "src": "icon.svg?v=4",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
