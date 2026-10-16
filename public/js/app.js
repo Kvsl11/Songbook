@@ -2,6 +2,7 @@ import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
 import { completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord } from './chordpro.js';
 import { icon, logo } from './icons.js';
+import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { buscarCindy, getCanto, getMissa, indiceMusicasParaMissa } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -37,7 +38,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-16';
+export const APP_VERSAO = '2026.10.16-17';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -318,6 +319,58 @@ function ask({ title, text = '', value = null, ok = 'Confirmar', danger = false 
     input?.addEventListener('keydown', (e) => e.key === 'Enter' && confirm());
     setTimeout(() => input?.select(), 30);
   });
+}
+
+// Opções do PDF: com/sem cifra, tamanho, colunas e (no repertório) uma música por página
+const PDF_PREF = 'songbook.pdf';
+function dialogoPdf({ repertorio = false, comCifraPossivel = true } = {}) {
+  let o = { comCifra: comCifraPossivel, tamanho: 'media', colunas: false, paginaPorMusica: true };
+  try { o = { ...o, ...JSON.parse(localStorage.getItem(PDF_PREF) || '{}') }; } catch { /* sem armazenamento */ }
+  if (!comCifraPossivel) o.comCifra = false;
+  const seg = (nome, val, txt, on) => `<button class="chip" data-${nome}="${val}" aria-pressed="${on}">${txt}</button>`;
+  return openDialog(`
+    <h3 style="display:flex;gap:8px;align-items:center">${icon('file', 20)} Exportar ${repertorio ? 'repertório' : 'música'} em PDF</h3>
+    <div class="pdf-opcoes">
+      <div><small>Conteúdo</small><div class="seg-tabs">${comCifraPossivel ? seg('cifra', '1', 'Com cifra', o.comCifra) : ''}${seg('cifra', '0', 'Só a letra', !o.comCifra)}</div></div>
+      <div><small>Tamanho da letra</small><div class="seg-tabs">${[['pequena', 'Pequena'], ['media', 'Média'], ['grande', 'Grande']].map(([v, t]) => seg('tam', v, t, o.tamanho === v)).join('')}</div></div>
+      <label class="check"><input type="checkbox" data-col ${o.colunas ? 'checked' : ''}> Letra em duas colunas</label>
+      ${repertorio ? `<label class="check"><input type="checkbox" data-pag ${o.paginaPorMusica ? 'checked' : ''}> Cada música começa numa página nova</label>
+        <small>Inclui capa com nome, data e a lista de músicas por parte da missa.</small>` : ''}
+      <small>Na janela que abrir, escolha <b>Salvar como PDF</b> (ou uma impressora).</small>
+    </div>
+    <div class="acts">${repertorio ? '<button class="btn ghost" data-json title="Arquivo para importar em outro aparelho">Backup (.json)</button>' : ''}<button class="btn ghost" data-no>Cancelar</button><button class="btn primary" data-ok>${icon('download', 16)} Gerar PDF</button></div>`,
+  (dlg, done) => {
+    const marcar = (attr, v) => dlg.querySelectorAll(`[data-${attr}]`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset[attr] === v)));
+    dlg.querySelectorAll('[data-cifra]').forEach((b) => (b.onclick = () => { o.comCifra = b.dataset.cifra === '1'; marcar('cifra', b.dataset.cifra); }));
+    dlg.querySelectorAll('[data-tam]').forEach((b) => (b.onclick = () => { o.tamanho = b.dataset.tam; marcar('tam', b.dataset.tam); }));
+    $('[data-no]', dlg).onclick = () => done(null);
+    const json = $('[data-json]', dlg);
+    if (json) json.onclick = () => done('json');
+    $('[data-ok]', dlg).onclick = () => {
+      o.colunas = $('[data-col]', dlg).checked;
+      const pag = $('[data-pag]', dlg);
+      if (pag) o.paginaPorMusica = pag.checked;
+      try { localStorage.setItem(PDF_PREF, JSON.stringify(o)); } catch { /* sem armazenamento */ }
+      done(o);
+    };
+  });
+}
+
+const nomeArquivo = (t) => String(t || 'Songbook').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+async function exportarMusicaPdf(song) {
+  const o = await dialogoPdf({ comCifraPossivel: temCifra(song.content || '') });
+  if (!o) return;
+  imprimir(htmlMusica(song, o), nomeArquivo(song.title + (o.comCifra ? ' (cifra)' : ' (letra)')));
+}
+
+async function exportarRepertorioPdf(set) {
+  const itens = set.items.map((it) => ({ song: db.song(it.songId), parte: it.label || '' })).filter((x) => x.song);
+  if (!itens.length) { toast('Repertório vazio'); return; }
+  const o = await dialogoPdf({ repertorio: true, comCifraPossivel: itens.some((x) => temCifra(x.song.content || '')) });
+  if (o === 'json') { exportSet(set); return; }
+  if (!o) return;
+  imprimir(htmlRepertorio(set, itens, o), nomeArquivo(set.name + (o.comCifra ? ' (cifras)' : ' (letras)')));
 }
 
 const linhaMusica = (s, extra = '') => `
@@ -793,6 +846,7 @@ function viewSong(id, ctx = {}) {
         : `<button class="icon-btn" id="btn-add" aria-label="Adicionar a repertório" title="Adicionar a repertório">${icon('plus', 24)}</button>
            <a class="icon-btn" href="#/editar/${song.id}" aria-label="Editar" title="Editar cifra">${icon('edit', 22)}</a>`}
       <button class="icon-btn" id="btn-palco" aria-label="Só a letra (tela cheia)" title="Só a letra, tela cheia">${icon('expand', 22)}</button>
+      <button class="icon-btn" id="btn-pdf" aria-label="Exportar PDF" title="Exportar em PDF (com ou sem cifra)">${icon('file', 22)}</button>
       ${ctx.set ? `<button class="icon-btn" id="btn-fila" aria-label="Fila do repertório" title="Fila: próximas músicas">${icon('queue', 24)}</button>` : ''}
       <div class="seg-tabs">${semCifra ? '<span class="chip sm" title="Esta música não tem acordes">Só letra</span>'
         : `<button class="chip" data-modo="cifra" aria-pressed="${modo === 'cifra'}" title="Mostrar a letra com os acordes">Cifra</button><button class="chip" data-modo="letra" aria-pressed="${modo === 'letra'}" title="Mostrar só a letra, sem acordes">Letra</button>`}</div>
@@ -889,6 +943,7 @@ function viewSong(id, ctx = {}) {
     songEl.scrollIntoView({ block: 'start' });
   }
   $('#btn-palco').onclick = entrarPalco;
+  $('#btn-pdf').onclick = () => exportarMusicaPdf({ ...song, transpose, capo });
   $('#palco-ctrl').addEventListener('click', (e) => {
     const b = e.target.closest('[data-palco]');
     if (!b) return;
@@ -1277,7 +1332,7 @@ function viewSet(id) {
       <button class="icon-btn" id="add" aria-label="Adicionar música da biblioteca" title="Adicionar música da biblioteca">${icon('plus', 24)}</button>
       <a class="btn small" href="#/editar/novo/${id}" title="Escrever uma música nova (letra, cifra, estrutura) e já colocar neste repertório">${icon('edit', 15)} Criar música</a>
       <button class="icon-btn" id="ren" aria-label="Renomear" title="Renomear">${icon('edit', 22)}</button>
-      <button class="icon-btn" id="exp" aria-label="Exportar" title="Exportar repertório">${icon('download', 22)}</button>
+      ${set.items.length ? `<button class="btn small" id="exp" title="Exportar o repertório inteiro em PDF (com ou sem cifra) ou backup">${icon('file', 15)} Exportar PDF</button>` : ''}
       <button class="icon-btn danger" id="del" aria-label="Excluir repertório" title="Excluir">${icon('trash', 22)}</button>
       <div class="seg-tabs" style="min-width:190px">${campoData('set-date', set.date, 'Data do repertório')}</div>
     </div>
@@ -1294,7 +1349,7 @@ function viewSet(id) {
     viewSet(id);
   };
   $('#ren').onclick = async () => { const n = await ask({ title: 'Renomear repertório', value: set.name, ok: 'Salvar' }); if (n) { set.name = n; db.saveSet(set); desenharLateral(); viewSet(id); } };
-  $('#exp').onclick = () => exportSet(set);
+  $('#exp')?.addEventListener('click', () => exportarRepertorioPdf(set));
   $('#del').onclick = async () => {
     if (await ask({ title: 'Excluir repertório?', text: `“${set.name}” será apagado. As músicas continuam na biblioteca.`, ok: 'Excluir', danger: true })) {
       db.deleteSet(id); desenharLateral(); toast('Repertório excluído'); location.hash = '#/biblioteca/repertorios';
