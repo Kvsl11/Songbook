@@ -39,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-29';
+export const APP_VERSAO = '2026.10.16-30';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2022,11 +2022,12 @@ route();
 // Service worker: sempre procura a versão nova; quando ela assume, recarrega a página uma vez.
 // ---------------------------------------------------------------- instalar como app
 // O Chrome só mostra o aviso automático uma vez; o app guarda o pedido e mostra o próprio convite.
+// (funções declaradas: a tela de Ajustes pode ser desenhada antes deste trecho rodar)
 let pedidoInstalar = null;
 const CHAVE_ADIADO = 'songbook.instalar.adiado';
-const jaInstalado = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-const ehIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const adiado = () => { try { return Date.now() - Number(localStorage.getItem(CHAVE_ADIADO) || 0) < 7 * 864e5; } catch { return false; } };
+function jaInstalado() { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }
+function ehIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function adiado() { try { return Date.now() - Number(localStorage.getItem('songbook.instalar.adiado') || 0) < 7 * 864e5; } catch { return false; } }
 
 async function instalarApp() {
   if (pedidoInstalar) {
