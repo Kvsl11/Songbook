@@ -56,17 +56,27 @@ const P = {
   gauge: '<path d="M12 14l4-4"/><path d="M3.3 19a10 10 0 1 1 17.4 0"/>',
 };
 
-// versões preenchidas (aba selecionada no menu, como no Spotify)
-const CHEIOS = {
-  home: '<path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" fill="currentColor"/>',
-  search: '<circle cx="11" cy="11" r="7" stroke-width="3.2"/><path d="M21 21l-4.3-4.3" stroke-width="3.2"/>',
-  library: '<rect x="3" y="3" width="3" height="18" rx="1" fill="currentColor" stroke="none"/><rect x="8" y="3" width="3" height="18" rx="1" fill="currentColor" stroke="none"/><path d="M13.2 4.6l2.9-.9 5 15.7-2.9.9z" fill="currentColor" stroke-width="1.2"/>',
-  cross: '<path d="M12 2v20M6 8h12" stroke-width="3.6"/>',
-  book: '<path d="M2 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8z" fill="currentColor"/>',
+// Ícones do menu no estilo Spotify (desenhos próprios): contorno quando normal, preenchido na aba selecionada.
+const CASA = 'M12 2.8 2.9 10.1a1.2 1.2 0 0 0-.4.9v9.8c0 .7.5 1.2 1.2 1.2H9V15.5c0-.4.3-.7.7-.7h4.6c.4 0 .7.3.7.7V22h5.3c.7 0 1.2-.5 1.2-1.2V11a1.2 1.2 0 0 0-.4-.9z';
+const CRUZ = 'M10.6 2h2.8c.5 0 .8.4.8.8V7h3.9c.5 0 .8.4.8.8v2.4c0 .5-.4.8-.8.8h-3.9v10.2c0 .5-.4.8-.8.8h-2.8c-.5 0-.8-.4-.8-.8V11H5.9c-.5 0-.8-.4-.8-.8V7.8c0-.5.4-.8.8-.8h3.9V2.8c0-.5.4-.8.8-.8z';
+const LIVRO = 'M12 6.2C10.3 4.8 7.6 4 3.8 4H2.5v15.5h1.3c3.6 0 6.3.8 8.2 2.3 1.9-1.5 4.6-2.3 8.2-2.3h1.3V4h-1.3c-3.8 0-6.5.8-8.2 2.2z';
+const MENU = {
+  home: { off: `<path d="${CASA}" stroke-width="1.9"/>`, on: `<path d="${CASA}" fill="currentColor" stroke-width="1.2"/>` },
+  search: {
+    off: '<circle cx="10.5" cy="10.5" r="7.2" stroke-width="2"/><path d="m16 16 5.5 5.5" stroke-width="2"/>',
+    on: '<circle cx="10.5" cy="10.5" r="7" stroke-width="3.4"/><path d="m16 16 5.3 5.3" stroke-width="3.4"/>',
+  },
+  library: {
+    off: '<path d="M3.5 3v18M8.5 3v18" stroke-width="2"/><rect x="13.2" y="3.2" width="4.6" height="17.8" rx="1" transform="rotate(-14 15.5 12.1)" stroke-width="1.9"/>',
+    on: '<rect x="2.4" y="2.5" width="2.6" height="19" rx="1" fill="currentColor" stroke="none"/><rect x="7.2" y="2.5" width="2.6" height="19" rx="1" fill="currentColor" stroke="none"/><rect x="13" y="3" width="5" height="18.2" rx="1" transform="rotate(-14 15.5 12.1)" fill="currentColor" stroke="none"/>',
+  },
+  cross: { off: `<path d="${CRUZ}" stroke-width="1.8"/>`, on: `<path d="${CRUZ}" fill="currentColor" stroke-width="1"/>` },
+  book: { off: `<path d="${LIVRO}" stroke-width="1.9"/><path d="M12 6.2v15.6" stroke-width="1.9"/>`, on: `<path d="${LIVRO}" fill="currentColor" stroke-width="1.2"/><path d="M12 7v14" stroke="var(--bg, #121212)" stroke-width="1.4"/>` },
 };
-// ícone do menu: contorno quando normal, preenchido quando a aba está selecionada
-export function iconeMenu(name, size = 22) {
-  return CHEIOS[name] ? `<span class="ic-off">${icon(name, size)}</span><span class="ic-on">${icon(name, size).replace(P[name], CHEIOS[name])}</span>` : icon(name, size);
+const svgMenu = (conteudo, size) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${conteudo}</svg>`;
+export function iconeMenu(name, size = 24) {
+  const m = MENU[name];
+  return m ? `<span class="ic-off">${svgMenu(m.off, size)}</span><span class="ic-on">${svgMenu(m.on, size)}</span>` : icon(name, size);
 }
 
 export function icon(name, size = 20, extra = '') {
