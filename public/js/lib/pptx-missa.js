@@ -27,6 +27,8 @@ const BASE_MAX = 5704791; // acima dos botões Reinic./Encerr.
 const LARGURA_PT = (8903969 - 2 * 91425) / EMU_PT;
 
 // Partes da missa que têm slides de canto no modelo, reconhecidas pelo cabeçalho do slide
+import { ehInstrumental } from '../chordpro.js';
+
 export const PARTES_PPTX = [
   { chave: 'entrada', nome: 'Entrada', re: /procissão de entrada/i, canto: /entrada|abertura/i },
   { chave: 'coleta', nome: 'Coleta fraterna', re: /coleta fraterna/i, canto: /coleta/i },
@@ -49,7 +51,7 @@ export function blocosDoCanto(parseChordPro, content, { repetirRefrao = true } =
     const linhas = s.lines
       .filter((l) => l.kind === 'lyrics')
       .map((l) => l.segments.map((x) => x.text).join('').replace(/\s+/g, ' ').trim())
-      .filter(Boolean);
+      .filter((t) => t && !ehInstrumental(t));
     if (linhas.length) blocos.push({ refrao: s.type === 'chorus', linhas });
   }
   const refroes = blocos.filter((b) => b.refrao);

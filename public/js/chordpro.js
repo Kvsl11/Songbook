@@ -308,3 +308,14 @@ export function completarCifra(src) {
   });
   return { texto: linhas.join('\n'), completadas };
 }
+
+// Linha só de instrumento (não é letra): "Intro: bm g c am d", "Solo: G D", "Final: C"
+// ou só acordes escritos como texto (inclusive em minúsculas). Some quando se mostra só a letra.
+const ACORDE_TXT = /^[a-g][#b]?(m|maj|min|dim|aug|sus|add)?\d*(\/[a-g][#b]?)?$/i;
+export function ehInstrumental(texto) {
+  const t = String(texto || '').trim();
+  if (!t) return false;
+  if (/^(intro(du[cç][aã]o)?|solo|riff|interl[uú]dio|ponte instrumental|instrumental|final|tom)\b\s*[:\-–]/i.test(t)) return true;
+  const partes = t.replace(/[|()\[\]\-–.,]/g, ' ').split(/\s+/).filter((x) => x && !/^(\d+x|x\d+|bis)$/i.test(x));
+  return partes.length >= 2 && partes.every((x) => ACORDE_TXT.test(x));
+}

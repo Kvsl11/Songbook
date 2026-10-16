@@ -43,8 +43,11 @@ function rodape(texto) {
 
 const classes = (o) => ['pdf', `pdf-${o.tamanho || 'media'}`, o.colunas ? 'pdf-colunas' : '', o.paginaPorMusica ? 'pdf-quebra' : ''].filter(Boolean).join(' ');
 
+// cor do PDF: a cor escolhida no app (já escurecida para ficar legível no papel)
+const estilo = (o) => (o.cor ? ` style="--pdf-cor:${o.cor}"` : '');
+
 export function htmlMusica(song, opcoes) {
-  return `<div class="${classes(opcoes)}">${blocoMusica(song, opcoes)}${rodape('Songbook Litúrgico')}</div>`;
+  return `<div class="${classes(opcoes)}"${estilo(opcoes)}>${blocoMusica(song, opcoes)}${rodape('Songbook Litúrgico')}</div>`;
 }
 
 // itens: [{ song, parte }]
@@ -64,7 +67,7 @@ export function htmlRepertorio(set, itens, opcoes) {
       </table>
     </section>`;
   const corpo = itens.map(({ song, parte }, i) => blocoMusica(song, { ...opcoes, numero: i + 1, parte })).join('');
-  return `<div class="${classes(opcoes)}">${capa}${corpo}${rodape(`${set.name}${data ? ' · ' + data : ''} · Songbook Litúrgico`)}</div>`;
+  return `<div class="${classes(opcoes)}"${estilo(opcoes)}>${capa}${corpo}${rodape(`${set.name}${data ? ' · ' + data : ''} · Songbook Litúrgico`)}</div>`;
 }
 
 // Abre a impressão; o nome sugerido do PDF vem do título da página

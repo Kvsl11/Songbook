@@ -39,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-38';
+export const APP_VERSAO = '2026.10.16-39';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -364,10 +364,17 @@ function dialogoPdf({ repertorio = false, comCifraPossivel = true } = {}) {
 
 const nomeArquivo = (t) => String(t || 'Songbook').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
 
+// cor do PDF = cor escolhida no app; cores claras (ciano, dourado…) são escurecidas para ler bem no papel
+function corDoPdf() {
+  const c = hexRgb(corDestaque());
+  const L = luminancia(c);
+  return rgbHex(L > 0.18 ? mistura(c, [0, 0, 0], Math.min(0.55, 0.25 + L * 0.5)) : c);
+}
+
 async function exportarMusicaPdf(song) {
   const o = await dialogoPdf({ comCifraPossivel: temCifra(song.content || '') });
   if (!o) return;
-  imprimir(htmlMusica(song, o), nomeArquivo(song.title + (o.comCifra ? ' (cifra)' : ' (letra)')));
+  imprimir(htmlMusica(song, { ...o, cor: corDoPdf() }), nomeArquivo(song.title + (o.comCifra ? ' (cifra)' : ' (letra)')));
 }
 
 async function exportarRepertorioPdf(set) {
@@ -376,7 +383,7 @@ async function exportarRepertorioPdf(set) {
   const o = await dialogoPdf({ repertorio: true, comCifraPossivel: itens.some((x) => temCifra(x.song.content || '')) });
   if (o === 'json') { exportSet(set); return; }
   if (!o) return;
-  imprimir(htmlRepertorio(set, itens, o), nomeArquivo(set.name + (o.comCifra ? ' (cifras)' : ' (letras)')));
+  imprimir(htmlRepertorio(set, itens, { ...o, cor: corDoPdf() }), nomeArquivo(set.name + (o.comCifra ? ' (cifras)' : ' (letras)')));
 }
 
 // ---------------------------------------------------------------- PowerPoint da missa
