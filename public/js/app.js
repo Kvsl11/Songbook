@@ -39,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-36';
+export const APP_VERSAO = '2026.10.16-37';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -730,6 +730,38 @@ const openImport = () => $('#file-input').click();
 
 // ------------------------------------------------------------- início
 
+// Significado das cores litúrgicas e por que a cor do dia pode ser diferente da cor do tempo
+const SENTIDO_COR = {
+  verde: 'esperança e crescimento na fé',
+  roxo: 'penitência, conversão e preparação',
+  branco: 'alegria, pureza e glória',
+  vermelho: 'Espírito Santo e sangue dos mártires',
+  rosa: 'alegria no meio da espera',
+  preto: 'luto e esperança na ressurreição',
+  azul: 'Nossa Senhora (uso local)',
+};
+const COR_DO_TEMPO = [[/comum/i, 'verde'], [/advento|quaresma/i, 'roxo'], [/natal|páscoa|pascal/i, 'branco']];
+function corLiturgica(lit) {
+  const cor = String(lit.cor || '').toLowerCase();
+  const nome = cor ? cor[0].toUpperCase() + cor.slice(1) : '';
+  const padrao = (COR_DO_TEMPO.find(([re]) => re.test(lit.tempo || '')) || [])[1];
+  let motivo = '';
+  if (padrao && cor && cor !== padrao) {
+    if (cor === 'rosa') motivo = 'Domingo da alegria (Gaudete/Laetare): o roxo dá lugar ao rosa.';
+    else if (lit.grau) motivo = `Hoje é ${lit.grau.toLowerCase()}: ${lit.celebracao}. Por isso a cor não é a do tempo (${padrao}).`;
+    else motivo = `Hoje há memória facultativa de santo(a). Se ela não for celebrada, usa-se o ${padrao} do ${lit.tempo}.`;
+  }
+  return { cor, nome, sentido: SENTIDO_COR[cor] || '', motivo };
+}
+// cartão da liturgia: tempo no topo; cor do dia com o significado (e o motivo, se não for a cor do tempo)
+const linhaCor = (lit) => `<div class="over">${esc(lit.tempo)}</div>`;
+const blocoCor = (lit) => {
+  const c = corLiturgica(lit);
+  if (!c.cor) return '';
+  return `<div class="cor-dia"><span class="dot" style="background:${c.cor === 'branco' ? '#fff' : CORES[c.cor] || 'currentColor'}"></span>
+    <span><b>Cor ${esc(({ branco: 'branca', vermelho: 'vermelha', roxo: 'roxa', preto: 'preta' })[c.cor] || c.cor)}</b>${c.sentido ? ` — ${esc(c.sentido)}` : ''}${c.motivo ? `<small>${esc(c.motivo)}</small>` : ''}</span></div>`;
+};
+
 const CORES = { verde: '#2e7d32', roxo: '#6a1b9a', branco: '#b8952b', vermelho: '#c62828', rosa: '#d0467f', preto: '#2b2b2b', azul: '#1565c0' };
 
 function tileMusica(s) {
@@ -799,9 +831,10 @@ function viewHome() {
     const sugestoes = m ? m.partes.reduce((n, p) => n + p.cantos.length, 0) : 0;
     box.innerHTML = `
       <section class="hero ${lit.cor === 'branco' ? 'claro' : ''}">
-        <div class="over"><span class="dot"></span>${esc(lit.tempo)} · ${esc(lit.cor)}</div>
+        ${linhaCor(lit)}
         <h2>${esc(lit.celebracao)}</h2>
         <div class="sub">${esc([lit.data_extenso, lit.ano].filter(Boolean).join(' · '))}</div>
+        ${blocoCor(lit)}
         ${salmo ? `<div class="salmo">Salmo: “${esc(salmo.refrao)}”</div>` : ''}
         ${lit.leituras?.length ? `<div class="refs">${lit.leituras.map((l) => `<span>${esc(l)}</span>`).join('')}</div>` : ''}
         <div class="acts"><a class="btn white" href="#/liturgia/${hoje}">${icon('sparkles', 16)} Montar a missa</a>
@@ -1752,9 +1785,10 @@ async function viewLiturgia(data) {
   for (const p of missa.partes) if (!LEITURAS.includes(p.chave)) numeros[p.chave] = ++passo;
   $('#lit').innerHTML = `
     <section class="hero ${lit.cor === 'branco' ? 'claro' : ''}">
-      <div class="over"><span class="dot"></span>${esc(lit.tempo)} · ${esc(lit.cor)}</div>
+      ${linhaCor(lit)}
       <h2>${esc(lit.celebracao)}</h2>
       <div class="sub">${esc([lit.data_extenso, lit.grau, lit.ano, lit.semana !== lit.celebracao ? lit.semana : ''].filter(Boolean).join(' · '))}</div>
+        ${blocoCor(lit)}
       ${lit.observacao ? `<div class="obs">${esc(lit.observacao)}</div>` : ''}
       <div class="refs">${lit.leituras.map((l) => `<span>${esc(l)}</span>`).join('')}</div>
     </section>
