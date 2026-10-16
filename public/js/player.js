@@ -1,13 +1,14 @@
-// Mini player do YouTube que continua tocando enquanto se navega pelo app.
-// Usa o iframe "embed" com enablejsapi=1 e comandos via postMessage
-// (sem carregar a biblioteca externa da API do YouTube).
+// Player do YouTube que continua tocando enquanto se navega pelo app.
+// O vídeo fica embutido na própria barra do player (no lugar da capa), sem abrir
+// janela; o botão de ampliar mostra o vídeo grande. Usa o iframe "embed" com
+// enablejsapi=1 e comandos via postMessage (sem a biblioteca externa da API).
 import { icon } from './icons.js';
 import { esc } from './render.js';
 
 const root = document.getElementById('player');
 let atual = null; // { id, titulo, subtitulo, capa, href }
 let tocando = false;
-let videoAberto = true;
+let grande = false;
 const ouvintes = new Set();
 
 const thumb = (id) => `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
@@ -25,31 +26,42 @@ function avisar() {
 export const estado = () => ({ id: atual?.id || null, tocando });
 export const aoMudar = (fn) => { ouvintes.add(fn); return () => ouvintes.delete(fn); };
 
+function src(id) {
+  const p = new URLSearchParams({ autoplay: '1', playsinline: '1', enablejsapi: '1', rel: '0', modestbranding: '1' });
+  if (/^https?:/.test(location.origin)) p.set('origin', location.origin);
+  return `https://www.youtube.com/embed/${encodeURIComponent(id)}?${p}`;
+}
+
 function desenhar() {
   if (!atual) { root.hidden = true; root.innerHTML = ''; return; }
   root.hidden = false;
   root.innerHTML = `
-    <div class="pl-video ${videoAberto ? '' : 'fechado'}">
-      <iframe src="https://www.youtube.com/embed/${encodeURIComponent(atual.id)}?autoplay=1&playsinline=1&enablejsapi=1&rel=0&modestbranding=1"
-        title="${esc(atual.titulo)}" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-    </div>
     <div class="pl-bar">
+      <div class="pl-video ${grande ? 'grande' : ''}">
+        <iframe src="${src(atual.id)}" title="${esc(atual.titulo)}"
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      </div>
       <a class="pl-info" href="${esc(atual.href || '#')}">
-        <img src="${esc(atual.capa || thumb(atual.id))}" alt="" loading="lazy">
-        <span><b>${esc(atual.titulo)}</b><small>${esc(atual.subtitulo || 'Referência no YouTube')}</small></span>
+        <b>${esc(atual.titulo)}</b><small>${icon('youtube', 12)} ${esc(atual.subtitulo || 'Referência no YouTube')}</small>
       </a>
       <div class="pl-ctrl">
-        <button class="icon-btn" data-pl="video" aria-label="${videoAberto ? 'Esconder vídeo' : 'Mostrar vídeo'}" title="${videoAberto ? 'Esconder vídeo' : 'Mostrar vídeo'}">${icon(videoAberto ? 'down' : 'video', 20)}</button>
         <button class="pl-play" data-pl="toggle" aria-label="${tocando ? 'Pausar' : 'Tocar'}">${icon(tocando ? 'pause' : 'play', 18)}</button>
+        <button class="icon-btn" data-pl="grande" aria-pressed="${grande}" aria-label="Ampliar vídeo" title="Ampliar / reduzir vídeo">${icon(grande ? 'shrink' : 'expand', 18)}</button>
         <a class="icon-btn" href="https://www.youtube.com/watch?v=${encodeURIComponent(atual.id)}" target="_blank" rel="noopener" aria-label="Abrir no YouTube" title="Abrir no YouTube">${icon('external', 18)}</a>
         <button class="icon-btn" data-pl="fechar" aria-label="Fechar player" title="Fechar">${icon('x', 20)}</button>
       </div>
     </div>`;
+  const f = root.querySelector('iframe');
+  // pede ao iframe para mandar eventos de estado (tocando/pausado)
+  f.addEventListener('load', () => f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'));
 }
 
 function atualizarBotoes() {
   const b = root.querySelector('[data-pl="toggle"]');
   if (b) { b.innerHTML = icon(tocando ? 'pause' : 'play', 18); b.setAttribute('aria-label', tocando ? 'Pausar' : 'Tocar'); }
+  const g = root.querySelector('[data-pl="grande"]');
+  if (g) { g.innerHTML = icon(grande ? 'shrink' : 'expand', 18); g.setAttribute('aria-pressed', String(grande)); }
+  root.querySelector('.pl-video')?.classList.toggle('grande', grande);
 }
 
 root.addEventListener('click', (e) => {
@@ -57,17 +69,14 @@ root.addEventListener('click', (e) => {
   if (!b) return;
   if (b.dataset.pl === 'toggle') { tocando ? pausar() : retomar(); }
   if (b.dataset.pl === 'fechar') fechar();
-  if (b.dataset.pl === 'video') {
-    videoAberto = !videoAberto;
-    root.querySelector('.pl-video').classList.toggle('fechado', !videoAberto);
-    b.innerHTML = icon(videoAberto ? 'down' : 'video', 20);
-    b.setAttribute('aria-label', videoAberto ? 'Esconder vídeo' : 'Mostrar vídeo');
-  }
+  if (b.dataset.pl === 'grande') { grande = !grande; atualizarBotoes(); }
 });
 
-// eventos do iframe (estado de reprodução) quando o YouTube os envia
+// eventos do iframe (estado de reprodução) enviados pelo YouTube
 window.addEventListener('message', (e) => {
-  if (!/youtube\.com$/.test(new URL(e.origin || 'http://x').hostname)) return;
+  let host = '';
+  try { host = new URL(e.origin).hostname; } catch { return; }
+  if (!/(^|\.)youtube(-nocookie)?\.com$/.test(host)) return;
   try {
     const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
     const st = d?.info?.playerState;
@@ -80,24 +89,18 @@ export function tocar(item) {
   if (atual?.id === item.id) { tocando ? pausar() : retomar(); return; }
   atual = item;
   tocando = true;
-  videoAberto = true;
   desenhar();
-  const f = root.querySelector('iframe');
-  // pede ao iframe para mandar eventos de estado
-  f.addEventListener('load', () => f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'));
   avisar();
 }
 
-// esconde o vídeo (o áudio continua) — usado ao sair da tela da música no celular
+// reduz o vídeo para a barra (o áudio continua) — usado ao trocar de tela no celular
 export function recolherVideo() {
-  if (!atual || !videoAberto) return;
-  videoAberto = false;
-  root.querySelector('.pl-video')?.classList.add('fechado');
-  const b = root.querySelector('[data-pl="video"]');
-  if (b) { b.innerHTML = icon('video', 20); b.setAttribute('aria-label', 'Mostrar vídeo'); }
+  if (!grande) return;
+  grande = false;
+  atualizarBotoes();
 }
 
 export function pausar() { comando('pauseVideo'); tocando = false; atualizarBotoes(); avisar(); }
 export function retomar() { comando('playVideo'); tocando = true; atualizarBotoes(); avisar(); }
-export function fechar() { atual = null; tocando = false; desenhar(); avisar(); }
+export function fechar() { atual = null; tocando = false; grande = false; desenhar(); avisar(); }
 export { thumb };

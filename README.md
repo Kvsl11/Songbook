@@ -21,6 +21,11 @@ Visual escuro inspirado no Spotify, com capas, cabeçalhos em degradê e player 
   (mini player no celular; barra inferior e janela de vídeo no computador).
 - **Repertórios** com cara de playlist: capa em mosaico, tocar em sequência, reordenar,
   avançar/voltar por gesto, setas ou pedal (PageUp/PageDown).
+- **Editor de cifra**: campos de título, autor, tom e vídeo; prévia ao vivo; acordes do tom para
+  inserir com um toque; transposição permanente; conversão de "cifra sobre a letra". Cantos vindos da
+  busca ou da liturgia também podem ser editados (são salvos na biblioteca antes).
+- **Personalização**: modo escuro, claro ou automático; 8 cores de destaque, cor livre ou a
+  **cor litúrgica do dia**; menu lateral recolhível no computador.
 - Importa `.cho/.chopro/.pro/.txt` (inclusive "cifra sobre a letra"), exporta e faz backup. PWA instalável e offline.
 
 ### Liturgia Diária (aba ✝)

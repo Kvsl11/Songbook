@@ -1,7 +1,7 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
-import { chordsOverLyricsToChordPro, toChordPro } from './chordpro.js';
-import { icon } from './icons.js';
+import { chordsOverLyricsToChordPro, toChordPro, transposeChordPro, transposeKey, transposeChord } from './chordpro.js';
+import { icon, logo } from './icons.js';
 import { buscarCindy, getCanto, getMissa } from './fonte.js';
 import * as player from './player.js';
 
@@ -15,6 +15,23 @@ const topbar = $('.topbar');
 
 backBtn.innerHTML = icon('back', 20);
 document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = icon(el.dataset.icon, 22); });
+$('#brand-logo').innerHTML = logo(36);
+
+// menu lateral recolhível (computador)
+$('#btn-side').addEventListener('click', () => {
+  const v = !db.prefs().sideCollapsed;
+  db.setPref('sideCollapsed', v);
+  document.documentElement.classList.toggle('side-collapsed', v);
+  $('#btn-side').setAttribute('aria-label', v ? 'Expandir menu' : 'Recolher menu');
+});
+// alternância rápida claro/escuro
+function alternarTema() {
+  const atual = document.documentElement.dataset.theme;
+  db.setPref('theme', atual === 'light' ? 'dark' : 'light');
+  applyTheme();
+  if (location.hash.startsWith('#/ajustes')) viewSettings();
+}
+$('#btn-tema').addEventListener('click', alternarTema);
 view.addEventListener('scroll', () => topbar.classList.toggle('scrolled', view.scrollTop > 120), { passive: true });
 
 // imagens de capa que falharem viram capa gerada
@@ -121,10 +138,69 @@ function capaRepertorio(set, cls = '') {
   return `<div class="cover gen ${cls}" style="--h:${hue(set.name)}">${icon('list', 24)}</div>`;
 }
 
+// ---------------------------------------------------------------- tema e cor de destaque
+const CORES_DESTAQUE = [
+  ['#1ed760', 'Verde'], ['#3b82f6', 'Azul'], ['#a855f7', 'Roxo'], ['#ec4899', 'Rosa'],
+  ['#ef4444', 'Vermelho'], ['#f97316', 'Laranja'], ['#e3b341', 'Dourado'], ['#06b6d4', 'Ciano'],
+];
+// cor de destaque quando a opção "cor litúrgica do dia" está ativa
+const COR_LIT_DESTAQUE = { verde: '#1ed760', roxo: '#a855f7', vermelho: '#ef4444', branco: '#e3b341', rosa: '#ec4899', azul: '#3b82f6', preto: '#9ca3af' };
+
+const hexRgb = (h) => { const n = parseInt(String(h).replace('#', '').slice(0, 6), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const rgbHex = (c) => '#' + c.map((x) => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join('');
+const mistura = (a, b, t) => a.map((x, i) => x + (b[i] - x) * t);
+const luminancia = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+
+function temaEfetivo() {
+  const t = db.prefs().theme || 'dark';
+  if (t !== 'auto') return t;
+  return matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+function corDestaque() {
+  const { accent, litHoje } = db.prefs();
+  if (accent === 'liturgico') return COR_LIT_DESTAQUE[litHoje?.cor] || '#1ed760';
+  return /^#[\da-f]{6}$/i.test(accent || '') ? accent : '#1ed760';
+}
+
 function applyTheme() {
-  const { theme, fontScale } = db.prefs();
-  document.documentElement.dataset.theme = theme || 'dark';
-  document.documentElement.style.setProperty('--font-scale', fontScale);
+  const { fontScale } = db.prefs();
+  const tema = temaEfetivo();
+  const root = document.documentElement;
+  root.dataset.theme = tema;
+  root.style.setProperty('--font-scale', fontScale);
+  const c = hexRgb(corDestaque());
+  const L = luminancia(c);
+  const branco = [255, 255, 255];
+  const preto = [0, 0, 0];
+  // cor de texto/ícone legível sobre o fundo atual
+  const ink = tema === 'light' ? (L > 0.3 ? mistura(c, preto, 0.42) : c) : (L < 0.12 ? mistura(c, branco, 0.45) : c);
+  const vars = {
+    '--accent': rgbHex(c),
+    '--accent-2': rgbHex(mistura(c, branco, 0.12)),
+    '--accent-deep': rgbHex(mistura(c, preto, 0.45)),
+    '--accent-soft': `rgb(${c.join(' ')} / ${tema === 'light' ? 0.14 : 0.16})`,
+    '--accent-ink': rgbHex(ink),
+    '--on-accent': L > 0.36 ? '#000' : '#fff',
+    '--chord': rgbHex(ink),
+    '--chorus-bar': rgbHex(c),
+    '--logo-ink': rgbHex(mistura(c, preto, 0.82)),
+  };
+  for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = tema === 'light' ? '#ffffff' : '#121212';
+  const bt = $('#btn-tema');
+  if (bt) { bt.innerHTML = icon(tema === 'light' ? 'moon' : 'sun', 20); bt.title = tema === 'light' ? 'Mudar para escuro' : 'Mudar para claro'; }
+}
+matchMedia('(prefers-color-scheme: light)').addEventListener?.('change', () => { if (db.prefs().theme === 'auto') applyTheme(); });
+
+// guarda a cor litúrgica de hoje (para a opção "cor litúrgica do dia")
+function lembrarCorLiturgica(data, cor) {
+  if (data !== hojeISO()) return;
+  const atual = db.prefs().litHoje;
+  if (atual?.data === data && atual?.cor === cor) return;
+  db.setPref('litHoje', { data, cor });
+  if (db.prefs().accent === 'liturgico') applyTheme();
 }
 
 function tocarReferencia(song, href) {
@@ -251,12 +327,14 @@ const openImport = () => $('#file-input').click();
 const CORES = { verde: '#2e7d32', roxo: '#6a1b9a', branco: '#b8952b', vermelho: '#c62828', rosa: '#d0467f', preto: '#2b2b2b', azul: '#1565c0' };
 
 function tileMusica(s) {
-  return `<a class="tile" href="#/musica/${s.id}">${capa(s)}<b>${esc(s.title)}</b><small>${esc(s.artist || (s.key ? 'Tom ' + s.key : 'Cifra'))}</small>
-    ${s.youtube ? `<button class="tile-play" data-play="${s.id}" aria-label="Tocar referência" style="top:calc(100% - 112px)">${icon('play', 18)}</button>` : ''}</a>`;
+  return `<a class="tile" href="#/musica/${s.id}"><div class="tile-art">${capa(s)}
+    ${s.youtube ? `<button class="tile-play" data-play="${s.id}" aria-label="Tocar referência">${icon('play', 18)}</button>` : ''}</div>
+    <b>${esc(s.title)}</b><small>${esc(s.artist || (s.key ? 'Tom ' + s.key : 'Cifra'))}</small></a>`;
 }
 function tileRepertorio(s) {
-  return `<a class="tile" href="#/repertorio/${s.id}">${capaRepertorio(s)}<b>${esc(s.name)}</b><small>${fmtData(s.date)} · ${s.items.length} músicas</small>
-    ${s.items.length ? `<button class="tile-play" data-href="#/repertorio/${s.id}/0" aria-label="Tocar repertório" style="top:calc(100% - 112px)">${icon('play', 18)}</button>` : ''}</a>`;
+  return `<a class="tile" href="#/repertorio/${s.id}"><div class="tile-art">${capaRepertorio(s)}
+    ${s.items.length ? `<button class="tile-play" data-href="#/repertorio/${s.id}/0" aria-label="Tocar repertório">${icon('play', 18)}</button>` : ''}</div>
+    <b>${esc(s.name)}</b><small>${fmtData(s.date)} · ${s.items.length} músicas</small></a>`;
 }
 function ligarTiles(box) {
   box.addEventListener('click', (e) => {
@@ -307,6 +385,7 @@ function viewHome() {
     const box = $('#home-lit');
     if (!box) return;
     const lit = m.liturgia;
+    lembrarCorLiturgica(hoje, lit.cor);
     const salmo = lit.missas[0]?.salmo;
     document.documentElement.style.setProperty('--lit-cor', CORES[lit.cor] || '#555');
     const qa = $('.quick a[href="#/liturgia"] .cover');
@@ -492,6 +571,7 @@ function viewSong(id, ctx = {}) {
 
   const back = ctx.set ? `#/repertorio/${ctx.set.id}` : isPreview ? (song.back || '#/liturgia') : '#/biblioteca';
   setHeader(song.title, { back, eyebrow: ctx.set ? `${ctx.index + 1} de ${ctx.set.items.length} · ${ctx.set.name}` : '', actions: [
+    ...(isPreview ? [] : [{ icon: 'edit', label: 'Editar cifra', href: '#/editar/' + song.id }]),
     { icon: 'expand', label: 'Modo apresentação (Esc para sair)', onClick: () => document.body.classList.toggle('performance') },
   ] });
 
@@ -504,7 +584,8 @@ function viewSong(id, ctx = {}) {
         <div class="meta" id="song-meta"></div></div></section>
     <div class="actions-row">
       <button class="play-big ${song.youtube ? '' : 'off'}" id="btn-play" aria-label="${song.youtube ? 'Tocar referência' : 'Buscar no YouTube'}" title="${song.youtube ? 'Ouvir a referência (YouTube)' : 'Sem vídeo: buscar no YouTube'}">${icon(song.youtube ? 'play' : 'youtube', 24)}</button>
-      ${isPreview ? `<button class="icon-btn" id="btn-save" aria-label="Salvar na biblioteca" title="Salvar na biblioteca">${icon('plus', 24)}</button>`
+      ${isPreview ? `<button class="icon-btn" id="btn-save" aria-label="Salvar na biblioteca" title="Salvar na biblioteca">${icon('plus', 24)}</button>
+           <button class="icon-btn" id="btn-edit-prev" aria-label="Editar cifra" title="Salvar e editar a cifra">${icon('edit', 22)}</button>`
         : `<button class="icon-btn" id="btn-add" aria-label="Adicionar a repertório" title="Adicionar a repertório">${icon('plus', 24)}</button>
            <a class="icon-btn" href="#/editar/${song.id}" aria-label="Editar" title="Editar cifra">${icon('edit', 22)}</a>`}
       <div class="seg-tabs"><button class="chip" data-modo="cifra" aria-pressed="${modo === 'cifra'}">Cifra</button><button class="chip" data-modo="letra" aria-pressed="${modo === 'letra'}">Letra</button></div>
@@ -567,12 +648,14 @@ function viewSong(id, ctx = {}) {
   sync();
   aoSair(player.aoMudar(sync));
 
-  $('#btn-save')?.addEventListener('click', () => {
+  const salvarPrevia = () => {
     const existing = db.songBySource(song.source);
     const saved = existing || db.saveSong({ content: song.content, source: song.source, transpose, capo });
     toast(existing ? 'Já estava na biblioteca' : 'Salva na biblioteca');
-    location.hash = '#/musica/' + saved.id;
-  });
+    return saved;
+  };
+  $('#btn-save')?.addEventListener('click', () => { location.hash = '#/musica/' + salvarPrevia().id; });
+  $('#btn-edit-prev')?.addEventListener('click', () => { location.hash = '#/editar/' + salvarPrevia().id; });
   $('#btn-add')?.addEventListener('click', () => addToSetDialog(song.id));
   view.querySelectorAll('[data-modo]').forEach((b) => (b.onclick = () => {
     modo = b.dataset.modo;
@@ -645,12 +728,7 @@ document.addEventListener('keydown', (e) => {
 
 // ------------------------------------------------------------- editor
 
-const TEMPLATE = `{title: Nova música}
-{artist: }
-{key: C}
-{youtube: }
-
-{start_of_verse: Estrofe 1}
+const TEMPLATE_CORPO = `{start_of_verse: Estrofe 1}
 [C]Escreva a letra com os [G]acordes entre [Am]colchetes
 {end_of_verse}
 
@@ -659,15 +737,51 @@ const TEMPLATE = `{title: Nova música}
 {end_of_chorus}
 `;
 
+// diretivas que viram campos do formulário do editor
+const CAMPOS_META = { title: /^(title|t)$/i, artist: /^(artist|a)$/i, key: /^key$/i, youtube: /^youtube$/i };
+
+function separarMeta(content) {
+  const meta = { title: '', artist: '', key: '', youtube: '' };
+  const corpo = [];
+  for (const linha of String(content || '').split('\n')) {
+    const m = /^\s*\{\s*([^:}]+?)\s*:\s*(.*?)\s*\}\s*$/.exec(linha);
+    const campo = m && Object.keys(CAMPOS_META).find((k) => CAMPOS_META[k].test(m[1]));
+    if (campo) meta[campo] = m[2];
+    else corpo.push(linha);
+  }
+  while (corpo.length && !corpo[0].trim()) corpo.shift();
+  return { meta, corpo: corpo.join('\n') };
+}
+
+function juntarMeta(meta, corpo) {
+  const cab = [];
+  if (meta.title) cab.push(`{title: ${meta.title}}`);
+  if (meta.artist) cab.push(`{artist: ${meta.artist}}`);
+  if (meta.key) cab.push(`{key: ${meta.key}}`);
+  if (meta.youtube) cab.push(`{youtube: ${meta.youtube}}`);
+  return cab.join('\n') + (cab.length ? '\n\n' : '') + corpo.replace(/^\n+/, '');
+}
+
+// acordes do campo harmônico do tom (para inserir com um toque)
+function acordesDoTom(tom) {
+  const m = /^([A-G][#b]?)(m?)/.exec(tom || '');
+  if (!m) return ['C', 'Dm', 'Em', 'F', 'G', 'Am', 'G7'];
+  const flats = /b/.test(m[1]) || ['F', 'Dm', 'Gm', 'Cm', 'Fm'].includes(m[1] + m[2]);
+  const grau = (n, q) => transposeChord(m[1], n, flats) + q;
+  if (m[2]) return [grau(0, 'm'), grau(5, 'm'), grau(7, 'm'), grau(3, ''), grau(8, ''), grau(10, ''), grau(7, '7')];
+  return [grau(0, ''), grau(2, 'm'), grau(4, 'm'), grau(5, ''), grau(7, ''), grau(9, 'm'), grau(7, '7')];
+}
+
 function viewEditor(id) {
   setTab('biblioteca');
   const isNew = id === 'novo';
-  const song = isNew ? { content: TEMPLATE } : db.song(id);
+  const song = isNew ? { content: `{title: }\n\n${TEMPLATE_CORPO}` } : db.song(id);
   if (!song) return viewNotFound();
   setTint(corDaMusica(song.title || 'nova'));
+  const { meta, corpo } = separarMeta(song.content);
   const actions = [];
   if (!isNew) {
-    actions.push({ icon: 'download', label: 'Exportar .cho', onClick: () => download(song.title.replace(/[^\w\- ]+/g, '') + '.cho', $('#content').value) });
+    actions.push({ icon: 'download', label: 'Exportar .cho', onClick: () => download((song.title || 'cifra').replace(/[^\w\- ]+/g, '') + '.cho', montar()) });
     actions.push({ icon: 'trash', label: 'Excluir', onClick: async () => {
       if (!(await ask({ title: 'Excluir música?', text: `“${song.title}” será removida da biblioteca e dos repertórios.`, ok: 'Excluir', danger: true }))) return;
       db.deleteSong(song.id);
@@ -675,34 +789,71 @@ function viewEditor(id) {
       location.hash = '#/biblioteca';
     } });
   }
-  setHeader(isNew ? 'Nova música' : song.title, { back: isNew ? '#/biblioteca' : '#/musica/' + id, actions });
+  const voltar = isNew ? '#/biblioteca' : '#/musica/' + id;
+  setHeader(isNew ? 'Nova música' : 'Editar cifra', { back: voltar, actions, eyebrow: isNew ? '' : song.title });
   view.innerHTML = `
     <h2 class="greet">${isNew ? 'Nova música' : 'Editar cifra'}</h2>
-    <div class="form">
-      <div class="toolbar-chips">
-        <button class="chip" data-ins="{start_of_chorus}\n\n{end_of_chorus}">${icon('plus', 14)} Refrão</button>
-        <button class="chip" data-ins="{start_of_verse: }\n\n{end_of_verse}">${icon('plus', 14)} Estrofe</button>
+    <div class="editor">
+      <div class="campos">
+        <label>Título<input class="input" id="f-title" value="${esc(meta.title)}" placeholder="Nome do canto"></label>
+        <label>Autor / intérprete<input class="input" id="f-artist" value="${esc(meta.artist)}" placeholder="Ex.: Pe. Zezinho"></label>
+        <label>Tom<input class="input" id="f-key" value="${esc(meta.key)}" placeholder="Ex.: G, Em, Bb"></label>
+        <label>Vídeo de referência (YouTube)<input class="input" id="f-yt" value="${esc(meta.youtube)}" placeholder="https://www.youtube.com/watch?v=…"></label>
+      </div>
+      <div class="barra">
+        <div class="seg" title="Transpor a cifra inteira (altera o texto)"><button data-tr="-1" aria-label="Meio tom abaixo">${icon('minus', 16)}</button><span class="val"><small>Transpor</small>cifra</span><button data-tr="1" aria-label="Meio tom acima">${icon('plus', 16)}</button></div>
+        <button class="chip" data-ins="{start_of_chorus}\\n\\n{end_of_chorus}">${icon('plus', 14)} Refrão</button>
+        <button class="chip" data-ins="{start_of_verse: }\\n\\n{end_of_verse}">${icon('plus', 14)} Estrofe</button>
         <button class="chip" data-ins="{chorus}">Repetir refrão</button>
-        <button class="chip" data-ins="{youtube: https://www.youtube.com/watch?v=}">${icon('youtube', 14)} Vídeo</button>
         <button class="chip" data-ins="{comment: }">Comentário</button>
         <button class="chip" id="conv" title="Converte texto com acordes em linha separada (Cifra Club etc.)">${icon('sparkles', 14)} Cifra sobre letra → ChordPro</button>
       </div>
-      <textarea id="content" spellcheck="false" aria-label="Conteúdo em ChordPro">${esc(song.content)}</textarea>
-      <div class="row"><span class="muted" style="font-size:13px">Acordes entre colchetes, ex.: <code>[G]Senhor</code>. Vídeo de referência: <code>{youtube: link}</code></span><span class="spacer"></span>
-        <button class="btn primary" id="save">${icon('check', 18)} Salvar</button></div>
+      <div class="chord-pal" id="pal"></div>
+      <div class="tabs-mob"><button class="chip" data-aba="editar" aria-pressed="true">${icon('edit', 14)} Editar</button><button class="chip" data-aba="previa" aria-pressed="false">${icon('eye', 14)} Prévia</button></div>
+      <div class="editor-split">
+        <textarea id="content" spellcheck="false" aria-label="Letra e acordes">${esc(corpo)}</textarea>
+        <div class="editor-prev" id="prev" hidden><div class="song" id="prev-song"></div></div>
+      </div>
+      <p class="muted" style="font-size:13px;margin:0">Escreva os acordes entre colchetes antes da sílaba: <code>[G]Senhor, tende pie[D]dade</code>. Toque num acorde acima para inseri-lo onde está o cursor.</p>
+      <div class="row"><a class="btn ghost" href="${voltar}">Cancelar</a><span class="spacer"></span><button class="btn primary" id="save">${icon('check', 18)} Salvar</button></div>
     </div>`;
   const ta = $('#content');
+  const campo = (k) => $('#f-' + k);
+  const montar = () => juntarMeta({ title: campo('title').value.trim(), artist: campo('artist').value.trim(), key: campo('key').value.trim(), youtube: campo('yt').value.trim() }, ta.value);
+  let t;
+  const atualizar = () => {
+    clearTimeout(t);
+    t = setTimeout(() => { if (ta.isConnected) $('#prev-song').innerHTML = renderSong(montar()).html; }, 120);
+    $('#pal').innerHTML = `<small>Acordes do tom${campo('key').value ? ' ' + esc(campo('key').value) : ''}:</small>` +
+      acordesDoTom(campo('key').value.trim()).map((c) => `<button class="chip" data-acorde="${esc(c)}">${esc(c)}</button>`).join('');
+  };
+  atualizar();
+  view.querySelector('.editor').addEventListener('input', atualizar);
+
+  const inserir = (txt) => { ta.focus(); ta.setRangeText(txt, ta.selectionStart, ta.selectionEnd, 'end'); atualizar(); };
+  $('#pal').addEventListener('mousedown', (e) => e.preventDefault()); // mantém o cursor no texto
+  $('#pal').addEventListener('click', (e) => { const b = e.target.closest('[data-acorde]'); if (b) inserir(`[${b.dataset.acorde}]`); });
+  view.querySelectorAll('[data-ins]').forEach((b) => (b.onclick = () => inserir('\n' + b.dataset.ins.replace(/\\n/g, '\n') + '\n')));
+  view.querySelectorAll('[data-tr]').forEach((b) => (b.onclick = () => {
+    const n = Number(b.dataset.tr);
+    ta.value = transposeChordPro(ta.value, n);
+    if (campo('key').value.trim()) campo('key').value = transposeKey(campo('key').value.trim(), n);
+    atualizar();
+    toast(`Cifra transposta ${n > 0 ? '+' : '−'}½ tom`);
+  }));
+  $('#conv').onclick = () => { ta.value = chordsOverLyricsToChordPro(ta.value); atualizar(); toast('Convertido para ChordPro'); };
+  view.querySelectorAll('[data-aba]').forEach((b) => (b.onclick = () => {
+    const prev = b.dataset.aba === 'previa';
+    $('#prev').hidden = !prev;
+    ta.hidden = prev;
+    view.querySelectorAll('[data-aba]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  }));
   $('#save').onclick = () => {
-    const saved = db.saveSong({ ...song, content: ta.value });
+    if (!campo('title').value.trim()) { toast('Dê um título à música'); campo('title').focus(); return; }
+    const saved = db.saveSong({ ...song, content: montar() });
     toast('Música salva');
     location.hash = '#/musica/' + saved.id;
   };
-  $('#conv').onclick = () => { ta.value = chordsOverLyricsToChordPro(ta.value); toast('Convertido para ChordPro'); };
-  view.querySelectorAll('[data-ins]').forEach((b) => (b.onclick = () => {
-    const ins = b.dataset.ins.replace(/\\n/g, '\n');
-    ta.setRangeText('\n' + ins + '\n', ta.selectionStart, ta.selectionEnd, 'end');
-    ta.focus();
-  }));
 }
 
 // ------------------------------------------------------------- repertórios
@@ -866,6 +1017,7 @@ async function viewLiturgia(data) {
   if (!dt || dt.value !== data) return; // usuário navegou enquanto carregava
 
   const lit = missa.liturgia;
+  lembrarCorLiturgica(data, lit.cor);
   if (!escolhas.has(data)) escolhas.set(data, Object.fromEntries(missa.partes.map((p) => [p.chave, escolhaPadrao(p)])));
   const sel = escolhas.get(data);
   const cantoEscolhido = (p) => p.cantos.find((c) => c.url === sel[p.chave]);
@@ -1021,6 +1173,8 @@ function viewSettings() {
   setTint('#333');
   setHeader('Ajustes', { back: '#/' });
   const p = db.prefs();
+  const accent = p.accent || '#1ed760';
+  const personalizada = /^#/.test(accent) && !CORES_DESTAQUE.some(([c]) => c === accent);
   view.innerHTML = `
     <h2 class="greet">Ajustes</h2>
     <div class="stats">
@@ -1029,10 +1183,25 @@ function viewSettings() {
       <div class="stat"><b>${db.songs().filter((s) => s.youtube).length}</b><span>Com vídeo</span></div>
     </div>
 
-    <div class="section-title">Aparência</div>
+    <div class="section-title">Modo</div>
+    <div class="theme-cards" id="theme">
+      ${[['dark', 'Escuro'], ['light', 'Claro'], ['auto', 'Automático']].map(([v, l]) => `
+        <button class="theme-card ${v}" data-v="${v}" aria-pressed="${(p.theme || 'dark') === v}"><div class="prev"><i></i><b></b></div>${l}</button>`).join('')}
+    </div>
+
+    <div class="section-title">Cor do site</div>
+    <div class="settings-group"><div class="setting" style="display:block">
+      <div class="swatches" id="cores">
+        ${CORES_DESTAQUE.map(([c, n]) => `<button class="swatch" style="--c:${c}" data-c="${c}" aria-pressed="${accent === c}" title="${n}" aria-label="${n}"></button>`).join('')}
+        <button class="swatch lit" data-c="liturgico" aria-pressed="${accent === 'liturgico'}" title="Cor litúrgica do dia" aria-label="Cor litúrgica do dia"></button>
+        <label class="swatch custom" style="--c:${personalizada ? accent : '#888'}" aria-pressed="${personalizada}" title="Escolher outra cor">
+          <input type="color" id="cor-livre" value="${personalizada ? accent : '#1ed760'}" aria-label="Escolher outra cor"></label>
+      </div>
+      <p class="swatch-label" id="cor-nome" style="margin:10px 0 0"></p>
+    </div></div>
+
+    <div class="section-title">Cifras</div>
     <div class="settings-group">
-      <div class="setting wrap"><span class="ico">${icon('sun', 18)}</span><div class="grow"><div class="t">Tema</div><div class="s">Escuro (padrão), claro ou igual ao sistema</div></div>
-        <div class="seg-select" id="theme">${[['dark', 'Escuro'], ['light', 'Claro'], ['auto', 'Sistema']].map(([v, l]) => `<button class="chip" data-v="${v}" aria-pressed="${p.theme === v}">${l}</button>`).join('')}</div></div>
       <label class="setting"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Mostrar acordes</div><div class="s">Desligue para usar só a letra (coral, telão)</div></div><input type="checkbox" class="switch" id="chords" ${p.showChords ? 'checked' : ''}></label>
       <label class="setting"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns ? 'checked' : ''}></label>
     </div>
@@ -1046,9 +1215,28 @@ function viewSettings() {
 
     <div class="section-title">Sobre</div>
     <div class="settings-group">
-      <div class="setting"><span class="ico">${icon('info', 18)}</span><div class="grow"><div class="t">Songbook Litúrgico</div>
+      <div class="setting"><span class="ico" style="background:none">${logo(40)}</span><div class="grow"><div class="t">Songbook Litúrgico</div>
         <div class="s">Cifras e letras com transposição, capotraste, rolagem automática, repertórios e referências no YouTube, integrado à Liturgia Diária da CNBB e aos cantos de cindyferrarezi.com.</div></div></div>
     </div>`;
+  const nomeCor = () => {
+    const a = db.prefs().accent || '#1ed760';
+    const txt = a === 'liturgico'
+      ? `Cor litúrgica do dia${db.prefs().litHoje?.data === hojeISO() ? ` (hoje: ${db.prefs().litHoje.cor})` : ' (abra a Liturgia para atualizar)'}`
+      : (CORES_DESTAQUE.find(([c]) => c === a)?.[1] || `Personalizada ${a}`);
+    $('#cor-nome').textContent = 'Cor atual: ' + txt;
+  };
+  nomeCor();
+  const escolherCor = (v) => {
+    db.setPref('accent', v);
+    applyTheme();
+    $('#cores').querySelectorAll('[aria-pressed]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.c === v)));
+    const livre = $('#cor-livre').closest('.swatch');
+    livre.setAttribute('aria-pressed', String(/^#/.test(v) && !CORES_DESTAQUE.some(([c]) => c === v)));
+    if (livre.getAttribute('aria-pressed') === 'true') livre.style.setProperty('--c', v);
+    nomeCor();
+  };
+  $('#cores').addEventListener('click', (e) => { const b = e.target.closest('button[data-c]'); if (b) escolherCor(b.dataset.c); });
+  $('#cor-livre').addEventListener('input', (e) => escolherCor(e.target.value));
   $('#theme').onclick = (e) => {
     const b = e.target.closest('button[data-v]');
     if (!b) return;

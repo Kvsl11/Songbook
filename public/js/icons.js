@@ -1,5 +1,11 @@
 // Ícones SVG em traço (24x24), herdam a cor do texto.
 const P = {
+  shrink: '<path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>',
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+  sidebar: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
+  palette: '<path d="M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.6 0-.9-.7-1.4-.7-2.3 0-1 .8-1.6 1.8-1.6H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10.5" cy="7.5" r="1.2" fill="currentColor"/><circle cx="15" cy="7.5" r="1.2" fill="currentColor"/>',
+  undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-2"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   home: '<path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   library: '<path d="M4 3v18M9 3v18"/><path d="M14 4l5 16"/>',
   external: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14L21 3"/>',
@@ -50,4 +56,18 @@ const P = {
 
 export function icon(name, size = 20, extra = '') {
   return `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${P[name] || ''}</svg>`;
+}
+
+// Logo do app: livro de cifras aberto com nota musical e cruz, na cor de destaque.
+export function logo(size = 32) {
+  return `<svg class="logo" width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true">
+    <defs><linearGradient id="lg-a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--accent-2, #1fdf64)"/><stop offset="1" stop-color="var(--accent-deep, #0f8a3c)"/></linearGradient></defs>
+    <rect width="64" height="64" rx="16" fill="url(#lg-a)"/>
+    <path d="M12 20c6-3 13-3 19 1v27c-6-4-13-4-19-1z" fill="#fff" opacity=".95"/>
+    <path d="M52 20c-6-3-13-3-19 1v27c6-4 13-4 19-1z" fill="#fff" opacity=".8"/>
+    <path d="M42 26v13" stroke="var(--logo-ink, #0b2b17)" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M42 26l5 1.6" stroke="var(--logo-ink, #0b2b17)" stroke-width="2.6" stroke-linecap="round"/>
+    <circle cx="39.3" cy="39.6" r="3.2" fill="var(--logo-ink, #0b2b17)"/>
+    <path d="M21.5 26v13M17.5 30.5h8" stroke="var(--logo-ink, #0b2b17)" stroke-width="2.6" stroke-linecap="round"/>
+  </svg>`;
 }
