@@ -44,6 +44,8 @@ const P = {
   chord: '<path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"/>',
   text: '<path d="M4 7V4h16v3M9 20h6M12 4v16"/>',
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  // violão em traço (como o símbolo do Cifra Club), na cor do app
+  violao: '<path d="M13.2 9.4c-1.6-1.3-3.8-1.4-5 0-.8.9-.9 2-1.9 2.6-1 .6-2.4.4-3.4 1.6-1.9 2.2-1.2 5.8 1.2 7.9 2.1 2.4 5.7 3.1 7.9 1.2 1.2-1 1-2.4 1.6-3.4.6-1 1.7-1.1 2.6-1.9 1.4-1.2 1.3-3.4 0-5"/><circle cx="9.2" cy="15.4" r="2.1"/><path d="M11.6 12.9 20.6 3.9M13.4 14.7 22.2 5.9"/>',
   book: '<path d="M2 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8z"/>',
   youtube: '<rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9l5 3-5 3z" fill="currentColor"/>',
   file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
@@ -98,3 +100,17 @@ export function logo(size = 32) {
 }
 
 
+
+// Símbolo no estilo do Cifra Club (violão branco saindo pelas bordas), na cor de destaque do app
+let nCc = 0;
+export function logoCifraClub(size = 48) {
+  const id = 'cc' + ++nCc;
+  return `<svg class="logo-cc" width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true">
+    <defs><clipPath id="${id}r"><rect width="64" height="64" rx="15"/></clipPath>
+      <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent-deep)"/></linearGradient></defs>
+    <g clip-path="url(#${id}r)"><rect width="64" height="64" fill="url(#${id}g)"/>
+      <g fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M-6 37c9 0 11-9 16-14 5-5 13-5 17 0 3 4 2 8 6 11s9 3 11 8c2 5-2 10-7 13-5 3-8 3-10 8-2 4-3 7-4 10"/>
+        <circle cx="24" cy="41" r="6.5"/>
+        <path d="M28.5 34.5 60 3M33 39 64 8"/></g></g></svg>`;
+}

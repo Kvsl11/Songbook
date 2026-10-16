@@ -848,3 +848,5 @@ body.performance .convite-instalar { display: none; }
 .nav a.active .ic-on { display: inline-flex; }
 .nav a.active { color: var(--text); }
 .nav a.active em { font-weight: 800; }
+.ref-card .ico.ico-logo { background: none; overflow: hidden; border-radius: 13px; }
+.ref-card .ico.ico-logo svg { width: 100%; height: 100%; }

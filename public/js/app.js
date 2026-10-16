@@ -1,7 +1,7 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
 import { completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord } from './chordpro.js';
-import { icon, iconeMenu, logo } from './icons.js';
+import { icon, iconeMenu, logo, logoCifraClub } from './icons.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
 import { buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
@@ -39,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-47';
+export const APP_VERSAO = '2026.10.16-48';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -932,7 +932,7 @@ function viewSearch() {
       <div id="online"><div class="loading-note"><span class="spin"></span>Buscando…</div></div>
       <div id="mpm-res"></div>
       <div class="shelf-head"><h2>Cifra Club</h2></div>
-      <a class="ref-card" style="max-width:420px" href="https://www.cifraclub.com.br/?q=${encodeURIComponent(term)}" target="_blank" rel="noopener"><span class="ico">${icon('chord', 22)}</span><span><b>Procurar “${esc(term)}” no Cifra Club</b><small>Copie a cifra e cole no editor (Organizar cifra colada)</small></span></a>`;
+      <a class="ref-card" style="max-width:420px" href="https://www.cifraclub.com.br/?q=${encodeURIComponent(term)}" target="_blank" rel="noopener"><span class="ico ico-logo">${logoCifraClub(48)}</span><span><b>Procurar “${esc(term)}” no Cifra Club</b><small>Copie a cifra e cole no editor (Organizar cifra colada)</small></span></a>`;
     // Músicas para Missa: índice local das cifras copiadas
     indiceMusicasParaMissa().then((indice) => {
       const box = $('#mpm-res');
@@ -1143,7 +1143,7 @@ function viewSong(id, ctx = {}) {
     const faltam = !semCifra && completarCifra(song.content).completadas;
     if (semCifra) {
       box.innerHTML = `<div class="aviso">${icon('info', 18)}<span>Esta versão não tem cifra. <span id="alternativas">Procurando versões com acordes…</span></span>
-        <a class="btn small" href="https://www.cifraclub.com.br/?q=${encodeURIComponent(song.title)}" target="_blank" rel="noopener" title="Procurar a cifra no Cifra Club">${icon('chord', 15)} Cifra Club</a></div>`;
+        <a class="btn small" href="https://www.cifraclub.com.br/?q=${encodeURIComponent(song.title)}" target="_blank" rel="noopener" title="Procurar a cifra no Cifra Club">${icon('violao', 16)} Cifra Club</a></div>`;
       buscarAlternativas(song.title).then((alts) => {
         const el = $('#alternativas');
         if (!el) return;
@@ -1232,7 +1232,7 @@ function viewSong(id, ctx = {}) {
   if (song.pdf) cards.push(`<a class="ref-card" href="${esc(song.pdf)}" target="_blank" rel="noopener"><span class="ico">${icon('file', 22)}</span><span><b>Partitura</b><small>PDF</small></span></a>`);
   if (song.youtube) cards.push(`<a class="ref-card" href="https://www.youtube.com/watch?v=${esc(song.youtube)}" target="_blank" rel="noopener"><span class="ico">${icon('youtube', 22)}</span><span><b>Abrir no YouTube</b><small>Vídeo de referência</small></span></a>`);
   cards.push(`<a class="ref-card" href="${esc(ytBusca(song.title))}" target="_blank" rel="noopener"><span class="ico">${icon('search', 22)}</span><span><b>Outras versões</b><small>Buscar no YouTube</small></span></a>`);
-  cards.push(`<a class="ref-card" href="https://www.cifraclub.com.br/?q=${encodeURIComponent(song.title)}" target="_blank" rel="noopener" title="Abre a busca do Cifra Club; para trazer a cifra, copie e cole no editor (Organizar cifra colada)"><span class="ico">${icon('chord', 22)}</span><span><b>Cifra Club</b><small>Procurar outra cifra</small></span></a>`);
+  cards.push(`<a class="ref-card" href="https://www.cifraclub.com.br/?q=${encodeURIComponent(song.title)}" target="_blank" rel="noopener" title="Abre a busca do Cifra Club; para trazer a cifra, copie e cole no editor (Organizar cifra colada)"><span class="ico ico-logo">${logoCifraClub(48)}</span><span><b>Cifra Club</b><small>Procurar outra cifra</small></span></a>`);
   $('#refs').innerHTML = refs.join('') + `<div class="refs-grid">${cards.join('')}</div>`;
 
   // vídeo de referência: toca embutido aqui mesmo, na seção "Referências"
