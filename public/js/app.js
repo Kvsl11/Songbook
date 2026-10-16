@@ -3,7 +3,7 @@ import { esc, renderSong } from './render.js';
 import { completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord } from './chordpro.js';
 import { icon, logo } from './icons.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
-import { apagarModelo, gerarPowerPoint, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
+import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
 import { buscarCindy, getCanto, getMissa, indiceMusicasParaMissa } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -39,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-22';
+export const APP_VERSAO = '2026.10.16-23';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -399,7 +399,61 @@ function enviarModeloPptx() {
   });
 }
 
+// escolha entre o modelo do grupo e o PowerPoint simples (só a letra)
 async function exportarPowerPoint(set) {
+  const modelo = await lerModelo();
+  const o = await openDialog(`
+    <h3 style="display:flex;gap:8px;align-items:center">${icon('grid', 20)} PowerPoint do repertório</h3>
+    <div class="pptx-tipos">
+      <button class="pptx-tipo" data-tipo="modelo"><b>No modelo do grupo</b><span>${modelo ? esc(modelo.nome) : 'Envie o modelo .pptx uma vez'} · letras e liturgia nos lugares certos</span></button>
+      <button class="pptx-tipo" data-tipo="simples"><b>Simples, só a letra</b><span>Sem cifra · fundo escuro · um refrão/estrofe por slide</span></button>
+    </div>
+    <div class="acts"><button class="btn ghost" data-no>Cancelar</button></div>`,
+  (dlg, done) => {
+    dlg.querySelectorAll('[data-tipo]').forEach((b) => (b.onclick = () => done(b.dataset.tipo)));
+    $('[data-no]', dlg).onclick = () => done(null);
+  });
+  if (o === 'modelo') return exportarPowerPointModelo(set);
+  if (o === 'simples') return exportarPowerPointSimples(set);
+}
+
+async function exportarPowerPointSimples(set) {
+  const itens = set.items.map((it) => ({ ...it, song: db.song(it.songId) })).filter((x) => x.song);
+  let proporcao = db.prefs().pptxProporcao || '16:9';
+  const r = await openDialog(`
+    <h3 style="display:flex;gap:8px;align-items:center">${icon('grid', 20)} PowerPoint só com a letra</h3>
+    <div class="pdf-opcoes">
+      <div><small>Proporção da tela</small><div class="seg-tabs">
+        <button class="chip" data-prop="16:9" aria-pressed="${proporcao === '16:9'}" title="Telas e TVs modernas (widescreen)">16:9 (widescreen)</button>
+        <button class="chip" data-prop="4:3" aria-pressed="${proporcao === '4:3'}" title="Projetores e telas mais quadradas">4:3</button></div></div>
+      <label class="check"><input type="checkbox" data-refrao checked> Repetir o refrão depois de cada estrofe</label>
+      <label class="check"><input type="checkbox" data-capa checked> Capa com o nome do repertório e a celebração do dia</label>
+      <small>${itens.length} música(s), na ordem do repertório. Os acordes não entram.</small>
+    </div>
+    <div class="acts"><button class="btn ghost" data-no>Cancelar</button><button class="btn primary" data-ok>${icon('download', 16)} Gerar PowerPoint</button></div>`,
+  (dlg, done) => {
+    dlg.querySelectorAll('[data-prop]').forEach((b) => (b.onclick = () => {
+      proporcao = b.dataset.prop;
+      dlg.querySelectorAll('[data-prop]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    }));
+    $('[data-no]', dlg).onclick = () => done(null);
+    $('[data-ok]', dlg).onclick = () => done({ repetirRefrao: $('[data-refrao]', dlg).checked, comCapa: $('[data-capa]', dlg).checked });
+  });
+  if (!r) return;
+  db.setPref('pptxProporcao', proporcao);
+  toast('Gerando o PowerPoint…');
+  try {
+    const blob = await gerarPowerPointSimples({ set, itens, proporcao, ...r });
+    const dia = (set.date || hojeISO()).split('-').reverse().slice(0, 2).join('-');
+    download(`${dia} ${nomeArquivo(set.name)} (letras ${proporcao.replace(':', 'x')}).pptx`, blob, 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+    toast('PowerPoint gerado');
+  } catch (e) {
+    console.error(e);
+    toast('Não foi possível gerar: ' + e.message);
+  }
+}
+
+async function exportarPowerPointModelo(set) {
   let modelo = await lerModelo();
   if (!modelo) {
     const ok = await ask({ title: 'PowerPoint da missa', text: 'Envie uma vez o modelo de PowerPoint do grupo (o arquivo "cru", com os espaços para as letras). Ele fica guardado neste aparelho e depois é só gerar.', ok: 'Enviar modelo' });
@@ -427,7 +481,7 @@ async function exportarPowerPoint(set) {
       done({ escolha: esc2, repetirRefrao: $('[data-refrao]', dlg).checked, comLiturgia: $('[data-lit]', dlg).checked });
     };
   });
-  if (r === 'trocar') { if (await enviarModeloPptx()) exportarPowerPoint(set); return; }
+  if (r === 'trocar') { if (await enviarModeloPptx()) exportarPowerPointModelo(set); return; }
   if (!r) return;
   if (!Object.keys(r.escolha).length && !r.comLiturgia) { toast('Escolha ao menos um canto'); return; }
   toast('Gerando o PowerPoint…');

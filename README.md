@@ -36,6 +36,8 @@ Visual escuro moderno (cor padrão azul-marinho), com capas, cabeçalhos em degr
   slides extras são criados copiando o slide da mesma parte e os que sobram são retirados. Capa, leituras, salmo,
   aclamação e evangelista vêm da liturgia da CNBB da data do repertório; textos de instrução em vermelho são removidos.
   Gerador em `js/lib/pptx-missa.js` (JSZip carregado sob demanda).
+  Também há o **PowerPoint simples, só a letra** (sem modelo e sem cifra), em **16:9** ou **4:3**: capa com o nome
+  do repertório e a celebração, e um refrão/estrofe por slide com a parte da missa no topo (`js/lib/pptx-simples.js`).
 - **Exportar PDF**: na música (botão de documento) ou no repertório inteiro ("Exportar PDF"), com cifra ou só a letra,
   tamanho da letra e duas colunas. O PDF tem cabeçalho (parte da missa, título, autor, tom, capotraste e fonte);
   o do repertório tem capa com nome, data e índice, e cada música pode começar numa página nova.

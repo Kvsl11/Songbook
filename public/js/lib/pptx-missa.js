@@ -71,9 +71,9 @@ export function blocosDoCanto(parseChordPro, content, { repetirRefrao = true } =
 
 // ------------------------------------------------------------------ medida do texto
 
-function contarLinhas(texto, szPt, negrito) {
+function contarLinhas(texto, szPt, negrito, larguraPt = LARGURA_PT) {
   const larguraChar = szPt * (negrito ? 0.57 : 0.53);
-  const max = Math.max(8, Math.floor(LARGURA_PT / larguraChar));
+  const max = Math.max(8, Math.floor(larguraPt / larguraChar));
   let linhas = 1, atual = 0;
   for (const w of texto.split(/\s+/).filter(Boolean)) {
     const n = w.length;
@@ -82,19 +82,20 @@ function contarLinhas(texto, szPt, negrito) {
   }
   return linhas;
 }
-const alturaPt = (paragrafos) => paragrafos.reduce((h, p) => h + contarLinhas(p.texto || ' ', p.sz, p.negrito) * p.sz * 1.2, 0) + 7.2;
+const alturaPt = (paragrafos, larguraPt) => paragrafos.reduce((h, p) => h + contarLinhas(p.texto || ' ', p.sz, p.negrito, larguraPt) * p.sz * 1.2, 0) + 7.2;
 
 // Divide os blocos em páginas que cabem num slide: tenta o tamanho do modelo, depois 44 e 40;
 // se ainda não couber, parte o bloco em dois pelos versos.
-export function paginar(blocos, { titulo = '', szTitulo = 25, szCorpo = 50 } = {}) {
-  const tamanhos = [...new Set([szCorpo, 44, 40].filter((s) => s <= szCorpo))];
-  const disponivel = (BASE_MAX - TOPO_MIN) / EMU_PT;
+// (larguraPt/disponivelPt/tamanhos permitem usar a mesma regra em outros formatos de slide)
+export function paginar(blocos, { titulo = '', szTitulo = 25, szCorpo = 50, larguraPt = LARGURA_PT, disponivelPt = (BASE_MAX - TOPO_MIN) / EMU_PT, tamanhos: lista } = {}) {
+  const tamanhos = lista || [...new Set([szCorpo, 44, 40].filter((s) => s <= szCorpo))];
+  const disponivel = disponivelPt;
   const paginas = [];
   const cabe = (linhas, refrao, comTitulo) => {
     const texto = linhas.join(' ');
     for (const sz of tamanhos) {
       const pars = [...(comTitulo ? [{ texto: titulo, sz: szTitulo, negrito: false }] : []), { texto, sz, negrito: refrao }];
-      if (alturaPt(pars) <= disponivel) return sz;
+      if (alturaPt(pars, larguraPt) <= disponivel) return sz;
     }
     return 0;
   };

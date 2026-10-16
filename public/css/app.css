@@ -760,3 +760,8 @@ body.performance .rolagem { bottom: 92px; }
 }
 .rol-barra input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgb(0 0 0 / 0.4); }
 .rol-barra input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgb(0 0 0 / 0.4); }
+.pptx-tipos { display: grid; gap: 10px; }
+.pptx-tipo { text-align: left; display: grid; gap: 3px; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer; font: inherit; }
+.pptx-tipo:hover { border-color: var(--accent-ink); background: var(--surface-3); }
+.pptx-tipo b { font-size: 16px; }
+.pptx-tipo span { color: var(--muted); font-size: 13px; }

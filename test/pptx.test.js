@@ -85,3 +85,20 @@ test('modelo: encontra a parte de canto e preenche cantos, liturgia e capa', asy
   const ct = await zip.file('[Content_Types].xml').async('string');
   assert.equal((ct.match(/slide\+xml/g) || []).length, 9);
 });
+
+test('PowerPoint simples: só a letra, na proporção escolhida', async () => {
+  const { createRequire } = await import('node:module');
+  const PptxGenJS = createRequire(import.meta.url)('pptxgenjs');
+  const { montarPptxSimples } = await import('../public/js/lib/pptx-simples.js');
+  for (const [prop, cy] of [['16:9', '5143500'], ['4:3', '6858000']]) {
+    const pres = montarPptxSimples(PptxGenJS, { nome: 'Missa', proporcao: prop, capa: { titulo: 'Missa', linhas: ['25º Domingo'] },
+      itens: [{ parte: 'Entrada', titulo: 'Eu Sou a Salvação', blocos: blocosDoCanto(parseChordPro, CANTO) }] });
+    const zip = await JSZip.loadAsync(await pres.write({ outputType: 'nodebuffer' }));
+    assert.match(await zip.file('ppt/presentation.xml').async('string'), new RegExp(`<p:sldSz cx="9144000" cy="${cy}"`));
+    const slides = Object.keys(zip.files).filter((f) => /^ppt\/slides\/slide\d+\.xml$/.test(f));
+    assert.equal(slides.length, 6); // capa + R, E, R, E, R
+    const s2 = await zip.file('ppt/slides/slide2.xml').async('string');
+    assert.match(s2, /Eu sou a salvação do povo/);
+    assert.doesNotMatch(s2, /\[G\]|>G</);
+  }
+});

@@ -4,6 +4,7 @@
 import { parseChordPro } from './chordpro.js';
 import { getLiturgia } from './lib/cnbb.js';
 import { PARTES_PPTX, blocosDoCanto, partesDoModelo, preencherModelo } from './lib/pptx-missa.js';
+import { montarPptxSimples } from './lib/pptx-simples.js';
 
 const JSZIP_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
 let jszip = null;
@@ -95,4 +96,35 @@ export async function gerarPowerPoint({ itens, escolha, data, repetirRefrao = tr
     capa: { linhas: linhasDaCapa(lit) },
   }, await deps(), { tipo: 'blob' });
   return { blob: saida, liturgia: lit };
+}
+
+// ------------------------------------------------------------------ PowerPoint simples (sem modelo)
+
+const PPTXGEN_URL = 'https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';
+let pptxgen = null;
+function carregarPptxGen() {
+  if (window.PptxGenJS) return Promise.resolve(window.PptxGenJS);
+  pptxgen ||= new Promise((ok, erro) => {
+    const s = document.createElement('script');
+    s.src = PPTXGEN_URL;
+    s.onload = () => ok(window.PptxGenJS);
+    s.onerror = () => { pptxgen = null; erro(new Error('Não foi possível carregar o gerador de PowerPoint (sem internet?)')); };
+    document.head.append(s);
+  });
+  return pptxgen;
+}
+
+// itens: [{ song, label }] na ordem do repertório; só a letra
+export async function gerarPowerPointSimples({ set, itens, proporcao = '16:9', repetirRefrao = true, comCapa = true }) {
+  const PptxGenJS = await carregarPptxGen();
+  let lit = null;
+  if (comCapa && set.date) lit = await getLiturgia(set.date).catch(() => null);
+  const capa = comCapa ? { titulo: set.name, linhas: lit ? [lit.celebracao, [lit.grau, lit.ano].filter(Boolean).join(' · ')] : [] } : null;
+  const pres = montarPptxSimples(PptxGenJS, {
+    nome: set.name,
+    proporcao,
+    capa,
+    itens: itens.map((it) => ({ parte: it.label || '', titulo: it.song.title, blocos: blocosDoCanto(parseChordPro, it.song.content, { repetirRefrao }) })),
+  });
+  return pres.write({ outputType: 'blob' });
 }
