@@ -7,17 +7,21 @@ ofertório, comunhão etc.).
 
 ## Funcionalidades
 
-Recursos inspirados no SongbookPro (reimplementados do zero, sem código do app original):
+Visual escuro inspirado no Spotify, com capas, cabeçalhos em degradê e player embutido:
 
-| SongbookPro | Aqui |
-|---|---|
-| Biblioteca universal de músicas | Biblioteca local com busca por título, autor e letra |
-| Acordes e letras claros | Renderização ChordPro com acordes sobre a letra, refrão destacado, 1 ou 2 colunas |
-| Ajuste rápido de tom e capotraste | Transposição ± semitom, capotraste (mostra o "desenho"), sustenidos/bemóis conforme o tom |
-| Sets para tocar ao vivo | Repertórios com ordem, rótulo por parte da missa, avançar/voltar por gesto, setas ou pedal (PageUp/PageDown) |
-| Importar ChordPro/OnSong | Importa `.cho/.chopro/.chordpro/.pro/.txt` e converte "cifra sobre a letra" (estilo Cifra Club) em ChordPro |
-| Compartilhar músicas e sets | Exporta repertório (.json) e música (.cho); backup completo |
-| — | Rolagem automática, modo apresentação (tela cheia), tema claro/escuro, PWA instalável e offline |
+- **Início**: saudação, atalhos, a liturgia de hoje, seus repertórios, tocadas e adicionadas recentemente.
+- **Buscar**: seções da missa (Entrada, Salmos, Aclamação, Comunhão, Maria, Natal…) e busca online
+  nos cantos cifrados de cindyferrarezi.com, com as capas do site.
+- **Biblioteca**: músicas e repertórios, com filtros (com vídeo, cifras próprias).
+- **Música**: capa, botão verde para ouvir a **referência no YouTube**, abas **Cifra** e **Letra**
+  (letra grande, estilo Spotify), transposição, capotraste, rolagem automática, tamanho da letra,
+  duas colunas, modo apresentação e cartões de referência (vídeo, cifra original, partitura em PDF,
+  outras versões no YouTube).
+- **Player persistente**: o vídeo de referência continua tocando enquanto você navega
+  (mini player no celular; barra inferior e janela de vídeo no computador).
+- **Repertórios** com cara de playlist: capa em mosaico, tocar em sequência, reordenar,
+  avançar/voltar por gesto, setas ou pedal (PageUp/PageDown).
+- Importa `.cho/.chopro/.pro/.txt` (inclusive "cifra sobre a letra"), exporta e faz backup. PWA instalável e offline.
 
 ### Liturgia Diária (aba ✝)
 

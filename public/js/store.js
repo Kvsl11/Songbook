@@ -2,7 +2,7 @@
 import { parseChordPro, guessKey } from './chordpro.js';
 
 const KEY = 'songbook.v1';
-const DEFAULT_PREFS = { theme: 'auto', fontScale: 1, showChords: true, columns: false, scrollSpeed: 3 };
+const DEFAULT_PREFS = { theme: 'dark', fontScale: 1, showChords: true, columns: false, scrollSpeed: 3 };
 
 function load() {
   try {
@@ -13,6 +13,8 @@ function load() {
 }
 
 let state = load();
+// músicas salvas por versões anteriores ainda não têm capa/vídeo extraídos do conteúdo
+for (const s of state.songs) if (s.youtube === undefined && s.content) Object.assign(s, metaFrom(s.content));
 
 function persist() {
   try {
@@ -24,6 +26,11 @@ function persist() {
 
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
+export function youtubeId(url) {
+  const m = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/.exec(url || '');
+  return m ? m[1] : null;
+}
+
 function metaFrom(content) {
   const { meta } = parseChordPro(content);
   return {
@@ -31,6 +38,9 @@ function metaFrom(content) {
     artist: meta.artist || meta.subtitle || '',
     key: meta.key || guessKey(content),
     source: meta.source || '',
+    youtube: youtubeId(meta.youtube) || '',
+    cover: meta.cover || '',
+    pdf: meta.pdf || '',
   };
 }
 
@@ -74,6 +84,16 @@ export const db = {
     persist();
   },
 
+  // tocadas recentemente (mais recente primeiro)
+  touchRecent(id) {
+    const r = (state.recent || []).filter((x) => x !== id);
+    r.unshift(id);
+    state.recent = r.slice(0, 30);
+    persist();
+  },
+  recent: () => (state.recent || []).map((id) => db.song(id)).filter(Boolean),
+  recentSongs: (n = 12) => [...state.songs].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, n),
+
   prefs: () => state.prefs,
   setPref(k, v) {
     state.prefs[k] = v;
@@ -93,7 +113,7 @@ export const db = {
     return n;
   },
   clear() {
-    state = { songs: [], sets: [], prefs: { ...DEFAULT_PREFS } };
+    state = { songs: [], sets: [], recent: [], prefs: { ...DEFAULT_PREFS } };
     persist();
   },
 };

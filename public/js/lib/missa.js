@@ -2,7 +2,7 @@
 // numa estrutura única de "partes da missa".
 
 import { getLiturgia } from './cnbb.js';
-import { buscarPorTexto, buscarRepertorio, getRepertorio } from './cindy.js';
+import { buscarPorTexto, buscarRepertorio, capasPorUrl, getRepertorio } from './cindy.js';
 import { normalize } from './html.js';
 
 export const PARTES = [
@@ -126,11 +126,22 @@ export async function getMissa(date, fetchImpl) {
   ]);
 
   const relevantes = (lista) => lista.filter((c) => c.score >= 2).slice(0, 4);
+  const partes = montarEstrutura(lit, rep.repertorio, { salmo: relevantes(salmo), aclamacao: relevantes(acl) });
+
+  // capas (imagem destacada de cada post) para exibir nas opções
+  const semCapa = partes.flatMap((p) => p.cantos).filter((c) => !c.capa).map((c) => c.url);
+  if (semCapa.length) {
+    try {
+      const capas = await capasPorUrl(semCapa, fetchImpl);
+      for (const p of partes) for (const c of p.cantos) if (!c.capa && capas[c.url]) c.capa = capas[c.url];
+    } catch { /* capas são opcionais */ }
+  }
+
   return {
     liturgia: lit,
     repertorio: rep.repertorio ? { titulo: rep.repertorio.titulo, url: rep.repertorio.url } : null,
     buscaRepertorio: rep.busca,
-    partes: montarEstrutura(lit, rep.repertorio, { salmo: relevantes(salmo), aclamacao: relevantes(acl) }),
+    partes,
     avisos,
   };
 }

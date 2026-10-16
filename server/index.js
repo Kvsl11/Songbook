@@ -7,7 +7,7 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getLiturgia } from '../public/js/lib/cnbb.js';
-import { buscarPorTexto, getCanto, getRepertorio, wpPosts } from '../public/js/lib/cindy.js';
+import { buscarCantos, buscarPorTexto, getCanto, getRepertorio } from '../public/js/lib/cindy.js';
 import { getMissa } from '../public/js/lib/missa.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
@@ -49,12 +49,11 @@ const routes = {
   '/api/cindy/busca': async (q) => {
     const termo = (q.get('q') || '').trim();
     const tipo = q.get('tipo') || 'todos';
-    if (!termo) return [];
-    return cached(`busca:${tipo}:${termo}`, async () => {
-      if (tipo === 'salmo' || tipo === 'aclamacao') return buscarPorTexto(termo, tipo);
-      const posts = await wpPosts({ search: termo, per_page: 20, _fields: 'id,date,link,title' });
-      return posts.map((p) => ({ id: p.id, titulo: p.title.rendered.replace(/&#8211;/g, '–').replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(n)), url: p.link, data: p.date }));
-    });
+    const categoria = q.get('categoria') || undefined;
+    if (!termo && !categoria) return [];
+    return cached(`busca:${tipo}:${categoria}:${termo}`, () => (tipo === 'salmo' || tipo === 'aclamacao'
+      ? buscarPorTexto(termo, tipo)
+      : buscarCantos(termo, { categoria })));
   },
 };
 

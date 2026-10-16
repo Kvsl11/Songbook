@@ -38,7 +38,14 @@ export function wpPosts(params, fetchImpl = fetch) {
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') url.searchParams.set(k, Array.isArray(v) ? v.join(',') : v);
   const tarefa = fila.then(async () => {
     for (let tentativa = 0; ; tentativa++) {
-      const res = await fetchImpl(url, { headers: UA });
+      let res;
+      try {
+        res = await fetchImpl(url, { headers: UA });
+      } catch (e) {
+        // no navegador, um 429 sem cabeçalho CORS aparece como erro de rede
+        if (tentativa < 3) { await pausa(1500 * (tentativa + 1)); continue; }
+        throw e;
+      }
       if (res.status === 429 && tentativa < 3) {
         await pausa((Number(res.headers.get('retry-after')) || 1.5 * (tentativa + 1)) * 1000);
         continue;
@@ -47,7 +54,7 @@ export function wpPosts(params, fetchImpl = fetch) {
       return res.json();
     }
   });
-  fila = tarefa.catch(() => {}).then(() => pausa(250));
+  fila = tarefa.catch(() => {}).then(() => pausa(NO_NAVEGADOR ? 400 : 250));
   return tarefa;
 }
 
@@ -118,6 +125,30 @@ export async function buscarRepertorio(lit, fetchImpl) {
   return { candidatos: [], tentativas };
 }
 
+// Campos usados nas listagens (capa = imagem destacada do post, servida pelo Jetpack).
+export const CAMPOS_LISTA = 'id,date,link,title,jetpack_featured_media_url';
+export const resumoPost = (p) => ({
+  id: p.id, titulo: decodeEntities(p.title?.rendered || ''), url: p.link, data: p.date, capa: p.jetpack_featured_media_url || null,
+});
+
+// Busca livre (tela "Buscar") e listagem por categoria.
+export async function buscarCantos(termo, { categoria, pagina = 1 } = {}, fetchImpl) {
+  const posts = await wpPosts({ search: termo || undefined, categories: categoria, per_page: 20, page: pagina, _fields: CAMPOS_LISTA }, fetchImpl);
+  return posts.map(resumoPost);
+}
+
+// Capas de vários cantos de uma vez (o repertório só traz título e link).
+export async function capasPorUrl(urls, fetchImpl) {
+  const slugs = [...new Set(urls.map((u) => { try { return slugFromUrl(u); } catch { return null; } }).filter(Boolean))];
+  const mapa = {};
+  for (let i = 0; i < slugs.length; i += 40) {
+    const lote = slugs.slice(i, i + 40);
+    const posts = await wpPosts({ slug: lote, per_page: 100, _fields: 'link,jetpack_featured_media_url' }, fetchImpl);
+    for (const p of posts) if (p.jetpack_featured_media_url) mapa[slugFromUrl(p.link)] = p.jetpack_featured_media_url;
+  }
+  return Object.fromEntries(urls.map((u) => { try { return [u, mapa[slugFromUrl(u)] || null]; } catch { return [u, null]; } }));
+}
+
 export async function buscarPorTexto(texto, tipo, fetchImpl) {
   const palavras = String(texto || '').replace(/[*!?.,;:"“”]/g, ' ').split(/\s+/).filter(Boolean);
   const consulta = palavras.slice(0, 6).join(' ');
@@ -166,10 +197,10 @@ export function parseRepertorio(html) {
 
 export async function getPost(url, fetchImpl) {
   const slug = slugFromUrl(url);
-  const posts = await wpPosts({ slug, _fields: 'id,date,link,title,content' }, fetchImpl);
+  const posts = await wpPosts({ slug, _fields: 'id,date,link,title,content,jetpack_featured_media_url' }, fetchImpl);
   if (!posts.length) throw new Error('Post não encontrado: ' + slug);
   const p = posts[0];
-  return { id: p.id, titulo: decodeEntities(p.title.rendered), url: p.link, data: p.date, html: p.content.rendered };
+  return { id: p.id, titulo: decodeEntities(p.title.rendered), url: p.link, data: p.date, html: p.content.rendered, capa: p.jetpack_featured_media_url || null };
 }
 
 export async function getRepertorio(url, fetchImpl) {
@@ -227,7 +258,9 @@ export function parseCanto(post) {
   cabecalho.push(`{source: ${post.url}}`);
   if (yt) cabecalho.push(`{youtube: https://www.youtube.com/watch?v=${yt[1]}}`);
   if (pdf) cabecalho.push(`{pdf: ${pdf[1]}}`);
+  if (post.capa) cabecalho.push(`{cover: ${post.capa}}`);
   return {
+    capa: post.capa || null,
     titulo,
     url: post.url,
     youtube: yt ? `https://www.youtube.com/watch?v=${yt[1]}` : null,

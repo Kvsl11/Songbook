@@ -4,7 +4,7 @@
 // usa a API /api/* dele como reserva. Resultados ficam em cache local.
 
 import { getMissa as getMissaDireto } from './lib/missa.js';
-import { getCanto as getCantoDireto } from './lib/cindy.js';
+import { buscarCantos as buscarDireto, getCanto as getCantoDireto } from './lib/cindy.js';
 
 const PREFIXO = 'songbook.cache.';
 const VALIDADE = 12 * 3600e3;
@@ -74,4 +74,9 @@ export function getMissa(data, opts) {
 
 export function getCanto(url) {
   return obter('canto:' + url, () => getCantoDireto(url), 'api/cindy/canto?url=' + encodeURIComponent(url));
+}
+
+export function buscarCindy(termo, { categoria } = {}) {
+  const chave = `busca:${categoria || ''}:${termo || ''}`;
+  return obter(chave, () => buscarDireto(termo, { categoria }), 'api/cindy/busca?q=' + encodeURIComponent(termo || '') + (categoria ? '&categoria=' + categoria : ''));
 }
