@@ -30,6 +30,12 @@ Visual escuro moderno (cor padrão azul-marinho), com capas, cabeçalhos em degr
   Músicas sem nenhum acorde mostram só a opção Letra.
 - **Dicas**: passar o mouse ou segurar o dedo num botão mostra o nome da função.
 - **Atualização automática**: o app busca sempre a versão mais nova e recarrega sozinho; a versão aparece em Ajustes.
+- **PowerPoint da missa**: envie uma vez em Ajustes o modelo "cru" do PowerPoint do grupo (fica só no aparelho).
+  No repertório, "PowerPoint" escolhe o canto de cada parte do modelo (Entrada, Oferendas, Comunhão, Saída…) e gera o
+  .pptx sem mudar o visual: cada refrão/estrofe vai num slide (refrão em negrito, refrão repetido entre as estrofes),
+  slides extras são criados copiando o slide da mesma parte e os que sobram são retirados. Capa, leituras, salmo,
+  aclamação e evangelista vêm da liturgia da CNBB da data do repertório; textos de instrução em vermelho são removidos.
+  Gerador em `js/lib/pptx-missa.js` (JSZip carregado sob demanda).
 - **Exportar PDF**: na música (botão de documento) ou no repertório inteiro ("Exportar PDF"), com cifra ou só a letra,
   tamanho da letra e duas colunas. O PDF tem cabeçalho (parte da missa, título, autor, tom, capotraste e fonte);
   o do repertório tem capa com nome, data e índice, e cada música pode começar numa página nova.

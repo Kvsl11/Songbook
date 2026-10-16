@@ -3,6 +3,7 @@ import { esc, renderSong } from './render.js';
 import { completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord } from './chordpro.js';
 import { icon, logo } from './icons.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
+import { apagarModelo, gerarPowerPoint, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
 import { buscarCindy, getCanto, getMissa, indiceMusicasParaMissa } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -38,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-20';
+export const APP_VERSAO = '2026.10.16-21';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -375,6 +376,70 @@ async function exportarRepertorioPdf(set) {
   if (o === 'json') { exportSet(set); return; }
   if (!o) return;
   imprimir(htmlRepertorio(set, itens, o), nomeArquivo(set.name + (o.comCifra ? ' (cifras)' : ' (letras)')));
+}
+
+// ---------------------------------------------------------------- PowerPoint da missa
+// escolhe um .pptx e guarda como modelo; devolve o registro salvo (ou null)
+function enviarModeloPptx() {
+  return new Promise((resolve) => {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = '.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    inp.onchange = async () => {
+      const f = inp.files[0];
+      if (!f) return resolve(null);
+      toast('Lendo o modelo…');
+      try {
+        const reg = await salvarModelo(f);
+        toast(`Modelo salvo: ${reg.partes.length} partes de canto encontradas`);
+        resolve(reg);
+      } catch (e) { toast(e.message); resolve(null); }
+    };
+    inp.click();
+  });
+}
+
+async function exportarPowerPoint(set) {
+  let modelo = await lerModelo();
+  if (!modelo) {
+    const ok = await ask({ title: 'PowerPoint da missa', text: 'Envie uma vez o modelo de PowerPoint do grupo (o arquivo "cru", com os espaços para as letras). Ele fica guardado neste aparelho e depois é só gerar.', ok: 'Enviar modelo' });
+    if (!ok || !(modelo = await enviarModeloPptx())) return;
+  }
+  const itens = set.items.map((it) => ({ ...it, song: db.song(it.songId) })).filter((x) => x.song);
+  const escolha = sugerirCantos(modelo.partes, itens);
+  const opcoesItens = (sel) => `<option value="">— deixar como está no modelo —</option>${itens.map((it, i) => `<option value="${i}" ${sel === i ? 'selected' : ''}>${i + 1}. ${esc(it.label ? it.label + ' — ' : '')}${esc(it.song.title)}</option>`).join('')}`;
+  const r = await openDialog(`
+    <h3 style="display:flex;gap:8px;align-items:center">${icon('file', 20)} PowerPoint da missa</h3>
+    <p>Modelo: <b>${esc(modelo.nome)}</b>. Escolha o canto de cada parte; o visual do modelo não muda.</p>
+    <div class="pptx-partes">${modelo.partes.map((p) => `<label><span>${esc(p.nome)}</span><select class="input" data-parte="${p.chave}">${opcoesItens(escolha[p.chave])}</select></label>`).join('')}</div>
+    <div class="pdf-opcoes">
+      <label class="check"><input type="checkbox" data-refrao checked> Repetir o refrão depois de cada estrofe</label>
+      <label class="check"><input type="checkbox" data-lit checked> Preencher capa e leituras com a liturgia de ${fmtData(set.date) || 'hoje'} (CNBB)</label>
+      <small>Cada refrão/estrofe vai num slide; se a letra for maior que os slides do modelo, o app cria mais slides iguais.</small>
+    </div>
+    <div class="acts"><button class="btn ghost" data-trocar>Trocar modelo</button><button class="btn ghost" data-no>Cancelar</button><button class="btn primary" data-ok>${icon('download', 16)} Gerar PowerPoint</button></div>`,
+  (dlg, done) => {
+    $('[data-no]', dlg).onclick = () => done(null);
+    $('[data-trocar]', dlg).onclick = () => done('trocar');
+    $('[data-ok]', dlg).onclick = () => {
+      const esc2 = {};
+      dlg.querySelectorAll('[data-parte]').forEach((s) => { if (s.value !== '') esc2[s.dataset.parte] = Number(s.value); });
+      done({ escolha: esc2, repetirRefrao: $('[data-refrao]', dlg).checked, comLiturgia: $('[data-lit]', dlg).checked });
+    };
+  });
+  if (r === 'trocar') { if (await enviarModeloPptx()) exportarPowerPoint(set); return; }
+  if (!r) return;
+  if (!Object.keys(r.escolha).length && !r.comLiturgia) { toast('Escolha ao menos um canto'); return; }
+  toast('Gerando o PowerPoint…');
+  try {
+    const { blob, liturgia } = await gerarPowerPoint({ itens, escolha: r.escolha, data: set.date || hojeISO(), repetirRefrao: r.repetirRefrao, comLiturgia: r.comLiturgia });
+    const dia = (set.date || hojeISO()).split('-').reverse().slice(0, 2).join('-');
+    download(`${dia} ${nomeArquivo(set.name)}.pptx`, blob, 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+    toast(r.comLiturgia && !liturgia ? 'PowerPoint gerado (sem a liturgia: não consegui consultar a CNBB)' : 'PowerPoint gerado');
+  } catch (e) {
+    console.error(e);
+    toast('Não foi possível gerar: ' + e.message);
+  }
 }
 
 const linhaMusica = (s, extra = '') => `
@@ -1344,6 +1409,7 @@ function viewSet(id) {
       <a class="btn small" href="#/editar/novo/${id}" title="Escrever uma música nova (letra, cifra, estrutura) e já colocar neste repertório">${icon('edit', 15)} Criar música</a>
       <button class="icon-btn" id="ren" aria-label="Renomear" title="Renomear">${icon('edit', 22)}</button>
       ${set.items.length ? `<button class="btn small" id="exp" title="Exportar o repertório inteiro em PDF (com ou sem cifra) ou backup">${icon('file', 15)} Exportar PDF</button>` : ''}
+      ${set.items.length ? `<button class="btn small" id="pptx" title="Gerar o PowerPoint da missa no modelo do grupo, com as letras nos lugares certos">${icon('grid', 15)} PowerPoint</button>` : ''}
       <button class="icon-btn danger" id="del" aria-label="Excluir repertório" title="Excluir">${icon('trash', 22)}</button>
       <div class="seg-tabs" style="min-width:190px">${campoData('set-date', set.date, 'Data do repertório')}</div>
     </div>
@@ -1361,6 +1427,7 @@ function viewSet(id) {
   };
   $('#ren').onclick = async () => { const n = await ask({ title: 'Renomear repertório', value: set.name, ok: 'Salvar' }); if (n) { set.name = n; db.saveSet(set); desenharLateral(); viewSet(id); } };
   $('#exp')?.addEventListener('click', () => exportarRepertorioPdf(set));
+  $('#pptx')?.addEventListener('click', () => exportarPowerPoint(set));
   $('#del').onclick = async () => {
     if (await ask({ title: 'Excluir repertório?', text: `“${set.name}” será apagado. As músicas continuam na biblioteca.`, ok: 'Excluir', danger: true })) {
       db.deleteSet(id); desenharLateral(); toast('Repertório excluído'); location.hash = '#/biblioteca/repertorios';
@@ -1685,6 +1752,12 @@ function viewSettings() {
       <label class="setting"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns ? 'checked' : ''}></label>
     </div>
 
+    <div class="section-title">PowerPoint da missa</div>
+    <div class="settings-group">
+      <div class="setting"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Modelo do grupo</div><div class="s" id="pptx-info">Verificando…</div></div>
+        <button class="btn small" id="pptx-enviar">Enviar</button><button class="btn small danger" id="pptx-apagar" hidden>Remover</button></div>
+    </div>
+
     <div class="section-title">Dados</div>
     <div class="settings-group">
       <div class="setting"><span class="ico">${icon('download', 18)}</span><div class="grow"><div class="t">Exportar backup</div><div class="s">Todas as músicas e repertórios em .json</div></div><button class="btn small" id="exp">Exportar</button></div>
@@ -1723,6 +1796,18 @@ function viewSettings() {
     applyTheme();
     $('#theme').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   };
+  const infoModelo = async () => {
+    const m = await lerModelo();
+    const el = $('#pptx-info');
+    if (!el) return;
+    el.textContent = m ? `${m.nome} · ${(m.tamanho / 1048576).toFixed(1)} MB · partes: ${m.partes.map((x) => x.nome).join(', ')}`
+      : 'Envie o arquivo "cru" do PowerPoint da missa. Depois, no repertório, toque em "PowerPoint" para gerar com as letras.';
+    $('#pptx-enviar').textContent = m ? 'Trocar' : 'Enviar';
+    $('#pptx-apagar').hidden = !m;
+  };
+  infoModelo();
+  $('#pptx-enviar').onclick = async () => { if (await enviarModeloPptx()) infoModelo(); };
+  $('#pptx-apagar').onclick = async () => { if (await ask({ title: 'Remover o modelo?', text: 'O arquivo sai deste aparelho; os repertórios continuam.', ok: 'Remover', danger: true })) { await apagarModelo(); infoModelo(); } };
   $('#chords').onchange = (e) => db.setPref('showChords', e.target.checked);
   $('#cols').onchange = (e) => db.setPref('columns', e.target.checked);
   $('#exp').onclick = () => download(`songbook-backup-${hojeISO()}.json`, db.exportAll(), 'application/json');

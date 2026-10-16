@@ -13,5 +13,9 @@
   },
   "dependencies": {
     "node-html-parser": "^6.1.13"
+  },
+  "devDependencies": {
+    "@xmldom/xmldom": "^0.8.10",
+    "jszip": "^3.10.1"
   }
 }

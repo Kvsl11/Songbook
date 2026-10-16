@@ -725,3 +725,6 @@ button, a.icon-btn, .chip, .swatch { -webkit-touch-callout: none; -webkit-user-s
 .fonte-pref { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -4px 0 16px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .fonte-pref small { flex-basis: 100%; font-weight: 500; }
 .parte summary .n .cont { display: block; color: var(--subtle); font-size: 11.5px; font-weight: 600; margin-top: 1px; }
+.pptx-partes { display: grid; gap: 10px; max-height: 46vh; overflow: auto; }
+.pptx-partes label { display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.pptx-partes select { width: 100%; }
