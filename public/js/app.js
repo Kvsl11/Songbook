@@ -23,14 +23,6 @@ $('#btn-side').addEventListener('click', () => {
   document.documentElement.classList.toggle('side-collapsed', v);
   $('#btn-side').setAttribute('aria-label', v ? 'Expandir menu' : 'Recolher menu');
 });
-// alternância rápida claro/escuro
-function alternarTema() {
-  const atual = document.documentElement.dataset.theme;
-  db.setPref('theme', atual === 'light' ? 'dark' : 'light');
-  applyTheme();
-  if (location.hash.startsWith('#/ajustes')) viewSettings();
-}
-$('#btn-tema').addEventListener('click', alternarTema);
 view.addEventListener('scroll', () => topbar.classList.toggle('scrolled', view.scrollTop > 120), { passive: true });
 
 // imagens de capa que falharem viram capa gerada
@@ -45,7 +37,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-15';
+export const APP_VERSAO = '2026.10.16-16';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -260,8 +252,6 @@ function applyTheme() {
   for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.content = tema === 'light' ? '#ffffff' : '#121212';
-  const bt = $('#btn-tema');
-  if (bt) { bt.innerHTML = icon(tema === 'light' ? 'moon' : 'sun', 20); bt.title = tema === 'light' ? 'Mudar para escuro' : 'Mudar para claro'; }
 }
 matchMedia('(prefers-color-scheme: light)').addEventListener?.('change', () => { if (db.prefs().theme === 'auto') applyTheme(); });
 
