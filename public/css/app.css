@@ -333,6 +333,18 @@ a.chip.sm { cursor: pointer; }
 .song.lyrics-mode .section.chorus { background: none; border: 0; padding: 0; color: #fff; }
 .song.lyrics-mode .section:not(.chorus) { color: rgb(255 255 255 / 0.62); }
 .song.lyrics-mode .section-label { color: rgb(255 255 255 / 0.55); font-size: 12px; letter-spacing: 0.14em; }
+/* modo Cifra no mesmo painel: acordes por cima da letra, em cor clara de destaque */
+.song.lyrics-mode.with-chords { font-size: calc(19px * var(--font-scale)); line-height: 1.25; }
+.song.lyrics-mode.with-chords .chord { display: block; color: color-mix(in srgb, var(--accent) 55%, #fff); font-size: 0.78em; font-weight: 800; min-height: 1.2em; padding-right: 0.35em; }
+.song.lyrics-mode.with-chords .line.chords-only { display: flex; }
+.song.lyrics-mode.with-chords .comment { display: block; color: rgb(255 255 255 / 0.6); font-weight: 600; font-size: 0.75em; }
+.song.lyrics-mode.with-chords .chunk { display: inline-flex; flex-direction: column; white-space: pre-wrap; max-width: 100%; }
+.song.lyrics-mode.with-chords .lyrics-only .chunk { display: inline; }
+.song.lyrics-mode.with-chords .line { display: flex; flex-wrap: wrap; align-items: flex-end; margin-bottom: 0.25em; }
+.song.lyrics-mode.with-chords .lyrics-only .chord { display: none; }
+.song.lyrics-mode.with-chords .section:not(.chorus) { color: rgb(255 255 255 / 0.85); }
+@media (min-width: 900px) { .song.lyrics-mode.with-chords { font-size: calc(26px * var(--font-scale)); } }
+@media (min-width: 1100px) { .song.lyrics-mode.with-chords.columns { column-count: 2; column-gap: 48px; } }
 .song.lyrics-mode .chunk { display: inline; white-space: pre-wrap; }
 .song.lyrics-mode .line { display: block; min-height: 0; }
 @media (min-width: 900px) { .song.lyrics-mode { border-radius: var(--radius); margin: 0; font-size: calc(32px * var(--font-scale)); padding: 36px 40px; } }

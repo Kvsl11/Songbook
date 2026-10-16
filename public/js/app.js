@@ -620,7 +620,9 @@ function viewSong(id, ctx = {}) {
     songEl.innerHTML = r.html;
     songEl.classList.toggle('no-chords', !showChords);
     songEl.classList.toggle('columns', db.prefs().columns && modo === 'cifra');
-    songEl.classList.toggle('lyrics-mode', modo === 'letra');
+    // Cifra e Letra usam o mesmo painel estilo Spotify; na Cifra os acordes aparecem por cima
+    songEl.classList.add('lyrics-mode');
+    songEl.classList.toggle('with-chords', modo === 'cifra' && showChords);
     $('#tools').hidden = modo === 'letra';
     $('#key').innerHTML = `<small>Tom</small>${r.key ? esc(r.key) : (transpose ? (transpose > 0 ? '+' : '') + transpose : '—')}`;
     $('#capo').innerHTML = `<small>Capo</small>${capo || '—'}`;
