@@ -39,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-28';
+export const APP_VERSAO = '2026.10.16-29';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -204,10 +204,10 @@ function capaRepertorio(set, cls = '') {
 }
 
 // ---------------------------------------------------------------- tema e cor de destaque
-export const COR_PADRAO = '#2747a3'; // azul-marinho
+export const COR_PADRAO = '#06b6d4'; // ciano (cor da logo)
 const CORES_DESTAQUE = [
-  [COR_PADRAO, 'Azul-marinho'], ['#1ed760', 'Verde'], ['#3b82f6', 'Azul'], ['#a855f7', 'Roxo'], ['#ec4899', 'Rosa'],
-  ['#ef4444', 'Vermelho'], ['#f97316', 'Laranja'], ['#e3b341', 'Dourado'], ['#06b6d4', 'Ciano'],
+  [COR_PADRAO, 'Ciano'], ['#2747a3', 'Azul-marinho'], ['#1ed760', 'Verde'], ['#3b82f6', 'Azul'], ['#a855f7', 'Roxo'],
+  ['#ec4899', 'Rosa'], ['#ef4444', 'Vermelho'], ['#f97316', 'Laranja'], ['#e3b341', 'Dourado'],
 ];
 // cor de destaque quando a opção "cor litúrgica do dia" está ativa
 const COR_LIT_DESTAQUE = { verde: '#1ed760', roxo: '#a855f7', vermelho: '#ef4444', branco: '#e3b341', rosa: '#ec4899', azul: '#3b82f6', preto: '#9ca3af' };
@@ -230,7 +230,8 @@ function corDestaque() {
 }
 
 // a cor padrão deixou de ser o verde: quem estava com o verde antigo passa para o azul-marinho (uma vez)
-if (!db.prefs().corV2) { if ((db.prefs().accent || '#1ed760') === '#1ed760') db.setPref('accent', COR_PADRAO); db.setPref('corV2', true); }
+// a cor padrão agora é o ciano da logo: quem estava no verde antigo ou no azul-marinho (padrão anterior) passa para ele (uma vez)
+if (!db.prefs().corV3) { if (['#1ed760', '#2747a3', undefined, ''].includes(db.prefs().accent)) db.setPref('accent', COR_PADRAO); db.setPref('corV3', true); }
 
 function applyTheme() {
   const { fontScale } = db.prefs();

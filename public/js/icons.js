@@ -63,18 +63,18 @@ export function icon(name, size = 20, extra = '') {
 // Logo do app: livro de cifras aberto com nota musical e cruz, na cor de destaque.
 let nLogo = 0;
 export function logo(size = 32) {
-  // palheta de violão com uma cruz. ids únicos: um degradê dentro de uma logo escondida não pinta as outras
+  // palheta de violão com uma cruz, no ciano padrão do app. ids únicos: um degradê dentro de uma logo escondida não pinta as outras
   const id = 'lg' + ++nLogo;
   return `<svg class="logo" width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true">
   <defs>
-    <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4272e6"/><stop offset="1" stop-color="#15225a"/></linearGradient>
+    <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#35d3ec"/><stop offset="1" stop-color="#086b86"/></linearGradient>
     <radialGradient id="${id}h" cx=".22" cy=".12" r=".85"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".6" stop-color="#fff" stop-opacity="0"/></radialGradient>
-    <linearGradient id="${id}p" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#dfe6fb"/></linearGradient>
+    <linearGradient id="${id}p" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#dcf4f9"/></linearGradient>
   </defs>
   <rect width="64" height="64" rx="15" fill="url(#${id}g)"/>
   <rect width="64" height="64" rx="15" fill="url(#${id}h)"/>
   <path d="M32 9.5c11.2 0 21.5 3.8 21.5 12.3 0 10.3-10.9 27-16.8 33.4a6.4 6.4 0 0 1-9.4 0C21.4 48.8 10.5 32.1 10.5 21.8 10.5 13.3 20.8 9.5 32 9.5z" fill="url(#${id}p)"/>
-  <path d="M32 17.5v23.5M24 25.5h16" stroke="#1b2f74" stroke-width="5" stroke-linecap="round"/>
+  <path d="M32 17.5v23.5M24 25.5h16" stroke="#0a5e73" stroke-width="5" stroke-linecap="round"/>
   </svg>`;
 }
 
