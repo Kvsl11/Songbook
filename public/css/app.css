@@ -573,7 +573,17 @@ dialog { border: 0; padding: 0; background: var(--surface); color: var(--text); 
 dialog::backdrop { background: rgb(0 0 0 / 0.7); }
 dialog[open] { animation: pop 0.2s ease-out; }
 @keyframes pop { from { opacity: 0; transform: scale(0.97); } }
-.dlg { padding: 22px; display: grid; gap: 14px; }
+.dlg { padding: 22px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+/* conteúdo nunca mais largo que a tela; janela rola por dentro quando é alta */
+dialog { max-height: calc(100dvh - 24px); overflow-y: auto; overflow-x: hidden; }
+.dlg > * { min-width: 0; max-width: 100%; }
+.dlg p { overflow-wrap: anywhere; }
+.dlg select, .dlg .input { width: 100%; max-width: 100%; min-width: 0; text-overflow: ellipsis; }
+.dlg .acts { flex-wrap: wrap; }
+.pptx-partes { grid-template-columns: minmax(0, 1fr); max-height: none; overflow: visible; }
+.pptx-partes label { min-width: 0; }
+.pdf-opcoes label.check { align-items: flex-start; }
+.pdf-opcoes label.check input { flex: none; margin-top: 2px; }
 .dlg h3 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
 .dlg p { margin: 0; color: var(--muted); }
 .dlg .tracks { max-height: 50vh; overflow: auto; margin: 0; }
@@ -725,7 +735,7 @@ button, a.icon-btn, .chip, .swatch { -webkit-touch-callout: none; -webkit-user-s
 .fonte-pref { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -4px 0 16px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .fonte-pref small { flex-basis: 100%; font-weight: 500; }
 .parte summary .n .cont { display: block; color: var(--subtle); font-size: 11.5px; font-weight: 600; margin-top: 1px; }
-.pptx-partes { display: grid; gap: 10px; max-height: 46vh; overflow: auto; }
+.pptx-partes { display: grid; gap: 10px; }
 .pptx-partes label { display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .pptx-partes select { width: 100%; }
 

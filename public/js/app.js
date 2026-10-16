@@ -39,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-23';
+export const APP_VERSAO = '2026.10.16-24';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -461,10 +461,10 @@ async function exportarPowerPointModelo(set) {
   }
   const itens = set.items.map((it) => ({ ...it, song: db.song(it.songId) })).filter((x) => x.song);
   const escolha = sugerirCantos(modelo.partes, itens);
-  const opcoesItens = (sel) => `<option value="">— deixar como está no modelo —</option>${itens.map((it, i) => `<option value="${i}" ${sel === i ? 'selected' : ''}>${i + 1}. ${esc(it.label ? it.label + ' — ' : '')}${esc(it.song.title)}</option>`).join('')}`;
+  const opcoesItens = (sel) => `<option value="">— deixar como está no modelo —</option>${itens.map((it, i) => `<option value="${i}" ${sel === i ? 'selected' : ''}>${i + 1}. ${esc(it.song.title)}${it.label ? ` (${esc(it.label)})` : ''}</option>`).join('')}`;
   const r = await openDialog(`
     <h3 style="display:flex;gap:8px;align-items:center">${icon('file', 20)} PowerPoint da missa</h3>
-    <p>Modelo: <b>${esc(modelo.nome)}</b>. Escolha o canto de cada parte; o visual do modelo não muda.</p>
+    <p>Escolha o canto de cada parte; o visual do modelo não muda.<br><small>Modelo: ${esc(modelo.nome)}</small></p>
     <div class="pptx-partes">${modelo.partes.map((p) => `<label><span>${esc(p.nome)}</span><select class="input" data-parte="${p.chave}">${opcoesItens(escolha[p.chave])}</select></label>`).join('')}</div>
     <div class="pdf-opcoes">
       <label class="check"><input type="checkbox" data-refrao checked> Repetir o refrão depois de cada estrofe</label>
