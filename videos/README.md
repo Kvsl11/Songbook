@@ -1,6 +1,6 @@
 # Vídeos de apresentação
 
-Vídeos de divulgação do Songbook Litúrgico (84 s, com trilha sonora).
+Vídeos de divulgação do Songbook Litúrgico (84 s, sem áudio).
 
 | Arquivo | Proporção | Onde usar |
 |---|---|---|
