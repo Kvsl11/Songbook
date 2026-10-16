@@ -1,6 +1,6 @@
 # Publica a pasta public/ no GitHub Pages a cada push e uma vez por dia.
 # Na publicação, copia do musicasparamissa.com.br as sugestões e cifras das próximas datas
-# (o site não permite acesso direto pelo navegador).
+# (o site não permite acesso direto pelo navegador), e do pocketterco.com.br o missal do dia e as orações.
 # Antes do primeiro uso: Settings → Pages → Build and deployment → Source: "GitHub Actions".
 name: Publicar no GitHub Pages
 
@@ -53,6 +53,16 @@ jobs:
         continue-on-error: true # se o site estiver fora do ar, o app é publicado mesmo assim
         timeout-minutes: 25
         run: node scripts/mpm-sync.mjs --dias 12 --max 700
+      - name: Cache das orações do Pocket Terço
+        uses: actions/cache@v4
+        with:
+          path: .pt-cache
+          key: pt-${{ github.run_id }}
+          restore-keys: pt-
+      - name: Copiar missal do dia, orações (Pocket Terço) e fontes (Junior Música Católica)
+        continue-on-error: true
+        timeout-minutes: 25
+        run: node scripts/liturgia-sync.mjs --dias 21
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

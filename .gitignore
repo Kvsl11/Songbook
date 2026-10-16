@@ -3,3 +3,6 @@ node_modules/
 *.log
 .mpm-cache/
 public/data/mpm/
+.pt-cache/
+public/data/pt/
+public/data/junior.json

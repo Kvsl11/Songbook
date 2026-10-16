@@ -4,7 +4,7 @@ import { completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsO
 import { icon, logo } from './icons.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
-import { buscarCindy, getCanto, getLiturgiaDoDia, getMissa, indiceMusicasParaMissa, liturgiaGuardada, missaGuardada, prepararOffline } from './fonte.js';
+import { buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const view = $('#view');
@@ -39,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-39';
+export const APP_VERSAO = '2026.10.16-40';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1827,6 +1827,7 @@ async function viewLiturgia(data) {
         </div>
       </details>`).join('')}
     </div>
+    <div id="missal-dia"></div>
     <div class="cta-bar">
       <div class="info"><b id="cta-count"></b><span>Serão baixados com cifra e reunidos num repertório</span></div>
       <button class="btn primary" id="montar">${icon('sparkles', 18)} Montar repertório</button>
@@ -1873,6 +1874,7 @@ async function viewLiturgia(data) {
     }
   });
   $('#montar').onclick = () => montarRepertorio(missa, sel, data);
+  desenharMissalDoDia(data);
   $('#lit').querySelectorAll('[data-fonte]').forEach((b) => (b.onclick = () => {
     db.setPref('fonteSugestoes', b.dataset.fonte);
     escolhas.set(data, Object.fromEntries(missa.partes.map((p) => [p.chave, escolhaPadrao(p)])));
@@ -2045,6 +2047,100 @@ function viewNotFound() {
 
 // ------------------------------------------------------------- roteador
 
+// ---------------------------------------------------------------- orações, textos da missa e fontes
+const ICONE_LINK = { video: 'youtube', musica: 'music', documento: 'file', pasta: 'library', rede: 'link', site: 'external' };
+
+async function viewOracoes() {
+  setTab('oracoes');
+  setTint('#3b2f5c');
+  setHeader('Orações', { eyebrow: 'Textos da missa e orações' });
+  view.innerHTML = `
+    <h2 class="greet">Orações</h2>
+    <p class="muted" style="margin:-6px 0 14px">Orações eucarísticas, prefácios, ordinário da missa e outras orações — do Missal Romano, via Pocket Terço.</p>
+    <label class="field">${icon('search', 18)}<input class="search" id="busca-oracao" type="search" placeholder="Buscar oração (ex.: Oração Eucarística II, prefácio do Advento)"></label>
+    <div class="quick" style="margin:14px 0">
+      <a href="#/liturgia"><div class="cover gen" style="--h:130">${icon('cross', 22)}</div><span>Liturgia e orações do dia</span></a>
+      <a href="#/fontes"><div class="cover gen" style="--h:210">${icon('library', 22)}</div><span>Fontes litúrgicas (hinários, salmos)</span></a>
+    </div>
+    <div id="lista-oracoes"><div class="loading-note"><span class="spin"></span>Carregando orações…</div></div>`;
+  let indice;
+  try { indice = await indiceOracoes(); } catch {
+    $('#lista-oracoes').innerHTML = `<div class="empty"><div class="bubble">${icon('book', 30)}</div><h3>Orações ainda não disponíveis</h3><p>${navigator.onLine === false ? 'Sem internet e sem orações guardadas. Abra esta tela uma vez com internet.' : 'A cópia diária das orações ainda não foi gerada. Tente mais tarde.'}</p></div>`;
+    return;
+  }
+  const desenhar = (termo = '') => {
+    const t = normalizar(termo);
+    const palavras = t.split(' ').filter(Boolean);
+    const html = indice.map((c) => {
+      const itens = c.itens.filter((i) => { const n = normalizar(i.titulo); return palavras.every((w) => n.split(' ').some((x) => x.startsWith(w))); });
+      if (!itens.length) return '';
+      return `<details class="cat-oracoes" ${t || c.categoria === 'oracoes-eucaristicas' ? 'open' : ''}><summary><b>${esc(c.nome)}</b><span class="chip sm">${itens.length}</span>${icon('down', 18)}</summary>
+        <ul class="lista-oracoes">${itens.map((i) => `<li><a href="#/oracao/${encodeURIComponent(i.slug)}">${icon('book', 16)}<span>${esc(i.titulo)}</span></a></li>`).join('')}</ul></details>`;
+    }).join('');
+    $('#lista-oracoes').innerHTML = html || '<p class="muted">Nenhuma oração encontrada.</p>';
+  };
+  desenhar();
+  $('#busca-oracao').addEventListener('input', (e) => desenhar(e.target.value));
+}
+
+async function viewOracao(slug) {
+  setTab('oracoes');
+  setTint('#3b2f5c');
+  setHeader('Oração', { back: '#/oracoes' });
+  view.innerHTML = '<div class="loading-note"><span class="spin"></span>Carregando…</div>';
+  let o;
+  try { o = await getOracao(slug); } catch { return viewNotFound(); }
+  setHeader(o.titulo, { back: '#/oracoes', eyebrow: o.categoria || 'Oração' });
+  view.innerHTML = `
+    <section class="page-hero"><div class="cover gen" style="--h:270">${icon('book', 40)}</div>
+      <div><div class="kind">${esc(o.categoria || 'Oração')}</div><h2>${esc(o.titulo)}</h2>
+      <div class="meta"><span>Fonte: <a href="${esc(o.url)}" target="_blank" rel="noopener">Pocket Terço</a> · Missal Romano</span></div></div></section>
+    <div class="seg" style="margin-bottom:14px;width:max-content"><button data-f="-" aria-label="Diminuir letra">A−</button><button data-f="+" aria-label="Aumentar letra">A+</button></div>
+    <article class="texto-liturgico">${o.html}</article>
+    <p class="legenda-rub"><span class="rub">Em marrom</span>: indicações para quem preside. <b>Em negrito</b>: respostas do povo.</p>`;
+  view.querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => {
+    const p = db.prefs();
+    db.setPref('fontScale', Math.max(0.6, Math.min(2.5, +(p.fontScale + (b.dataset.f === '+' ? 0.1 : -0.1)).toFixed(2))));
+    applyTheme();
+  }));
+}
+
+async function viewFontes() {
+  setTab('oracoes');
+  setTint('#24425c');
+  setHeader('Fontes litúrgicas', { back: '#/oracoes' });
+  view.innerHTML = `<h2 class="greet">Fontes litúrgicas</h2>
+    <p class="muted" style="margin:-6px 0 14px">Hinários da CNBB, salmos, partituras, documentos da Igreja e formação para músicos — reunidos por <a href="https://sites.google.com/view/juniormusicacatolica/m%C3%BAsica-lit%C3%BArgica-para-missa" target="_blank" rel="noopener">Junior Música Católica</a>.</p>
+    <div id="fontes"><div class="loading-note"><span class="spin"></span>Carregando…</div></div>`;
+  let d;
+  try { d = await diretorioJunior(); } catch {
+    $('#fontes').innerHTML = '<p class="muted">Ainda não disponível. Tente mais tarde (a lista é copiada uma vez por dia).</p>';
+    return;
+  }
+  $('#fontes').innerHTML = d.paginas.map((p) => `
+    <h3 class="fontes-pag">${esc(tituloBonitoPagina(p.titulo))}</h3>
+    ${p.secoes.map((sec) => `<details class="cat-oracoes" ${/liturgia diária|hinários|salmos|fórmulas/i.test(sec.titulo) ? 'open' : ''}><summary><b>${esc(sec.titulo)}</b><span class="chip sm">${sec.links.length}</span>${icon('down', 18)}</summary>
+      <ul class="lista-oracoes">${sec.links.map((l) => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener">${icon(ICONE_LINK[l.tipo] || 'external', 16)}<span>${esc(l.texto)}</span><small>${esc(host(l.url))}</small></a></li>`).join('')}</ul></details>`).join('')}`).join('');
+}
+const tituloBonitoPagina = (t) => t.charAt(0) + t.slice(1).toLowerCase().replace(/\bcnbb\b/g, 'CNBB').replace(/\(preces\)/, '(Preces)');
+
+// Orações e antífonas do dia (Pocket Terço), dentro da tela da Liturgia
+async function desenharMissalDoDia(data) {
+  const box = $('#missal-dia');
+  if (!box) return;
+  const m = await missalDoDia(data);
+  if (!$('#missal-dia')) return;
+  if (!m?.blocos?.length) { box.innerHTML = ''; return; }
+  const oracoes = m.blocos.filter((b) => b.tipo === 'oracao');
+  const outros = m.blocos.filter((b) => b.tipo !== 'oracao');
+  const bloco = (b) => `<details class="cat-oracoes"><summary><b>${esc(b.titulo)}</b>${icon('down', 18)}</summary><div class="texto-liturgico">${b.html}</div></details>`;
+  box.innerHTML = `
+    <div class="shelf-head"><h2>Orações e antífonas do dia</h2><a href="#/oracoes">Orações eucarísticas</a></div>
+    ${oracoes.map(bloco).join('')}
+    ${outros.length ? `<details class="cat-oracoes"><summary><b>Leituras, santo do dia e homilia</b><span class="chip sm">${outros.length}</span>${icon('down', 18)}</summary>${outros.map(bloco).join('')}</details>` : ''}
+    <p class="fonte">Missal do dia: <a href="${esc(m.url)}" target="_blank" rel="noopener">Pocket Terço</a> (Missal Romano / CNBB).</p>`;
+}
+
 function route() {
   stopScroll();
   keyHandler = null;
@@ -2067,6 +2163,9 @@ function route() {
     case 'repertorio': return c !== undefined ? viewSetSong(b, Number(c)) : viewSet(b);
     case 'liturgia': return viewLiturgia(b);
     case 'ajustes': return viewSettings();
+    case 'oracoes': return viewOracoes();
+    case 'oracao': return viewOracao(b);
+    case 'fontes': return viewFontes();
     default: return viewNotFound();
   }
 }

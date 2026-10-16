@@ -116,3 +116,23 @@ export function buscarCindy(termo, { categoria } = {}) {
   const chave = `busca:${categoria || ''}:${termo || ''}`;
   return obter(chave, () => buscarDireto(termo, { categoria }), 'api/cindy/busca?q=' + encodeURIComponent(termo || '') + (categoria ? '&categoria=' + categoria : ''));
 }
+
+// ------------------------------------------------------------------ orações e missal do dia (Pocket Terço) e fontes (Junior)
+// Copiados diariamente pelo GitHub Actions (scripts/liturgia-sync.mjs) para data/; guardados no aparelho para o offline.
+async function dadosLocais(chave, caminho) {
+  try {
+    const res = await fetch(new URL(caminho, document.baseURI), { cache: 'no-cache' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const v = await res.json();
+    gravarCache(chave, v);
+    return v;
+  } catch (e) {
+    const velho = lerCacheVelho(chave);
+    if (velho) return velho;
+    throw e;
+  }
+}
+export const missalDoDia = (data) => dadosLocais('pt-lit:' + data, `data/pt/liturgia/${data}.json`).catch(() => null);
+export const indiceOracoes = () => dadosLocais('pt-oracoes', 'data/pt/oracoes.json');
+export const getOracao = (slug) => dadosLocais('pt-oracao:' + slug, `data/pt/oracoes/${encodeURIComponent(slug)}.json`);
+export const diretorioJunior = () => dadosLocais('junior', 'data/junior.json');

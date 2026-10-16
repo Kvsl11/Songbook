@@ -29,6 +29,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   nas demais (com aviso para conferir ouvindo o vídeo); botão "Completar cifra" na música e no editor.
   Músicas sem nenhum acorde mostram só a opção Letra.
 - **Dicas**: passar o mouse ou segurar o dedo num botão mostra o nome da função.
+- **Orações**: aba com orações eucarísticas, prefácios, ordinário da missa e outras orações (com rubricas e posturas);
+  na Liturgia, as orações e antífonas do dia (entrada, coleta, oferendas, comunhão, depois da comunhão).
 - **Funciona sem internet**: repertórios e músicas ficam no aparelho; a Início mostra a liturgia de hoje sozinha e
   o app já deixa guardadas a liturgia e as sugestões de hoje, do próximo domingo e das datas dos repertórios futuros.
   Capas, fontes e bibliotecas também ficam guardadas; com sinal fraco, o app abre com a cópia guardada em poucos segundos.
@@ -63,6 +65,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 | **CNBB** (liturgia oficial) | leituras, salmo, aclamação | direto do navegador (API com CORS) |
 | **Cindy Ferrarezi** | repertório por missa, cifras, capas, vídeos | direto do navegador (WordPress com CORS) |
 | **Músicas para Missa** | sugestões por data e por parte da missa, cifras, vídeos | cópia diária feita pelo GitHub Actions (`scripts/mpm-sync.mjs`) em `data/mpm/`, porque o site não permite acesso direto |
+| **Pocket Terço** | missal do dia (antífonas, coleta, oferendas, comunhão, leituras, homilia) e orações (orações eucarísticas, prefácios, ordinário da missa) | cópia diária pelo GitHub Actions (`scripts/liturgia-sync.mjs`) em `data/pt/` |
+| **Junior Música Católica** | diretório de hinários da CNBB, salmos, partituras, documentos e formação | cópia diária em `data/junior.json` (aba Orações → Fontes litúrgicas) |
 | **Cifra Club** | outras versões de cifra | link de busca; a cifra copiada é colada no editor ("Organizar cifra colada") |
 
 As sugestões das fontes são misturadas em cada parte da missa (as do Músicas para Missa aparecem com a
