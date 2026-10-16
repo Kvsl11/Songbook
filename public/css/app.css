@@ -101,10 +101,6 @@ body.performance main { padding: 0 0 110px; background: color-mix(in srgb, var(-
 body.performance .shell { padding: 0; gap: 0; }
 body.performance .main-col { border-radius: 0; }
 body.performance #song.lyrics-mode { margin: 0; border-radius: 0; min-height: 100%; padding-top: calc(28px + env(safe-area-inset-top)); max-width: none; }
-/* tela cheia: letra centralizada */
-body.performance #song.lyrics-mode { text-align: center; }
-body.performance #song.lyrics-mode.with-chords .line { justify-content: center; }
-body.performance #song.lyrics-mode .section-label { text-align: center; }
 @media (min-width: 900px) { body.performance #song.lyrics-mode { padding-left: max(40px, calc((100% - 1000px) / 2)); padding-right: max(40px, calc((100% - 1000px) / 2)); } }
 .palco-ctrl { display: none; }
 body.performance .palco-ctrl {
@@ -366,6 +362,10 @@ a.chip.sm { cursor: pointer; }
 .song.lyrics-mode.with-chords .lyrics-only .chord { display: none; }
 .song.lyrics-mode.with-chords .section:not(.chorus) { color: rgb(255 255 255 / 0.85); }
 @media (min-width: 900px) { .song.lyrics-mode.with-chords { font-size: calc(26px * var(--font-scale)); } }
+/* letra centralizada (cifra e letra, normal e tela cheia) */
+.song.lyrics-mode { text-align: center; }
+.song.lyrics-mode.with-chords .line { justify-content: center; }
+.song.lyrics-mode .section-label, .song.lyrics-mode .comment { text-align: center; }
 /* duas colunas: só em telas largas (tablet deitado/computador); no celular o botão some */
 @media (min-width: 700px) { .song.lyrics-mode.columns { column-count: 2; column-gap: 48px; } .song.lyrics-mode.columns .section { break-inside: avoid; } }
 @media (max-width: 699px) { .song-toolbar [data-act="cols"] { display: none; } }
