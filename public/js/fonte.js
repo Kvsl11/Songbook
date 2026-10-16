@@ -6,15 +6,19 @@
 import { getMissa as getMissaDireto } from './lib/missa.js';
 import { buscarCantos as buscarDireto, getCanto as getCantoDireto } from './lib/cindy.js';
 import { ehMpm, getMusicaMpm } from './lib/mpm.js';
+import { getLiturgia as getLiturgiaDireto } from './lib/cnbb.js';
 
 const PREFIXO = 'songbook.cache.';
 const VALIDADE = 12 * 3600e3;
-const MAX_ITENS = 60;
+// a liturgia de uma data não muda: vale por mais tempo (e fica guardada para o modo offline)
+const VALIDADE_LITURGIA = 5 * 864e5;
+const MAX_ITENS = 140;
+const validade = (chave) => (/^(missa|lit):/.test(chave) ? VALIDADE_LITURGIA : VALIDADE);
 
 function lerCache(chave) {
   try {
     const item = JSON.parse(localStorage.getItem(PREFIXO + chave) || 'null');
-    return item && Date.now() - item.t < VALIDADE ? item.v : null;
+    return item && Date.now() - item.t < validade(chave) ? item.v : null;
   } catch {
     return null;
   }
@@ -67,6 +71,27 @@ async function obter(chave, direto, caminhoServidor, { forcar = false } = {}) {
     if (velho) return velho;
     throw erroDireto;
   }
+}
+
+// só o texto da CNBB (uma requisição, rápida): usado na Início antes da missa completa
+export function getLiturgiaDoDia(data, opts) {
+  return obter('lit:' + data, () => getLiturgiaDireto(data), 'api/liturgia?data=' + data, opts);
+}
+// o que já estiver guardado no aparelho (mesmo antigo), sem ir à internet
+export const liturgiaGuardada = (data) => lerCacheVelho('missa:' + data)?.liturgia || lerCacheVelho('lit:' + data);
+export const missaGuardada = (data) => lerCacheVelho('missa:' + data);
+
+// Baixa antes (em segundo plano) a liturgia/sugestões das datas pedidas, para abrir sem internet depois
+let baixando = null;
+export function prepararOffline(datas) {
+  if (baixando || (typeof navigator !== 'undefined' && navigator.onLine === false)) return baixando;
+  baixando = (async () => {
+    for (const d of [...new Set(datas)].filter(Boolean)) {
+      if (lerCache('missa:' + d)) continue;
+      try { await getMissa(d); } catch { /* sem rede ou fonte fora do ar: tenta na próxima vez */ }
+    }
+  })().finally(() => { baixando = null; });
+  return baixando;
 }
 
 export function getMissa(data, opts) {

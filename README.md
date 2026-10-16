@@ -29,6 +29,9 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   nas demais (com aviso para conferir ouvindo o vídeo); botão "Completar cifra" na música e no editor.
   Músicas sem nenhum acorde mostram só a opção Letra.
 - **Dicas**: passar o mouse ou segurar o dedo num botão mostra o nome da função.
+- **Funciona sem internet**: repertórios e músicas ficam no aparelho; a Início mostra a liturgia de hoje sozinha e
+  o app já deixa guardadas a liturgia e as sugestões de hoje, do próximo domingo e das datas dos repertórios futuros.
+  Capas, fontes e bibliotecas também ficam guardadas; com sinal fraco, o app abre com a cópia guardada em poucos segundos.
 - **Atualização automática**: o app busca sempre a versão mais nova e recarrega sozinho; a versão aparece em Ajustes.
 - **PowerPoint da missa**: envie uma vez em Ajustes o modelo "cru" do PowerPoint do grupo (fica só no aparelho).
   No repertório, "PowerPoint" escolhe o canto de cada parte do modelo (Entrada, Oferendas, Comunhão, Saída…) e gera o

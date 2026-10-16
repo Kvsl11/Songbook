@@ -4,7 +4,7 @@ import { completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsO
 import { icon, logo } from './icons.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
-import { buscarCindy, getCanto, getMissa, indiceMusicasParaMissa } from './fonte.js';
+import { buscarCindy, getCanto, getLiturgiaDoDia, getMissa, indiceMusicasParaMissa, liturgiaGuardada, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const view = $('#view');
@@ -39,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-30';
+export const APP_VERSAO = '2026.10.16-31';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -787,27 +787,43 @@ function viewHome() {
         <div class="row"><a class="btn primary" href="#/editar/novo">Criar música</a><a class="btn" href="#/liturgia">Missa de hoje</a><a class="btn" href="#/buscar">Buscar cantos</a></div></div>`}`;
   ligarTiles(view);
 
-  getMissa(hoje).then((m) => {
+  // liturgia de hoje: aparece na hora com o que já está guardado, depois atualiza sozinha
+  const desenharLit = (lit, m) => {
     const box = $('#home-lit');
-    if (!box) return;
-    const lit = m.liturgia;
+    if (!box || !lit) return;
     lembrarCorLiturgica(hoje, lit.cor);
-    const salmo = lit.missas[0]?.salmo;
+    const salmo = lit.missas?.[0]?.salmo;
     document.documentElement.style.setProperty('--lit-cor', CORES[lit.cor] || '#555');
     const qa = $('.quick a[href="#/liturgia"] .cover');
     if (qa) qa.style.setProperty('--h', { verde: 130, roxo: 285, vermelho: 0, branco: 45, rosa: 330 }[lit.cor] ?? 130);
+    const sugestoes = m ? m.partes.reduce((n, p) => n + p.cantos.length, 0) : 0;
     box.innerHTML = `
       <section class="hero ${lit.cor === 'branco' ? 'claro' : ''}">
         <div class="over"><span class="dot"></span>${esc(lit.tempo)} · ${esc(lit.cor)}</div>
         <h2>${esc(lit.celebracao)}</h2>
         <div class="sub">${esc([lit.data_extenso, lit.ano].filter(Boolean).join(' · '))}</div>
         ${salmo ? `<div class="salmo">Salmo: “${esc(salmo.refrao)}”</div>` : ''}
+        ${lit.leituras?.length ? `<div class="refs">${lit.leituras.map((l) => `<span>${esc(l)}</span>`).join('')}</div>` : ''}
         <div class="acts"><a class="btn white" href="#/liturgia/${hoje}">${icon('sparkles', 16)} Montar a missa</a>
-          ${m.repertorio ? `<span class="chip sm" style="background:rgb(255 255 255 / .2);color:inherit">${m.partes.reduce((n, p) => n + p.cantos.length, 0)} sugestões de cantos</span>` : ''}</div>
+          ${sugestoes ? `<span class="chip sm" style="background:rgb(255 255 255 / .2);color:inherit">${sugestoes} sugestões de cantos</span>` : m === undefined ? '<span class="chip sm" style="background:rgb(255 255 255 / .2);color:inherit">buscando sugestões…</span>' : ''}</div>
       </section>`;
-  }).catch(() => {
-    const box = $('#home-lit');
-    if (box) box.innerHTML = `<a class="source" href="#/liturgia"><span class="ico">${icon('cross', 18)}</span><span>Abrir a liturgia do dia</span></a>`;
+  };
+  const guardadaM = missaGuardada(hoje);
+  const guardada = liturgiaGuardada(hoje);
+  if (guardada) desenharLit(guardada, guardadaM || undefined);
+  getLiturgiaDoDia(hoje).then((lit) => { if (!guardadaM) desenharLit(lit, undefined); }).catch(() => {});
+  getMissa(hoje).then((m) => desenharLit(m.liturgia, m)).catch(() => {
+    if (guardada || !$('#home-lit')) return;
+    getLiturgiaDoDia(hoje).then((lit) => desenharLit(lit, null)).catch(() => {
+      const box = $('#home-lit');
+      if (box) box.innerHTML = `<a class="source" href="#/liturgia"><span class="ico">${icon('cross', 18)}</span><span>${navigator.onLine === false ? 'Sem internet e sem liturgia de hoje guardada. Ela aparece aqui quando houver conexão.' : 'Abrir a liturgia do dia'}</span></a>`;
+    });
+  }).finally(() => {
+    // deixa prontas para o modo offline: hoje, o próximo domingo e as datas dos repertórios futuros
+    const d = new Date(hoje + 'T12:00:00');
+    const domingo = somaDias(hoje, (7 - d.getDay()) % 7 || 7);
+    const futuras = db.sets().map((x) => x.date).filter((x) => x && x >= hoje && x <= somaDias(hoje, 14));
+    setTimeout(() => prepararOffline([hoje, domingo, ...futuras]), 1500);
   });
 }
 
@@ -2067,6 +2083,12 @@ window.addEventListener('beforeinstallprompt', (e) => {
 window.addEventListener('appinstalled', () => { pedidoInstalar = null; esconderConvite(); toast('Songbook instalado! Abra pelo ícone na tela inicial.'); });
 // iPhone/iPad não têm o pedido automático: mostra o convite com as instruções
 if (ehIOS() && !jaInstalado()) setTimeout(mostrarConvite, 2500);
+
+// ---------------------------------------------------------------- offline
+// pede ao navegador para não apagar os dados do app (repertórios, músicas, liturgia guardada)
+navigator.storage?.persist?.().catch(() => {});
+window.addEventListener('offline', () => toast('Sem internet: o app continua com os repertórios e a liturgia guardados'));
+window.addEventListener('online', () => toast('Conexão de volta'));
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   const tinhaControle = Boolean(navigator.serviceWorker.controller);
