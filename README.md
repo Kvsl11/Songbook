@@ -50,7 +50,8 @@ Visual escuro moderno (cor padrão azul-marinho), com capas, cabeçalhos em degr
   busca ou da liturgia também podem ser editados (são salvos na biblioteca antes).
 - **Personalização**: modo escuro, claro ou automático; cor padrão azul-marinho, outras 8 cores de destaque, cor livre ou a
   **cor litúrgica do dia**; menu lateral recolhível no computador.
-- Importa `.cho/.chopro/.pro/.txt` (inclusive "cifra sobre a letra"), exporta e faz backup. PWA instalável e offline.
+- Importa `.cho/.chopro/.pro/.txt` (inclusive "cifra sobre a letra"), exporta e faz backup. PWA instalável e offline:
+  o app mostra um convite "Instale o Songbook" (e o botão em Ajustes); no iPhone, mostra como adicionar à Tela de Início.
 
 ### Fontes de cantos
 

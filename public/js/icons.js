@@ -61,15 +61,18 @@ export function icon(name, size = 20, extra = '') {
 }
 
 // Logo do app: livro de cifras aberto com nota musical e cruz, na cor de destaque.
+let nLogo = 0;
 export function logo(size = 32) {
+  // ids únicos: um degradê dentro de uma logo escondida (display:none) não pinta as outras
+  const id = 'lg' + ++nLogo;
   // livro aberto com uma nota musical cuja haste forma uma cruz
   return `<svg class="logo" width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true">
   <defs>
-    <linearGradient id="lg-a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f7be8"/><stop offset="1" stop-color="#1a2d6e"/></linearGradient>
-    <radialGradient id="lg-b" cx=".2" cy=".1" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".3"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="${id}a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f7be8"/><stop offset="1" stop-color="#1a2d6e"/></linearGradient>
+    <radialGradient id="${id}b" cx=".2" cy=".1" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".3"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></radialGradient>
   </defs>
-  <rect width="64" height="64" rx="18" fill="url(#lg-a)"/>
-  <rect width="64" height="64" rx="18" fill="url(#lg-b)"/>
+  <rect width="64" height="64" rx="18" fill="url(#${id}a)"/>
+  <rect width="64" height="64" rx="18" fill="url(#${id}b)"/>
   <path d="M36.5 9.5v23" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>
   <path d="M31.5 15.5h10" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>
   <ellipse cx="31.4" cy="33" rx="5.9" ry="4.7" transform="rotate(-20 31.4 33)" fill="#fff"/>

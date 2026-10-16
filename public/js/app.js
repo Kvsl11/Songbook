@@ -39,7 +39,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.16-25';
+export const APP_VERSAO = '2026.10.16-26';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1904,6 +1904,11 @@ function viewSettings() {
       <label class="setting"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns ? 'checked' : ''}></label>
     </div>
 
+    ${jaInstalado() ? '' : `<div class="section-title">App</div>
+    <div class="settings-group">
+      <div class="setting"><span class="ico" style="background:none">${logo(36)}</span><div class="grow"><div class="t">Instalar o Songbook</div><div class="s">Ícone na tela inicial, abre em tela cheia e funciona sem internet</div></div><button class="btn small primary" id="instalar">Instalar</button></div>
+    </div>`}
+
     <div class="section-title">PowerPoint da missa</div>
     <div class="settings-group">
       <div class="setting"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Modelo do grupo</div><div class="s" id="pptx-info">Verificando…</div></div>
@@ -1958,6 +1963,7 @@ function viewSettings() {
     $('#pptx-apagar').hidden = !m;
   };
   infoModelo();
+  $('#instalar')?.addEventListener('click', instalarApp);
   $('#pptx-enviar').onclick = async () => { if (await enviarModeloPptx()) infoModelo(); };
   $('#pptx-apagar').onclick = async () => { if (await ask({ title: 'Remover o modelo?', text: 'O arquivo sai deste aparelho; os repertórios continuam.', ok: 'Remover', danger: true })) { await apagarModelo(); infoModelo(); } };
   $('#chords').onchange = (e) => { db.setPref('modo', e.target.checked ? 'cifra' : 'letra'); db.setPref('showChords', true); };
@@ -2013,6 +2019,53 @@ applyTheme();
 route();
 
 // Service worker: sempre procura a versão nova; quando ela assume, recarrega a página uma vez.
+// ---------------------------------------------------------------- instalar como app
+// O Chrome só mostra o aviso automático uma vez; o app guarda o pedido e mostra o próprio convite.
+let pedidoInstalar = null;
+const CHAVE_ADIADO = 'songbook.instalar.adiado';
+const jaInstalado = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const ehIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const adiado = () => { try { return Date.now() - Number(localStorage.getItem(CHAVE_ADIADO) || 0) < 7 * 864e5; } catch { return false; } };
+
+async function instalarApp() {
+  if (pedidoInstalar) {
+    pedidoInstalar.prompt();
+    const { outcome } = await pedidoInstalar.userChoice.catch(() => ({}));
+    pedidoInstalar = null;
+    esconderConvite();
+    if (outcome === 'accepted') toast('Instalando o Songbook…');
+    return;
+  }
+  if (ehIOS()) {
+    await openDialog(`<h3>Instalar no iPhone/iPad</h3>
+      <p>1. Toque em <b>Compartilhar</b> (o quadrado com a seta para cima) na barra do Safari.<br>2. Escolha <b>Adicionar à Tela de Início</b>.<br>3. Toque em <b>Adicionar</b>.</p>
+      <div class="acts"><button class="btn primary" data-ok>Entendi</button></div>`, (dlg, done) => { $('[data-ok]', dlg).onclick = () => done(true); });
+    return;
+  }
+  toast('Use o menu do navegador (⋮) → "Instalar app" ou "Adicionar à tela inicial"');
+}
+
+function esconderConvite() { document.getElementById('convite-instalar')?.remove(); }
+function mostrarConvite() {
+  if (jaInstalado() || adiado() || document.getElementById('convite-instalar')) return;
+  const el = document.createElement('div');
+  el.id = 'convite-instalar';
+  el.className = 'convite-instalar';
+  el.innerHTML = `${logo(44)}<div class="txt"><b>Instale o Songbook</b><span>Abre como app, em tela cheia, e funciona sem internet</span></div>
+    <button class="btn primary small" data-instalar>Instalar</button><button class="icon-btn" data-fechar aria-label="Agora não" title="Agora não">${icon('x', 18)}</button>`;
+  el.querySelector('[data-instalar]').onclick = instalarApp;
+  el.querySelector('[data-fechar]').onclick = () => { try { localStorage.setItem(CHAVE_ADIADO, String(Date.now())); } catch { /* sem armazenamento */ } esconderConvite(); };
+  document.body.append(el);
+}
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); // guarda para mostrar no nosso convite (e em Ajustes)
+  pedidoInstalar = e;
+  setTimeout(mostrarConvite, 1500);
+});
+window.addEventListener('appinstalled', () => { pedidoInstalar = null; esconderConvite(); toast('Songbook instalado! Abra pelo ícone na tela inicial.'); });
+// iPhone/iPad não têm o pedido automático: mostra o convite com as instruções
+if (ehIOS() && !jaInstalado()) setTimeout(mostrarConvite, 2500);
+
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   const tinhaControle = Boolean(navigator.serviceWorker.controller);
   let recarregou = false;
