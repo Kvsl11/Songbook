@@ -10,7 +10,7 @@
 // - YouTube: busca pelo Piped (instâncias públicas, com CORS); o oEmbed confirma um link colado.
 
 import { decodeEntities, normalize } from './html.js';
-import { doEditor, isChord } from '../chordpro.js';
+import { doEditor, isChord, semIntro } from '../chordpro.js';
 
 const NO_NAVEGADOR = typeof window !== 'undefined';
 const UA = NO_NAVEGADOR ? {} : { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36', 'Accept-Language': 'pt-BR,pt;q=0.9' };
@@ -92,7 +92,7 @@ export function parseCifraClub(html, url = '') {
   return { titulo, artista, tom: isChord(tom) ? tom : '', url, chordpro: cab.join('\n') + '\n\n' + simplificarCifra(cifraTextoParaChordPro(texto)) };
 }
 
-// Versão simplificada: sem tablaturas, riffs e solos — só letra, acordes e a linha de acordes da introdução
+// Versão simplificada: sem tablaturas, riffs, solos e introdução — só letra e acordes
 const soAcordesPro = (l) => /^\s*(\[[^\]]+\]\s*)+$/.test(l);
 const INSTRUMENTAL = /^\s*\{\s*(comment|c)\s*:\s*(tab\b|solo|riff|dedilhado|base|interl[úu]dio|intro|final)/i;
 export function simplificarCifra(pro) {
@@ -115,7 +115,7 @@ export function simplificarCifra(pro) {
     const prox = out.slice(i + 1).find((x) => x.trim());
     return prox !== undefined && !/^\s*\{/.test(prox);
   });
-  return limpo.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return semIntro(limpo.join('\n')).replace(/\n{3,}/g, '\n\n').trim();
 }
 
 // serviços públicos que abrem a página por nós (o 1º que responder com a cifra vence).

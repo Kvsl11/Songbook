@@ -1,6 +1,6 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
-import { definirMeta, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra } from './chordpro.js';
+import { definirMeta, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra } from './chordpro.js';
 import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { chaveIA, organizarPartes } from './ia.js';
@@ -42,7 +42,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-71';
+export const APP_VERSAO = '2026.10.19-72';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -828,9 +828,19 @@ async function exportarPowerPointModelo(set) {
   }
 }
 
+// indicadores bem pequenos nas listas: a música tem cifra (a letra vem junto) e/ou vídeo
+const memoCifra = new Map();
+function indicadores(s) {
+  if (!s) return '';
+  let c = memoCifra.get(s.content);
+  if (c === undefined) { c = temCifra(s.content || ''); memoCifra.set(s.content, c); }
+  const tem = (ic, t) => `<span class="ind-i" title="${t}" aria-label="${t}">${icon(ic, 11)}</span>`;
+  return c || s.youtube ? `<span class="ind">${c ? tem('chord', 'Tem cifra') : ''}${s.youtube ? tem('youtube', 'Tem vídeo') : ''}</span>` : '';
+}
+
 const linhaMusica = (s, extra = '') => `
   <li class="track clickable" data-id="${s.id}" style="grid-template-columns:auto 1fr auto">
-    ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
+    ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
 
 // Escolhe uma música: da biblioteca ou procurando na internet (Cifra Club, cantos da missa, letras,
 // vídeos do YouTube). O que vem da internet é salvo na biblioteca. Devolve o id, 'nova' ou null.
@@ -1051,7 +1061,7 @@ function linhaItemRepertorio(set, it, i, { atual = -1, fila = false } = {}) {
   return `<li class="track set-item ${i === atual ? 'atual' : ''}" data-i="${i}">
     <span class="lead">${capa(s || {})}</span>
     <a class="info" href="#/repertorio/${set.id}/${i}" ${fila ? 'data-ir' : ''}><div class="t ${i === atual ? 'playing' : ''}">${i === atual ? icon('music', 13, 'style="display:inline;vertical-align:-1px;margin-right:4px"') : ''}${esc(s?.title || '(música removida)')}</div>
-      <div class="s">${it.label ? `<b class="parte-tag">${esc(it.label)}</b> ` : ''}${esc(s?.artist || '')}${s?.youtube ? ` ${icon('youtube', 13)}` : ''}</div></a>
+      <div class="s">${it.label ? `<b class="parte-tag">${esc(it.label)}</b> ` : ''}${indicadores(s)}${esc(s?.artist || '')}</div></a>
     ${s?.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '<span></span>'}
     <span class="acts">
       <button class="icon-btn" data-parte aria-label="Parte da missa" title="${it.label ? 'Trocar a parte da missa (' + esc(it.label) + ')' : 'Definir a parte da missa'}">${icon('list', 17)}</button>
@@ -1382,11 +1392,13 @@ function nomesDoVideo(v) {
 // vídeo do YouTube. Devolve { content, source, video } (video é a busca, que pode ainda estar andando).
 async function trazerMusica({ titulo, artista = '', cifra = '', letra = null, video = null, artistaIncerto = false }) {
   const termo = `${tituloLimpo(titulo)} ${artista}`.trim();
-  const pVideo = video ? Promise.resolve([video]) : buscarYoutube(termo).catch(() => []);
   const pCifra = (async () => {
     const url = cifra || mesmaMusica(await buscarCifraClub(termo), titulo, artista, artistaIncerto)?.url;
     return url ? { ...(await getCifraClub(url)), url } : null;
   })().catch(() => null);
+  // com o link da cifra na mão, o vídeo é procurado pelo nome que vem na cifra
+  const pVideo = (video ? Promise.resolve([video])
+    : cifra ? pCifra.then((c) => buscarYoutube(c ? `${c.titulo} ${c.artista || ''}` : termo)) : buscarYoutube(termo)).catch(() => []);
   const pLetra = (async () => {
     const item = letra || mesmaMusica(await buscarLetras(termo), titulo, artista, artistaIncerto);
     return item ? { ...(await trazerLetra(item)), url: item.url } : null;
@@ -1555,7 +1567,7 @@ async function buscarMusicas(termo) {
 }
 const linhaMusicaWeb = (r, i, extra = '') => `
   <li class="track clickable" data-web="musica" data-i="${i}" style="grid-template-columns:auto 1fr auto">
-    ${capa({ titulo: r.titulo, capa: r.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${esc(r.artista || '')}${r.cifra ? ' · com cifra' : ''}</div></div>
+    ${capa({ titulo: r.titulo, capa: r.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${r.cifra ? `<span class="ind"><span class="ind-i" title="Tem cifra">${icon('chord', 11)}</span></span>` : ''}${esc(r.artista || '')}</div></div>
     <span class="acts">${extra}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 
 function viewSearch() {
@@ -1680,7 +1692,7 @@ function viewLibrary(filtro = 'repertorios', { selecionando = false, marcados = 
         <div class="info"><div class="t">${esc(s.name)}</div><div class="s">Repertório · ${fmtData(s.date)} · ${s.items.length} músicas</div></div>
         <span class="acts">${s.items.length ? `<a class="icon-btn" href="#/repertorio/${s.id}/0" aria-label="Tocar">${icon('play', 16)}</a>` : ''}${lixeira(s.id, s.name)}</span></li>`
     : (s) => `<li class="track clickable lib-item" data-k="${s.id}">${marca(s.id)}${capa(s)}
-        <div class="info"><div class="t">${esc(s.title)}</div><div class="s">${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>
+        <div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>
         <span class="acts">${s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : ''}${s.youtube ? `<button class="icon-btn" data-play="${s.id}" aria-label="Tocar referência">${icon('play', 16)}</button>` : ''}${lixeira(s.id, s.title)}</span></li>`;
   const vazio = ehRep
     ? `<div class="empty"><div class="bubble">${icon('list', 32)}</div><h3>Crie seu primeiro repertório</h3><p>Monte o da missa de hoje automaticamente ou crie uma lista do zero.</p>
@@ -1936,11 +1948,21 @@ function viewSong(id, ctx = {}) {
   draw();
 
   // letra que veio da internet sem acordes: procura a cifra da mesma música no Cifra Club e troca sozinho,
-  // mantendo o vídeo, a parte da missa e os quadros (uma vez só; se não achar, fica como está, sem aviso)
+  // mantendo o vídeo, a parte da missa e os quadros (uma vez só; se não achar, fica como está)
+  const procuraCifra = () => (isPreview ? !String(song.source || '').startsWith('cnbb:') : /letras\.mus\.br|lrclib/.test(song.source || ''))
+    && !renderSong(song.content).meta.x_sem_cifra && !!song.title;
+  // só depois de o app já ter procurado: um aviso simples do que esta música não tem
+  const avisoFalta = () => {
+    const box = $('#aviso-video');
+    if (!box) return;
+    const falta = [];
+    if (semCifra && !procuraCifra()) falta.push('cifra');
+    if (!linhasDaLetra(song.content).length) falta.push('letra');
+    if (!song.youtube && (!isPreview || preview.semVideo || String(song.source || '').startsWith('cnbb:'))) falta.push('vídeo');
+    box.innerHTML = falta.length ? `<div class="aviso">${icon('info', 18)}<span>Esta música não tem ${falta.length > 1 ? falta.slice(0, -1).join(', ') + ' nem ' + falta[falta.length - 1] : falta[0]}.</span></div>` : '';
+  };
   const trazerCifraSozinho = async () => {
-    const meta = renderSong(song.content).meta;
-    const daInternet = isPreview ? !String(song.source || '').startsWith('cnbb:') : /letras\.mus\.br|lrclib/.test(song.source || '');
-    if (!daInternet || meta.x_sem_cifra || !song.title) return;
+    if (!procuraCifra()) return;
     const conteudoAntes = song.content;
     const hashAntes = location.hash;
     let novo = null;
@@ -1962,6 +1984,7 @@ function viewSong(id, ctx = {}) {
       const content = definirMeta(dono.content, 'x_sem_cifra', '1');
       if (isPreview) preview.content = content; else db.saveSong({ ...dono, content });
       song.content = content;
+      avisoFalta();
       return;
     }
     if (isPreview) { preview.content = novo.content; preview.source = novo.source; } else db.saveSong({ ...dono, content: novo.content, source: novo.source });
@@ -2090,27 +2113,17 @@ function viewSong(id, ctx = {}) {
     if (player.atual?.youtube === song.youtube) player.alternar(); else tocar();
   };
   if (ctx.tocar && song.youtube) setTimeout(tocar, 60);
-  // música vinda da busca (Cifra Club, letras, cantos) sem vídeo: procura no YouTube sozinho e já vincula;
-  // se não achar, avisa e oferece escolher
-  if (isPreview && !song.youtube && !String(song.source || '').startsWith('cnbb:')) {
-    const box = $('#aviso-video');
-    if (preview.semVideo) {
-      box.innerHTML = `<div class="aviso">${icon('youtube', 18)}<span>Não achei o vídeo desta música no YouTube.</span><button class="btn small" data-escolher-video>Escolher vídeo</button></div>`;
-      box.querySelector('[data-escolher-video]').onclick = mudarVideo;
-    } else if (!preview.videoProcurado) {
-      const esta = preview;
-      esta.videoProcurado = true;
-      box.innerHTML = `<div class="aviso"><span class="spin"></span><span>Procurando o vídeo no YouTube…</span></div>`;
-      buscarYoutube([song.title, song.artist].filter(Boolean).join(' ')).then((vs) => vs[0]).catch(() => null).then((v) => {
-        if (preview !== esta) return; // já saiu desta música
-        if (v) {
-          esta.content = definirMeta(esta.content, 'youtube', v.url);
-          toast('Vídeo do YouTube encontrado');
-        } else esta.semVideo = true;
-        if (location.hash === '#/musica/previa') route();
-      });
-    }
+  // música vinda da busca sem vídeo: procura no YouTube sozinho e já vincula (se não achar, o aviso diz)
+  if (isPreview && !song.youtube && !String(song.source || '').startsWith('cnbb:') && !preview.semVideo && !preview.videoProcurado) {
+    const esta = preview;
+    esta.videoProcurado = true;
+    buscarYoutube([song.title, song.artist].filter(Boolean).join(' ')).then((vs) => vs[0]).catch(() => null).then((v) => {
+      if (preview !== esta) return; // já saiu desta música
+      if (v) esta.content = definirMeta(esta.content, 'youtube', v.url); else esta.semVideo = true;
+      if (location.hash === '#/musica/previa') route();
+    });
   }
+  avisoFalta();
 
   // ---- organizar as partes (refrão, estrofes…) com a IA do Claude; dá para desfazer
   const chaveDesfazer = 'desfazerIA:' + (isPreview ? 'previa' : song.id);
@@ -3249,7 +3262,7 @@ async function viewOracoes() {
     <label class="field">${icon('search', 18)}<input class="search" id="busca-oracao" type="search" placeholder="Buscar oração (ex.: Oração Eucarística II, prefácio do Advento)"></label>
     <div class="quick" style="margin:14px 0">
       <a href="#/liturgia"><div class="cover gen" style="--h:130">${icon('cross', 22)}</div><span>Liturgia e orações do dia</span></a>
-      <a href="#/fontes"><div class="cover gen" style="--h:210">${icon('library', 22)}</div><span>Fontes litúrgicas (hinários, salmos)</span></a>
+      <a href="#/fontes"><div class="cover gen" style="--h:210">${icon('library', 22)}</div><span>Hinários, partituras e formação</span></a>
     </div>
     <div id="lista-oracoes"><div class="loading-note"><span class="spin"></span>Carregando orações…</div></div>`;
   let indice;
@@ -3294,36 +3307,122 @@ async function viewOracao(slug) {
   }));
 }
 
+// ---- fontes do Junior Música Católica: em vez de uma lista de links, tudo abre aqui dentro —
+// arquivos do Google Drive (partituras, hinários, preces) num leitor do app, vídeos no player,
+// cifras do Cifra Club como música do app e a liturgia/orações nas telas do próprio app.
+const idDrive = (url) => (/drive\.google\.com\/file\/d\/([\w-]+)/.exec(url) || /drive\.google\.com\/(?:open|uc)\?(?:.*&)?id=([\w-]+)/.exec(url) || [])[1];
+const idPastaDrive = (url) => (/drive\.google\.com\/drive\/(?:u\/\d+\/)?folders\/([\w-]+)/.exec(url) || [])[1];
+// endereço que mostra o arquivo dentro do app (ou null se o site não deixa)
+function leitorDoArquivo(url) {
+  const f = idDrive(url);
+  if (f) return `https://drive.google.com/file/d/${f}/preview`;
+  const pasta = idPastaDrive(url);
+  if (pasta) return `https://drive.google.com/embeddedfolderview?id=${pasta}#grid`;
+  const doc = /docs\.google\.com\/(document|spreadsheets|presentation)\/d\/([\w-]+)/.exec(url);
+  if (doc) return `https://docs.google.com/${doc[1]}/d/${doc[2]}/${doc[1] === 'presentation' ? 'embed' : 'preview'}`;
+  if (/\.pdf(\?|#|$)/i.test(url)) return `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(url)}`;
+  return null;
+}
+// o que fazer com cada link: { acao: 'ver' | 'tocar' | 'cifra' | 'app' | 'site', rotulo, ic, href? }
+function acaoDoLink(l) {
+  const u = l.url;
+  if (/pocketterco\.com\.br\/liturgia|cnbb\.org\.br\/liturgia-diaria/i.test(u)) return { acao: 'app', href: '#/liturgia', rotulo: 'Abrir no app', ic: 'cross' };
+  if (/pocketterco\.com\.br\/oracoes/i.test(u)) return { acao: 'app', href: '#/oracoes', rotulo: 'Abrir no app', ic: 'book' };
+  if (youtubeId(u) && !/@|\/playlist/.test(u)) return { acao: 'tocar', rotulo: 'Ouvir', ic: 'play' };
+  if (ehCifraClub(u)) return { acao: 'cifra', rotulo: 'Cifra', ic: 'chord' };
+  if (leitorDoArquivo(u)) return { acao: 'ver', rotulo: idPastaDrive(u) ? 'Ver pasta' : 'Ver aqui', ic: idPastaDrive(u) ? 'library' : 'file' };
+  return { acao: 'site', rotulo: 'Site', ic: ICONE_LINK[l.tipo] || 'external' };
+}
+const bonito = (t) => { const x = String(t || '').trim(); return x === x.toUpperCase() ? x.charAt(0) + x.slice(1).toLowerCase().replace(/\bcnbb\b/g, 'CNBB').replace(/\bigmr\b/g, 'IGMR') : x; };
+const tituloSecao = (t) => bonito(String(t || '').replace(/^[-–\s]+/, '').replace(/^para\s*/i, '').trim()).replace(/^./, (c) => c.toUpperCase());
+// seção que é um canto (referência para ouvir, cifra e partitura): vira uma linha com os botões
+const ehCanto = (sec) => sec.links.length <= 4 && sec.links.some((l) => /refer[êe]ncia|ouvir|cifra|partitura/i.test(l.texto));
+
 async function viewFontes() {
   setTab('oracoes');
   setTint('#24425c');
-  setHeader('Fontes litúrgicas', { back: '#/oracoes' });
-  view.innerHTML = `<h2 class="greet">Fontes litúrgicas</h2>
-    <p class="muted" style="margin:-6px 0 14px">Hinários da CNBB, salmos, partituras, documentos da Igreja e formação para músicos — reunidos por <a href="https://sites.google.com/view/juniormusicacatolica/m%C3%BAsica-lit%C3%BArgica-para-missa" target="_blank" rel="noopener">Junior Música Católica</a>.</p>
-    <label class="field" style="margin-bottom:14px">${icon('search', 18)}<input class="search" id="busca-fonte" type="search" placeholder="Buscar link (ex.: salmos, hinário, IGMR, partitura)"></label>
+  setHeader('Hinários e formação', { back: '#/oracoes' });
+  view.innerHTML = `<h2 class="greet">Hinários e formação</h2>
+    <p class="muted" style="margin:-6px 0 14px">Hinários da CNBB, preces, partituras, documentos e formação para músicos — reunidos por <a href="https://sites.google.com/view/juniormusicacatolica/m%C3%BAsica-lit%C3%BArgica-para-missa" target="_blank" rel="noopener">Junior Música Católica</a>. Partituras e arquivos abrem aqui no app; os vídeos tocam no player.</p>
+    <label class="field" style="margin-bottom:12px">${icon('search', 18)}<input class="search" id="busca-fonte" type="search" placeholder="Buscar (ex.: salmos, Advento, partitura, Glória)"></label>
+    <div class="chips" id="fonte-abas" style="margin-bottom:14px"></div>
     <div id="fontes"><div class="loading-note"><span class="spin"></span>Carregando…</div></div>`;
   let d;
   try { d = await diretorioJunior(); } catch {
-    $('#fontes').innerHTML = '<p class="muted">Ainda não disponível. Tente mais tarde (a lista é copiada uma vez por dia).</p>';
+    $('#fontes').innerHTML = '<p class="muted">Ainda não disponível. Tente mais tarde.</p>';
     return;
   }
-  // busca: cada palavra precisa aparecer no nome do link, na seção ou no endereço
+  if (!$('#fontes')) return;
+  const paginas = d.paginas.map((p, i) => ({ ...p, i, nome: tituloBonitoPagina(p.titulo).replace(/^Hinário - o povo canta.*/i, 'Hinário O Povo Canta').replace(/:.*$/, '') }));
+  let aba = Number(sessionStorage.getItem('fonteAba') || 0);
+  if (!paginas[aba]) aba = 0;
+  const todos = [];
+  const linkBtn = (l, extra = '', sec = null) => {
+    const a = acaoDoLink(l);
+    const k = todos.push({ l, sec }) - 1;
+    return a.acao === 'site'
+      ? `<a class="fonte-item ${extra}" href="${esc(l.url)}" target="_blank" rel="noopener"><span class="ico">${icon(a.ic, 18)}</span><span class="txt"><b>${esc(bonito(l.texto) || host(l.url))}</b><small>${esc(host(l.url))} ${icon('external', 11)}</small></span></a>`
+      : `<button class="fonte-item ${extra}" data-l="${k}"><span class="ico">${icon(a.ic, 18)}</span><span class="txt"><b>${esc((extra === 'mini' && { tocar: 'Ouvir', cifra: 'Cifra' }[a.acao]) || bonito(l.texto) || a.rotulo)}</b><small>${esc(a.rotulo)}</small></span></button>`;
+  };
   const desenhar = (termo = '') => {
-    // sem o plural ("salmos" acha "salmo")
+    todos.length = 0;
     const palavras = normalizar(termo).split(' ').filter(Boolean).map((w) => (w.length > 4 ? w.replace(/(e?s)$/, '') : w));
     const casa = (...txt) => { const n = normalizar(txt.join(' ')); return palavras.every((w) => n.includes(w)); };
+    $('#fonte-abas').hidden = !!palavras.length;
+    $('#fonte-abas').innerHTML = paginas.map((p) => `<button class="chip" data-aba="${p.i}" aria-pressed="${p.i === aba}">${esc(p.nome)}</button>`).join('');
     let total = 0;
-    const html = d.paginas.map((p) => {
-      const secoes = p.secoes.map((sec) => ({ ...sec, links: sec.links.filter((l) => casa(l.texto, sec.titulo, host(l.url))) })).filter((sec) => sec.links.length);
+    const html = paginas.filter((p) => palavras.length || p.i === aba).map((p) => {
+      const secoes = p.secoes.map((sec) => ({ ...sec, nome: tituloSecao(sec.titulo), links: casa(sec.titulo) ? sec.links : sec.links.filter((l) => casa(l.texto, sec.titulo, host(l.url))) })).filter((sec) => sec.links.length);
       if (!secoes.length) return '';
-      return `<h3 class="fontes-pag">${esc(tituloBonitoPagina(p.titulo))}</h3>
-        ${secoes.map((sec) => { total += sec.links.length; return `<details class="cat-oracoes" ${palavras.length || /liturgia diária|hinários|salmos|fórmulas/i.test(sec.titulo) ? 'open' : ''}><summary><b>${esc(sec.titulo)}</b><span class="chip sm">${sec.links.length}</span>${icon('down', 18)}</summary>
-          <ul class="lista-oracoes">${sec.links.map((l) => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener">${icon(ICONE_LINK[l.tipo] || 'external', 16)}<span>${esc(l.texto)}</span><small>${esc(host(l.url))}</small></a></li>`).join('')}</ul></details>`; }).join('')}`;
+      const cantos = secoes.filter(ehCanto);
+      const outras = secoes.filter((x) => !ehCanto(x));
+      total += secoes.reduce((n, x) => n + x.links.length, 0);
+      return `${palavras.length ? `<h3 class="fontes-pag">${esc(p.nome)}</h3>` : ''}
+        ${outras.map((sec) => `<section class="fonte-sec"><h4>${esc(sec.nome || 'Outros')}<span class="chip sm">${sec.links.length}</span></h4>
+          <div class="fonte-itens">${sec.links.map((l) => linkBtn(l, '', sec)).join('')}</div></section>`).join('')}
+        ${cantos.length ? `<section class="fonte-sec"><h4>Cantos — ouvir, cifra e partitura<span class="chip sm">${cantos.length}</span></h4>
+          <ul class="fonte-cantos">${cantos.map((sec) => `<li><span class="nome">${icon('music', 16)}<b>${esc(sec.nome || 'Canto')}</b></span><span class="bts">${sec.links.map((l) => linkBtn(l, 'mini', sec)).join('')}</span></li>`).join('')}</ul></section>` : ''}`;
     }).join('');
-    $('#fontes').innerHTML = palavras.length ? (total ? `<p class="muted" style="margin:0 0 10px">${total} link(s) encontrado(s)</p>${html}` : '<p class="muted">Nenhum link encontrado. Tente outra palavra.</p>') : html;
+    $('#fontes').innerHTML = palavras.length && !total ? '<p class="muted">Nada encontrado. Tente outra palavra.</p>' : (palavras.length ? `<p class="muted" style="margin:0 0 10px">${total} resultado(s)</p>` : '') + html;
   };
+  $('#fonte-abas').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-aba]');
+    if (!b) return;
+    aba = Number(b.dataset.aba);
+    sessionStorage.setItem('fonteAba', String(aba));
+    desenhar($('#busca-fonte').value);
+  });
+  $('#fontes').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-l]');
+    if (!b) return;
+    const { l, sec: secao } = todos[Number(b.dataset.l)];
+    const sec = secao?.nome || '';
+    const a = acaoDoLink(l);
+    const ref = secao?.links.map((x) => youtubeId(x.url)).find((x) => x && !/@|\/playlist/.test(x)); // o vídeo de referência do mesmo canto
+    const nome = a.acao === 'ver' && /partitura|sumário|^[A-ZÀ-Ú\s]+$/.test(l.texto || '') && sec ? `${sec} — ${bonito(l.texto)}` : bonito(l.texto) || sec;
+    if (a.acao === 'app') location.hash = a.href;
+    else if (a.acao === 'ver') location.hash = `#/arquivo/${encodeURIComponent(l.url)}/${encodeURIComponent(nome)}`;
+    else if (a.acao === 'cifra') abrirMusica({ titulo: sec, cifra: l.url, video: ref ? { id: ref, url: `https://www.youtube.com/watch?v=${ref}` } : null }, location.hash);
+    else if (a.acao === 'tocar') {
+      const v = { id: youtubeId(l.url), url: `https://www.youtube.com/watch?v=${youtubeId(l.url)}`, titulo: sec || 'Referência', canal: 'Junior Música Católica' };
+      player.tocar({ youtube: v.id, titulo: v.titulo, artista: 'Referência para ouvir', abrir: () => abrirVideoComoMusica(v) });
+    }
+  });
   desenhar();
   $('#busca-fonte').addEventListener('input', (e) => desenhar(e.target.value));
+}
+
+// leitor de arquivos (partituras, hinários, preces do Google Drive, PDFs) dentro do app
+function viewArquivo(url, titulo) {
+  setTab('oracoes');
+  setTint('#24425c');
+  setHeader(titulo || 'Arquivo', { back: '#/fontes', eyebrow: host(url) });
+  const leitor = leitorDoArquivo(url || '');
+  if (!leitor) { location.hash = '#/fontes'; return; }
+  view.innerHTML = `<div class="leitor">
+    <div class="leitor-barra"><b>${esc(titulo || 'Arquivo')}</b><span class="spacer"></span>
+      <a class="btn small" href="${esc(url)}" target="_blank" rel="noopener">${icon('external', 14)} Abrir no ${idDrive(url) || idPastaDrive(url) ? 'Drive' : 'site'}</a></div>
+    <div class="leitor-tela"><div class="loading-note"><span class="spin"></span>Abrindo o arquivo…</div><iframe src="${esc(leitor)}" title="${esc(titulo || 'Arquivo')}" allow="autoplay; fullscreen" loading="eager"></iframe></div></div>`;
 }
 const tituloBonitoPagina = (t) => t.charAt(0) + t.slice(1).toLowerCase().replace(/\bcnbb\b/g, 'CNBB').replace(/\(preces\)/, '(Preces)');
 
@@ -3370,6 +3469,7 @@ function route() {
     case 'oracoes': return viewOracoes();
     case 'oracao': return viewOracao(b);
     case 'fontes': return viewFontes();
+    case 'arquivo': return viewArquivo(b, c);
     default: return viewNotFound();
   }
 }

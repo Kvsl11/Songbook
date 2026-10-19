@@ -320,6 +320,37 @@ export function ehInstrumental(texto) {
   return partes.length >= 2 && partes.every((x) => ACORDE_TXT.test(x));
 }
 
+// Tira a introdução da cifra (o que interessa é da letra em diante): o título "Intro" e as linhas de
+// acordes logo abaixo dele, linhas "Intro: G D…" e partes chamadas Intro que não têm letra.
+const SO_ACORDES = /^\s*(\[[^\]]*\]\s*)+$/;
+const EH_INTRO = /^intro(du[cç][aã]o)?\b/i;
+export function semIntro(pro) {
+  const linhas = String(pro || '').split('\n');
+  const out = [];
+  for (let i = 0; i < linhas.length; i++) {
+    const l = linhas[i];
+    const com = /^\s*\{\s*(comment|c|comment_italic|ci)\s*:\s*([^}]*)\}\s*$/i.exec(l);
+    const inicio = /^\s*\{\s*(start_of_\w+|so\w)\s*:\s*([^}]*)\}\s*$/i.exec(l);
+    if (com && EH_INTRO.test(com[2].trim())) {
+      while (i + 1 < linhas.length && (SO_ACORDES.test(linhas[i + 1]) || !linhas[i + 1].trim())) i++;
+      continue;
+    }
+    if (inicio && EH_INTRO.test(inicio[2].trim())) {
+      let j = i + 1;
+      while (j < linhas.length && !/^\s*\{\s*(end_of_\w+|eo\w)\s*\}/i.test(linhas[j])) j++;
+      const corpo = linhas.slice(i + 1, j);
+      if (corpo.every((x) => !x.trim() || SO_ACORDES.test(x) || ehInstrumental(x.replace(/\[[^\]]*\]/g, ' ')) || /^\s*\{/.test(x))) {
+        i = j;
+        while (i + 1 < linhas.length && !linhas[i + 1].trim()) i++;
+        continue;
+      }
+    }
+    if (!/^\s*\{/.test(l) && EH_INTRO.test(l.replace(/\[[^\]]*\]/g, '').trim()) && ehInstrumental(l.replace(/\[([^\]]*)\]/g, ' $1 '))) continue;
+    out.push(l);
+  }
+  return out.join('\n').replace(/^\n+/, '');
+}
+
 // ---------------------------------------------------------------- editar só a letra
 // Mostra a música sem os acordes (para corrigir a letra) e, ao salvar, devolve cada acorde à
 // mesma sílaba. Linhas só de acordes (introdução, passagens) ficam escondidas e são mantidas.

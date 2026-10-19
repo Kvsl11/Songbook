@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   cifraTextoParaChordPro, ehCifraClub, simplificarCifra, parseLetras, resultadosLetras, lerLrc, mesmaDuracao, buscarLetraSincronizada, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
 } from '../public/js/lib/web.js';
-import { aplicarEstrutura, aplicarLetra, definirMeta, doEditor, letraDe, linhasDaLetra, paraEditor, parseChordPro } from '../public/js/chordpro.js';
+import { semIntro, aplicarEstrutura, aplicarLetra, definirMeta, doEditor, letraDe, linhasDaLetra, paraEditor, parseChordPro } from '../public/js/chordpro.js';
 
 test('lê a busca do Cifra Club (JSONP) e monta links e capas', () => {
   const json = lerJsonp('({"response":{"docs":[{"t":"1","m":"Artista","d":"artista"},{"t":"2","m":"Noites Traiçoeiras","a":"Padre Marcelo Rossi","i":"7/6/4/6/abc-tb.jpg","d":"padre-marcelo-rossi","u":"noite-traicoeira"}]}})');
@@ -108,7 +108,7 @@ test('editor simples: [Refrão] vale até a próxima parte e volta igual', () =>
 
 test('versão simplificada: tira tablaturas, "Parte 1 de 3" e solos vazios', () => {
   const pro = '{comment: Intro}\n[E]   [A]\n\n{comment: Intro}\n\nParte 1 de 2\n  [E]    [A]\n{start_of_tab}\nE|---3---|\n{end_of_tab}\n\n{start_of_verse: Primeira Parte}\n[E]Deus está [A]aqui\n{end_of_verse}\n\n{comment: Solo}\n{start_of_tab}\nB|--5--|\n{end_of_tab}';
-  assert.equal(simplificarCifra(pro), '{comment: Intro}\n[E]   [A]\n\n{start_of_verse: Primeira Parte}\n[E]Deus está [A]aqui\n{end_of_verse}');
+  assert.equal(simplificarCifra(pro), '{start_of_verse: Primeira Parte}\n[E]Deus está [A]aqui\n{end_of_verse}');
 });
 
 test('Letras.mus.br: busca e página da letra', () => {
@@ -145,4 +145,12 @@ test('letra sincronizada só da mesma gravação do vídeo (ao vivo ≠ estúdio
   const fetchImpl = async () => new Response(JSON.stringify(lista), { status: 200 });
   assert.equal((await buscarLetraSincronizada({ titulo: 'Aba', artista: 'Kemuel', duracao: 194 }, fetchImpl)).fonte, 'https://lrclib.net/api/get/2');
   assert.equal(await buscarLetraSincronizada({ titulo: 'Aba', artista: 'Kemuel', duracao: 250 }, fetchImpl), null);
+});
+
+test('tira a introdução da cifra: começa na letra', () => {
+  assert.equal(semIntro('{title: X}\n\n{comment: Intro}\n[D]  [G]  [D]  [G]\n\n[D]Não me sinto [G]só'), '{title: X}\n\n[D]Não me sinto [G]só');
+  assert.equal(semIntro('{start_of_verse: Intro}\n[E] [A]\n{end_of_verse}\n\n{start_of_verse}\n[E]Deus está aqui\n{end_of_verse}'), '{start_of_verse}\n[E]Deus está aqui\n{end_of_verse}');
+  assert.equal(semIntro('Intro: G D Em C\n[G]Aleluia'), '[G]Aleluia');
+  // "Introdução" como letra (com palavras) fica
+  assert.equal(semIntro('Introduzi a minha vida em Ti'), 'Introduzi a minha vida em Ti');
 });

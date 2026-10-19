@@ -15,7 +15,14 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   Club, que já tem a letra; sem cifra, a letra do Letras), o **vídeo** do YouTube e o compositor. Um vídeo tocado
   direto da busca abre como música do mesmo jeito, com cifra e letra. Filtros: Tudo, Músicas, Vídeos, Biblioteca.
 - **Cifra automática**: uma letra que veio da internet sem acordes procura sozinha a cifra da mesma música no
-  Cifra Club e troca (mantendo vídeo, parte da missa e quadros); se não achar, fica como está, sem aviso.
+  Cifra Club e troca (mantendo vídeo, parte da missa e quadros). Só depois de procurar, um aviso simples diz o que
+  falta ("Esta música não tem cifra nem vídeo").
+- **Sem introdução**: a parte de Intro das cifras não aparece (nem é trazida do Cifra Club) — a cifra começa na letra.
+- **Indicadores nas listas**: na biblioteca, na busca e nas faixas do repertório, ícones bem pequenos mostram se a
+  música tem cifra e/ou vídeo.
+- **Hinários e formação** (Orações): o diretório do Junior Música Católica em abas, com tudo abrindo no app —
+  partituras, hinários e preces do Google Drive (e PDFs) num leitor dentro do app, vídeos de referência no player,
+  cifras do Cifra Club como música do app (já com o vídeo de referência) e a liturgia/orações nas telas do app.
 - **Importar da internet**: tocar numa cifra do Cifra Club abre a cifra já organizada (partes, refrão, tom e
   capotraste), na **versão simplificada**: sem tablaturas, riffs e solos. Como o site não deixa outros apps lerem a página, o app a lê pelo Jina Reader
   (serviço público); se ele não responder, abre o "Importar da internet": copie a cifra no site e cole
@@ -110,7 +117,7 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 | **Cindy Ferrarezi** | repertório por missa, cifras, capas, vídeos | direto do navegador (WordPress com CORS) |
 | **Músicas para Missa** | sugestões por data e por parte da missa, cifras, vídeos | cópia diária feita pelo GitHub Actions (`scripts/mpm-sync.mjs`) em `data/mpm/`, porque o site não permite acesso direto |
 | **Pocket Terço** | missal do dia (antífonas, coleta, oferendas, comunhão, leituras, homilia) e orações (orações eucarísticas, prefácios, ordinário da missa) | cópia diária pelo GitHub Actions (`scripts/liturgia-sync.mjs`) em `data/pt/` |
-| **Junior Música Católica** | diretório de hinários da CNBB, salmos, partituras, documentos e formação | cópia diária em `data/junior.json` (aba Orações → Fontes litúrgicas) |
+| **Junior Música Católica** | diretório de hinários da CNBB, salmos, partituras, documentos e formação | cópia diária em `data/junior.json` (aba Orações → Hinários, partituras e formação; os arquivos abrem no app) |
 | **Cifra Club** | busca e cifra completa de qualquer música | busca direta (serviço de busca do site libera CORS); a página da cifra pelo Jina Reader (r.jina.ai, público, com CORS), com proxies de reserva; se nada responder, colando o texto |
 | **Letras.mus.br** | letras de músicas (com compositor) | busca direta (serviço de busca do site, com CORS); a página da letra pelo Jina Reader; reserva: LRCLIB (API aberta) |
 | **YouTube** | vídeo de referência, player | busca pelo Piped (público, com CORS), oEmbed para links colados, player embutido |

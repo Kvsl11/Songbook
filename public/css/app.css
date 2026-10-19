@@ -1089,3 +1089,40 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 .song.karaoke-pronta .line:not(.chords-only):active { opacity: 0.8; }
 /* vídeo no topo durante o anúncio: na frente, com os controles do YouTube (dá para pular o anúncio) */
 #pl-tela.na-frente { z-index: 14; border-radius: 0; background: #000; }
+
+/* indicadores pequenos nas listas: tem cifra / tem vídeo */
+.ind { display: inline-flex; gap: 3px; margin-right: 6px; vertical-align: -2px; }
+.ind-i { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 5px; background: var(--accent-soft); color: var(--accent-ink); }
+.ind-i svg { width: 11px; height: 11px; }
+
+/* hinários e formação (Junior Música Católica): tudo abre no app */
+.fonte-sec { background: var(--surface); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+.fonte-sec h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 15px; }
+.fonte-sec h4 .chip { margin-left: auto; }
+.fonte-itens { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 8px; }
+.fonte-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 10px; background: var(--bg-elev); color: var(--text); text-decoration: none; border: 0; text-align: left; cursor: pointer; min-width: 0; font: inherit; transition: background 0.2s, transform 0.15s; }
+.fonte-item:hover { background: var(--surface-2); }
+.fonte-item:active { transform: scale(0.98); }
+.fonte-item .ico { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: 9px; background: var(--accent-soft); color: var(--accent-ink); }
+.fonte-item .txt { min-width: 0; }
+.fonte-item b { display: block; font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fonte-item small { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fonte-cantos { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.fonte-cantos li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px; background: var(--bg-elev); }
+.fonte-cantos .nome { flex: 1 1 160px; min-width: 0; display: flex; align-items: center; gap: 8px; color: var(--accent-ink); }
+.fonte-cantos .nome b { color: var(--text); font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fonte-cantos .bts { display: flex; gap: 6px; flex-wrap: wrap; }
+.fonte-item.mini { padding: 6px 10px 6px 6px; gap: 6px; border-radius: 999px; background: var(--surface-2); }
+.fonte-item.mini .ico { width: 26px; height: 26px; border-radius: 50%; }
+.fonte-item.mini .ico svg { width: 14px; height: 14px; }
+.fonte-item.mini small { display: none; }
+.fonte-item.mini b { font-size: 12.5px; }
+.leitor { display: flex; flex-direction: column; gap: 10px; height: calc(100dvh - var(--nav-h) - 130px); min-height: 420px; }
+.leitor-barra { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.leitor-barra b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leitor-tela { position: relative; flex: 1; border-radius: 12px; overflow: hidden; background: var(--surface); }
+.leitor-tela .loading-note { position: absolute; inset: 0; display: grid; place-content: center; }
+.leitor-tela iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
+.fonte-cantos { grid-template-columns: minmax(0, 1fr); }
+.fonte-cantos li, .fonte-cantos .bts { min-width: 0; }
+.fonte-item.mini { max-width: 100%; }

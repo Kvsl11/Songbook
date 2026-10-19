@@ -1,12 +1,12 @@
 // Renderização de ChordPro em HTML (acordes sobre a letra).
-import { ehInstrumental, parseChordPro, preferFlatsFor, transposeChord, transposeKey } from './chordpro.js';
+import { ehInstrumental, parseChordPro, preferFlatsFor, semIntro, transposeChord, transposeKey } from './chordpro.js';
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const LABELS = { chorus: 'Refrão', verse: '', bridge: 'Ponte', tab: 'Tablatura' };
 
 export function renderSong(content, { transpose = 0, capo = 0, key = '' } = {}) {
-  const { meta, sections } = parseChordPro(content);
+  const { meta, sections } = parseChordPro(semIntro(content)); // sem a introdução: a cifra começa na letra
   const baseKey = meta.key || key;
   const shift = transpose - capo; // com capotraste mostramos o "desenho" do acorde
   const targetKey = transposeKey(baseKey, transpose);
