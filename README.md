@@ -18,6 +18,9 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   tablatura). Como o site não deixa outros apps lerem a página, o app usa o servidor do projeto, um proxy
   próprio (Ajustes) ou proxies públicos; se nenhum responder, abre o "Importar da internet": copie a cifra no
   site e cole (botão "Colar copiado"). Serve para cifra ou letra de **qualquer site**.
+- **Spotify sem login**: o botão verde abre a música direto no Spotify; ao voltar com o link copiado
+  (⋯ → Compartilhar → Copiar link), "Vincular link copiado" liga a faixa à música com um toque. Na Buscar, a seção
+  Spotify mostra capas e **prévias de 30 s** do catálogo aberto da Apple Music, com o botão para ouvir no Spotify.
 - **Spotify**: cada música pode ter a faixa do Spotify vinculada (player embutido nas Referências, botão
   verde do Spotify, modo **Vídeo/Áudio**). Sem login, o app abre a busca do Spotify e aceita o link colado;
   conectando a conta em Ajustes (Client ID de um app grátis em developer.spotify.com, login seguro PKCE), a busca

@@ -853,16 +853,16 @@ body.performance .convite-instalar { display: none; }
 
 /* ============================================================ acordes em destaque (Ajustes → Destaque dos acordes) */
 /* padrão "forte": acordes maiores, mais grossos e com um fundo leve, para achar de relance */
-:root[data-cifra="forte"] .song.lyrics-mode.with-chords .chord,
-:root:not([data-cifra]) .song.lyrics-mode.with-chords .chord { font-size: 0.86em; font-weight: 900; color: var(--tint-cifra, #9be7b4); text-shadow: 0 1px 8px rgb(0 0 0 / 0.35); letter-spacing: 0.01em; }
-:root[data-cifra="maximo"] .song.lyrics-mode.with-chords .chord { font-size: 0.95em; font-weight: 900; color: var(--tint-cifra, #9be7b4); letter-spacing: 0.01em; }
-:root[data-cifra="maximo"] .song.lyrics-mode.with-chords .chord:not(:empty) {
+:root[data-destaque="forte"] .song.lyrics-mode.with-chords .chord,
+:root:not([data-destaque]) .song.lyrics-mode.with-chords .chord { font-size: 0.86em; font-weight: 900; color: var(--tint-cifra, #9be7b4); text-shadow: 0 1px 8px rgb(0 0 0 / 0.35); letter-spacing: 0.01em; }
+:root[data-destaque="maximo"] .song.lyrics-mode.with-chords .chord { font-size: 0.95em; font-weight: 900; color: var(--tint-cifra, #9be7b4); letter-spacing: 0.01em; }
+:root[data-destaque="maximo"] .song.lyrics-mode.with-chords .chord:not(:empty) {
   align-self: flex-start; background: rgb(0 0 0 / 0.32); border-radius: 6px; padding: 0 0.22em; margin-bottom: 0.08em;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tint-cifra, #9be7b4) 45%, transparent);
 }
-:root[data-cifra="suave"] .song.lyrics-mode.with-chords .chord { font-size: 0.74em; font-weight: 700; opacity: 0.9; }
-:root:not([data-cifra="suave"]) .song .chord { font-weight: 900; }
-:root:not([data-cifra="suave"]) .song.lyrics-mode.with-chords .line.chords-only .chord { font-size: 0.9em; }
+:root[data-destaque="suave"] .song.lyrics-mode.with-chords .chord { font-size: 0.74em; font-weight: 700; opacity: 0.9; }
+:root:not([data-destaque="suave"]) .song .chord { font-weight: 900; }
+:root:not([data-destaque="suave"]) .song.lyrics-mode.with-chords .line.chords-only .chord { font-size: 0.9em; }
 
 /* ============================================================ cards com vida */
 @keyframes surgir { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
@@ -962,3 +962,10 @@ body.performance .convite-instalar { display: none; }
 .diagrama .casa-n { font-size: 11px; opacity: 0.8; }
 .acorde-pop { position: fixed; z-index: 60; display: grid; justify-items: center; gap: 2px; padding: 10px 10px 8px; border-radius: 12px; background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg); animation: pop 0.15s ease; }
 .acorde-pop b { color: var(--chord); font-size: 16px; font-weight: 900; }
+
+/* Spotify sem login: aviso de "vincular link copiado" e prévias */
+.sp-aviso { margin: 0 0 14px; }
+.sp-aviso .ico.spotify { --sp-onda: var(--bg); background: none; }
+.sp-aviso .icon-btn { width: 30px; height: 30px; margin-left: auto; }
+.sp-abrir { color: #1ed760; --sp-onda: var(--bg); }
+[data-previa].tocando { color: var(--accent-ink); }

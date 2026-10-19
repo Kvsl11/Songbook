@@ -5,7 +5,7 @@ import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
-import { cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, spotifyBusca, spotifyEmbed, spotifyOEmbed, spotifyRef, spotifyUrl } from './lib/web.js';
+import { buscarCatalogo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, spotifyBusca, spotifyEmbed, spotifyOEmbed, spotifyRef, spotifyUrl } from './lib/web.js';
 import * as spotify from './spotify.js';
 import { buscarCifraClub, buscarLetras, getCifraClub, buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -42,7 +42,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-51';
+export const APP_VERSAO = '2026.10.19-52';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -241,7 +241,7 @@ function applyTheme() {
   const tema = temaEfetivo();
   const root = document.documentElement;
   root.dataset.theme = tema;
-  root.dataset.cifra = db.prefs().destaqueCifra || 'forte';
+  root.dataset.destaque = db.prefs().destaqueCifra || 'forte';
   root.style.setProperty('--font-scale', fontScale);
   const c = hexRgb(corDestaque());
   const L = luminancia(c);
@@ -301,12 +301,11 @@ function vincularSpotify(song) {
   const ligado = spotify.conectado();
   return openDialog(`
     <h3>Spotify</h3>
-    <p>${ligado ? 'Escolha a versão desta música:' : 'Abra o Spotify, procure a música, toque em ⋯ → Compartilhar → Copiar link e cole aqui.'}</p>
+    <p>${ligado ? 'Escolha a versão desta música:' : 'Abra o Spotify, procure a música, toque em ⋯ → Compartilhar → Copiar link e depois em “Colar” aqui.'}</p>
     ${ligado ? `<label class="field">${icon('search', 18)}<input class="search" type="search" id="sp-q" value="${esc(termo)}"></label><ul class="tracks" id="sp-lista"><li class="loading-note"><span class="spin"></span>Buscando…</li></ul>`
       : `<a class="btn small" href="${esc(spotifyBusca(termo))}" target="_blank" rel="noopener" style="justify-self:start">${icon('spotify', 16)} Procurar “${esc(termo)}” no Spotify</a>`}
-    <label class="campo-livre">Link da faixa<input class="input" id="sp-link" placeholder="https://open.spotify.com/track/…" value="${esc(song.spotify || '')}"></label>
+    <label class="campo-livre">Link da faixa<span class="input-btn"><input class="input" id="sp-link" placeholder="https://open.spotify.com/track/…" value="${esc(song.spotify || '')}"><button class="btn small" type="button" data-colar>Colar</button></span></label>
     <p class="muted" id="sp-info" style="margin:0;font-size:13px"></p>
-    ${ligado ? '' : '<p class="muted" style="margin:0;font-size:13px">Dica: conecte sua conta em <a href="#/ajustes/spotify" data-no>Ajustes → Spotify</a> para buscar aqui mesmo.</p>'}
     <div class="acts">${song.spotify ? '<button class="btn ghost danger" data-rm>Remover</button><span class="spacer"></span>' : ''}<button class="btn ghost" data-no>Cancelar</button><button class="btn primary" data-ok>Vincular</button></div>`,
   (dlg, done) => {
     const link = $('#sp-link', dlg);
@@ -337,6 +336,9 @@ function vincularSpotify(song) {
       $('#sp-q', dlg).oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => buscar(e.target.value), 400); };
       $('#sp-lista', dlg).onclick = (e) => { const li = e.target.closest('li[data-i]'); if (li) done(achadas[Number(li.dataset.i)].url); };
     }
+    $('[data-colar]', dlg).onclick = async () => {
+      try { link.value = (await navigator.clipboard.readText()).trim(); link.dispatchEvent(new Event('input')); } catch { link.focus(); toast('Segure o dedo no campo e escolha Colar'); }
+    };
     dlg.querySelectorAll('[data-no]').forEach((b) => b.addEventListener('click', () => done(null)));
     $('[data-rm]', dlg)?.addEventListener('click', () => done(''));
     $('[data-ok]', dlg).onclick = confirmar;
@@ -1042,6 +1044,29 @@ const linhaWeb = (r, i, origem, extra = '') => `
     ${capa({ titulo: r.titulo, capa: r.capa }, { ic: origem === 'letra' ? 'text' : 'music' })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${esc([r.artista, r.album].filter(Boolean).join(' · '))}</div></div>
     <span class="acts">${extra}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 
+// prévia de 30 segundos (catálogo aberto): um player só, o botão vira pausa
+let audioPrevia = null;
+function pararPrevia() {
+  audioPrevia?.pause();
+  document.querySelectorAll('[data-previa].tocando').forEach((b) => { b.classList.remove('tocando'); b.innerHTML = icon('play', 16); });
+}
+function tocarPrevia(item, li) {
+  const b = li.querySelector('[data-previa]');
+  if (!item.previa || !b) return;
+  const mesma = audioPrevia && audioPrevia.dataset.src === item.previa;
+  const tocava = b.classList.contains('tocando');
+  pararPrevia();
+  if (mesma && tocava) return;
+  if (!mesma) {
+    audioPrevia = new Audio(item.previa);
+    audioPrevia.dataset.src = item.previa;
+    audioPrevia.onended = pararPrevia;
+  }
+  audioPrevia.play().catch(() => toast('Não consegui tocar a prévia'));
+  b.classList.add('tocando');
+  b.innerHTML = icon('pause', 16);
+}
+
 // leva para a Buscar já procurando cifras desta música
 function buscarCifraNoApp(song) {
   sessionStorage.setItem('busca', [song.title.replace(/\s*[–—-]\s*cifra.*$/i, ''), song.artist].filter(Boolean).join(' '));
@@ -1143,12 +1168,25 @@ function viewSearch() {
     <div id="res"></div>`;
   const res = $('#res');
   ligarListaCindy(res, '#/buscar');
-  let achados = { cifraclub: [], letra: [], spotify: [] };
+  let achados = { cifraclub: [], letra: [], spotify: [], catalogo: [] };
+  aoSair(pararPrevia);
   res.addEventListener('click', (e) => {
     const li = e.target.closest('li[data-web]');
     if (!li) return;
     const item = achados[li.dataset.web][Number(li.dataset.i)];
     if (!item) return;
+    if (li.dataset.web === 'catalogo') {
+      if (e.target.closest('.sp-abrir')) return;
+      if (e.target.closest('[data-cifra]')) {
+        const termo = `${item.titulo} ${item.artista}`;
+        sessionStorage.setItem('busca', termo);
+        $('.search').value = termo;
+        definirFiltro('cifras');
+        return;
+      }
+      tocarPrevia(item, li);
+      return;
+    }
     if (li.dataset.web === 'cifraclub') abrirCifraClub(item, li, '#/buscar');
     else if (li.dataset.web === 'letra') abrirLetra(item, '#/buscar');
     else if (li.dataset.web === 'spotify') {
@@ -1216,8 +1254,17 @@ function viewSearch() {
       }
       if (mostra('spotify')) {
         if (!spotify.conectado()) {
-          $('#sp-res').innerHTML = `<div class="refs-grid"><a class="ref-card" href="${esc(spotifyBusca(term))}" target="_blank" rel="noopener"><span class="ico spotify">${icon('spotify', 24)}</span><span><b>Procurar “${esc(term)}”</b><small>Abre no Spotify</small></span></a>
-            <a class="ref-card" href="#/ajustes/spotify"><span class="ico">${icon('link', 22)}</span><span><b>Ver resultados aqui</b><small>Conecte sua conta em Ajustes</small></span></a></div>`;
+          // sem login: catálogo aberto (capa + prévia de 30 s) e um toque abre a faixa no Spotify
+          buscarCatalogo(term, undefined, filtro === 'spotify' ? 20 : 6).then((lista) => {
+            if (!vivo('sp-res')) return;
+            achados.catalogo = lista;
+            $('#sp-res').innerHTML = (lista.length ? `<ul class="tracks">${lista.map((r, i) => linhaWeb(r, i, 'catalogo',
+              `${r.previa ? `<button class="icon-btn" data-previa aria-label="Ouvir prévia" title="Ouvir 30 segundos">${icon('play', 16)}</button>` : ''}<a class="icon-btn sp-abrir" href="${esc(spotifyBusca(r.titulo + ' ' + r.artista))}" target="_blank" rel="noopener" aria-label="Ouvir no Spotify" title="Ouvir a música inteira no Spotify">${icon('spotify', 20)}</a><button class="icon-btn" data-cifra aria-label="Procurar a cifra" title="Procurar a cifra desta música">${icon('chord', 17)}</button>`)
+              .replace(`<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button>`, '')).join('')}</ul>` : '<p class="muted">Nada encontrado.</p>')
+              + '<p class="muted" style="font-size:12px;margin:4px 0 0">Prévias de 30 s do catálogo da Apple Music. O botão verde abre a música inteira no Spotify.</p>';
+          }).catch(() => {
+            if (vivo('sp-res')) $('#sp-res').innerHTML = `<div class="refs-grid"><a class="ref-card" href="${esc(spotifyBusca(term))}" target="_blank" rel="noopener"><span class="ico spotify">${icon('spotify', 24)}</span><span><b>Procurar “${esc(term)}”</b><small>Abre no Spotify</small></span></a></div>`;
+          });
         } else {
           spotify.buscarFaixas(term, filtro === 'spotify' ? 20 : 6).then((lista) => {
             if (!vivo('sp-res')) return;
@@ -1384,6 +1431,7 @@ function viewSong(id, ctx = {}) {
       ${semCifra ? '<div class="seg-tabs"><span class="chip sm" title="Esta música não tem acordes">Só letra</span></div>' : ''}
     </div>
     <div id="aviso-cifra"></div>
+    <div id="sp-pendente"></div>
     <div class="song-toolbar" id="tools">
       <div class="seg so-cifra"><button class="tom-btn" data-act="tom" aria-label="Escolher o tom" title="Escolher o tom"><span class="val" id="key"></span>${icon('down', 14)}</button></div>
       <div class="seg so-cifra" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
@@ -1568,7 +1616,8 @@ function viewSong(id, ctx = {}) {
   if (sp) refs.push(`<div class="spotify-box" id="spotify-box"><iframe src="${esc(spotifyEmbed(sp))}" height="152" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" title="Spotify: ${esc(song.title)}"></iframe></div>`);
   const cards = [];
   if (sp) cards.push(`<a class="ref-card" href="${esc(spotifyUrl(sp))}" target="_blank" rel="noopener"><span class="ico spotify">${icon('spotify', 24)}</span><span><b>Abrir no Spotify</b><small>Faixa vinculada</small></span></a>`);
-  cards.push(`<button class="ref-card" data-vincular><span class="ico spotify">${icon('spotify', 24)}</span><span><b>${sp ? 'Trocar faixa do Spotify' : 'Vincular ao Spotify'}</b><small>${sp ? 'Escolher outra versão' : 'Ouvir a música no Spotify'}</small></span></button>`);
+  if (!sp) cards.push(`<button class="ref-card" data-abrir-sp><span class="ico spotify">${icon('spotify', 24)}</span><span><b>Ouvir no Spotify</b><small>Abre a música no Spotify</small></span></button>`);
+  cards.push(`<button class="ref-card" data-vincular><span class="ico spotify">${icon('spotify', 24)}</span><span><b>${sp ? 'Trocar faixa do Spotify' : 'Vincular ao Spotify'}</b><small>${sp ? 'Escolher outra versão' : 'Colar o link da faixa'}</small></span></button>`);
   if (song.source && /^https?:/.test(song.source)) cards.push(`<a class="ref-card" href="${esc(song.source)}" target="_blank" rel="noopener">${song.cover ? capa(song) : `<span class="ico">${icon('link', 22)}</span>`}<span><b>Cifra original</b><small>${esc(host(song.source))}</small></span></a>`);
   if (song.source?.startsWith('cnbb:')) cards.push(`<a class="ref-card" href="https://www.cnbb.org.br/liturgia-diaria/" target="_blank" rel="noopener"><span class="ico">${icon('cross', 22)}</span><span><b>Liturgia Diária</b><small>cnbb.org.br</small></span></a>`);
   if (song.pdf) cards.push(`<a class="ref-card" href="${esc(song.pdf)}" target="_blank" rel="noopener"><span class="ico">${icon('file', 22)}</span><span><b>Partitura</b><small>PDF</small></span></a>`);
@@ -1593,17 +1642,43 @@ function viewSong(id, ctx = {}) {
     ${isPreview ? '' : `<a class="link-btn" href="#/editar/${song.id}">${icon('edit', 13)} Editar créditos</a>`}</div>` : '';
 
   // Spotify: player embutido, vincular/trocar a faixa
-  const mudarSpotify = async () => {
-    const url = await vincularSpotify(song);
-    if (url === null) return;
+  const salvarSpotify = (url) => {
     const content = definirMeta(song.content, 'spotify', url);
     if (isPreview) preview.content = content; else db.saveSong({ ...db.song(song.id), content });
+    sessionStorage.removeItem('spPendente');
     toast(url ? 'Spotify vinculado' : 'Vínculo com o Spotify removido');
     route();
   };
-  $('#refs').addEventListener('click', (e) => { if (e.target.closest('[data-vincular]')) mudarSpotify(); if (e.target.closest('[data-buscar-cifra]')) buscarCifraNoApp(song); });
+  const mudarSpotify = async () => {
+    const url = await vincularSpotify(song);
+    if (url !== null) salvarSpotify(url);
+  };
+  // sem login: abre a música no Spotify; na volta, um toque vincula o link copiado
+  const chavePendente = isPreview ? 'previa:' + song.source : song.id;
+  const avisoPendente = () => {
+    const box = $('#sp-pendente');
+    if (!box) return;
+    box.innerHTML = !sp && sessionStorage.getItem('spPendente') === chavePendente ? `<div class="aviso sp-aviso"><span class="ico spotify">${icon('spotify', 20)}</span>
+      <span>No Spotify, toque em <b>⋯ → Compartilhar → Copiar link</b> e volte aqui.</span>
+      <button class="btn small primary" data-colar-sp>Vincular link copiado</button><button class="icon-btn" data-fechar-sp aria-label="Fechar">${icon('x', 16)}</button></div>` : '';
+  };
+  const abrirNoSpotify = () => {
+    window.open(spotifyBusca([song.title, song.artist].filter(Boolean).join(' ')), '_blank', 'noopener');
+    sessionStorage.setItem('spPendente', chavePendente);
+    avisoPendente();
+  };
+  $('#sp-pendente').addEventListener('click', async (e) => {
+    if (e.target.closest('[data-fechar-sp]')) { sessionStorage.removeItem('spPendente'); avisoPendente(); return; }
+    if (!e.target.closest('[data-colar-sp]')) return;
+    let texto = '';
+    try { texto = await navigator.clipboard.readText(); } catch { /* sem permissão: abre o campo para colar */ }
+    const ref = spotifyRef((/https?:\/\/\S+/.exec(texto) || [texto])[0]);
+    if (ref) salvarSpotify(spotifyUrl(ref)); else { if (texto) toast('O que foi copiado não é um link do Spotify'); mudarSpotify(); }
+  });
+  avisoPendente();
+  $('#refs').addEventListener('click', (e) => { if (e.target.closest('[data-abrir-sp]')) abrirNoSpotify(); if (e.target.closest('[data-vincular]')) mudarSpotify(); if (e.target.closest('[data-buscar-cifra]')) buscarCifraNoApp(song); });
   const mostrarSpotify = () => {
-    if (!sp) { mudarSpotify(); return; }
+    if (!sp) { abrirNoSpotify(); return; }
     const box = $('#spotify-box');
     box.classList.add('destaque');
     box.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1613,7 +1688,7 @@ function viewSong(id, ctx = {}) {
   view.querySelector('.midia').onclick = (e) => {
     const b = e.target.closest('[data-midia]');
     if (!b) return;
-    if (b.dataset.midia === 'audio' && !sp) { mudarSpotify(); return; }
+    if (b.dataset.midia === 'audio' && !sp) { abrirNoSpotify(); return; }
     modoMidia = b.dataset.midia;
     db.setPref('midia', modoMidia);
     view.querySelectorAll('[data-midia]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));

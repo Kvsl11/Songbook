@@ -225,3 +225,21 @@ export async function spotifyOEmbed(url, fetchImpl) {
   const j = await res.json();
   return { ...ref, url: spotifyUrl(ref), titulo: j.title || '', capa: j.thumbnail_url || '' };
 }
+
+// ------------------------------------------------------------------ catálogo aberto (Apple/iTunes)
+// Busca sem login nenhum, com CORS: capa, álbum e uma prévia de 30 segundos de cada música.
+export async function buscarCatalogo(termo, fetchImpl, limite = 10) {
+  const q = String(termo || '').trim();
+  if (!q) return [];
+  const res = await buscar(`https://itunes.apple.com/search?media=music&entity=song&country=BR&limit=${limite}&term=${encodeURIComponent(q)}`, { fetchImpl });
+  if (!res.ok) throw new Error(`Catálogo respondeu ${res.status}`);
+  return ((await res.json()).results || []).filter((r) => r.kind === 'song').map((r) => ({
+    titulo: r.trackName,
+    artista: r.artistName,
+    album: r.collectionName || '',
+    capa: String(r.artworkUrl100 || '').replace(/100x100bb/, '300x300bb'),
+    previa: r.previewUrl || '',
+    url: r.trackViewUrl || '',
+    fonte: 'catalogo',
+  }));
+}
