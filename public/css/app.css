@@ -1126,3 +1126,9 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 .fonte-cantos { grid-template-columns: minmax(0, 1fr); }
 .fonte-cantos li, .fonte-cantos .bts { min-width: 0; }
 .fonte-item.mini { max-width: 100%; }
+
+/* artistas: foto redonda (busca e página do artista) */
+.tile-artista .cover { border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
+.tile-artista b, .tile-artista small { text-align: center; }
+.grade-artistas { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 18px 14px; padding-top: 6px; }
+.artista-hero .cover { border-radius: 50%; display: grid; place-items: center; color: var(--muted); }

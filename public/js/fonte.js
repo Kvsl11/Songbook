@@ -7,7 +7,7 @@ import { getMissa as getMissaDireto } from './lib/missa.js';
 import { buscarCantos as buscarDireto, getCanto as getCantoDireto } from './lib/cindy.js';
 import { ehMpm, getMusicaMpm } from './lib/mpm.js';
 import { getLiturgia as getLiturgiaDireto } from './lib/cnbb.js';
-import { buscarCifraClub as buscarCifraClubDireto, buscarLetras as buscarLetrasDireto, getCifraClub as getCifraClubDireto, getLetra as getLetraDireto, buscarLetraSincronizada as buscarSincronizadaDireto, PROXIES_PUBLICOS } from './lib/web.js';
+import { buscarCifraClub as buscarCifraClubDireto, buscarLetras as buscarLetrasDireto, getCifraClub as getCifraClubDireto, buscarArtistasCifraClub as buscarArtistasDireto, getArtistaCifraClub as getArtistaDireto, getLetra as getLetraDireto, buscarLetraSincronizada as buscarSincronizadaDireto, PROXIES_PUBLICOS } from './lib/web.js';
 
 const PREFIXO = 'songbook.cache.';
 const VALIDADE = 12 * 3600e3;
@@ -147,6 +147,14 @@ export function buscarCifraClub(termo) {
 export function buscarLetras(termo) {
   const t = String(termo || '').trim();
   return obter('letras:' + t.toLowerCase(), () => buscarLetrasDireto(t), 'api/letras?q=' + encodeURIComponent(t));
+}
+
+// artistas do Cifra Club: a busca (com CORS) e a página do artista (pelos proxies), guardadas
+export function buscarArtistasCifraClub(termo) {
+  return obter('cca:' + termo, () => buscarArtistasDireto(termo));
+}
+export function getArtistaCifraClub(slug) {
+  return obter('ccart:' + slug, () => getArtistaDireto(slug, { proxies: PROXIES_PUBLICOS }));
 }
 
 // A página da cifra não libera CORS: tenta o servidor do projeto (se houver) e depois os proxies

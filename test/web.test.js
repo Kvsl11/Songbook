@@ -175,3 +175,21 @@ test('acordes entre parênteses viram acordes (não observação)', async () => 
   assert.match(html, /<span class="chord">D<\/span>[^]*<span class="chord">F#m<\/span>/);
   assert.doesNotMatch(html, /class="comment"/);
 });
+
+test('página do artista no Cifra Club: nome, foto e músicas mais tocadas com o tom', async () => {
+  const { parseArtistaCifraClub, artistasCifraClub } = await import('../public/js/lib/web.js');
+  const html = `<meta property="og:image" content="https://akamai.sscdn.co/f.jpg"><h1><span>Frei Gilson</span></h1>
+    <a href="/frei-gilson/">Cifra</a>
+    <ol><li><a href="/frei-gilson/eu-seguirei/"><p>01</p><p class="primaryLabel">Eu Seguirei</p><span>74.872</span><span>E</span><span>Opções</span></a></li>
+    <li><a href="/frei-gilson/colo-de-mae/"><p>02</p><p>Colo de Mãe</p><span>25.048</span><span>D</span></a></li>
+    <li><a href="/frei-gilson/eu-seguirei/">Eu Seguirei</a></li></ol>`;
+  const a = parseArtistaCifraClub(html, 'frei-gilson');
+  assert.equal(a.nome, 'Frei Gilson');
+  assert.equal(a.foto, 'https://akamai.sscdn.co/f.jpg');
+  assert.deepEqual(a.musicas, [
+    { titulo: 'Eu Seguirei', tom: 'E', url: 'https://www.cifraclub.com.br/frei-gilson/eu-seguirei/' },
+    { titulo: 'Colo de Mãe', tom: 'D', url: 'https://www.cifraclub.com.br/frei-gilson/colo-de-mae/' },
+  ]);
+  const ar = artistasCifraClub({ response: { docs: [{ t: '1', m: 'Frei Gilson', d: 'frei-gilson', i: 'b/2/x-tb.jpg', s: 259 }, { t: '2', m: 'Eu Seguirei', d: 'frei-gilson', u: 'eu-seguirei' }] } });
+  assert.deepEqual(ar.map((x) => [x.nome, x.slug]), [['Frei Gilson', 'frei-gilson']]);
+});

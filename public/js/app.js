@@ -6,7 +6,7 @@ import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
 import { buscarYoutube, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, mesmaDuracao, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
-import { buscarCifraClub, buscarLetras, buscarLetraSincronizada, getCifraClub, getLetra, buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
+import { buscarArtistasCifraClub, getArtistaCifraClub, buscarCifraClub, buscarLetras, buscarLetraSincronizada, getCifraClub, getLetra, buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const view = $('#view');
@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-80';
+export const APP_VERSAO = '2026.10.19-81';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1588,6 +1588,11 @@ async function buscarMusicas(termo) {
   }
   return lista;
 }
+// artista (Cifra Club): foto redonda; abre a página dele com as músicas mais tocadas
+const tileArtista = (a) => `<a class="tile tile-artista" href="#/artista/${encodeURIComponent(a.slug)}/${encodeURIComponent(a.nome)}">
+  <div class="cover">${a.capa ? `<img src="${esc(a.capa)}" alt="" loading="lazy">` : icon('mic', 40)}</div><b>${esc(a.nome)}</b><small>Artista</small></a>`;
+const artistaCerto = (lista, nome) => lista.find((a) => mesmoNome(a.nome, nome)) || null;
+
 const linhaMusicaWeb = (r, i, extra = '') => `
   <li class="track clickable" data-web="musica" data-i="${i}" style="grid-template-columns:auto 1fr auto">
     ${capa({ titulo: r.titulo, capa: r.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${r.cifra ? `<span class="ind"><span class="ind-i" title="Tem cifra">${icon('chord', 11)}</span></span>` : ''}${esc(r.artista || '')}</div></div>
@@ -1618,7 +1623,7 @@ function viewSearch() {
   setTint('#2d2d2d');
   setHeader('Buscar', { actions: [{ icon: 'download', label: 'Importar cifra ou letra da internet', onClick: () => importarDaInternet() }] });
   const q = sessionStorage.getItem('busca') || '';
-  const FILTROS = [['tudo', 'Tudo'], ['musicas', 'Músicas'], ['videos', 'Vídeos'], ['biblioteca', 'Biblioteca']];
+  const FILTROS = [['tudo', 'Tudo'], ['musicas', 'Músicas'], ['artistas', 'Artistas'], ['videos', 'Vídeos'], ['biblioteca', 'Biblioteca']];
   let filtro = sessionStorage.getItem('buscaFiltro') || 'tudo';
   if (!FILTROS.some(([k]) => k === filtro)) filtro = 'tudo';
   view.innerHTML = `
@@ -1654,8 +1659,13 @@ function viewSearch() {
       res.innerHTML = `
         <div class="busca-dica">${icon('sparkles', 18)}<span>Busque qualquer música: ao abrir, ela já vem com a cifra (<b>Cifra Club</b>), a letra (<b>Letras</b>) e o vídeo (<b>YouTube</b>). Achou a cifra em outro site? <button class="link-btn" id="btn-importar">Cole aqui</button>.</span></div>`;
       $('#btn-importar').onclick = () => importarDaInternet();
-      res.insertAdjacentHTML('beforeend', `<div class="shelf-head"><h2>Católicas em alta</h2></div><div id="em-alta"><div class="loading-note"><span class="spin"></span>Carregando as mais tocadas…</div></div>`);
+      res.insertAdjacentHTML('beforeend', `<div class="shelf-head"><h2>Artistas católicos</h2></div><div class="shelf" id="art-cat"></div>
+        <div class="shelf-head"><h2>Católicas em alta</h2></div><div id="em-alta"><div class="loading-note"><span class="spin"></span>Carregando as mais tocadas…</div></div>`);
       const meu = ++seq;
+      Promise.all(ARTISTAS_CATOLICOS.map((a) => buscarArtistasCifraClub(a).then((l) => artistaCerto(l, a)).catch(() => null))).then((lista) => {
+        if (meu !== seq || !$('#art-cat')) return;
+        $('#art-cat').innerHTML = lista.filter(Boolean).map(tileArtista).join('');
+      });
       catolicasEmAlta().then((lista) => {
         if (meu !== seq || !$('#em-alta')) return;
         achados.musica = lista;
@@ -1668,6 +1678,7 @@ function viewSearch() {
     const locais = db.songs().filter((s) => normalizar(s.title + ' ' + s.artist + ' ' + s.content).includes(t)).slice(0, filtro === 'biblioteca' ? 50 : 6);
     const blocos = [];
     if (mostra('biblioteca') && (locais.length || filtro === 'biblioteca')) blocos.push(`<div class="shelf-head"><h2>Na sua biblioteca</h2></div>${locais.length ? `<ul class="tracks">${locais.map((s) => linhaMusica(s, s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '')).join('')}</ul>` : '<p class="muted">Nada na biblioteca.</p>'}`);
+    if (mostra('artistas')) blocos.push(caixa('ar-res', 'Artistas'));
     if (mostra('musicas')) blocos.push(caixa('mu-res', 'Músicas'));
     if (mostra('videos')) blocos.push(caixa('yt-res', 'Vídeos', `<a href="${esc(ytBusca(term))}" target="_blank" rel="noopener">youtube.com</a>`));
     res.innerHTML = blocos.join('');
@@ -1675,6 +1686,15 @@ function viewSearch() {
     clearTimeout(timer);
     timer = setTimeout(() => {
       if (meu !== seq) return;
+      if (mostra('artistas')) {
+        buscarArtistasCifraClub(term).then((lista) => {
+          if (!vivo('ar-res')) return;
+          const artistas = lista.slice(0, filtro === 'artistas' ? 20 : 8);
+          $('#ar-res').innerHTML = artistas.length ? `<div class="${filtro === 'artistas' ? 'grade-artistas' : 'shelf'}">${artistas.map(tileArtista).join('')}</div>` : '<p class="muted">Nenhum artista encontrado.</p>';
+          // na aba Tudo, sem artista, a seção some
+          if (!artistas.length && filtro === 'tudo') { $('#ar-res').previousElementSibling?.remove(); $('#ar-res').remove(); }
+        }).catch((e) => vivo('ar-res') && erro('ar-res', 'Não consegui buscar artistas: ' + e.message));
+      }
       if (mostra('musicas')) {
         buscarMusicas(term).then((lista) => {
           if (!vivo('mu-res')) return;
@@ -1702,6 +1722,41 @@ function viewSearch() {
   $('#filtros').onclick = (e) => { const b = e.target.closest('[data-f]'); if (b) definirFiltro(b.dataset.f); };
   draw(q);
   $('.search').oninput = (e) => { sessionStorage.setItem('busca', e.target.value); draw(e.target.value); };
+}
+
+// página do artista: as músicas mais tocadas dele no Cifra Club; cada uma abre com cifra, letra e vídeo
+async function viewArtista(slug, nome) {
+  setTab('buscar');
+  setTint('#3a2f4f');
+  setHeader(nome || 'Artista', { back: '#/buscar', eyebrow: 'Artista' });
+  view.innerHTML = `
+    <section class="page-hero artista-hero"><div class="cover" id="art-foto">${icon('mic', 48)}</div>
+      <div><div class="kind">Artista</div><h2>${esc(nome || slug)}</h2><div class="meta">Músicas mais tocadas no <a href="https://www.cifraclub.com.br/${esc(slug)}/" target="_blank" rel="noopener">Cifra Club</a></div></div></section>
+    <div id="art-musicas"><div class="loading-note"><span class="spin"></span>Carregando as músicas…</div></div>`;
+  let musicas = [];
+  let foto = '';
+  const desenhar = (lista, aviso = '') => {
+    musicas = lista;
+    $('#art-musicas').innerHTML = (aviso ? `<p class="muted">${aviso}</p>` : '') + (lista.length
+      ? `<ul class="tracks">${lista.map((r, i) => linhaMusicaWeb({ ...r, capa: r.capa || foto, artista: r.tom ? `Tom ${r.tom}` : nome, cifra: r.url }, i)).join('')}</ul>` : '<p class="muted">Nenhuma música encontrada.</p>');
+  };
+  $('#art-musicas').addEventListener('click', (e) => {
+    const li = e.target.closest('li[data-i]');
+    const m = li && musicas[Number(li.dataset.i)];
+    if (m) abrirMusica({ titulo: m.titulo, artista: nome, cifra: m.url }, location.hash, li);
+  });
+  try {
+    const a = await getArtistaCifraClub(slug);
+    if (!$('#art-musicas')) return;
+    foto = a.foto;
+    if (a.foto) $('#art-foto').innerHTML = `<img src="${esc(a.foto)}" alt="">`;
+    desenhar(a.musicas);
+  } catch {
+    // a página do artista não abriu: as mais tocadas pela busca do Cifra Club
+    const lista = (await buscarCifraClub(nome || slug).catch(() => [])).filter((r) => r.url.includes(`/${slug}/`));
+    if ($('#art-musicas')) desenhar(lista.map((r) => ({ titulo: r.titulo, url: r.url, tom: '', capa: r.capa })), lista.length ? 'Não consegui abrir a lista completa agora; estas são as mais tocadas.' : '');
+    if (!$('#art-foto img')) { const f = (await buscarArtistasCifraClub(nome || slug).catch(() => [])).find((x) => x.slug === slug)?.capa; if (f && $('#art-foto')) $('#art-foto').innerHTML = `<img src="${esc(f)}" alt="">`; }
+  }
 }
 
 async function viewCategoria(id, nome) {
@@ -3436,6 +3491,7 @@ function route() {
   switch (a) {
     case undefined: return viewHome();
     case 'buscar': return b === 'categoria' ? viewCategoria(c, d || 'Seção') : viewSearch();
+    case 'artista': return viewArtista(b, c);
     case 'biblioteca': return viewLibrary(b);
     case 'repertorios': return viewLibrary('repertorios');
     case 'musica': return viewSong(b, { tocar: c === 'tocar' });

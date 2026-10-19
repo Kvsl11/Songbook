@@ -154,6 +154,49 @@ export async function getCifraClub(url, opcoes = {}) {
   return lerPagina(limpo, (html) => parseCifraClub(html, limpo), { ...opcoes, nome: 'o Cifra Club' });
 }
 
+// ---- artistas do Cifra Club: na busca (t = 1) e a página do artista com as músicas mais tocadas
+export function artistasCifraClub(json) {
+  return (json?.response?.docs || [])
+    .filter((d) => String(d.t) === '1' && d.d)
+    .map((d) => ({ nome: d.m || d.a, slug: d.d, capa: d.i ? CAPAS + String(d.i).replace(/-tb(\.\w+)$/, '$1') : '', popularidade: Number(d.s) || 0 }));
+}
+export async function buscarArtistasCifraClub(termo, fetchImpl) {
+  const q = String(termo || '').trim();
+  if (!q) return [];
+  const res = await buscar(`https://solr.sscdn.co/cc/h2/?q=${encodeURIComponent(q)}`, { fetchImpl });
+  if (!res.ok) throw new Error(`Cifra Club respondeu ${res.status}`);
+  return artistasCifraClub(lerJsonp(await res.text()));
+}
+// Página do artista: nome, foto e as músicas na ordem de mais tocadas (com o tom de cada uma)
+export function parseArtistaCifraClub(html, slug) {
+  const texto = (h) => decodeEntities(String(h).replace(/<[^>]+>/g, '|')).split('|').map((x) => x.trim()).filter(Boolean);
+  const nome = texto((/<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html) || [])[1] || '')[0] || '';
+  const foto = (/property="og:image"\s+content="([^"]+)"|content="([^"]+)"\s+property="og:image"/.exec(html) || []).slice(1).find(Boolean) || '';
+  const re = new RegExp(`<a[^>]+href="(?:https://www\\.cifraclub\\.com\\.br)?/${slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/([a-z0-9-]+)/"[^>]*>([\\s\\S]*?)</a>`, 'g');
+  const musicas = [];
+  const vistas = new Set();
+  for (const m of html.matchAll(re)) {
+    if (vistas.has(m[1])) continue;
+    const partes = texto(m[2]).filter((x) => !/^op[çc][õo]es$/i.test(x));
+    const i = partes.findIndex((x) => !/^\d{1,3}$/.test(x)); // pula o número da posição
+    const titulo = partes[i];
+    if (!titulo) continue;
+    vistas.add(m[1]);
+    const tom = partes.slice(i + 1).find((x) => isChord(x)) || '';
+    musicas.push({ titulo, tom, url: `${CIFRACLUB}/${slug}/${m[1]}/` });
+  }
+  return { nome, foto, slug, musicas };
+}
+export function getArtistaCifraClub(slug, opcoes = {}) {
+  if (!/^[a-z0-9-]+$/.test(slug || '')) throw new Error('Artista inválido');
+  const url = `${CIFRACLUB}/${slug}/`;
+  return lerPagina(url, (html) => {
+    const a = parseArtistaCifraClub(html, slug);
+    if (!a.musicas.length) throw new Error('Página do artista sem músicas');
+    return a;
+  }, { ...opcoes, nome: 'o Cifra Club' });
+}
+
 // ------------------------------------------------------------------ letras (Letras.mus.br; reserva: LRCLIB)
 
 export const ehLetras = (url) => /^https?:\/\/(www\.|m\.)?letras\.mus\.br\/[^/?#]+\/[^/?#]+/.test(url || '');
