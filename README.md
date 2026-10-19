@@ -18,6 +18,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   tablatura, tom e capotraste). Como o site não deixa outros apps lerem a página, o app a lê pelo Jina Reader
   (serviço público); se ele não responder, abre o "Importar da internet": copie a cifra no site e cole
   (botão "Colar copiado"). Serve para cifra ou letra de **qualquer site**.
+  Ao abrir uma música da busca (Cifra Club, letras, cantos), o app procura o vídeo no YouTube sozinho e já
+  vincula; se não achar, mostra o aviso com "Escolher vídeo".
 
 - **Player como no Spotify**: na página da música o vídeo toca na telinha das Referências; ao sair dela, continua no mini player
   sem parar nem repetir anúncio (é o mesmo vídeo, que só muda de lugar na tela) fixo acima do menu, com o vídeo do YouTube

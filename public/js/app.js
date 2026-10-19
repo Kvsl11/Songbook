@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-60';
+export const APP_VERSAO = '2026.10.19-61';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1691,6 +1691,7 @@ function viewSong(id, ctx = {}) {
     </div>
     ${canvas ? '</div>' : ''}
     <div id="aviso-cifra"></div>
+    <div id="aviso-video"></div>
     <div class="song-toolbar ${comCifra ? '' : 'sem-cifra'}" id="tools">
       <div class="seg so-cifra"><button class="tom-btn" data-act="tom" aria-label="Escolher o tom" title="Escolher o tom"><span class="val" id="key"></span>${icon('down', 14)}</button></div>
       <div class="seg so-cifra" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
@@ -1917,6 +1918,28 @@ function viewSong(id, ctx = {}) {
     if (player.atual?.youtube === song.youtube) player.alternar(); else tocar();
   };
   if (ctx.tocar && song.youtube) setTimeout(tocar, 60);
+  // música vinda da busca (Cifra Club, letras, cantos) sem vídeo: procura no YouTube sozinho e já vincula;
+  // se não achar, avisa e oferece escolher
+  if (isPreview && !song.youtube) {
+    const box = $('#aviso-video');
+    if (preview.semVideo) {
+      box.innerHTML = `<div class="aviso">${icon('youtube', 18)}<span>Não achei o vídeo desta música no YouTube.</span><button class="btn small" data-escolher-video>Escolher vídeo</button></div>`;
+      box.querySelector('[data-escolher-video]').onclick = mudarVideo;
+    } else if (!preview.videoProcurado) {
+      const esta = preview;
+      esta.videoProcurado = true;
+      box.innerHTML = `<div class="aviso"><span class="spin"></span><span>Procurando o vídeo no YouTube…</span></div>`;
+      buscarYoutube([song.title, song.artist].filter(Boolean).join(' ')).then((vs) => vs[0]).catch(() => null).then((v) => {
+        if (preview !== esta) return; // já saiu desta música
+        if (v) {
+          esta.content = definirMeta(esta.content, 'youtube', v.url);
+          toast('Vídeo do YouTube encontrado');
+        } else esta.semVideo = true;
+        if (location.hash === '#/musica/previa') route();
+      });
+    }
+  }
+
   // nesta página o vídeo toca aqui (Referências); ao sair, continua no mini player
   if (song.youtube) {
     player.palco($('#video-box'), song.youtube);
