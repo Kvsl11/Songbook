@@ -1151,3 +1151,28 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 .salvar-btn.mini { width: 26px; height: 26px; border-width: 1.5px; }
 .salvar-btn.mini svg { width: 13px; height: 13px; }
 .salvar-btn .spin { width: 12px; height: 12px; }
+
+/* ---- topo da música no tablet e no computador (como o Spotify no computador): uma faixa larga e alta
+   com o vídeo cobrindo tudo, o título grande embaixo à esquerda e os botões logo abaixo dele; o vídeo
+   termina nos botões (o aviso e a barra de tom/capo ficam fora dele) */
+@media (min-width: 641px) {
+  .song-topo.canvas-on { min-height: clamp(320px, 50vh, 520px); display: flex; flex-direction: column; justify-content: flex-end; margin-bottom: 20px; }
+  .song-topo.canvas-on .canvas-fundo { inset: -64px calc(-1 * var(--gutter)) -36px; -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 100%); mask-image: linear-gradient(180deg, #000 78%, transparent 100%); }
+  .song-topo.canvas-on .song-hero { padding: 0 0 12px; max-width: min(100%, 980px); }
+  .song-topo.canvas-on .song-hero > .cover { display: none; } /* o próprio vídeo é a capa */
+  .song-topo.canvas-on .song-hero h2 { font-size: clamp(40px, 6.2vw, 88px); margin: 4px 0 12px; text-shadow: 0 2px 24px rgb(0 0 0 / 0.55); }
+  .song-topo.canvas-on .page-hero .meta { font-size: 15px; gap: 8px; text-shadow: 0 1px 8px rgb(0 0 0 / 0.6); }
+  .song-topo.canvas-on .actions-row { padding-bottom: 16px; margin: 0; }
+  /* escurece embaixo e à esquerda, onde ficam o título e os botões */
+  .song-topo.canvas-on .canvas-fundo::after {
+    background:
+      linear-gradient(90deg, rgb(0 0 0 / 0.62) 0%, rgb(0 0 0 / 0.32) 40%, transparent 70%),
+      linear-gradient(180deg, rgb(0 0 0 / 0.35) 0%, transparent 20%, transparent 36%, rgb(0 0 0 / 0.5) 62%, rgb(0 0 0 / 0.7) 100%);
+  }
+  .song-topo.canvas-on + #aviso-cifra .aviso, .song-topo.canvas-on ~ #aviso-video .aviso { margin-top: 0; }
+}
+@media (min-width: 900px) { .song-topo.canvas-on .canvas-fundo { border-radius: var(--radius) var(--radius) 0 0; } }
+@media (min-width: 641px) {
+  /* o clipe tocando atrás do título some aos poucos embaixo, como o fundo */
+  #pl-tela.no-fundo { -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 100%); mask-image: linear-gradient(180deg, #000 78%, transparent 100%); }
+}
