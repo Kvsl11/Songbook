@@ -11,23 +11,22 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 
 - **Início**: saudação, atalhos, a liturgia de hoje, seus repertórios, tocadas e adicionadas recentemente.
 - **Buscar (qualquer música)**: digite música, artista ou trecho e o app procura ao mesmo tempo no
-  **Cifra Club** (cifras, com capas), em **letras** (LRCLIB), no **Spotify**, nos cantos cifrados de
-  cindyferrarezi.com e do Músicas para Missa e na sua biblioteca. Filtros: Tudo, Cifras, Letras, Spotify,
+  **Cifra Club** (cifras, com capas), em **letras** (LRCLIB), no **YouTube** (vídeos), nos cantos cifrados de
+  cindyferrarezi.com e do Músicas para Missa e na sua biblioteca. Filtros: Tudo, Cifras, Letras, Vídeos,
   Cantos da missa, Biblioteca. Também traz atalhos para procurar a cifra em toda a internet, no Letras.mus.br e no YouTube.
 - **Importar da internet**: tocar numa cifra do Cifra Club abre a cifra já organizada (partes, refrão,
   tablatura). Como o site não deixa outros apps lerem a página, o app usa o servidor do projeto, um proxy
   próprio (Ajustes) ou proxies públicos; se nenhum responder, abre o "Importar da internet": copie a cifra no
   site e cole (botão "Colar copiado"). Serve para cifra ou letra de **qualquer site**.
-- **Spotify sem login**: o botão verde abre a música direto no Spotify; ao voltar com o link copiado
-  (⋯ → Compartilhar → Copiar link), "Vincular link copiado" liga a faixa à música com um toque. Na Buscar, a seção
-  Spotify mostra capas e **prévias de 30 s** do catálogo aberto da Apple Music, com o botão para ouvir no Spotify.
-- **Spotify**: cada música pode ter a faixa do Spotify vinculada (player embutido nas Referências, botão
-  verde do Spotify, modo **Vídeo/Áudio**). Sem login, o app abre a busca do Spotify e aceita o link colado;
-  conectando a conta em Ajustes (Client ID de um app grátis em developer.spotify.com, login seguro PKCE), a busca
-  e a escolha da faixa acontecem dentro do app.
+
+- **Player como no Spotify**: tocar uma música abre o mini player fixo acima do menu, com o vídeo do YouTube
+  pequeno, nome, parte da missa, tempo e barra de progresso; a música continua tocando enquanto você navega.
+  Dá para ampliar o vídeo, pausar e fechar; no repertório, ao terminar, toca a próxima que tiver vídeo.
+- **Vídeo do YouTube em cada música**: "Escolher vídeo" procura no YouTube dentro do app (instâncias públicas do
+  Piped, sem chave nem login) ou aceita o link colado. Se o dono não deixar tocar fora do YouTube, o player avisa.
 - **Biblioteca**: músicas e repertórios, com filtros (com vídeo, cifras próprias).
-- **Música (estilo Spotify)**: o clipe do YouTube passa mudo, em loop, atrás da capa; Vídeo/Áudio
-  alterna entre o vídeo e o Spotify; seção **Créditos** (intérprete, composição, tom original, fonte).
+- **Música (estilo Spotify)**: o clipe do YouTube aparece mudo, em loop, no lugar da capa; seção **Créditos**
+  (intérprete, composição, tom original, fonte). A letra tem o mesmo peso em tudo; o refrão é marcado pelo rótulo.
   Capa, botão verde para ouvir a **referência no YouTube**, botão **#** que liga a cifra ou deixa só a letra
   (letra grande, estilo Spotify), **tabela de tons** para trocar o tom com um toque, capotraste, rolagem automática (o ícone liga e mostra embaixo uma barra de velocidade), tamanho da letra,
   duas colunas, modo apresentação e cartões de referência (vídeo, cifra original, partitura em PDF,
@@ -69,10 +68,13 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   (mouse parado em cima), ícones flutuando nas seções, fundo da liturgia em movimento (respeita "reduzir movimento").
 - **Desenho dos acordes**: em Ajustes → Cifras, "Desenho dos acordes" mostra no início da música como montar cada acorde no violão (no tom e capo atuais) e o desenho de um acorde ao tocar nele na letra (`js/acordes.js`).
 - **Acordes em destaque** por padrão (maiores e mais fortes); em Ajustes → Destaque dos acordes: Suave, Forte ou Máximo (acorde num "selo").
-- **Parte da missa editável**: no repertório (ícone de lista na linha, na fila ou tocando no nome da parte
+- **Adicionar música ao repertório procurando na internet**: em "Adicionar", a aba "Procurar na internet" mostra
+  cifras do Cifra Club, cantos da missa, letras e vídeos do YouTube; a escolhida é salva na biblioteca (já com vídeo)
+  e entra no repertório. A **Biblioteca** abre em Repertórios.
+- **Parte da missa editável**: no editor, "Parte da missa" (Entrada, Aclamação…) fica sempre disponível; no repertório (ícone de lista na linha, na fila ou tocando no nome da parte
   na música) troque a parte (Entrada, Comunhão…) a qualquer momento; ao adicionar uma música, o app pergunta a parte.
 - **Editor de cifra**: modo **Só a letra** (corrige o texto e os acordes voltam às mesmas sílabas), campos de
-  composição e Spotify, botão "Trazer da internet"; acordes na linha de cima da letra (como num caderno) ou entre [colchetes]; campos de título, autor, tom e vídeo; prévia ao vivo; acordes do tom para
+  composição e vídeo (com busca no YouTube), botão "Trazer da internet"; acordes na linha de cima da letra (como num caderno) ou entre [colchetes]; campos de título, autor, tom e vídeo; prévia ao vivo; acordes do tom para
   inserir com um toque; transposição permanente; conversão de "cifra sobre a letra". Cantos vindos da
   busca ou da liturgia também podem ser editados (são salvos na biblioteca antes).
 - **Personalização**: modo escuro, claro ou automático; cor padrão ciano (a da logo), outras 8 cores de destaque, cor livre ou a
@@ -91,7 +93,7 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 | **Junior Música Católica** | diretório de hinários da CNBB, salmos, partituras, documentos e formação | cópia diária em `data/junior.json` (aba Orações → Fontes litúrgicas) |
 | **Cifra Club** | busca de cifras de qualquer música | busca direta (serviço de busca do site libera CORS); a página da cifra via servidor/proxy ou colando o texto |
 | **LRCLIB** | letras de músicas | direto do navegador (API aberta com CORS) |
-| **Spotify** | faixa de referência, player | player embutido + oEmbed sem login; busca com o login do usuário (Web API, PKCE) |
+| **YouTube** | vídeo de referência, player | busca pelo Piped (público, com CORS), oEmbed para links colados, player embutido |
 
 As sugestões das fontes são misturadas em cada parte da missa (as do Músicas para Missa aparecem com a
 etiqueta **MpM**). Na Liturgia, "Sugestão principal em cada parte" escolhe qual fonte vem marcada primeiro
@@ -148,8 +150,8 @@ public/
   js/lib/cnbb.js  cliente/parser da Liturgia Diária da CNBB          (navegador e Node)
   js/lib/cindy.js cliente do WordPress da Cindy: busca, repertório, cifras -> ChordPro (navegador e Node)
   js/lib/missa.js junta CNBB + Cindy na estrutura de partes da missa
-  js/lib/web.js   Cifra Club (busca e página -> ChordPro), letras (LRCLIB), links do Spotify
-  js/spotify.js   login PKCE e busca na Web API do Spotify (opcional)
+  js/lib/web.js   Cifra Club (busca e página -> ChordPro), letras (LRCLIB), vídeos do YouTube (Piped)
+  js/acordes.js   desenho dos acordes no violão
   js/fonte.js     busca direta + cache local, com o servidor como reserva
   js/chordpro.js  parser ChordPro, transposição, conversão "cifra sobre a letra" (usado também no servidor)
   js/render.js    ChordPro -> HTML

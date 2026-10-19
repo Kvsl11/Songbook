@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cifraTextoParaChordPro, ehCifraClub, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, spotifyRef, spotifyUrl, viaProxy,
+  cifraTextoParaChordPro, ehCifraClub, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
 } from '../public/js/lib/web.js';
 import { aplicarLetra, definirMeta, letraDe, parseChordPro } from '../public/js/chordpro.js';
 
@@ -61,11 +61,11 @@ test('letra pura vira estrofes e refrão (estrofe repetida)', () => {
   assert.match(pro, /\{chorus\}\n$/);
 });
 
-test('reconhece links do Spotify e monta o proxy', () => {
-  assert.deepEqual(spotifyRef('https://open.spotify.com/intl-pt/track/4cOdK2wGLETKBW3PvgPWqT?si=x'), { tipo: 'track', id: '4cOdK2wGLETKBW3PvgPWqT' });
-  assert.deepEqual(spotifyRef('spotify:track:4cOdK2wGLETKBW3PvgPWqT'), { tipo: 'track', id: '4cOdK2wGLETKBW3PvgPWqT' });
-  assert.equal(spotifyRef('https://example.com'), null);
-  assert.equal(spotifyUrl({ tipo: 'track', id: 'x' }), 'https://open.spotify.com/track/x');
+test('lê vídeos do YouTube (Piped), limpa o título e monta o proxy', () => {
+  const v = videosDoPiped({ items: [{ type: 'channel', url: '/channel/x' }, { type: 'stream', url: '/watch?v=xV7ZzeBR3oc', title: 'Noites Traiçoeiras (Vídeo Oficial)', uploaderName: 'Padre Marcelo Rossi - Topic', duration: 245 }] });
+  assert.equal(v.length, 1);
+  assert.deepEqual([v[0].id, v[0].canal, v[0].duracao, v[0].url], ['xV7ZzeBR3oc', 'Padre Marcelo Rossi', '4:05', 'https://www.youtube.com/watch?v=xV7ZzeBR3oc']);
+  assert.equal(tituloDoVideo('Padre Marcelo Rossi - Noites Traiçoeiras (Vídeo Oficial) [4K] | Canal'), 'Padre Marcelo Rossi - Noites Traiçoeiras');
   assert.equal(viaProxy('https://p.dev/?url={url}', 'https://a.b/c d'), 'https://p.dev/?url=https%3A%2F%2Fa.b%2Fc%20d');
 });
 
@@ -79,7 +79,7 @@ test('editar só a letra mantém os acordes nas sílabas', () => {
   assert.match(aplicarLetra(src, letra + '\nNova linha'), /\nNova linha$/);
 });
 
-test('troca e remove diretivas (vínculo do Spotify)', () => {
+test('troca e remove diretivas (vídeo, etc.)', () => {
   const src = '{title: A}\n{artist: B}\n\n[G]x';
   const com = definirMeta(src, 'spotify', 'https://open.spotify.com/track/x');
   assert.equal(com, '{title: A}\n{artist: B}\n{spotify: https://open.spotify.com/track/x}\n\n[G]x');

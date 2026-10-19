@@ -14,7 +14,7 @@ function load() {
 
 let state = load();
 // músicas salvas por versões anteriores ainda não têm capa/vídeo extraídos do conteúdo
-for (const s of state.songs) if ((s.youtube === undefined || s.spotify === undefined) && s.content) Object.assign(s, metaFrom(s.content));
+for (const s of state.songs) if ((s.youtube === undefined || s.parte === undefined) && s.content) Object.assign(s, metaFrom(s.content));
 
 function persist() {
   try {
@@ -41,8 +41,8 @@ function metaFrom(content) {
     youtube: youtubeId(meta.youtube) || '',
     cover: meta.cover || '',
     pdf: meta.pdf || '',
-    spotify: meta.spotify || '',
     composer: meta.composer || meta.lyricist || '',
+    parte: meta.x_parte || '',
   };
 }
 

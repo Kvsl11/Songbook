@@ -357,7 +357,7 @@ a.chip.sm { cursor: pointer; }
 .song.lyrics-mode .chord, .song.lyrics-mode .line.chords-only, .song.lyrics-mode .comment { display: none; }
 .song.lyrics-mode .section { margin-bottom: 1.1em; }
 .song.lyrics-mode .section.chorus { background: none; border: 0; padding: 0; color: #fff; }
-.song.lyrics-mode .section:not(.chorus) { color: rgb(255 255 255 / 0.62); }
+.song.lyrics-mode .section:not(.chorus) { color: #fff; }
 .song.lyrics-mode .section-label { color: rgb(255 255 255 / 0.55); font-size: 12px; letter-spacing: 0.14em; }
 /* modo Cifra no mesmo painel: acordes por cima da letra, num tom claro da própria cor do fundo */
 .song.lyrics-mode.with-chords { font-size: calc(19px * var(--font-scale)); line-height: 1.25; }
@@ -368,7 +368,7 @@ a.chip.sm { cursor: pointer; }
 .song.lyrics-mode.with-chords .lyrics-only .chunk { display: inline; }
 .song.lyrics-mode.with-chords .line { display: flex; flex-wrap: wrap; align-items: flex-end; margin-bottom: 0.25em; }
 .song.lyrics-mode.with-chords .lyrics-only .chord { display: none; }
-.song.lyrics-mode.with-chords .section:not(.chorus) { color: rgb(255 255 255 / 0.85); }
+.song.lyrics-mode.with-chords .section:not(.chorus) { color: #fff; }
 @media (min-width: 900px) { .song.lyrics-mode.with-chords { font-size: calc(26px * var(--font-scale)); } }
 /* letra centralizada (cifra e letra, normal e tela cheia) */
 .song.lyrics-mode { text-align: center; }
@@ -885,37 +885,27 @@ body.performance .convite-instalar { display: none; }
   .ref-card { transition: background 0.2s, transform 0.2s; }
   .ref-card:hover { transform: translateY(-2px); }
   .hero { background-size: 200% 200%; animation: surgir 0.5s backwards, deslizar-fundo 14s ease-in-out infinite; }
-  .song-hero > .cover { animation: respirar 7s ease-in-out infinite; }
+  .song-hero > .cover:not(.canvas) { animation: respirar 7s ease-in-out infinite; }
 }
 /* prévia do vídeo no card (mouse parado em cima) */
 .tile-video { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; animation: surgir 0.4s both; pointer-events: none; }
 .tile-video { container-type: size; }
 .tile-video iframe { position: absolute; top: 50%; left: 50%; width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.15); border: 0; }
-.badge-sp { position: absolute; left: 8px; top: 8px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: rgb(0 0 0 / 0.55); color: #1ed760; --sp-onda: #000; z-index: 1; }
 
 /* ============================================================ página da música estilo Spotify */
 .song-hero { position: relative; isolation: isolate; }
-.hero-video {
-  position: absolute; z-index: -1; inset: -64px calc(-1 * var(--gutter)) -8px; overflow: hidden; pointer-events: none;
-  opacity: 0; animation: aparecer-video 1.2s 1.5s forwards;
-  -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent 100%); mask-image: linear-gradient(180deg, #000 30%, transparent 100%);
+/* Canvas (como no Spotify): o vídeo, mudo e em loop, aparece no lugar da capa */
+.cover.canvas { container-type: size; background: #000; }
+.cover.canvas img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cover.canvas iframe {
+  position: absolute; top: 50%; left: 50%; border: 0; pointer-events: none;
+  width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.35);
+  opacity: 0; animation: aparecer-video 0.8s 5.5s forwards; /* depois que os controles do YouTube somem */
 }
-.hero-video::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.15) 60%, rgb(0 0 0 / 0.4)); }
-.hero-video { container-type: size; }
-.hero-video iframe { position: absolute; top: 50%; left: 50%; width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.2); border: 0; }
-@keyframes aparecer-video { to { opacity: 0.6; } }
+@keyframes aparecer-video { to { opacity: 1; } }
+@media (max-width: 640px) { .song-hero .cover.canvas { width: min(78vw, 320px); height: min(78vw * 1.25, 400px); border-radius: 10px; } }
 .kind-btn { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; padding: 4px 10px; margin-left: -10px; border-radius: 999px; }
 .kind-btn:hover, .kind-btn:focus-visible { background: rgb(255 255 255 / 0.12); }
-.seg.midia button { padding: 0 12px; gap: 6px; display: inline-flex; }
-.seg.midia button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
-.spotify-btn { color: var(--muted); --sp-onda: var(--bg); }
-.spotify-btn.on { color: #1ed760; }
-.ico.spotify { color: #1ed760 !important; --sp-onda: var(--surface-2); }
-.spotify-box { max-width: 640px; margin-bottom: 12px; border-radius: 12px; transition: box-shadow 0.3s, transform 0.3s; }
-.spotify-box iframe { display: block; width: 100%; border: 0; border-radius: 12px; }
-.spotify-box.destaque { box-shadow: 0 0 0 3px #1ed760; transform: scale(1.01); }
-.spotify-inline { list-style: none; padding: 0 0 8px; }
-.spotify-inline iframe { width: 100%; border: 0; border-radius: 12px; display: block; }
 .creditos { background: var(--bg-elev); border-radius: 12px; padding: 16px 18px; max-width: 640px; margin: 0 0 24px; }
 .creditos h3 { margin: 0 0 10px; font-size: 18px; font-weight: 800; }
 .creditos .cred { display: flex; flex-direction: column; padding: 6px 0; }
@@ -937,7 +927,6 @@ body.performance .convite-instalar { display: none; }
 .partes-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .input-btn { display: flex; gap: 6px; align-items: center; }
 .input-btn .input { flex: 1; min-width: 0; }
-.input-btn .icon-btn { color: #1ed760; --sp-onda: var(--bg); flex: none; }
 .setting-ajuda { padding: 4px 16px 14px; font-size: 14px; }
 .setting-ajuda summary { cursor: pointer; font-weight: 700; color: var(--accent-ink); padding: 8px 0; }
 .setting-ajuda ol { padding-left: 20px; margin: 6px 0 12px; line-height: 1.6; }
@@ -963,9 +952,46 @@ body.performance .convite-instalar { display: none; }
 .acorde-pop { position: fixed; z-index: 60; display: grid; justify-items: center; gap: 2px; padding: 10px 10px 8px; border-radius: 12px; background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg); animation: pop 0.15s ease; }
 .acorde-pop b { color: var(--chord); font-size: 16px; font-weight: 900; }
 
-/* Spotify sem login: aviso de "vincular link copiado" e prévias */
-.sp-aviso { margin: 0 0 14px; }
-.sp-aviso .ico.spotify { --sp-onda: var(--bg); background: none; }
-.sp-aviso .icon-btn { width: 30px; height: 30px; margin-left: auto; }
-.sp-abrir { color: #1ed760; --sp-onda: var(--bg); }
-[data-previa].tocando { color: var(--accent-ink); }
+
+/* letra: mesmo peso e cor em tudo; o refrão é marcado só pelo rótulo */
+.song.lyrics-mode { font-weight: 700; }
+.song.lyrics-mode .section-label { display: inline-block; padding: 2px 10px; border-radius: 999px; background: rgb(255 255 255 / 0.12); color: rgb(255 255 255 / 0.8); font-size: 11px; margin-bottom: 6px; }
+.song.lyrics-mode .section.chorus .section-label { background: color-mix(in srgb, var(--tint-cifra, #9be7b4) 30%, transparent); color: #fff; }
+
+/* ============================================================ mini player (fixo acima do menu) */
+#player {
+  position: absolute; z-index: 25; left: 8px; right: 8px; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 6px);
+  border-radius: 10px; overflow: hidden; background: color-mix(in srgb, var(--tint) 55%, #121212); color: #fff;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.5); display: grid; grid-template-columns: auto 1fr; animation: surgir 0.3s both;
+}
+#player .pl-video { width: 96px; aspect-ratio: 16 / 9; background: #000; align-self: center; margin: 6px 0 8px 6px; border-radius: 6px; overflow: hidden; position: relative; }
+#player .pl-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+#player .pl-barra { display: flex; align-items: center; gap: 2px; min-width: 0; padding: 0 4px 2px 0; }
+#player .pl-info { all: unset; cursor: pointer; flex: 1; min-width: 0; padding: 6px 10px; }
+#player .pl-txt b { display: block; font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#player .pl-txt small { display: block; font-size: 12px; color: rgb(255 255 255 / 0.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#player .icon-btn { color: #fff; width: 38px; height: 38px; flex: none; }
+#player .pl-play { width: 42px; height: 42px; }
+#player .pl-prog { grid-column: 1 / -1; height: 3px; background: rgb(255 255 255 / 0.2); margin: 0 8px 4px; border-radius: 2px; overflow: hidden; }
+#player .pl-prog i { display: block; height: 100%; width: 0; background: #fff; transition: width 0.5s linear; }
+/* ampliado: o vídeo grande em cima da barra */
+#player.grande { grid-template-columns: 1fr; }
+#player.grande .pl-video { width: auto; margin: 8px 8px 0; }
+body.com-player main { padding-bottom: calc(var(--nav-h) + 140px + env(safe-area-inset-bottom)); }
+@media (min-width: 900px) {
+  #player { left: auto; right: 16px; width: 440px; bottom: 16px; }
+  #player .pl-video { width: 128px; }
+}
+body.performance #player { bottom: calc(env(safe-area-inset-bottom) + 70px); }
+
+/* vídeos do YouTube (busca, escolher vídeo, adicionar ao repertório) */
+.video-thumb { width: 86px !important; height: 48px !important; border-radius: 6px !important; position: relative; }
+.video-thumb .dur { position: absolute; right: 3px; bottom: 3px; padding: 0 4px; border-radius: 3px; background: rgb(0 0 0 / 0.75); color: #fff; font-size: 11px; font-weight: 700; }
+.video-inline { list-style: none; padding: 0 0 10px; }
+.lista-videos { max-height: 46vh; overflow-y: auto; }
+.colar-link summary { cursor: pointer; font-weight: 700; color: var(--accent-ink); font-size: 14px; padding: 4px 0; }
+.colar-link .input-btn { margin-top: 8px; }
+.pk-res { max-height: 52vh; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+.pk-sec { margin: 4px 0 10px; }
+.pk-sec > b { display: block; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 6px 0 2px; }
+#player .pl-txt small a, #player .pl-txt small .link-btn { color: #fff; font-weight: 800; text-decoration: underline; font-size: 12px; }

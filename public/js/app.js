@@ -5,8 +5,7 @@ import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
-import { buscarCatalogo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, spotifyBusca, spotifyEmbed, spotifyOEmbed, spotifyRef, spotifyUrl } from './lib/web.js';
-import * as spotify from './spotify.js';
+import { buscarYoutube, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarCifraClub, buscarLetras, getCifraClub, buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -42,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-52';
+export const APP_VERSAO = '2026.10.19-54';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -198,6 +197,11 @@ function capa(item = {}, { ic = 'music', cls = '' } = {}) {
   if (src) return `<div class="cover ${cls}"><img src="${esc(src)}" alt="${esc(titulo)}" loading="lazy"></div>`;
   return `<div class="cover gen ${cls}" style="--h:${hue(titulo)}">${icon(ic, 24)}</div>`;
 }
+// só a imagem da capa (o Canvas põe o vídeo por cima dela)
+function capaImagem(item) {
+  const src = item.cover || (item.youtube ? `https://i.ytimg.com/vi/${item.youtube}/hqdefault.jpg` : '');
+  return src ? `<img src="${esc(src)}" alt="" loading="lazy">` : '';
+}
 function capaRepertorio(set, cls = '') {
   const songs = set.items.map((it) => db.song(it.songId)).filter(Boolean);
   const comImg = [...new Map(songs.filter((s) => s.cover || s.youtube).map((s) => [s.cover || s.youtube, s])).values()];
@@ -277,8 +281,16 @@ function lembrarCorLiturgica(data, cor) {
 
 // abre a música já tocando o vídeo de referência na seção "Referências"
 function tocarReferencia(song) {
-  if (!song.youtube) { window.open(ytBusca(`${song.title} ${song.artist || ''}`), '_blank', 'noopener'); return; }
-  location.hash = `#/musica/${song.id}/tocar`;
+  if (!song.youtube) { location.hash = `#/musica/${song.id}`; toast('Esta música ainda não tem vídeo: escolha um em Referências'); return; }
+  player.tocar(itemDoPlayer(song));
+}
+// o que o player precisa saber de uma música (e de onde ela veio: repertório e parte da missa)
+function itemDoPlayer(song, set = null, index = -1) {
+  return {
+    youtube: song.youtube, titulo: song.title, artista: song.artist || '', capa: song.cover || '', songId: song.id,
+    href: set ? `#/repertorio/${set.id}/${index}` : song.id && song.id !== 'previa' ? `#/musica/${song.id}` : location.hash,
+    parte: set ? set.items[index]?.label || '' : '', setId: set?.id || '', index,
+  };
 }
 
 // endereço do player do YouTube embutido (enablejsapi permite pausar/tocar pelo botão verde)
@@ -288,63 +300,202 @@ function ytEmbed(id) {
   return `https://www.youtube.com/embed/${encodeURIComponent(id)}?${p}`;
 }
 
-// vídeo de fundo (como o "Canvas" do Spotify): mudo, em loop, sem controles, atrás da capa
+// vídeo no lugar da capa (como o "Canvas" do Spotify): mudo, em loop, sem controles
 function ytFundo(id) {
   const p = new URLSearchParams({ autoplay: '1', mute: '1', loop: '1', playlist: id, controls: '0', playsinline: '1', rel: '0', modestbranding: '1', disablekb: '1', iv_load_policy: '3', start: '30' });
   return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?${p}`;
 }
 
-// Escolhe a faixa do Spotify de uma música: busca no app (conta conectada) ou link colado.
-// Devolve o link, '' para remover o vínculo, ou null se cancelou.
-function vincularSpotify(song) {
+// linha de um vídeo do YouTube (busca no app)
+const linhaVideo = (v, i, extra = '') => `
+  <li class="track clickable video-item" data-video="${i}" style="grid-template-columns:auto 1fr auto">
+    <div class="cover video-thumb"><img src="${esc(v.capa)}" alt="" loading="lazy">${v.duracao ? `<span class="dur">${esc(v.duracao)}</span>` : ''}</div>
+    <div class="info"><div class="t">${esc(v.titulo)}</div><div class="s">${esc(v.canal)}</div></div><span class="acts">${extra}</span></li>`;
+
+// Escolhe o vídeo do YouTube de uma música: busca aqui dentro ou link colado.
+// Devolve o link, '' para remover, ou null se cancelou.
+function escolherVideo(song) {
   const termo = [song.title, song.artist].filter(Boolean).join(' ');
-  const ligado = spotify.conectado();
   return openDialog(`
-    <h3>Spotify</h3>
-    <p>${ligado ? 'Escolha a versão desta música:' : 'Abra o Spotify, procure a música, toque em ⋯ → Compartilhar → Copiar link e depois em “Colar” aqui.'}</p>
-    ${ligado ? `<label class="field">${icon('search', 18)}<input class="search" type="search" id="sp-q" value="${esc(termo)}"></label><ul class="tracks" id="sp-lista"><li class="loading-note"><span class="spin"></span>Buscando…</li></ul>`
-      : `<a class="btn small" href="${esc(spotifyBusca(termo))}" target="_blank" rel="noopener" style="justify-self:start">${icon('spotify', 16)} Procurar “${esc(termo)}” no Spotify</a>`}
-    <label class="campo-livre">Link da faixa<span class="input-btn"><input class="input" id="sp-link" placeholder="https://open.spotify.com/track/…" value="${esc(song.spotify || '')}"><button class="btn small" type="button" data-colar>Colar</button></span></label>
-    <p class="muted" id="sp-info" style="margin:0;font-size:13px"></p>
-    <div class="acts">${song.spotify ? '<button class="btn ghost danger" data-rm>Remover</button><span class="spacer"></span>' : ''}<button class="btn ghost" data-no>Cancelar</button><button class="btn primary" data-ok>Vincular</button></div>`,
+    <h3>Vídeo do YouTube</h3>
+    <label class="field">${icon('search', 18)}<input class="search" type="search" id="yt-q" value="${esc(termo)}" placeholder="Música, artista…"></label>
+    <ul class="tracks lista-videos" id="yt-lista"><li class="loading-note"><span class="spin"></span>Buscando vídeos…</li></ul>
+    <details class="colar-link"><summary>Tenho o link do vídeo</summary>
+      <span class="input-btn"><input class="input" id="yt-link" placeholder="https://www.youtube.com/watch?v=…" value="${esc(song.youtube ? 'https://www.youtube.com/watch?v=' + song.youtube : '')}"><button class="btn small" type="button" data-colar>Colar</button><button class="btn small primary" type="button" data-ok>Usar</button></span>
+      <p class="muted" id="yt-info" style="margin:6px 0 0;font-size:13px"></p></details>
+    <div class="acts">${song.youtube ? '<button class="btn ghost danger" data-rm>Remover vídeo</button><span class="spacer"></span>' : ''}<button class="btn ghost" data-no>Cancelar</button></div>`,
   (dlg, done) => {
-    const link = $('#sp-link', dlg);
-    const info = $('#sp-info', dlg);
-    let achadas = [];
+    const link = $('#yt-link', dlg);
+    const info = $('#yt-info', dlg);
+    const ul = $('#yt-lista', dlg);
+    let achados = [];
+    const buscar = async (q) => {
+      ul.innerHTML = '<li class="loading-note"><span class="spin"></span>Buscando vídeos…</li>';
+      try {
+        achados = await buscarYoutube(q);
+        ul.innerHTML = achados.map((v, i) => linhaVideo(v, i, `<button class="btn small" data-escolher>Escolher</button>`)).join('') || '<li class="muted" style="padding:12px">Nenhum vídeo encontrado</li>';
+      } catch {
+        ul.innerHTML = `<li class="muted" style="padding:12px">A busca de vídeos não respondeu agora. <a href="${esc(ytBusca(q))}" target="_blank" rel="noopener">Procure no YouTube</a>, copie o link e use “Tenho o link do vídeo”.</li>`;
+      }
+    };
+    buscar(termo);
+    let tb;
+    $('#yt-q', dlg).oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => buscar(e.target.value), 450); };
+    // tocar no vídeo mostra uma prévia; "Escolher" vincula
+    ul.onclick = (e) => {
+      const li = e.target.closest('li[data-video]');
+      if (!li) return;
+      const v = achados[Number(li.dataset.video)];
+      if (e.target.closest('[data-escolher]')) { done(v.url); return; }
+      const aberto = li.nextElementSibling?.classList.contains('video-inline');
+      ul.querySelectorAll('.video-inline').forEach((x) => x.remove());
+      if (!aberto) li.insertAdjacentHTML('afterend', `<li class="video-inline"><div class="video-embed"><iframe src="${esc(ytEmbed(v.id))}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="${esc(v.titulo)}"></iframe></div></li>`);
+    };
     const confirmar = () => {
-      const ref = spotifyRef(link.value);
-      if (!ref) { info.textContent = 'Cole um link do Spotify (open.spotify.com/track/…)'; link.focus(); return; }
-      done(spotifyUrl(ref));
+      const id = youtubeId(link.value);
+      if (!id) { info.textContent = 'Cole um link do YouTube (youtube.com/watch?v=… ou youtu.be/…)'; link.focus(); return; }
+      done('https://www.youtube.com/watch?v=' + id);
     };
     let t;
     link.addEventListener('input', () => {
       clearTimeout(t);
-      const ref = spotifyRef(link.value);
-      info.textContent = ref ? 'Conferindo…' : '';
-      if (ref) t = setTimeout(() => spotifyOEmbed(link.value).then((o) => { info.textContent = '✓ ' + o.titulo; }).catch(() => { info.textContent = 'Link reconhecido'; }), 400);
+      const id = youtubeId(link.value);
+      info.textContent = id ? 'Conferindo…' : '';
+      if (id) t = setTimeout(() => youtubeOEmbed('https://www.youtube.com/watch?v=' + id).then((o) => { info.textContent = `✓ ${o.titulo} — ${o.canal}`; }).catch(() => { info.textContent = 'Link reconhecido'; }), 400);
     });
-    const buscar = async (q) => {
-      const ul = $('#sp-lista', dlg);
-      try {
-        achadas = await spotify.buscarFaixas(q, 8);
-        ul.innerHTML = achadas.map((r, i) => `<li class="track clickable" data-i="${i}" style="grid-template-columns:auto 1fr">${capa({ titulo: r.titulo, capa: r.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${esc(r.artista)} · ${esc(r.album)}</div></div></li>`).join('') || '<li class="muted" style="padding:12px">Nada encontrado</li>';
-      } catch (e) { ul.innerHTML = `<li class="muted" style="padding:12px">${esc(e.message)}</li>`; }
-    };
-    if (ligado) {
-      buscar(termo);
-      let tb;
-      $('#sp-q', dlg).oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => buscar(e.target.value), 400); };
-      $('#sp-lista', dlg).onclick = (e) => { const li = e.target.closest('li[data-i]'); if (li) done(achadas[Number(li.dataset.i)].url); };
-    }
     $('[data-colar]', dlg).onclick = async () => {
       try { link.value = (await navigator.clipboard.readText()).trim(); link.dispatchEvent(new Event('input')); } catch { link.focus(); toast('Segure o dedo no campo e escolha Colar'); }
     };
-    dlg.querySelectorAll('[data-no]').forEach((b) => b.addEventListener('click', () => done(null)));
-    $('[data-rm]', dlg)?.addEventListener('click', () => done(''));
     $('[data-ok]', dlg).onclick = confirmar;
     link.addEventListener('keydown', (e) => e.key === 'Enter' && confirmar());
+    $('[data-no]', dlg).onclick = () => done(null);
+    $('[data-rm]', dlg)?.addEventListener('click', () => done(''));
   });
 }
+
+// ---------------------------------------------------------------- player (mini player fixo, como no Spotify)
+// Um player só para o app inteiro: a música continua tocando enquanto você navega. Fica acima do
+// menu, com o vídeo pequeno, nome, parte da missa, progresso, tocar/pausar e ampliar o vídeo.
+const player = (() => {
+  let atual = null;
+  let estado = 'parado'; // tocando | pausado | parado
+  let tempo = 0;
+  let duracao = 0;
+  const ouvintes = new Set();
+  const el = document.createElement('div');
+  el.id = 'player';
+  el.hidden = true;
+  el.innerHTML = `
+    <div class="pl-video"></div>
+    <div class="pl-barra">
+      <button class="pl-info" data-pl="abrir" title="Abrir a música"><span class="pl-txt"><b></b><small></small></span></button>
+      <button class="icon-btn" data-pl="ampliar" aria-label="Ampliar o vídeo" title="Ampliar o vídeo">${icon('expand', 18)}</button>
+      <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button>
+      <button class="icon-btn" data-pl="fechar" aria-label="Fechar o player" title="Fechar">${icon('x', 18)}</button>
+    </div>
+    <div class="pl-prog"><i></i></div>`;
+  $('.main-col').append(el);
+  const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+  const avisar = () => ouvintes.forEach((fn) => fn());
+  const desenhar = () => {
+    if (!atual) return;
+    $('.pl-txt b', el).textContent = atual.titulo || 'Vídeo';
+    $('.pl-txt small', el).textContent = [atual.parte, atual.artista, duracao ? `${fmt(tempo)} / ${fmt(duracao)}` : ''].filter(Boolean).join(' · ');
+    $('.pl-play', el).innerHTML = icon(estado === 'tocando' ? 'pause' : 'play', 20);
+    $('.pl-prog i', el).style.width = duracao ? `${Math.min(100, (tempo / duracao) * 100)}%` : '0';
+  };
+  const comando = (func, args = []) => $('iframe', el)?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+  const api = {
+    get atual() { return atual; },
+    get estado() { return estado; },
+    tocandoAgora: (youtube) => Boolean(atual && atual.youtube === youtube && estado === 'tocando'),
+    ouvir(fn) { ouvintes.add(fn); return () => ouvintes.delete(fn); },
+    tocar(item) {
+      if (!item?.youtube) return;
+      if (atual?.youtube === item.youtube && estado !== 'parado') {
+        atual = { ...atual, ...item };
+        if (estado !== 'tocando') api.alternar(); else desenhar();
+        return;
+      }
+      atual = item;
+      tempo = 0;
+      duracao = 0;
+      estado = 'tocando';
+      $('.pl-video', el).innerHTML = `<iframe src="${esc(ytEmbed(item.youtube))}" title="${esc(item.titulo || 'Vídeo')}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
+      const f = $('iframe', el);
+      f.addEventListener('load', () => f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'));
+      el.hidden = false;
+      document.body.classList.add('com-player');
+      document.querySelectorAll('.canvas iframe').forEach((x) => x.remove()); // a capa animada para enquanto toca
+      desenhar();
+      avisar();
+    },
+    alternar() {
+      if (!atual) return;
+      if (estado === 'tocando') { comando('pauseVideo'); estado = 'pausado'; } else { comando('playVideo'); estado = 'tocando'; }
+      desenhar();
+      avisar();
+    },
+    fechar() {
+      $('.pl-video', el).innerHTML = '';
+      el.hidden = true;
+      el.classList.remove('grande');
+      document.body.classList.remove('com-player');
+      atual = null;
+      estado = 'parado';
+      avisar();
+    },
+  };
+  // ao terminar, no repertório, segue para a próxima música que tiver vídeo
+  const proxima = () => {
+    const set = atual?.setId && db.set(atual.setId);
+    if (!set) return false;
+    for (let i = atual.index + 1; i < set.items.length; i++) {
+      const s = db.song(set.items[i].songId);
+      if (s?.youtube) { api.tocar(itemDoPlayer(s, set, i)); toast(`Tocando: ${s.title}`); return true; }
+    }
+    return false;
+  };
+  window.addEventListener('message', (e) => {
+    let h = '';
+    try { h = new URL(e.origin).hostname; } catch { return; }
+    if (!/(^|\.)youtube(-nocookie)?\.com$/.test(h) || !atual || e.source !== $('iframe', el)?.contentWindow) return;
+    try {
+      const msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+      // vídeo que o dono não deixa tocar fora do YouTube (erros 101/150) ou que saiu do ar
+      if (msg?.event === 'onError') {
+        estado = 'parado';
+        $('.pl-txt small', el).innerHTML = `Este vídeo não toca fora do YouTube · <a href="https://www.youtube.com/watch?v=${esc(atual.youtube)}" target="_blank" rel="noopener">abrir</a>${atual.songId ? ' · <button class="link-btn" data-pl="trocar">escolher outro</button>' : ''}`;
+        $('.pl-play', el).innerHTML = icon('play', 20);
+        avisar();
+        return;
+      }
+      const info = msg?.info;
+      if (!info) return;
+      if (typeof info.currentTime === 'number') tempo = info.currentTime;
+      if (typeof info.duration === 'number' && info.duration > 0) duracao = info.duration;
+      const antes = estado;
+      if (info.playerState === 1) estado = 'tocando';
+      else if (info.playerState === 2) estado = 'pausado';
+      else if (info.playerState === 0) { estado = 'pausado'; if (proxima()) return; }
+      desenhar();
+      if (antes !== estado) avisar();
+    } catch { /* mensagem de outro formato */ }
+  });
+  el.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pl]');
+    if (!b) return;
+    if (b.dataset.pl === 'play') api.alternar();
+    if (b.dataset.pl === 'fechar') api.fechar();
+    if (b.dataset.pl === 'trocar') {
+      const s = db.song(atual?.songId);
+      if (s) escolherVideo(s).then((url) => { if (!url) return; db.saveSong({ ...db.song(s.id), content: definirMeta(db.song(s.id).content, 'youtube', url) }); api.tocar({ ...atual, youtube: youtubeId(url) }); route(); });
+    }
+    if (b.dataset.pl === 'ampliar') { el.classList.toggle('grande'); b.innerHTML = icon(el.classList.contains('grande') ? 'shrink' : 'expand', 18); }
+    if (b.dataset.pl === 'abrir' && atual?.href && location.hash !== atual.href) location.hash = atual.href;
+  });
+  return api;
+})();
 
 // barra lateral (desktop): repertórios
 function desenharLateral() {
@@ -570,27 +721,109 @@ const linhaMusica = (s, extra = '') => `
   <li class="track clickable" data-id="${s.id}" style="grid-template-columns:auto 1fr auto">
     ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
 
-// Escolhe uma música da biblioteca; devolve o id, ou 'nova' para criar uma do zero
-function pickSong() {
-  return openDialog(`
+// Escolhe uma música: da biblioteca ou procurando na internet (Cifra Club, cantos da missa, letras,
+// vídeos do YouTube). O que vem da internet é salvo na biblioteca. Devolve o id, 'nova' ou null.
+async function pickSong() {
+  const r = await openDialog(`
     <h3>Adicionar música</h3>
-    <button class="btn primary" data-nova style="justify-self:start">${icon('edit', 16)} Criar música do zero</button>
-    <label class="field">${icon('search', 18)}<input class="search" type="search" placeholder="Buscar na biblioteca"></label>
-    <ul class="tracks"></ul>
-    <div class="acts"><button class="btn ghost" data-no>Fechar</button></div>`,
+    <div class="chips" id="pk-abas"><button class="chip" data-aba="biblioteca" aria-pressed="false">${icon('library', 14)} Biblioteca</button><button class="chip" data-aba="internet" aria-pressed="false">${icon('search', 14)} Procurar na internet</button></div>
+    <label class="field">${icon('search', 18)}<input class="search" type="search" id="pk-q"></label>
+    <div id="pk-res" class="pk-res"></div>
+    <div class="acts"><button class="btn ghost" data-nova>${icon('edit', 16)} Criar do zero</button><span class="spacer"></span><button class="btn ghost" data-no>Fechar</button></div>`,
   (dlg, done) => {
-    const list = $('ul', dlg);
-    const draw = (q = '') => {
-      const songs = db.songs().filter((s) => (s.title + ' ' + s.artist).toLowerCase().includes(q.toLowerCase()));
-      list.innerHTML = songs.map((s) => linhaMusica(s, s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '')).join('')
-        || '<li class="empty" style="padding:24px">Nenhuma música encontrada</li>';
+    const box = $('#pk-res', dlg);
+    const input = $('#pk-q', dlg);
+    let aba = db.songs().length ? 'biblioteca' : 'internet';
+    let achados = {};
+    let seq = 0;
+    let timer;
+    const secao = (titulo, id) => `<div class="pk-sec"><b>${titulo}</b><div id="${id}"><div class="loading-note"><span class="spin"></span>Buscando…</div></div></div>`;
+    const lista = (tipo, itens, linha) => (itens.length ? `<ul class="tracks">${itens.map((it, i) => linha(it, i).replace('<li class="track', `<li data-tipo="${tipo}" data-n="${i}" class="track`)).join('')}</ul>` : '<p class="muted" style="margin:4px 0">Nada encontrado.</p>');
+    const linhaSimples = (it) => `<li class="track clickable" style="grid-template-columns:auto 1fr auto">${capa({ titulo: it.titulo, capa: it.capa }, { ic: it.letra ? 'text' : 'music' })}<div class="info"><div class="t">${esc(it.titulo)}</div><div class="s">${esc(it.artista || it.sub || '')}</div></div><span class="acts"><span class="chip sm">${icon('plus', 13)} Adicionar</span></span></li>`;
+    const desenhar = () => {
+      $('#pk-abas', dlg).querySelectorAll('[data-aba]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.aba === aba)));
+      input.placeholder = aba === 'biblioteca' ? 'Buscar na biblioteca' : 'Música, artista ou trecho da letra';
+      const q = input.value.trim();
+      if (aba === 'biblioteca') {
+        const songs = db.songs().filter((s) => normalizar(s.title + ' ' + s.artist).includes(normalizar(q)));
+        box.innerHTML = `<ul class="tracks">${songs.map((s) => linhaMusica(s, s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '')).join('')}</ul>`
+          + (songs.length ? '' : `<p class="muted">Nada na biblioteca. <button class="link-btn" data-ir-internet>Procurar “${esc(q)}” na internet</button></p>`);
+        return;
+      }
+      if (!q) { box.innerHTML = '<p class="muted">Digite o nome da música: o app procura a cifra (Cifra Club), os cantos da missa, a letra e o vídeo do YouTube.</p>'; return; }
+      const meu = ++seq;
+      achados = {};
+      box.innerHTML = secao('Cifras — Cifra Club', 'pk-cc') + secao('Cantos da missa', 'pk-missa') + secao('Letras', 'pk-lt') + secao('Vídeos — YouTube', 'pk-yt');
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const encher = (id, tipo, p, linha = linhaSimples) => p.then((itens) => { if (meu !== seq || !$('#' + id, dlg)) return; achados[tipo] = itens; $('#' + id, dlg).innerHTML = lista(tipo, itens, linha); })
+          .catch(() => { if (meu === seq && $('#' + id, dlg)) $('#' + id, dlg).innerHTML = '<p class="muted" style="margin:4px 0">Não respondeu agora.</p>'; });
+        encher('pk-cc', 'cifraclub', buscarCifraClub(q).then((l) => l.slice(0, 6)));
+        encher('pk-missa', 'canto', Promise.all([
+          buscarCindy(q).then((l) => l.slice(0, 5).map((c) => ({ titulo: c.titulo, sub: 'cindyferrarezi.com', capa: c.capa, url: c.url }))).catch(() => []),
+          indiceMusicasParaMissa().then((ind) => ind.filter((m) => normalizar(m.titulo + ' ' + (m.artista || '')).includes(normalizar(q))).slice(0, 5)
+            .map((m) => ({ titulo: m.titulo, sub: 'Músicas para Missa' + (m.temCifra ? ' · com cifra' : ''), url: `https://musicasparamissa.com.br/musica/${m.slug}/` }))),
+        ]).then(([a, b]) => [...a, ...b]));
+        encher('pk-lt', 'letra', buscarLetras(q).then((l) => l.slice(0, 4)));
+        encher('pk-yt', 'video', buscarYoutube(q).then((l) => l.slice(0, 5)), (v, i) => linhaVideo(v, i, `<span class="chip sm">${icon('plus', 13)} Adicionar</span>`));
+      }, 400);
     };
-    draw();
-    $('input', dlg).oninput = (e) => draw(e.target.value);
-    list.onclick = (e) => { const li = e.target.closest('li[data-id]'); if (li) done(li.dataset.id); };
+    input.oninput = desenhar;
+    $('#pk-abas', dlg).onclick = (e) => { const b = e.target.closest('[data-aba]'); if (b) { aba = b.dataset.aba; desenhar(); input.focus(); } };
+    box.onclick = (e) => {
+      if (e.target.closest('[data-ir-internet]')) { aba = 'internet'; desenhar(); return; }
+      const web = e.target.closest('li[data-tipo]');
+      if (web) { done({ tipo: web.dataset.tipo, item: achados[web.dataset.tipo][Number(web.dataset.n)] }); return; }
+      const li = e.target.closest('li[data-id]');
+      if (li) done(li.dataset.id);
+    };
     $('[data-no]', dlg).onclick = () => done(null);
     $('[data-nova]', dlg).onclick = () => done('nova');
+    desenhar();
+    setTimeout(() => input.focus(), 50);
   });
+  if (!r || typeof r === 'string') return r;
+  return salvarDaInternet(r.tipo, r.item);
+}
+
+// Salva na biblioteca uma música achada na internet e devolve o id (ou null se não deu)
+async function salvarDaInternet(tipo, item) {
+  const ja = db.songBySource(item.url);
+  if (ja) return ja.id;
+  toast('Trazendo a música…');
+  let content = '';
+  let source = item.url || '';
+  try {
+    if (tipo === 'cifraclub') {
+      try { content = (await getCifraClub(item.url)).chordpro; } catch {
+        const r = await importarDaInternet({ titulo: item.titulo, artista: item.artista, url: item.url, aviso: true, paraEditor: (x) => x });
+        if (!r) return null;
+        content = r.content;
+      }
+    } else if (tipo === 'canto') {
+      const c = await getCanto(item.url);
+      content = c.chordpro;
+      source = c.url;
+    } else if (tipo === 'letra') {
+      content = letraParaChordPro({ titulo: item.titulo, artista: item.artista, letra: item.letra, fonte: item.url });
+    } else if (tipo === 'video') {
+      content = `{title: ${tituloDoVideo(item.titulo)}}\n{artist: ${item.canal}}\n{youtube: ${item.url}}\n\n{comment: Sem letra ainda: toque em Editar → Trazer da internet}\n`;
+      source = '';
+    }
+  } catch (e) {
+    toast('Não consegui trazer: ' + e.message);
+    return null;
+  }
+  const salva = db.saveSong({ content, source });
+  // sem vídeo: procura o do YouTube (dá para trocar depois em Referências)
+  if (!salva.youtube) {
+    buscarYoutube([salva.title, salva.artist].filter(Boolean).join(' ')).then((vs) => {
+      const s = db.song(salva.id);
+      if (!vs[0] || !s || s.youtube) return;
+      db.saveSong({ ...s, content: definirMeta(s.content, 'youtube', vs[0].url) });
+    }).catch(() => {});
+  }
+  return salva.id;
 }
 
 async function addToSetDialog(songId, label = '') {
@@ -614,7 +847,7 @@ async function addToSetDialog(songId, label = '') {
     set = db.saveSet({ name });
   } else set = db.set(escolha);
   if (!label) {
-    const parte = await escolherParte('', db.song(songId)?.title);
+    const parte = await escolherParte(db.song(songId)?.parte || '', db.song(songId)?.title);
     if (parte === null) return;
     label = parte;
   }
@@ -871,7 +1104,7 @@ const blocoCor = (lit) => {
 const CORES = { verde: '#2e7d32', roxo: '#6a1b9a', branco: '#b8952b', vermelho: '#c62828', rosa: '#d0467f', preto: '#2b2b2b', azul: '#1565c0' };
 
 function tileMusica(s) {
-  return `<a class="tile" href="#/musica/${s.id}" ${s.youtube ? `data-yt="${esc(s.youtube)}"` : ''}><div class="tile-art">${capa(s)}${s.spotify ? `<span class="badge-sp" title="No Spotify">${icon('spotify', 18)}</span>` : ''}
+  return `<a class="tile" href="#/musica/${s.id}" ${s.youtube ? `data-yt="${esc(s.youtube)}"` : ''}><div class="tile-art">${capa(s)}
     ${s.youtube ? `<button class="tile-play" data-play="${s.id}" aria-label="Tocar referência">${icon('play', 18)}</button>` : ''}</div>
     <b>${esc(s.title)}</b><small>${esc(s.artist || (s.key ? 'Tom ' + s.key : 'Cifra'))}</small></a>`;
 }
@@ -953,7 +1186,7 @@ function viewHome() {
       <div class="shelf">${sets.slice(0, 12).map(tileRepertorio).join('')}</div>` : ''}
     ${recentes.length ? `<div class="shelf-head"><h2>Tocadas recentemente</h2></div>
       <div class="shelf">${recentes.slice(0, 12).map(tileMusica).join('')}</div>` : ''}
-    ${novas.length ? `<div class="shelf-head"><h2>Adicionadas recentemente</h2><a href="#/biblioteca">Biblioteca</a></div>
+    ${novas.length ? `<div class="shelf-head"><h2>Adicionadas recentemente</h2><a href="#/biblioteca/musicas">Biblioteca</a></div>
       <div class="shelf">${novas.map(tileMusica).join('')}</div>` : `
       <div class="empty"><div class="bubble">${icon('music', 34)}</div><h3>Comece sua biblioteca</h3>
         <p>Monte o repertório da missa de hoje com as cifras da Cindy Ferrarezi e do Músicas para Missa, busque cantos ou importe arquivos ChordPro.</p>
@@ -1037,35 +1270,12 @@ function ligarListaCindy(box, back) {
   });
 }
 
-// ---- busca na internet: Cifra Club, letras (LRCLIB) e Spotify
+// ---- busca na internet: Cifra Club, letras (LRCLIB) e vídeos do YouTube
 
 const linhaWeb = (r, i, origem, extra = '') => `
   <li class="track clickable" data-web="${origem}" data-i="${i}" style="grid-template-columns:auto 1fr auto">
     ${capa({ titulo: r.titulo, capa: r.capa }, { ic: origem === 'letra' ? 'text' : 'music' })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${esc([r.artista, r.album].filter(Boolean).join(' · '))}</div></div>
     <span class="acts">${extra}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
-
-// prévia de 30 segundos (catálogo aberto): um player só, o botão vira pausa
-let audioPrevia = null;
-function pararPrevia() {
-  audioPrevia?.pause();
-  document.querySelectorAll('[data-previa].tocando').forEach((b) => { b.classList.remove('tocando'); b.innerHTML = icon('play', 16); });
-}
-function tocarPrevia(item, li) {
-  const b = li.querySelector('[data-previa]');
-  if (!item.previa || !b) return;
-  const mesma = audioPrevia && audioPrevia.dataset.src === item.previa;
-  const tocava = b.classList.contains('tocando');
-  pararPrevia();
-  if (mesma && tocava) return;
-  if (!mesma) {
-    audioPrevia = new Audio(item.previa);
-    audioPrevia.dataset.src = item.previa;
-    audioPrevia.onended = pararPrevia;
-  }
-  audioPrevia.play().catch(() => toast('Não consegui tocar a prévia'));
-  b.classList.add('tocando');
-  b.innerHTML = icon('pause', 16);
-}
 
 // leva para a Buscar já procurando cifras desta música
 function buscarCifraNoApp(song) {
@@ -1159,8 +1369,9 @@ function viewSearch() {
   setTint('#2d2d2d');
   setHeader('Buscar', { actions: [{ icon: 'download', label: 'Importar cifra ou letra da internet', onClick: () => importarDaInternet() }] });
   const q = sessionStorage.getItem('busca') || '';
-  const FILTROS = [['tudo', 'Tudo'], ['cifras', 'Cifras'], ['letras', 'Letras'], ['spotify', 'Spotify'], ['missa', 'Cantos da missa'], ['biblioteca', 'Biblioteca']];
+  const FILTROS = [['tudo', 'Tudo'], ['cifras', 'Cifras'], ['letras', 'Letras'], ['videos', 'Vídeos'], ['missa', 'Cantos da missa'], ['biblioteca', 'Biblioteca']];
   let filtro = sessionStorage.getItem('buscaFiltro') || 'tudo';
+  if (!FILTROS.some(([k]) => k === filtro)) filtro = 'tudo';
   view.innerHTML = `
     <h2 class="greet">Buscar</h2>
     <label class="field">${icon('search', 20)}<input class="search" type="search" placeholder="Música, artista ou trecho da letra" value="${esc(q)}"></label>
@@ -1168,40 +1379,27 @@ function viewSearch() {
     <div id="res"></div>`;
   const res = $('#res');
   ligarListaCindy(res, '#/buscar');
-  let achados = { cifraclub: [], letra: [], spotify: [], catalogo: [] };
-  aoSair(pararPrevia);
+  let achados = { cifraclub: [], letra: [], videos: [] };
+  const procurarCifraDe = (termo) => {
+    sessionStorage.setItem('busca', termo);
+    $('.search').value = termo;
+    definirFiltro('cifras');
+  };
   res.addEventListener('click', (e) => {
+    const lv = e.target.closest('li[data-video]');
+    if (lv) {
+      const v = achados.videos[Number(lv.dataset.video)];
+      if (!v) return;
+      if (e.target.closest('[data-cifra]')) { procurarCifraDe(tituloDoVideo(v.titulo)); return; }
+      player.tocar({ youtube: v.id, titulo: tituloDoVideo(v.titulo), artista: v.canal });
+      return;
+    }
     const li = e.target.closest('li[data-web]');
     if (!li) return;
     const item = achados[li.dataset.web][Number(li.dataset.i)];
     if (!item) return;
-    if (li.dataset.web === 'catalogo') {
-      if (e.target.closest('.sp-abrir')) return;
-      if (e.target.closest('[data-cifra]')) {
-        const termo = `${item.titulo} ${item.artista}`;
-        sessionStorage.setItem('busca', termo);
-        $('.search').value = termo;
-        definirFiltro('cifras');
-        return;
-      }
-      tocarPrevia(item, li);
-      return;
-    }
     if (li.dataset.web === 'cifraclub') abrirCifraClub(item, li, '#/buscar');
     else if (li.dataset.web === 'letra') abrirLetra(item, '#/buscar');
-    else if (li.dataset.web === 'spotify') {
-      if (e.target.closest('[data-cifra]')) {
-        const termo = `${item.titulo} ${item.artista.split(',')[0]}`;
-        sessionStorage.setItem('busca', termo);
-        $('.search').value = termo;
-        definirFiltro('cifras');
-        return;
-      }
-      // toca a faixa aqui mesmo (player do Spotify embutido abaixo da linha)
-      const aberto = li.nextElementSibling?.classList.contains('spotify-inline');
-      res.querySelectorAll('.spotify-inline').forEach((x) => x.remove());
-      if (!aberto) li.insertAdjacentHTML('afterend', `<li class="spotify-inline"><iframe src="${esc(spotifyEmbed({ tipo: 'track', id: item.id }))}" height="80" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" title="${esc(item.titulo)}"></iframe></li>`);
-    }
   });
   let timer;
   let seq = 0;
@@ -1212,7 +1410,7 @@ function viewSearch() {
     term = term.trim();
     if (!term) {
       res.innerHTML = `
-        <div class="busca-dica">${icon('sparkles', 18)}<span>Busque qualquer música: cifras do <b>Cifra Club</b>, letras, faixas do <b>Spotify</b> e os cantos litúrgicos. Achou a cifra em outro site? <button class="link-btn" id="btn-importar">Cole aqui</button>.</span></div>
+        <div class="busca-dica">${icon('sparkles', 18)}<span>Busque qualquer música: cifras do <b>Cifra Club</b>, letras, vídeos do <b>YouTube</b> e os cantos litúrgicos. Achou a cifra em outro site? <button class="link-btn" id="btn-importar">Cole aqui</button>.</span></div>
         <div class="shelf-head"><h2>Navegar por todas as seções</h2></div>
         <div class="cat-grid">${CATEGORIAS.map(([n, id, ic], i) => `<a class="cat" href="#/buscar/categoria/${id}/${encodeURIComponent(n)}" style="--h:${(i * 47 + 200) % 360}">${esc(n)}${icon(ic, 60)}</a>`).join('')}</div>`;
       $('#btn-importar').onclick = () => importarDaInternet();
@@ -1224,13 +1422,12 @@ function viewSearch() {
     const blocos = [];
     if (mostra('biblioteca') && (locais.length || filtro === 'biblioteca')) blocos.push(`<div class="shelf-head"><h2>Na sua biblioteca</h2></div>${locais.length ? `<ul class="tracks">${locais.map((s) => linhaMusica(s, s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '')).join('')}</ul>` : '<p class="muted">Nada na biblioteca.</p>'}`);
     if (mostra('cifras')) blocos.push(caixa('cc-res', 'Cifra Club', `<a href="https://www.cifraclub.com.br/?q=${encodeURIComponent(term)}" target="_blank" rel="noopener">cifraclub.com.br</a>`));
-    if (mostra('spotify')) blocos.push(caixa('sp-res', 'Spotify', `<a href="${esc(spotifyBusca(term))}" target="_blank" rel="noopener">abrir no Spotify</a>`));
+    if (mostra('videos')) blocos.push(caixa('yt-res', 'Vídeos', `<a href="${esc(ytBusca(term))}" target="_blank" rel="noopener">youtube.com</a>`));
     if (mostra('missa')) blocos.push(caixa('online', 'Cantos cifrados', `<a href="https://cindyferrarezi.com/?s=${encodeURIComponent(term)}" target="_blank" rel="noopener">cindyferrarezi.com</a>`) + '<div id="mpm-res"></div>');
     if (mostra('letras')) blocos.push(caixa('lt-res', 'Letras', '<a href="https://lrclib.net/" target="_blank" rel="noopener">lrclib.net</a>'));
     if (filtro === 'tudo' || filtro === 'cifras' || filtro === 'letras') blocos.push(`<div class="shelf-head"><h2>Na internet</h2></div><div class="refs-grid">
       <a class="ref-card" href="https://www.google.com/search?q=${encodeURIComponent('cifra ' + term)}" target="_blank" rel="noopener"><span class="ico">${icon('search', 22)}</span><span><b>Cifra de “${esc(term)}”</b><small>Procurar em todos os sites</small></span></a>
       <a class="ref-card" href="https://www.letras.mus.br/?q=${encodeURIComponent(term)}" target="_blank" rel="noopener"><span class="ico">${icon('text', 22)}</span><span><b>Letras.mus.br</b><small>Procurar a letra</small></span></a>
-      <a class="ref-card" href="${esc(ytBusca(term))}" target="_blank" rel="noopener"><span class="ico">${icon('youtube', 22)}</span><span><b>YouTube</b><small>Vídeos e versões</small></span></a>
       <button class="ref-card" id="btn-importar"><span class="ico">${icon('download', 22)}</span><span><b>Colar cifra ou letra</b><small>De qualquer site, o app organiza</small></span></button></div>`);
     res.innerHTML = blocos.join('');
     $('#btn-importar')?.addEventListener('click', () => importarDaInternet({ titulo: term }));
@@ -1252,26 +1449,14 @@ function viewSearch() {
           $('#lt-res').innerHTML = achados.letra.length ? `<ul class="tracks">${achados.letra.map((r, i) => linhaWeb(r, i, 'letra')).join('')}</ul>` : '<p class="muted">Nenhuma letra encontrada.</p>';
         }).catch((e) => vivo('lt-res') && erro('lt-res', 'Não consegui buscar letras: ' + e.message));
       }
-      if (mostra('spotify')) {
-        if (!spotify.conectado()) {
-          // sem login: catálogo aberto (capa + prévia de 30 s) e um toque abre a faixa no Spotify
-          buscarCatalogo(term, undefined, filtro === 'spotify' ? 20 : 6).then((lista) => {
-            if (!vivo('sp-res')) return;
-            achados.catalogo = lista;
-            $('#sp-res').innerHTML = (lista.length ? `<ul class="tracks">${lista.map((r, i) => linhaWeb(r, i, 'catalogo',
-              `${r.previa ? `<button class="icon-btn" data-previa aria-label="Ouvir prévia" title="Ouvir 30 segundos">${icon('play', 16)}</button>` : ''}<a class="icon-btn sp-abrir" href="${esc(spotifyBusca(r.titulo + ' ' + r.artista))}" target="_blank" rel="noopener" aria-label="Ouvir no Spotify" title="Ouvir a música inteira no Spotify">${icon('spotify', 20)}</a><button class="icon-btn" data-cifra aria-label="Procurar a cifra" title="Procurar a cifra desta música">${icon('chord', 17)}</button>`)
-              .replace(`<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button>`, '')).join('')}</ul>` : '<p class="muted">Nada encontrado.</p>')
-              + '<p class="muted" style="font-size:12px;margin:4px 0 0">Prévias de 30 s do catálogo da Apple Music. O botão verde abre a música inteira no Spotify.</p>';
-          }).catch(() => {
-            if (vivo('sp-res')) $('#sp-res').innerHTML = `<div class="refs-grid"><a class="ref-card" href="${esc(spotifyBusca(term))}" target="_blank" rel="noopener"><span class="ico spotify">${icon('spotify', 24)}</span><span><b>Procurar “${esc(term)}”</b><small>Abre no Spotify</small></span></a></div>`;
-          });
-        } else {
-          spotify.buscarFaixas(term, filtro === 'spotify' ? 20 : 6).then((lista) => {
-            if (!vivo('sp-res')) return;
-            achados.spotify = lista;
-            $('#sp-res').innerHTML = lista.length ? `<ul class="tracks">${lista.map((r, i) => linhaWeb(r, i, 'spotify', `<button class="icon-btn" data-cifra aria-label="Procurar a cifra" title="Procurar a cifra desta música">${icon('chord', 17)}</button>`).replace(`<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button>`, `<button class="icon-btn" aria-label="Ouvir" title="Ouvir aqui">${icon('play', 16)}</button>`)).join('')}</ul>` : '<p class="muted">Nada no Spotify.</p>';
-          }).catch((e) => vivo('sp-res') && erro('sp-res', e.message));
-        }
+      if (mostra('videos')) {
+        buscarYoutube(term).then((lista) => {
+          if (!vivo('yt-res')) return;
+          achados.videos = lista.slice(0, filtro === 'videos' ? 15 : 5);
+          $('#yt-res').innerHTML = achados.videos.length ? `<ul class="tracks">${achados.videos.map((v, i) => linhaVideo(v, i, `<button class="icon-btn" aria-label="Tocar" title="Tocar no player">${icon('play', 16)}</button><button class="icon-btn" data-cifra aria-label="Procurar a cifra" title="Procurar a cifra desta música">${icon('chord', 17)}</button>`)).join('')}</ul>` : '<p class="muted">Nenhum vídeo encontrado.</p>';
+        }).catch(() => {
+          if (vivo('yt-res')) $('#yt-res').innerHTML = `<div class="refs-grid"><a class="ref-card" href="${esc(ytBusca(term))}" target="_blank" rel="noopener"><span class="ico">${icon('youtube', 22)}</span><span><b>Procurar “${esc(term)}”</b><small>A busca de vídeos não respondeu: abrir no YouTube</small></span></a></div>`;
+        });
       }
       if (mostra('missa')) {
         indiceMusicasParaMissa().then((indice) => {
@@ -1321,11 +1506,11 @@ async function viewCategoria(id, nome) {
 
 // ------------------------------------------------------------- biblioteca
 
-function viewLibrary(filtro = 'musicas') {
+function viewLibrary(filtro = 'repertorios') {
   setTab('biblioteca');
   setTint('#2b3d4f');
   setHeader('Sua biblioteca', { actions: [{ icon: 'edit', label: 'Criar música do zero', href: '#/editar/novo' }, { icon: 'upload', label: 'Importar arquivos', onClick: openImport }] });
-  const FILTROS = [['musicas', 'Músicas'], ['repertorios', 'Repertórios'], ['video', 'Com vídeo'], ['proprias', 'Cifras próprias']];
+  const FILTROS = [['repertorios', 'Repertórios'], ['musicas', 'Músicas'], ['video', 'Com vídeo'], ['proprias', 'Cifras próprias']];
   view.innerHTML = `
     <h2 class="greet">Sua biblioteca</h2>
     <div class="chips">${FILTROS.map(([k, n]) => `<a class="chip" href="#/biblioteca/${k}" aria-pressed="${k === filtro}">${n}</a>`).join('')}</div>
@@ -1392,7 +1577,7 @@ function viewSong(id, ctx = {}) {
   if (!song) return viewNotFound();
   if (isPreview) {
     const r = renderSong(song.content);
-    song = { ...song, title: r.meta.title || 'Canto', artist: r.meta.artist || r.meta.subtitle || '', youtube: youtubeId(r.meta.youtube) || '', cover: r.meta.cover || '', pdf: r.meta.pdf || '', key: r.key, spotify: r.meta.spotify || '', composer: r.meta.composer || r.meta.lyricist || '' };
+    song = { ...song, title: r.meta.title || 'Canto', artist: r.meta.artist || r.meta.subtitle || '', youtube: youtubeId(r.meta.youtube) || '', cover: r.meta.cover || '', pdf: r.meta.pdf || '', key: r.key, composer: r.meta.composer || r.meta.lyricist || '' };
   } else db.touchRecent(song.id);
   setTab(ctx.set ? 'biblioteca' : isPreview ? (song.back?.startsWith('#/buscar') ? 'buscar' : 'liturgia') : 'biblioteca');
   setTint(corDaMusica(song.title));
@@ -1404,21 +1589,22 @@ function viewSong(id, ctx = {}) {
   // tom de referência: o do {key} ou, se não houver, o primeiro acorde da música
   const tomBase = renderSong(song.content).key || song.key || (/\[([A-G][#b]?m?)(?![a-z])/.exec(song.content || '') || [])[1] || '';
   const save = () => { if (!isPreview) db.updateSong(song.id, { transpose, capo }); };
-  let modoMidia = prefs.midia === 'audio' && song.spotify ? 'audio' : 'video';
 
-  const back = ctx.set ? `#/repertorio/${ctx.set.id}` : isPreview ? (song.back || '#/liturgia') : '#/biblioteca';
+  const back = ctx.set ? `#/repertorio/${ctx.set.id}` : isPreview ? (song.back || '#/liturgia') : '#/biblioteca/musicas';
   // editar, fila e tela cheia ficam só na barra de ações abaixo da capa (sem repetir no topo)
   setHeader(song.title, { back, eyebrow: ctx.set ? `${ctx.index + 1} de ${ctx.set.items.length} · ${ctx.set.name}` : '' });
 
-  const kind = ctx.label || (/^salmo/i.test(song.title) ? 'Salmo' : /aclama|aleluia/i.test(song.title) ? 'Aclamação' : 'Cifra');
+  const kind = ctx.label || song.parte || (/^salmo/i.test(song.title) ? 'Salmo' : /aclama|aleluia/i.test(song.title) ? 'Aclamação' : 'Cifra');
   const fonte = song.source && /^https?:/.test(song.source) ? host(song.source) : song.source?.startsWith('cnbb:') ? 'Liturgia Diária – CNBB' : '';
   view.innerHTML = `
     ${ctx.set ? `<div class="set-progress"><i style="width:${((ctx.index + 1) / ctx.set.items.length) * 100}%"></i></div>` : ''}
-    <section class="page-hero song-hero">${song.youtube && prefs.videoFundo !== false && navigator.connection?.saveData !== true ? `<div class="hero-video" aria-hidden="true"><iframe src="${esc(ytFundo(song.youtube))}" tabindex="-1" title="" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>` : ''}${capa(song)}
+    <section class="page-hero song-hero">${song.youtube && prefs.videoFundo !== false && navigator.connection?.saveData !== true
+      ? `<div class="cover canvas" aria-hidden="true">${capaImagem(song)}<iframe src="${esc(ytFundo(song.youtube))}" tabindex="-1" title="" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`
+      : capa(song)}
       <div>${ctx.set ? `<button class="kind kind-btn" id="btn-parte" title="Trocar a parte da missa desta música no repertório">${esc(ctx.set.items[ctx.index]?.label || 'Definir a parte da missa')} ${icon('edit', 12)}</button>` : `<div class="kind">${esc(kind)}</div>`}<h2 id="song-title">${esc(song.title)}</h2>
         <div class="meta" id="song-meta"></div></div></section>
     <div class="actions-row">
-      <button class="play-big ${song.youtube ? '' : 'off'}" id="btn-play" aria-label="${song.youtube ? 'Tocar referência' : 'Buscar no YouTube'}" title="${song.youtube ? 'Ouvir a referência (YouTube)' : 'Sem vídeo: buscar no YouTube'}">${icon(song.youtube ? 'play' : 'youtube', 24)}</button>
+      <button class="play-big ${song.youtube ? '' : 'off'}" id="btn-play" aria-label="${song.youtube ? 'Tocar' : 'Escolher vídeo'}" title="${song.youtube ? 'Tocar (continua tocando no player enquanto você navega)' : 'Sem vídeo: escolher um no YouTube'}">${icon(song.youtube ? (player.tocandoAgora(song.youtube) ? 'pause' : 'play') : 'youtube', 24)}</button>
       ${isPreview ? `<button class="icon-btn" id="btn-save" aria-label="Salvar na biblioteca" title="Salvar na biblioteca">${icon('plus', 24)}</button>
            <button class="icon-btn" id="btn-edit-prev" aria-label="Editar cifra" title="Salvar e editar a cifra">${icon('edit', 22)}</button>`
         : `<button class="icon-btn" id="btn-add" aria-label="Adicionar a repertório" title="Adicionar a repertório">${icon('plus', 24)}</button>
@@ -1426,12 +1612,9 @@ function viewSong(id, ctx = {}) {
       <button class="icon-btn" id="btn-palco" aria-label="Só a letra (tela cheia)" title="Só a letra, tela cheia">${icon('expand', 22)}</button>
       <button class="icon-btn" id="btn-pdf" aria-label="Exportar PDF" title="Exportar em PDF (com ou sem cifra)">${icon('file', 22)}</button>
       ${ctx.set ? `<button class="icon-btn" id="btn-fila" aria-label="Fila do repertório" title="Fila: próximas músicas">${icon('queue', 24)}</button>` : ''}
-      <button class="icon-btn spotify-btn ${song.spotify ? 'on' : ''}" id="btn-spotify" aria-label="Spotify" title="${song.spotify ? 'Ouvir no Spotify' : 'Vincular a faixa do Spotify'}">${icon('spotify', 24)}</button>
-      <div class="seg midia" role="group" aria-label="Ouvir como"><button data-midia="video" aria-pressed="${modoMidia === 'video'}" title="Vídeo do YouTube">${icon('video', 16)} Vídeo</button><button data-midia="audio" aria-pressed="${modoMidia === 'audio'}" title="Só o áudio (Spotify)">${icon('music', 16)} Áudio</button></div>
       ${semCifra ? '<div class="seg-tabs"><span class="chip sm" title="Esta música não tem acordes">Só letra</span></div>' : ''}
     </div>
     <div id="aviso-cifra"></div>
-    <div id="sp-pendente"></div>
     <div class="song-toolbar" id="tools">
       <div class="seg so-cifra"><button class="tom-btn" data-act="tom" aria-label="Escolher o tom" title="Escolher o tom"><span class="val" id="key"></span>${icon('down', 14)}</button></div>
       <div class="seg so-cifra" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
@@ -1591,7 +1774,7 @@ function viewSong(id, ctx = {}) {
     if (r.adicionar) {
       const songId = await pickSong();
       if (songId === 'nova') { sairPalco(); location.hash = '#/editar/novo/' + set.id; return; }
-      if (songId) { set.items.push({ songId, label: '' }); db.saveSet(set); toast('Adicionada ao fim da fila'); }
+      if (songId) { set.items.push({ songId, label: db.song(songId)?.parte || '' }); db.saveSet(set); toast('Adicionada ao fim da fila'); }
       viewSetSong(set.id, set.items[r.atual]?.songId === song.id ? r.atual : ctx.index);
       $('#btn-fila')?.click();
       return;
@@ -1609,20 +1792,14 @@ function viewSong(id, ctx = {}) {
   // referências: vídeo, fonte, partitura, outras versões
   const refs = [];
   if (song.youtube) {
-    refs.push(`<div class="video-ref" id="video-box"><button class="video-card" id="video-ref" aria-label="Tocar o vídeo de referência"><img src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt="" loading="lazy">
-      <span class="vplay"><span>${icon('play', 26)}</span></span><span class="vtitle">${esc(song.title)}<small>Toque para assistir aqui</small></span></button></div>`);
+    refs.push(`<div class="video-ref"><button class="video-card" id="video-ref" aria-label="Tocar o vídeo"><img src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt="" loading="lazy">
+      <span class="vplay"><span>${icon('play', 26)}</span></span><span class="vtitle">${esc(song.title)}<small>Tocar no player</small></span></button></div>`);
   }
-  const sp = spotifyRef(song.spotify);
-  if (sp) refs.push(`<div class="spotify-box" id="spotify-box"><iframe src="${esc(spotifyEmbed(sp))}" height="152" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" title="Spotify: ${esc(song.title)}"></iframe></div>`);
   const cards = [];
-  if (sp) cards.push(`<a class="ref-card" href="${esc(spotifyUrl(sp))}" target="_blank" rel="noopener"><span class="ico spotify">${icon('spotify', 24)}</span><span><b>Abrir no Spotify</b><small>Faixa vinculada</small></span></a>`);
-  if (!sp) cards.push(`<button class="ref-card" data-abrir-sp><span class="ico spotify">${icon('spotify', 24)}</span><span><b>Ouvir no Spotify</b><small>Abre a música no Spotify</small></span></button>`);
-  cards.push(`<button class="ref-card" data-vincular><span class="ico spotify">${icon('spotify', 24)}</span><span><b>${sp ? 'Trocar faixa do Spotify' : 'Vincular ao Spotify'}</b><small>${sp ? 'Escolher outra versão' : 'Colar o link da faixa'}</small></span></button>`);
+  cards.push(`<button class="ref-card" data-video><span class="ico">${icon('youtube', 22)}</span><span><b>${song.youtube ? 'Trocar vídeo' : 'Escolher vídeo'}</b><small>${song.youtube ? 'Outra versão no YouTube' : 'Procurar no YouTube'}</small></span></button>`);
   if (song.source && /^https?:/.test(song.source)) cards.push(`<a class="ref-card" href="${esc(song.source)}" target="_blank" rel="noopener">${song.cover ? capa(song) : `<span class="ico">${icon('link', 22)}</span>`}<span><b>Cifra original</b><small>${esc(host(song.source))}</small></span></a>`);
   if (song.source?.startsWith('cnbb:')) cards.push(`<a class="ref-card" href="https://www.cnbb.org.br/liturgia-diaria/" target="_blank" rel="noopener"><span class="ico">${icon('cross', 22)}</span><span><b>Liturgia Diária</b><small>cnbb.org.br</small></span></a>`);
   if (song.pdf) cards.push(`<a class="ref-card" href="${esc(song.pdf)}" target="_blank" rel="noopener"><span class="ico">${icon('file', 22)}</span><span><b>Partitura</b><small>PDF</small></span></a>`);
-  if (song.youtube) cards.push(`<a class="ref-card" href="https://www.youtube.com/watch?v=${esc(song.youtube)}" target="_blank" rel="noopener"><span class="ico">${icon('youtube', 22)}</span><span><b>Abrir no YouTube</b><small>Vídeo de referência</small></span></a>`);
-  cards.push(`<a class="ref-card" href="${esc(ytBusca(song.title))}" target="_blank" rel="noopener"><span class="ico">${icon('search', 22)}</span><span><b>Outras versões</b><small>Buscar no YouTube</small></span></a>`);
   cards.push(`<button class="ref-card" data-buscar-cifra title="Procura outras cifras desta música (Cifra Club e cantos litúrgicos)"><span class="ico">${icon('chord', 22)}</span><span><b>Outras cifras</b><small>Cifra Club e cantos da missa</small></span></button>`);
   $('#refs').innerHTML = refs.join('') + `<div class="refs-grid">${cards.join('')}</div>`;
 
@@ -1641,100 +1818,29 @@ function viewSong(id, ctx = {}) {
   $('#creditos').innerHTML = creditos.length ? `<div class="creditos"><h3>Créditos</h3>${creditos.map(([k, v, html]) => `<div class="cred"><span>${esc(k)}</span><b>${html ? v : esc(v)}</b></div>`).join('')}
     ${isPreview ? '' : `<a class="link-btn" href="#/editar/${song.id}">${icon('edit', 13)} Editar créditos</a>`}</div>` : '';
 
-  // Spotify: player embutido, vincular/trocar a faixa
-  const salvarSpotify = (url) => {
-    const content = definirMeta(song.content, 'spotify', url);
+  // vídeo do YouTube: escolher/trocar e tocar no player do app
+  const salvarVideo = (url) => {
+    const content = definirMeta(song.content, 'youtube', url);
     if (isPreview) preview.content = content; else db.saveSong({ ...db.song(song.id), content });
-    sessionStorage.removeItem('spPendente');
-    toast(url ? 'Spotify vinculado' : 'Vínculo com o Spotify removido');
+    toast(url ? 'Vídeo escolhido' : 'Vídeo removido');
+    if (url) { song.youtube = youtubeId(url); song.content = content; tocar(); }
     route();
   };
-  const mudarSpotify = async () => {
-    const url = await vincularSpotify(song);
-    if (url !== null) salvarSpotify(url);
-  };
-  // sem login: abre a música no Spotify; na volta, um toque vincula o link copiado
-  const chavePendente = isPreview ? 'previa:' + song.source : song.id;
-  const avisoPendente = () => {
-    const box = $('#sp-pendente');
-    if (!box) return;
-    box.innerHTML = !sp && sessionStorage.getItem('spPendente') === chavePendente ? `<div class="aviso sp-aviso"><span class="ico spotify">${icon('spotify', 20)}</span>
-      <span>No Spotify, toque em <b>⋯ → Compartilhar → Copiar link</b> e volte aqui.</span>
-      <button class="btn small primary" data-colar-sp>Vincular link copiado</button><button class="icon-btn" data-fechar-sp aria-label="Fechar">${icon('x', 16)}</button></div>` : '';
-  };
-  const abrirNoSpotify = () => {
-    window.open(spotifyBusca([song.title, song.artist].filter(Boolean).join(' ')), '_blank', 'noopener');
-    sessionStorage.setItem('spPendente', chavePendente);
-    avisoPendente();
-  };
-  $('#sp-pendente').addEventListener('click', async (e) => {
-    if (e.target.closest('[data-fechar-sp]')) { sessionStorage.removeItem('spPendente'); avisoPendente(); return; }
-    if (!e.target.closest('[data-colar-sp]')) return;
-    let texto = '';
-    try { texto = await navigator.clipboard.readText(); } catch { /* sem permissão: abre o campo para colar */ }
-    const ref = spotifyRef((/https?:\/\/\S+/.exec(texto) || [texto])[0]);
-    if (ref) salvarSpotify(spotifyUrl(ref)); else { if (texto) toast('O que foi copiado não é um link do Spotify'); mudarSpotify(); }
+  const mudarVideo = async () => { const url = await escolherVideo(song); if (url !== null) salvarVideo(url); };
+  const tocar = () => player.tocar(itemDoPlayer(song, ctx.set ? db.set(ctx.set.id) : null, ctx.set ? ctx.index : -1));
+  $('#refs').addEventListener('click', (e) => {
+    if (e.target.closest('[data-video]')) mudarVideo();
+    if (e.target.closest('[data-buscar-cifra]')) buscarCifraNoApp(song);
+    if (e.target.closest('#video-ref')) { tocar(); $('#player').classList.add('grande'); }
   });
-  avisoPendente();
-  $('#refs').addEventListener('click', (e) => { if (e.target.closest('[data-abrir-sp]')) abrirNoSpotify(); if (e.target.closest('[data-vincular]')) mudarSpotify(); if (e.target.closest('[data-buscar-cifra]')) buscarCifraNoApp(song); });
-  const mostrarSpotify = () => {
-    if (!sp) { abrirNoSpotify(); return; }
-    const box = $('#spotify-box');
-    box.classList.add('destaque');
-    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setTimeout(() => box.classList.remove('destaque'), 1600);
-  };
-  $('#btn-spotify').onclick = mostrarSpotify;
-  view.querySelector('.midia').onclick = (e) => {
-    const b = e.target.closest('[data-midia]');
-    if (!b) return;
-    if (b.dataset.midia === 'audio' && !sp) { abrirNoSpotify(); return; }
-    modoMidia = b.dataset.midia;
-    db.setPref('midia', modoMidia);
-    view.querySelectorAll('[data-midia]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    if (modoMidia === 'audio') { if (estadoVideo === 'tocando') { comandoVideo('pauseVideo'); estadoVideo = 'pausado'; iconePlay(); } mostrarSpotify(); }
-    else if (song.youtube) { if (estadoVideo !== 'tocando') $('#btn-play').click(); } else tocarReferencia(song);
-  };
-
-  // vídeo de referência: toca embutido aqui mesmo, na seção "Referências"
-  let estadoVideo = 'parado'; // parado | tocando | pausado
-  const iconePlay = () => { const b = $('#btn-play'); if (b && song.youtube) b.innerHTML = icon(estadoVideo === 'tocando' ? 'pause' : 'play', 24); };
-  const comandoVideo = (func) => $('#video-box iframe')?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*');
-  const iniciarVideo = (rolar = true) => {
-    const box = $('#video-box');
-    if (!box) return;
-    box.innerHTML = `<div class="video-embed"><iframe src="${ytEmbed(song.youtube)}" title="${esc(song.title)}"
-      allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
-      <p class="video-alt">Se o vídeo não abrir aqui, <a href="https://www.youtube.com/watch?v=${esc(song.youtube)}" target="_blank" rel="noopener">assista no YouTube ${icon('external', 13)}</a></p>`;
-    const f = box.querySelector('iframe');
-    f.addEventListener('load', () => f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'));
-    estadoVideo = 'tocando';
-    iconePlay();
-    $('.hero-video')?.remove();
-    if (rolar) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
-  const ouvirVideo = (e) => {
-    let host = '';
-    try { host = new URL(e.origin).hostname; } catch { return; }
-    if (!/(^|\.)youtube(-nocookie)?\.com$/.test(host)) return;
-    try {
-      const st = (typeof e.data === 'string' ? JSON.parse(e.data) : e.data)?.info?.playerState;
-      if (st === 1) estadoVideo = 'tocando'; else if (st === 2 || st === 0) estadoVideo = 'pausado'; else return;
-      iconePlay();
-    } catch { /* mensagem de outro formato */ }
-  };
-  window.addEventListener('message', ouvirVideo);
-  aoSair(() => window.removeEventListener('message', ouvirVideo));
-
+  const iconePlay = () => { const b = $('#btn-play'); if (b && song.youtube) b.innerHTML = icon(player.tocandoAgora(song.youtube) ? 'pause' : 'play', 24); };
+  aoSair(player.ouvir(iconePlay));
   $('#btn-play').onclick = () => {
-    if (modoMidia === 'audio' && sp) { mostrarSpotify(); return; }
-    if (!song.youtube) { if (sp) { mostrarSpotify(); return; } tocarReferencia(song); return; }
-    if (estadoVideo === 'parado') iniciarVideo();
-    else if (estadoVideo === 'tocando') { comandoVideo('pauseVideo'); estadoVideo = 'pausado'; iconePlay(); }
-    else { comandoVideo('playVideo'); estadoVideo = 'tocando'; iconePlay(); }
+    if (!song.youtube) { mudarVideo(); return; }
+    if (player.atual?.youtube === song.youtube) player.alternar(); else tocar();
   };
-  $('#video-ref')?.addEventListener('click', () => iniciarVideo(false));
-  if (ctx.tocar && song.youtube) setTimeout(() => iniciarVideo(), 60);
+  if (ctx.tocar && song.youtube) setTimeout(tocar, 60);
+  if (player.atual?.youtube === song.youtube) $('.canvas iframe')?.remove();
 
   const salvarPrevia = () => {
     const existing = db.songBySource(song.source);
@@ -1887,13 +1993,13 @@ Segunda estrofe (use "Completar cifra" para repetir os acordes)
 `;
 
 // diretivas que viram campos do formulário do editor
-const CAMPOS_META = { title: /^(title|t)$/i, artist: /^(artist|a)$/i, key: /^key$/i, youtube: /^youtube$/i, spotify: /^spotify$/i, composer: /^composer$/i };
+const CAMPOS_META = { title: /^(title|t)$/i, artist: /^(artist|a)$/i, key: /^key$/i, youtube: /^youtube$/i, composer: /^composer$/i, parte: /^x_parte$/i };
 
 // dados técnicos (fonte, capa, partitura…) ficam guardados, mas fora do texto editável
-const META_OCULTA = /^(subtitle|st|source|cover|pdf|capo|tempo|time|album|year|copyright|x_[\w-]+)$/i;
+const META_OCULTA = /^(subtitle|st|source|cover|pdf|capo|tempo|time|album|year|copyright|spotify|x_[\w-]+)$/i;
 
 function separarMeta(content) {
-  const meta = { title: '', artist: '', key: '', youtube: '', spotify: '', composer: '', extras: [] };
+  const meta = { title: '', artist: '', key: '', youtube: '', composer: '', parte: '', extras: [] };
   const corpo = [];
   for (const linha of String(content || '').split('\n')) {
     const m = /^\s*\{\s*([^:}]+?)\s*:\s*(.*?)\s*\}\s*$/.exec(linha);
@@ -1912,8 +2018,8 @@ function juntarMeta(meta, corpo) {
   if (meta.artist) cab.push(`{artist: ${meta.artist}}`);
   if (meta.key) cab.push(`{key: ${meta.key}}`);
   if (meta.composer) cab.push(`{composer: ${meta.composer}}`);
+  if (meta.parte) cab.push(`{x_parte: ${meta.parte}}`);
   if (meta.youtube) cab.push(`{youtube: ${meta.youtube}}`);
-  if (meta.spotify) cab.push(`{spotify: ${meta.spotify}}`);
   cab.push(...(meta.extras || []));
   return cab.join('\n') + (cab.length ? '\n\n' : '') + corpo.replace(/^\n+/, '');
 }
@@ -1942,16 +2048,14 @@ function viewEditor(id, setId) {
   let baseLetra = corpo; // no modo "só a letra", os acordes vêm desta versão
   const actions = [];
   if (!isNew) {
-    actions.push({ icon: 'download', label: 'Exportar .cho', onClick: () => download((song.title || 'cifra').replace(/[^\w\- ]+/g, '') + '.cho', montar()) });
     actions.push({ icon: 'trash', label: 'Excluir', onClick: async () => {
       if (!(await ask({ title: 'Excluir música?', text: `“${song.title}” será removida da biblioteca e dos repertórios.`, ok: 'Excluir', danger: true }))) return;
       db.deleteSong(song.id);
       toast('Música excluída');
-      location.hash = '#/biblioteca';
+      location.hash = '#/biblioteca/musicas';
     } });
   }
-  const voltar = setDestino ? '#/repertorio/' + setDestino.id : isNew ? '#/biblioteca' : '#/musica/' + id;
-  actions.unshift({ icon: 'download', label: 'Trazer cifra ou letra da internet', onClick: () => trazerDaInternet() });
+  const voltar = setDestino ? '#/repertorio/' + setDestino.id : isNew ? '#/biblioteca/musicas' : '#/musica/' + id;
   setHeader(isNew ? 'Nova música' : 'Editar cifra', { back: voltar, actions, eyebrow: setDestino ? 'Para: ' + setDestino.name : isNew ? '' : song.title });
   view.innerHTML = `
     <h2 class="greet">${isNew ? 'Nova música' : 'Editar cifra'}</h2>
@@ -1961,10 +2065,9 @@ function viewEditor(id, setId) {
         <label>Autor / intérprete<input class="input" id="f-artist" value="${esc(meta.artist)}" placeholder="Ex.: Pe. Zezinho"></label>
         <label>Tom<input class="input" id="f-key" value="${esc(meta.key)}" placeholder="Ex.: G, Em, Bb"></label>
         <label>Composição<input class="input" id="f-composer" value="${esc(meta.composer)}" placeholder="Quem compôs (opcional)"></label>
-        <label>Vídeo de referência (YouTube)<input class="input" id="f-yt" value="${esc(meta.youtube)}" placeholder="https://www.youtube.com/watch?v=…"></label>
-        <label>Spotify<span class="input-btn"><input class="input" id="f-spotify" value="${esc(meta.spotify)}" placeholder="https://open.spotify.com/track/…"><button class="icon-btn" type="button" id="f-sp-buscar" title="Procurar a faixa no Spotify" aria-label="Procurar no Spotify">${icon('spotify', 18)}</button></span></label>
-        ${setDestino ? `<label class="full">Parte da missa no repertório “${esc(setDestino.name)}”<select class="input" id="f-parte">
-          <option value="">(sem parte)</option>${PARTES_MISSA.map((n) => `<option>${esc(n)}</option>`).join('')}</select></label>` : ''}
+        <label>Vídeo de referência (YouTube)<span class="input-btn"><input class="input" id="f-yt" value="${esc(meta.youtube)}" placeholder="https://www.youtube.com/watch?v=…"><button class="btn small" type="button" id="f-yt-buscar" title="Procurar o vídeo no YouTube">${icon('search', 15)} Procurar</button></span></label>
+        <label>Parte da missa (para que momento é)<select class="input" id="f-parte">
+          <option value="">(nenhuma)</option>${[...new Set([...PARTES_MISSA.filter((n) => n !== 'Outro'), meta.parte].filter(Boolean))].map((n) => `<option ${n === meta.parte ? 'selected' : ''}>${esc(n)}</option>`).join('')}<option value="__outra">Outra…</option></select></label>
       </div>
       <div class="barra">
         <div class="seg" title="Transpor a cifra inteira (altera o texto)"><button data-tr="-1" aria-label="Meio tom abaixo">${icon('minus', 16)}</button><span class="val"><small>Transpor</small>cifra</span><button data-tr="1" aria-label="Meio tom acima">${icon('plus', 16)}</button></div>
@@ -2001,7 +2104,7 @@ function viewEditor(id, setId) {
   };
   const montar = () => juntarMeta({
     title: campo('title').value.trim(), artist: campo('artist').value.trim(), key: campo('key').value.trim(), youtube: campo('yt').value.trim(),
-    spotify: campo('spotify').value.trim(), composer: campo('composer').value.trim(), extras: meta.extras,
+    composer: campo('composer').value.trim(), parte: campo('parte').value === '__outra' ? '' : campo('parte').value, extras: meta.extras,
   }, corpoPro());
   const DICAS = {
     acima: 'Escreva os acordes na linha de cima, alinhados com a sílaba (como num caderno de cifras):<br><code>Am        G<br>Senhor, tende piedade</code>',
@@ -2058,7 +2161,7 @@ function viewEditor(id, setId) {
   // traz cifra/letra da internet (link do Cifra Club ou texto colado) para o editor
   const trazerDaInternet = () => importarDaInternet({ titulo: campo('title').value.trim(), artista: campo('artist').value.trim(), paraEditor: (r) => {
     const { meta: m, corpo: c } = separarMeta(r.content);
-    for (const k of ['title', 'artist', 'key', 'youtube', 'spotify', 'composer']) {
+    for (const k of ['title', 'artist', 'key', 'youtube', 'composer']) {
       const el = campo(k === 'youtube' ? 'yt' : k);
       if (m[k] && !el.value.trim()) el.value = m[k];
     }
@@ -2068,10 +2171,9 @@ function viewEditor(id, setId) {
     toast('Cifra trazida para o editor — confira e salve');
   } });
   $('#trazer').onclick = trazerDaInternet;
-  campo('spotify').addEventListener('change', () => { const ref = spotifyRef(campo('spotify').value); if (ref) campo('spotify').value = spotifyUrl(ref); });
-  $('#f-sp-buscar').onclick = async () => {
-    const url = await vincularSpotify({ title: campo('title').value.trim(), artist: campo('artist').value.trim(), spotify: campo('spotify').value.trim() });
-    if (url !== null) campo('spotify').value = url;
+  $('#f-yt-buscar').onclick = async () => {
+    const url = await escolherVideo({ title: campo('title').value.trim(), artist: campo('artist').value.trim(), youtube: youtubeId(campo('yt').value) });
+    if (url !== null) campo('yt').value = url;
   };
   view.querySelectorAll('[data-aba]').forEach((b) => (b.onclick = () => {
     const prev = b.dataset.aba === 'previa';
@@ -2079,11 +2181,30 @@ function viewEditor(id, setId) {
     ta.hidden = prev;
     view.querySelectorAll('[data-aba]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   }));
+  // "Outra…": nome livre para a parte da missa
+  campo('parte').addEventListener('change', async (e) => {
+    if (e.target.value !== '__outra') return;
+    const nome = await ask({ title: 'Parte da missa', text: 'Escreva o momento (ex.: Canto de meditação)', value: '', ok: 'Usar' });
+    if (!nome) { e.target.value = meta.parte || ''; return; }
+    const opt = document.createElement('option');
+    opt.textContent = nome;
+    e.target.insertBefore(opt, e.target.querySelector('[value="__outra"]'));
+    e.target.value = nome;
+  });
   $('#save').onclick = () => {
     if (!campo('title').value.trim()) { toast('Dê um título à música'); campo('title').focus(); return; }
+    const parte = campo('parte').value === '__outra' ? '' : campo('parte').value;
     const saved = db.saveSong({ ...song, content: montar() });
+    // a parte nova vale também nos repertórios onde a música estava sem parte ou com a parte antiga
+    if (!isNew && parte !== (meta.parte || '')) {
+      for (const set of db.sets()) {
+        let mudou = false;
+        for (const it of set.items) if (it.songId === saved.id && (!it.label || it.label === meta.parte)) { it.label = parte; mudou = true; }
+        if (mudou) db.saveSet(set);
+      }
+    }
     if (setDestino) {
-      setDestino.items.push({ songId: saved.id, label: $('#f-parte')?.value || '' });
+      setDestino.items.push({ songId: saved.id, label: parte });
       db.saveSet(setDestino);
       desenharLateral();
       toast(`Música criada e adicionada a “${setDestino.name}”`);
@@ -2135,7 +2256,7 @@ function viewSet(id) {
     const songId = await pickSong();
     if (songId === 'nova') { location.hash = '#/editar/novo/' + id; return; }
     if (!songId) return;
-    const parte = await escolherParte('', db.song(songId)?.title);
+    const parte = await escolherParte(db.song(songId)?.parte || '', db.song(songId)?.title);
     set.items.push({ songId, label: parte || '' });
     db.saveSet(set);
     viewSet(id);
@@ -2472,21 +2593,7 @@ function viewSettings() {
       <label class="setting"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns ? 'checked' : ''}></label>
       <div class="setting wrap"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div><div class="s">Tamanho, cor e fundo dos acordes sobre a letra</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
-      <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo de fundo na música</div><div class="s">Mostra o clipe, mudo, atrás da capa (como no Spotify). Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
-    </div>
-
-    <div class="section-title" id="spotify">Spotify</div>
-    <div class="settings-group">
-      <div class="setting"><span class="ico spotify">${icon('spotify', 20)}</span><div class="grow"><div class="t">Conta do Spotify</div><div class="s" id="sp-status"></div></div><button class="btn small primary" id="sp-conectar"></button></div>
-      <details class="setting-ajuda"${p.spotifyClientId ? '' : ' open'}><summary>Como conectar (uma vez só)</summary>
-        <ol>
-          <li>Entre em <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a> com sua conta e toque em <b>Create app</b>.</li>
-          <li>Em <b>Redirect URIs</b>, cole exatamente: <code id="sp-redirect">${esc(spotify.redirectUri())}</code> <button class="link-btn" id="sp-copiar">copiar</button></li>
-          <li>Marque <b>Web API</b>, salve e copie o <b>Client ID</b> para o campo abaixo.</li>
-        </ol>
-        <label class="campo-livre">Client ID<input class="input" id="sp-client" value="${esc(p.spotifyClientId || '')}" placeholder="ex.: 1a2b3c4d5e6f…" autocomplete="off" spellcheck="false"></label>
-        <p class="muted" style="font-size:13px">Sem conectar, o app abre o Spotify pela busca e aceita links colados. Conectado, você busca e vincula faixas aqui dentro. Nenhuma senha passa pelo app.</p>
-      </details>
+      <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo de fundo na música</div><div class="s">Na música, o clipe aparece mudo no lugar da capa (como no Spotify). Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
     </div>
 
     <div class="section-title">Busca na internet</div>
@@ -2573,22 +2680,6 @@ function viewSettings() {
   $('#video-fundo').onchange = (e) => db.setPref('videoFundo', e.target.checked);
   $('#proxies-publicos').onchange = (e) => db.setPref('proxiesPublicos', e.target.checked);
   $('#proxy-cifra').onchange = (e) => db.setPref('proxyCifra', e.target.value.trim());
-  const statusSpotify = () => {
-    const ok = spotify.conectado();
-    $('#sp-status').textContent = ok ? 'Conectada: busque e vincule faixas dentro do app' : spotify.clientId() ? 'Client ID salvo. Toque em Conectar e autorize' : 'Não conectada (os links para o Spotify funcionam mesmo assim)';
-    $('#sp-conectar').textContent = ok ? 'Desconectar' : 'Conectar';
-    $('#sp-conectar').classList.toggle('primary', !ok);
-  };
-  statusSpotify();
-  $('#sp-client').onchange = (e) => { db.setPref('spotifyClientId', e.target.value.trim()); spotify.desconectar(); statusSpotify(); };
-  $('#sp-copiar').onclick = () => navigator.clipboard?.writeText(spotify.redirectUri()).then(() => toast('Endereço copiado'), () => toast('Selecione e copie o endereço'));
-  $('#sp-conectar').onclick = async () => {
-    if (spotify.conectado()) { spotify.desconectar(); statusSpotify(); toast('Spotify desconectado'); return; }
-    db.setPref('spotifyClientId', $('#sp-client').value.trim());
-    if (!spotify.clientId()) { view.querySelector('.setting-ajuda').open = true; $('#sp-client').focus(); toast('Cole o Client ID do seu app do Spotify'); return; }
-    try { await spotify.conectar(); } catch (e) { toast(e.message); }
-  };
-  if (/\/spotify$/.test(location.hash)) setTimeout(() => $('#spotify')?.scrollIntoView({ block: 'start' }), 50);
   $('#exp').onclick = () => download(`songbook-backup-${hojeISO()}.json`, db.exportAll(), 'application/json');
   $('#imp').onclick = openImport;
   $('#clr').onclick = async () => {
@@ -2749,10 +2840,7 @@ function route() {
 $('#side-sets').addEventListener('click', (e) => { const li = e.target.closest('li[data-href]'); if (li && !e.target.closest('a')) location.hash = li.dataset.href; });
 window.addEventListener('hashchange', route);
 applyTheme();
-// volta do login do Spotify (?code=…): troca pelo token e segue para onde estava
-if (/[?&](code|error)=/.test(location.search)) {
-  spotify.concluirLogin().then((v) => { if (v) toast('Spotify conectado'); }).catch((e) => toast(e.message)).finally(route);
-} else route();
+route();
 
 // Service worker: sempre procura a versão nova; quando ela assume, recarrega a página uma vez.
 // ---------------------------------------------------------------- instalar como app

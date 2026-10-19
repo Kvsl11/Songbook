@@ -1,4 +1,4 @@
-// Busca de músicas na internet: Cifra Club (cifras), LRCLIB (letras) e Spotify (links e player).
+// Busca de músicas na internet: Cifra Club (cifras), LRCLIB (letras) e YouTube (vídeos).
 // Módulo compartilhado entre o navegador e o servidor (sem DOM: só expressões regulares).
 //
 // - Cifra Club: a busca usa o mesmo serviço do campo de busca do site (solr.sscdn.co), que libera
@@ -6,8 +6,7 @@
 //   projeto, um proxy próprio configurado em Ajustes ou proxies públicos), e, se nenhum responder,
 //   o app oferece colar a cifra copiada do site.
 // - LRCLIB (lrclib.net): banco aberto de letras, com CORS.
-// - Spotify: o oEmbed público (com CORS) confirma um link colado; a busca dentro do app usa a
-//   Web API com o login do próprio usuário (veja js/spotify.js).
+// - YouTube: busca pelo Piped (instâncias públicas, com CORS); o oEmbed confirma um link colado.
 
 import { decodeEntities, normalize } from './html.js';
 import { chordsOverLyricsToChordPro, isChord } from '../chordpro.js';
@@ -202,44 +201,54 @@ export function letraParaChordPro({ titulo = '', artista = '', letra = '', fonte
   return cab.join('\n') + '\n\n' + corpo.join('\n\n') + '\n';
 }
 
-// ------------------------------------------------------------------ Spotify
+// ------------------------------------------------------------------ YouTube
+// Busca de vídeos sem chave e sem login, por instâncias públicas do Piped (front-end aberto do
+// YouTube, com CORS). Se uma estiver fora do ar, tenta a próxima.
+export const PIPED = ['https://api.piped.private.coffee', 'https://pipedapi.kavin.rocks', 'https://pipedapi.adminforge.de', 'https://pipedapi.leptons.xyz'];
 
-// aceita https://open.spotify.com/(intl-pt/)track/ID, spotify:track:ID e o ID puro
-export function spotifyRef(texto) {
-  const s = String(texto || '').trim();
-  const m = /open\.spotify\.com\/(?:intl-[\w-]+\/)?(?:embed\/)?(track|album|playlist|artist|episode)\/([A-Za-z0-9]{22})/.exec(s)
-    || /^spotify:(track|album|playlist|artist|episode):([A-Za-z0-9]{22})$/.exec(s);
-  if (m) return { tipo: m[1], id: m[2] };
-  return /^[A-Za-z0-9]{22}$/.test(s) ? { tipo: 'track', id: s } : null;
-}
-export const spotifyUrl = (ref) => (ref ? `https://open.spotify.com/${ref.tipo}/${ref.id}` : '');
-export const spotifyEmbed = (ref) => `https://open.spotify.com/embed/${ref.tipo}/${ref.id}?utm_source=songbook&theme=0`;
-export const spotifyBusca = (termo) => `https://open.spotify.com/search/${encodeURIComponent(String(termo || '').trim())}`;
-
-// confirma um link (título e capa) sem login, pelo oEmbed público
-export async function spotifyOEmbed(url, fetchImpl) {
-  const ref = spotifyRef(url);
-  if (!ref) throw new Error('Link do Spotify inválido');
-  const res = await buscar(`https://open.spotify.com/oembed?url=${encodeURIComponent(spotifyUrl(ref))}`, { fetchImpl });
-  if (!res.ok) throw new Error(`Spotify respondeu ${res.status}`);
-  const j = await res.json();
-  return { ...ref, url: spotifyUrl(ref), titulo: j.title || '', capa: j.thumbnail_url || '' };
+export function videosDoPiped(json) {
+  return (json?.items || [])
+    .filter((v) => v.type === 'stream' && /[?&]v=([\w-]{11})/.test(v.url || ''))
+    .map((v) => {
+      const id = /[?&]v=([\w-]{11})/.exec(v.url)[1];
+      return {
+        id,
+        titulo: v.title || '',
+        canal: (v.uploaderName || '').replace(/\s*-\s*Topic$/, ''),
+        duracao: v.duration > 0 ? `${Math.floor(v.duration / 60)}:${String(v.duration % 60).padStart(2, '0')}` : '',
+        capa: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+        url: `https://www.youtube.com/watch?v=${id}`,
+        fonte: 'youtube',
+      };
+    });
 }
 
-// ------------------------------------------------------------------ catálogo aberto (Apple/iTunes)
-// Busca sem login nenhum, com CORS: capa, álbum e uma prévia de 30 segundos de cada música.
-export async function buscarCatalogo(termo, fetchImpl, limite = 10) {
+export async function buscarYoutube(termo, { fetchImpl, instancias = PIPED } = {}) {
   const q = String(termo || '').trim();
   if (!q) return [];
-  const res = await buscar(`https://itunes.apple.com/search?media=music&entity=song&country=BR&limit=${limite}&term=${encodeURIComponent(q)}`, { fetchImpl });
-  if (!res.ok) throw new Error(`Catálogo respondeu ${res.status}`);
-  return ((await res.json()).results || []).filter((r) => r.kind === 'song').map((r) => ({
-    titulo: r.trackName,
-    artista: r.artistName,
-    album: r.collectionName || '',
-    capa: String(r.artworkUrl100 || '').replace(/100x100bb/, '300x300bb'),
-    previa: r.previewUrl || '',
-    url: r.trackViewUrl || '',
-    fonte: 'catalogo',
-  }));
+  let erro = new Error('Busca de vídeos indisponível agora');
+  for (const base of instancias) {
+    try {
+      const res = await buscar(`${base}/search?filter=videos&q=${encodeURIComponent(q)}`, { fetchImpl, timeout: 9000 });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return videosDoPiped(await res.json()).slice(0, 15);
+    } catch (e) {
+      erro = e;
+    }
+  }
+  throw erro;
+}
+
+// confere um link colado (título e canal), sem login, pelo oEmbed do YouTube
+export async function youtubeOEmbed(url, fetchImpl) {
+  const res = await buscar(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`, { fetchImpl });
+  if (!res.ok) throw new Error('Vídeo não encontrado');
+  const j = await res.json();
+  return { titulo: j.title || '', canal: j.author_name || '' };
+}
+
+// "Padre Marcelo Rossi - Noites Traiçoeiras (Vídeo Oficial)" -> título limpo para a música
+export function tituloDoVideo(t) {
+  return String(t || '').replace(/\s*[([{【][^)\]}】]*(oficial|official|clipe|video|vídeo|lyric|letra|ao vivo|live|audio|áudio|hd|4k)[^)\]}】]*[)\]}】]/gi, '')
+    .replace(/\s*\|.*$/, '').replace(/\s+/g, ' ').trim();
 }

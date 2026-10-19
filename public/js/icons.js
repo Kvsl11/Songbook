@@ -47,7 +47,6 @@ const P = {
   // violão em traço (como o símbolo do Cifra Club), na cor do app
   violao: '<path d="M13.2 9.4c-1.6-1.3-3.8-1.4-5 0-.8.9-.9 2-1.9 2.6-1 .6-2.4.4-3.4 1.6-1.9 2.2-1.2 5.8 1.2 7.9 2.1 2.4 5.7 3.1 7.9 1.2 1.2-1 1-2.4 1.6-3.4.6-1 1.7-1.1 2.6-1.9 1.4-1.2 1.3-3.4 0-5"/><circle cx="9.2" cy="15.4" r="2.1"/><path d="M11.6 12.9 20.6 3.9M13.4 14.7 22.2 5.9"/>',
   book: '<path d="M2 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8z"/>',
-  spotify: '<circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/><path d="M7 9.2c3.4-1 7.2-.7 10.2 1M7.6 12.4c2.8-.8 5.9-.5 8.4.9M8.2 15.4c2.2-.6 4.5-.4 6.4.7" style="stroke:var(--sp-onda,#000)" stroke-width="1.7"/>',
   youtube: '<rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9l5 3-5 3z" fill="currentColor"/>',
   file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
   link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
