@@ -127,7 +127,7 @@ body.performance .palco-ctrl:hover, body.performance .palco-ctrl:focus-within { 
   /* a margem da página é medida pela largura da coluna principal (cqw), e não em %: assim vale igual em
      qualquer elemento que a use (painel da letra, topo com vídeo, prateleiras) para ir de ponta a ponta */
   .main-col { border-radius: var(--radius); container-type: inline-size; }
-  main { --gutter: max(24px, calc((100cqw - 1100px) / 2)); padding-bottom: 48px; }
+  main { --gutter: max(32px, calc((100cqw - 1680px) / 2)); padding-bottom: 48px; } /* conteúdo bem largo: só uma margem confortável dos lados */
   .side { display: flex; flex-direction: column; gap: 8px; width: 300px; flex: none; }
   .brand-row { display: flex; align-items: center; gap: 8px; padding: 14px 12px 6px 16px; background: var(--bg); border-radius: var(--radius) var(--radius) 0 0; margin-bottom: -8px; }
   .side .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; flex: 1; min-width: 0; }
@@ -1221,3 +1221,5 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
   .refs-area .creditos h3, .refs-area .creditos .link-btn { grid-column: 1 / -1; }
 }
 @media (min-width: 900px) { .refs-area:has(#creditos:empty) { grid-template-columns: 1fr; } }
+/* textos da liturgia e das orações no computador: mais largos (ainda numa largura boa de ler) */
+@media (min-width: 900px) { .texto-liturgico { max-width: 1040px; } }
