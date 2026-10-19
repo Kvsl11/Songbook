@@ -44,7 +44,11 @@ export function renderSong(content, { transpose = 0, capo = 0, key = '' } = {}) 
         const chord = seg.chord === null ? '' : transposeChord(seg.chord, shift, flats);
         // espaço no fim do trecho vira separador visível entre acordes colados
         const text = seg.text || (chord ? ' ' : '');
-        html.push(`<span class="chunk"><span class="chord">${esc(chord)}</span><span class="lyric">${esc(text)}</span></span>`);
+        // o acorde fica só sobre a primeira palavra; as outras palavras quebram a linha uma a uma
+        // (como na letra sem cifra), em vez de o trecho inteiro descer junto
+        const [primeira, ...resto] = noChords ? [text] : text.match(/\s*\S+\s*|\s+/g) || [text];
+        html.push(`<span class="chunk"><span class="chord">${esc(chord)}</span><span class="lyric">${esc(primeira)}</span></span>`);
+        for (const p of resto) html.push(`<span class="chunk"><span class="chord"></span><span class="lyric">${esc(p)}</span></span>`);
       }
       html.push('</div>');
     }
