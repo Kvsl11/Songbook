@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-88';
+export const APP_VERSAO = '2026.10.19-89';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2209,8 +2209,7 @@ function viewSong(id, ctx = {}) {
       <button class="icon-btn" data-rol="parar" aria-label="Parar rolagem" title="Parar">${icon('pause', 18)}</button>
     </div>
     <div class="shelf-head"><h2>Referências</h2></div>
-    <div id="refs"></div>
-    <div id="creditos"></div>
+    <div class="refs-area"><div id="refs"></div><div id="creditos"></div></div>
     <div class="set-nav" id="set-nav"></div>
     <div class="palco-ctrl" id="palco-ctrl">
       ${ctx.set && ctx.index > 0 ? `<a class="icon-btn" href="#/repertorio/${ctx.set.id}/${ctx.index - 1}" aria-label="Música anterior" title="Anterior">${icon('back', 20)}</a>` : ''}
@@ -3769,6 +3768,30 @@ function route() {
     default: return viewNotFound();
   }
 }
+
+// Fileiras horizontais (artistas, repertórios, músicas…): no computador ganham setas ‹ › nos lados, como no
+// Spotify (com mouse não dá para arrastar para o lado). Cada fileira nova que aparece na tela recebe as setas.
+function ligarFileira(shelf) {
+  if (shelf.parentElement?.classList.contains('shelf-wrap')) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'shelf-wrap';
+  shelf.before(wrap);
+  wrap.innerHTML = `<button class="shelf-seta esq" aria-label="Voltar" tabindex="-1">${icon('back', 20)}</button><button class="shelf-seta dir" aria-label="Mais" tabindex="-1">${icon('next', 20)}</button>`;
+  wrap.prepend(shelf);
+  const [esq, dir] = wrap.querySelectorAll('.shelf-seta');
+  const atualizar = () => {
+    esq.hidden = shelf.scrollLeft < 30;
+    dir.hidden = shelf.scrollLeft + shelf.clientWidth >= shelf.scrollWidth - 30;
+  };
+  const passo = (lado) => shelf.scrollBy({ left: lado * Math.max(200, shelf.clientWidth * 0.8), behavior: 'smooth' });
+  esq.onclick = () => passo(-1);
+  dir.onclick = () => passo(1);
+  shelf.addEventListener('scroll', atualizar, { passive: true });
+  new ResizeObserver(atualizar).observe(shelf);
+  new MutationObserver(atualizar).observe(shelf, { childList: true });
+  atualizar();
+}
+new MutationObserver(() => view.querySelectorAll('.shelf').forEach(ligarFileira)).observe(view, { childList: true, subtree: true });
 
 $('#side-sets').addEventListener('click', (e) => { const li = e.target.closest('li[data-href]'); if (li && !e.target.closest('a')) location.hash = li.dataset.href; });
 window.addEventListener('hashchange', route);

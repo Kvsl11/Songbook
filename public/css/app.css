@@ -1187,3 +1187,36 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 }
 @media (min-width: 1200px) { .song.lyrics-mode.columns { column-count: 2; } .song.lyrics-mode.columns .section { break-inside: avoid; } }
 @media (min-width: 1700px) { .song.lyrics-mode.columns { column-count: 3; } }
+
+/* fileiras horizontais: setas ‹ › nos lados no computador (com mouse) e barra de rolagem fina */
+.shelf-wrap { position: relative; }
+.shelf-seta { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .shelf-seta { display: grid; place-items: center; position: absolute; top: calc(50% - 40px); z-index: 3; width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer;
+    background: rgb(0 0 0 / 0.72); color: #fff; box-shadow: 0 4px 14px rgb(0 0 0 / 0.5); opacity: 0; transition: opacity 0.2s, transform 0.15s; }
+  .shelf-seta[hidden] { display: none; }
+  .shelf-seta.esq { left: -6px; }
+  .shelf-seta.dir { right: -6px; }
+  .shelf-wrap:hover .shelf-seta { opacity: 1; }
+  .shelf-seta:hover { transform: scale(1.08); background: rgb(0 0 0 / 0.88); }
+  .shelf { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.25) transparent; }
+  .shelf::-webkit-scrollbar { display: block; height: 6px; }
+  .shelf::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.25); border-radius: 3px; }
+}
+
+/* Referências e Créditos no tablet e no computador: lado a lado, ocupando a largura (vídeo e cartões à
+   esquerda, créditos à direita) */
+@media (min-width: 900px) {
+  .refs-area { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); gap: 24px; align-items: start; }
+  .refs-area .video-ref { max-width: none; }
+  .refs-area .refs-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); margin-bottom: 0; }
+  .refs-area .ref-card .ico { width: 44px; height: 44px; }
+  .refs-area .creditos { max-width: none; margin: 0; }
+  .refs-area #creditos:empty { display: none; }
+}
+@media (min-width: 641px) and (max-width: 899px) {
+  .refs-area .video-ref, .refs-area .creditos { max-width: none; }
+  .refs-area .creditos { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; }
+  .refs-area .creditos h3, .refs-area .creditos .link-btn { grid-column: 1 / -1; }
+}
+@media (min-width: 900px) { .refs-area:has(#creditos:empty) { grid-template-columns: 1fr; } }
