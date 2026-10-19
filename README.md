@@ -28,10 +28,6 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 - **Hinários e formação** (Orações): o diretório do Junior Música Católica em abas, com tudo abrindo no app —
   partituras, hinários e preces do Google Drive (e PDFs) num leitor dentro do app, vídeos de referência no player,
   cifras do Cifra Club como música do app (já com o vídeo de referência) e a liturgia/orações nas telas do app.
-- **Resumo de arquivos com IA**: no leitor, o botão "Resumir" pede ao Claude (com a chave de Ajustes) um resumo
-  curto e os tópicos principais — num hinário, os cantos e para que momento da missa. O PDF vai inteiro (a API
-  baixa pelo link; páginas escaneadas também são lidas) e, se não der, vai o texto do arquivo. Em "Resumir um arquivo
-  seu" dá para enviar um PDF, foto ou texto do aparelho. O resumo fica guardado e não é gerado de novo.
 - **Importar da internet**: tocar numa cifra do Cifra Club abre a cifra já organizada (partes, refrão, tom e
   capotraste), na **versão simplificada**: sem tablaturas, riffs e solos. Como o site não deixa outros apps lerem a página, o app a lê pelo Jina Reader
   (serviço público); se ele não responder, abre o "Importar da internet": copie a cifra no site e cole
