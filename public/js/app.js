@@ -3,7 +3,6 @@ import { esc, renderSong } from './render.js';
 import { definirMeta, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra } from './chordpro.js';
 import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
-import { chaveIA, organizarPartes } from './ia.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
 import { buscarYoutube, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, mesmaDuracao, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
@@ -42,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-75';
+export const APP_VERSAO = '2026.10.19-76';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1870,14 +1869,12 @@ function viewSong(id, ctx = {}) {
            <a class="icon-btn" href="#/editar/${song.id}" aria-label="Editar" title="Editar cifra">${icon('edit', 22)}</a>`}
       <button class="icon-btn" id="btn-palco" aria-label="Só a letra (tela cheia)" title="Só a letra, tela cheia">${icon('expand', 22)}</button>
       <button class="icon-btn" id="btn-pdf" aria-label="Exportar PDF" title="Exportar em PDF (com ou sem cifra)">${icon('file', 22)}</button>
-      <button class="icon-btn" id="btn-ia" aria-label="Organizar as partes com IA" title="Organizar refrão e estrofes com a IA do Claude">${icon('sparkles', 22)}</button>
       ${ctx.set ? `<button class="icon-btn" id="btn-fila" aria-label="Fila do repertório" title="Fila: próximas músicas">${icon('queue', 24)}</button>` : ''}
       ${semCifra ? '<div class="seg-tabs"><span class="chip sm" title="Esta música não tem acordes">Só letra</span></div>' : ''}
     </div>
     ${canvas ? '</div>' : ''}
     <div id="aviso-cifra"></div>
     <div id="aviso-video"></div>
-    <div id="aviso-ia"></div>
     <div class="song-toolbar ${comCifra ? '' : 'sem-cifra'}" id="tools">
       <div class="seg so-cifra"><button class="tom-btn" data-act="tom" aria-label="Escolher o tom" title="Escolher o tom"><span class="val" id="key"></span>${icon('down', 14)}</button></div>
       <div class="seg so-cifra" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
@@ -2149,39 +2146,6 @@ function viewSong(id, ctx = {}) {
   }
   avisoFalta();
 
-  // ---- organizar as partes (refrão, estrofes…) com a IA do Claude; dá para desfazer
-  const chaveDesfazer = 'desfazerIA:' + (isPreview ? 'previa' : song.id);
-  const gravarConteudo = (content) => { if (isPreview) preview.content = content; else db.saveSong({ ...db.song(song.id), content }); };
-  const avisoIA = () => {
-    const box = $('#aviso-ia');
-    const antes = sessionStorage.getItem(chaveDesfazer);
-    box.innerHTML = antes ? `<div class="aviso">${icon('sparkles', 18)}<span>Partes organizadas pela IA. Confira refrão e estrofes.</span><button class="btn small" data-desfazer-ia>Desfazer</button><button class="icon-btn" data-fechar-ia aria-label="Fechar">${icon('x', 16)}</button></div>` : '';
-  };
-  avisoIA();
-  $('#aviso-ia').addEventListener('click', (e) => {
-    if (e.target.closest('[data-fechar-ia]')) { sessionStorage.removeItem(chaveDesfazer); avisoIA(); }
-    if (e.target.closest('[data-desfazer-ia]')) { gravarConteudo(sessionStorage.getItem(chaveDesfazer)); sessionStorage.removeItem(chaveDesfazer); toast('Voltou como estava'); route(); }
-  });
-  $('#btn-ia').onclick = async () => {
-    if (!chaveIA()) {
-      if (await ask({ title: 'Organizar com IA', text: 'Para usar a IA do Claude, informe uma chave da API da Anthropic em Ajustes → Inteligência artificial. Ela fica só neste aparelho.', ok: 'Abrir Ajustes' })) location.hash = '#/ajustes/ia';
-      return;
-    }
-    const b = $('#btn-ia');
-    b.disabled = true;
-    b.innerHTML = '<span class="spin"></span>';
-    try {
-      const novo = await organizarPartes(song.content, { titulo: song.title, artista: song.artist });
-      sessionStorage.setItem(chaveDesfazer, song.content);
-      gravarConteudo(novo);
-      toast('Partes organizadas pela IA');
-      route();
-    } catch (e) {
-      toast(e.message, 4500);
-      b.disabled = false;
-      b.innerHTML = icon('sparkles', 22);
-    }
-  };
 
   // ---- letra acompanhando a música (como no Spotify), só no modo sem cifra
   // Os tempos de cada verso vêm de um banco aberto de letras sincronizadas (LRCLIB); o tempo do vídeo
@@ -2569,7 +2533,6 @@ function viewEditor(id, setId) {
         <button class="chip" id="completar" title="Repete a sequência de acordes da estrofe cifrada nas estrofes que estão sem acordes">${icon('sparkles', 14)} Completar cifra</button>
         <button class="chip" id="conv" title="Organiza cifra colada de outro site (acordes numa linha, letra na outra)">${icon('sparkles', 14)} Organizar cifra colada</button>
         <button class="chip" id="trazer" title="Buscar no Cifra Club ou colar cifra/letra de qualquer site">${icon('download', 14)} Trazer da internet</button>
-        <button class="chip" id="ed-ia" title="A IA do Claude marca refrão, estrofes e ponte (sem mudar a letra)">${icon('sparkles', 14)} Organizar partes (IA)</button>
       </div>
       <div class="row" style="gap:6px"><span class="muted" style="font-size:12px;font-weight:700">Editar:</span>
         <button class="chip" data-formato="acima" aria-pressed="${formato === 'acima'}">${icon('chord', 14)} Cifra (acordes em cima)</button>
@@ -2695,26 +2658,6 @@ function viewEditor(id, setId) {
     toast('Cifra trazida para o editor — confira e salve');
   } });
   $('#trazer').onclick = trazerDaInternet;
-  let antesDaIA = null;
-  $('#ed-ia').onclick = async () => {
-    const b = $('#ed-ia');
-    if (antesDaIA !== null) { ta.value = antesDaIA; antesDaIA = null; b.innerHTML = `${icon('sparkles', 14)} Organizar partes (IA)`; atualizar(); toast('Voltou como estava'); return; }
-    if (!chaveIA()) { if (await ask({ title: 'Organizar com IA', text: 'Informe a chave da API do Claude em Ajustes → Inteligência artificial.', ok: 'Abrir Ajustes' })) location.hash = '#/ajustes/ia'; return; }
-    b.disabled = true;
-    b.innerHTML = '<span class="spin"></span> Organizando…';
-    try {
-      const novo = await organizarPartes(montar(), { titulo: campo('title').value.trim(), artista: campo('artist').value.trim() });
-      antesDaIA = ta.value;
-      ta.value = exibir(separarMeta(novo).corpo);
-      atualizar();
-      b.innerHTML = `${icon('undo', 14)} Desfazer IA`;
-      toast('Partes organizadas pela IA: confira e salve');
-    } catch (e) {
-      toast(e.message, 4500);
-      b.innerHTML = `${icon('sparkles', 14)} Organizar partes (IA)`;
-    }
-    b.disabled = false;
-  };
   $('#f-yt-buscar').onclick = async () => {
     const url = await escolherVideo({ title: campo('title').value.trim(), artist: campo('artist').value.trim(), youtube: youtubeId(campo('yt').value) });
     if (url !== null) campo('yt').value = url;
@@ -3156,19 +3099,6 @@ function viewSettings() {
       <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo no topo da música</div><div class="s">Um trecho do clipe passa sem som atrás do título, como no Spotify. Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
     </div>
 
-    <div class="section-title" id="ia">Inteligência artificial (Claude)</div>
-    <div class="settings-group">
-      <div class="setting"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Organizar partes com IA</div><div class="s" id="ia-status"></div></div></div>
-      <details class="setting-ajuda"${p.claudeKey ? '' : ' open'}><summary>Como ativar</summary>
-        <ol>
-          <li>Entre em <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> (conta da Anthropic, a empresa do Claude) e coloque créditos em <b>Billing</b>.</li>
-          <li>Em <b>API Keys</b>, toque em <b>Create Key</b> e copie a chave (começa com <code>sk-ant-</code>).</li>
-          <li>Cole abaixo. Ela fica só neste aparelho. Cada música organizada custa menos de 10 centavos.</li>
-        </ol>
-        <label class="campo-livre">Chave da API do Claude<input class="input" id="ia-chave" type="password" value="${esc(p.claudeKey || '')}" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"></label>
-      </details>
-    </div>
-
     ${jaInstalado() ? '' : `<div class="section-title">App</div>
     <div class="settings-group">
       <div class="setting"><span class="ico" style="background:none">${logo(36)}</span><div class="grow"><div class="t">Instalar o Songbook</div><div class="s">Ícone na tela inicial, abre em tela cheia e funciona sem internet</div></div><button class="btn small primary" id="instalar">Instalar</button></div>
@@ -3243,10 +3173,6 @@ function viewSettings() {
   };
   $('#video-fundo').onchange = (e) => db.setPref('videoFundo', e.target.checked);
   $('#karaoke').onchange = (e) => db.setPref('karaoke', e.target.checked);
-  const statusIA = () => { $('#ia-status').textContent = db.prefs().claudeKey ? 'Ativo: use o botão ✨ na música ou no editor para marcar refrão e estrofes' : 'Desligado: informe a chave da API do Claude'; };
-  statusIA();
-  $('#ia-chave').onchange = (e) => { db.setPref('claudeKey', e.target.value.trim()); statusIA(); toast(e.target.value.trim() ? 'Chave salva neste aparelho' : 'Chave removida'); };
-  if (/\/ia$/.test(location.hash)) setTimeout(() => $('#ia')?.scrollIntoView({ block: 'start' }), 50);
   $('#exp').onclick = () => download(`songbook-backup-${hojeISO()}.json`, db.exportAll(), 'application/json');
   $('#imp').onclick = openImport;
   $('#clr').onclick = async () => {

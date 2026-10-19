@@ -35,9 +35,6 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   Ao abrir uma música da busca (Cifra Club, letras, cantos), o app procura o vídeo no YouTube sozinho e já
   vincula; se não achar, mostra o aviso com "Escolher vídeo".
 
-- **Organizar partes com IA (Claude)**: o botão ✨ na música e no editor pede à IA do Claude (chave da API da
-  Anthropic informada em Ajustes, guardada só no aparelho) que marque refrão, estrofes, ponte; só as marcações mudam,
-  nunca a letra ou os acordes, e dá para desfazer (`js/ia.js`).
 - **Letra acompanhando a música**: no modo só letra, enquanto o vídeo toca, o verso cantado acende e a letra rola
   sozinha, com os tempos de cada verso de um banco aberto de letras sincronizadas (LRCLIB); tocar num verso leva a
   música até ele (como no Spotify). É automático: os tempos só são usados se forem da mesma gravação do vídeo
