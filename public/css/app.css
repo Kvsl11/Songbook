@@ -1132,3 +1132,10 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 .tile-artista b, .tile-artista small { text-align: center; }
 .grade-artistas { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 18px 14px; padding-top: 6px; }
 .artista-hero .cover { border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
+
+/* página do artista: álbuns e faixas numeradas */
+.grade-albuns { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 20px 16px; padding: 12px 0; }
+.grade-albuns .tile { margin: 0; padding: 0; }
+.track.faixa .num { width: 22px; text-align: right; color: var(--subtle); font-variant-numeric: tabular-nums; font-size: 13px; }
+.track.faixa.sem-cifra .t { color: var(--muted); }
+#art-abas[hidden] { display: none; }

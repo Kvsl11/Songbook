@@ -203,6 +203,65 @@ export function getArtistaCifraClub(slug, opcoes = {}) {
   }, { ...opcoes, nome: 'o Cifra Club' });
 }
 
+// Um array JSON que a página traz embutido nos dados ("albums":[...]): acha o fim pelos colchetes,
+// respeitando os textos entre aspas, e lê
+function arrayJsonEmbutido(html, chave) {
+  const s = String(html).replace(/\\"/g, '"');
+  const ini = s.indexOf(`"${chave}":[`);
+  if (ini < 0) return null;
+  let i = s.indexOf('[', ini);
+  const comeco = i;
+  let nivel = 0;
+  let texto = false;
+  for (; i < s.length; i++) {
+    const c = s[i];
+    if (texto) { if (c === '\\') i++; else if (c === '"') texto = false; continue; }
+    if (c === '"') texto = true;
+    else if (c === '[' || c === '{') nivel++;
+    else if (c === ']' || c === '}') { nivel--; if (!nivel) break; }
+  }
+  try { return JSON.parse(s.slice(comeco, i + 1)); } catch { return null; }
+}
+
+// Discografia do artista (página /artista/discografia.html): álbuns com ano, capa e faixas; cada faixa com o
+// link da cifra (quando há), o tom e quantas vezes foi vista
+export function parseDiscografiaCifraClub(html, slug) {
+  const albuns = arrayJsonEmbutido(html, 'albums') || [];
+  return albuns.filter((a) => a && a.title).map((a) => ({
+    titulo: a.title,
+    url: a.url || '',
+    ano: a.releaseYear || '',
+    tipo: a.type || 'album',
+    capa: a.image?.thumb || a.image?.image || '',
+    capaGrande: a.image?.image || a.image?.thumb || '',
+    faixas: (a.discs || []).flatMap((d) => d.songs || []).map((f) => ({
+      titulo: f.song?.name || String(f.name || '').replace(/\s*\((ao vivo|live|ac[úu]stico)\)\s*$/i, ''),
+      nome: f.name || '',
+      // só a letra (sem acordes) no Cifra Club: guitar = 0 — conta como sem cifra
+      url: f.song?.url && f.song.guitar !== 0 ? `${CIFRACLUB}/${a.dns || slug}/${f.song.url}/` : '',
+      tom: f.song?.tone || '',
+      popularidade: f.song?.hits || 0,
+    })),
+  }));
+}
+export function getDiscografiaCifraClub(slug, opcoes = {}) {
+  if (!/^[a-z0-9-]+$/.test(slug || '')) throw new Error('Artista inválido');
+  return lerPagina(`${CIFRACLUB}/${slug}/discografia.html`, (html) => {
+    const d = parseDiscografiaCifraClub(html, slug);
+    if (!d.length && !/"albums":\[\]/.test(String(html).replace(/\\"/g, '"'))) throw new Error('Discografia não encontrada');
+    return d;
+  }, { ...opcoes, nome: 'o Cifra Club' });
+}
+// Todas as músicas do artista (página /artista/musicas.html)
+export function getTodasMusicasCifraClub(slug, opcoes = {}) {
+  if (!/^[a-z0-9-]+$/.test(slug || '')) throw new Error('Artista inválido');
+  return lerPagina(`${CIFRACLUB}/${slug}/musicas.html`, (html) => {
+    const a = parseArtistaCifraClub(html, slug);
+    if (!a.musicas.length) throw new Error('Lista de músicas vazia');
+    return a.musicas;
+  }, { ...opcoes, nome: 'o Cifra Club' });
+}
+
 // ------------------------------------------------------------------ letras (Letras.mus.br; reserva: LRCLIB)
 
 export const ehLetras = (url) => /^https?:\/\/(www\.|m\.)?letras\.mus\.br\/[^/?#]+\/[^/?#]+/.test(url || '');

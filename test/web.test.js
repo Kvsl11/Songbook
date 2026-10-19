@@ -194,3 +194,24 @@ test('página do artista no Cifra Club: nome, foto e músicas mais tocadas com o
   const ar = artistasCifraClub({ response: { docs: [{ t: '1', m: 'Frei Gilson', d: 'frei-gilson', i: 'b/2/x-tb.jpg', s: 259 }, { t: '2', m: 'Eu Seguirei', d: 'frei-gilson', u: 'eu-seguirei' }] } });
   assert.deepEqual(ar.map((x) => [x.nome, x.slug]), [['Frei Gilson', 'frei-gilson']]);
 });
+
+test('discografia do Cifra Club: álbuns com ano, capa e faixas (só letra conta como sem cifra)', async () => {
+  const { parseDiscografiaCifraClub } = await import('../public/js/lib/web.js');
+  const albums = [{ title: 'Não Há Mais Vendaval', url: 'nao-ha-mais-vendaval-2021', dns: 'frei-gilson', type: 'album', releaseYear: 2021,
+    image: { image: 'https://x/a.jpg', thumb: 'https://x/a-tb_180.jpg' },
+    discs: [{ songs: [
+      { name: 'Deixa Deus Sonhar em Ti (Ao Vivo)', song: { name: 'Deixa Deus Sonhar em Ti', url: 'deixa-deus-sonhar-em-ti-2', guitar: 0, tone: '', hits: -1 } },
+      { name: 'Anjos Em Ordem de Batalha (Ao Vivo)', song: { name: 'Anjos Em Ordem de Batalha', url: 'anjos', guitar: 2, tone: 'Bm', hits: 10 } },
+      { name: 'Abertura (Ao Vivo)', song: null },
+    ] }] }];
+  const html = `<script>self.__next_f.push([1,"${JSON.stringify({ albums }).replace(/"/g, '\\"')}"])</script>`;
+  const [a] = parseDiscografiaCifraClub(html, 'frei-gilson');
+  assert.equal(a.titulo, 'Não Há Mais Vendaval');
+  assert.equal(a.ano, 2021);
+  assert.equal(a.capa, 'https://x/a-tb_180.jpg');
+  assert.deepEqual(a.faixas.map((f) => [f.titulo, f.url, f.tom]), [
+    ['Deixa Deus Sonhar em Ti', '', ''],
+    ['Anjos Em Ordem de Batalha', 'https://www.cifraclub.com.br/frei-gilson/anjos/', 'Bm'],
+    ['Abertura', '', ''],
+  ]);
+});

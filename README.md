@@ -15,9 +15,10 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   Club, que já tem a letra; sem cifra, a letra do Letras), o **vídeo** do YouTube e o compositor. Um vídeo tocado
   direto da busca abre como música do mesmo jeito, com cifra e letra. Filtros: Tudo, Músicas, Vídeos, Biblioteca.
 - **Buscar por artista**: a busca mostra também os artistas (filtro "Artistas"); tocar num abre a página dele, com
-  foto e as músicas mais tocadas no Cifra Club (com o tom e a capa do álbum de cada uma; sem álbum, a imagem do vídeo
-  do YouTube), que abrem com cifra, letra e vídeo. Com a
-  busca vazia aparece a fileira "Artistas católicos".
+  foto, uma lupa para buscar nas músicas dele e três abas: **Mais tocadas** (com a capa do álbum; sem álbum, a imagem
+  do vídeo do YouTube), **Todas as músicas** e **Álbuns** (capa, ano e as faixas na ordem do disco, com o tom). Tudo
+  vem do Cifra Club (página do artista, `musicas.html` e `discografia.html`); cada música abre com cifra, letra e
+  vídeo. Com a busca vazia aparece a fileira "Artistas católicos".
 - **Católicas em alta**: com a busca vazia, aparecem as músicas católicas mais procuradas agora no Cifra Club (as
   mais tocadas de artistas como Frei Gilson, Colo de Deus, Padre Fábio de Melo, Ministério Amor e Adoração, Shalom, Padre Reginaldo Manzotti, Canção Nova, Anjos de Resgate,
   Fraternidade São João Paulo II, Rosa de Saron),
