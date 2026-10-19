@@ -1,6 +1,6 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
-import { definirMeta, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra } from './chordpro.js';
+import { definirMeta, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra } from './chordpro.js';
 import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-54';
+export const APP_VERSAO = '2026.10.19-55';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2045,7 +2045,7 @@ function viewEditor(id, setId) {
   // formato do texto: acordes na linha de cima, entre [colchetes] ou só a letra (acordes preservados)
   let formato = ['colchetes', 'letra'].includes(db.prefs().formatoEditor) ? db.prefs().formatoEditor : 'acima';
   if (/^#\/editar\/[^/]+\/letra/.test(location.hash)) formato = 'letra';
-  let baseLetra = corpo; // no modo "só a letra", os acordes vêm desta versão
+  let baseLetra = paraEditor(corpo); // no modo "só a letra", os acordes vêm desta versão
   const actions = [];
   if (!isNew) {
     actions.push({ icon: 'trash', label: 'Excluir', onClick: async () => {
@@ -2071,11 +2071,12 @@ function viewEditor(id, setId) {
       </div>
       <div class="barra">
         <div class="seg" title="Transpor a cifra inteira (altera o texto)"><button data-tr="-1" aria-label="Meio tom abaixo">${icon('minus', 16)}</button><span class="val"><small>Transpor</small>cifra</span><button data-tr="1" aria-label="Meio tom acima">${icon('plus', 16)}</button></div>
-        <button class="chip" data-ins="{start_of_chorus}\\n\\n{end_of_chorus}">${icon('plus', 14)} Refrão</button>
-        <button class="chip" data-ins="{start_of_verse: }\\n\\n{end_of_verse}">${icon('plus', 14)} Estrofe</button>
-        <button class="chip" data-ins="{start_of_bridge: Ponte}\\n\\n{end_of_bridge}">${icon('plus', 14)} Ponte</button>
-        <button class="chip" data-ins="{chorus}">Repetir refrão</button>
-        <button class="chip" data-ins="{comment: }">Comentário</button>
+        <button class="chip parte" data-parte-ed="Refrão" title="Daqui para baixo é o refrão (até a próxima parte)">${icon('plus', 14)} Refrão</button>
+        <button class="chip parte" data-parte-ed="Estrofe" title="Daqui para baixo é uma estrofe (até a próxima parte)">${icon('plus', 14)} Estrofe</button>
+        <button class="chip parte" data-parte-ed="Ponte" title="Daqui para baixo é a ponte">${icon('plus', 14)} Ponte</button>
+        <button class="chip parte" data-parte-ed="Intro" title="Linha da introdução (acordes)">${icon('plus', 14)} Intro</button>
+        <button class="chip parte" data-parte-ed="Repetir refrão" title="Canta o refrão de novo aqui">${icon('refresh', 14)} Repetir refrão</button>
+        <button class="chip" data-parte-ed="(" title="Uma observação, ex.: (2x) ou (só vozes)">Observação</button>
         <button class="chip" id="completar" title="Repete a sequência de acordes da estrofe cifrada nas estrofes que estão sem acordes">${icon('sparkles', 14)} Completar cifra</button>
         <button class="chip" id="conv" title="Organiza cifra colada de outro site (acordes numa linha, letra na outra)">${icon('sparkles', 14)} Organizar cifra colada</button>
         <button class="chip" id="trazer" title="Buscar no Cifra Club ou colar cifra/letra de qualquer site">${icon('download', 14)} Trazer da internet</button>
@@ -2085,9 +2086,10 @@ function viewEditor(id, setId) {
         <button class="chip" data-formato="colchetes" aria-pressed="${formato === 'colchetes'}">Cifra em [colchetes]</button>
         <button class="chip" data-formato="letra" aria-pressed="${formato === 'letra'}" title="Corrija só o texto: os acordes continuam nas mesmas sílabas">${icon('text', 14)} Só a letra</button></div>
       <div class="chord-pal" id="pal"></div>
-      <div class="tabs-mob"><button class="chip" data-aba="editar" aria-pressed="true">${icon('edit', 14)} Editar</button><button class="chip" data-aba="previa" aria-pressed="false">${icon('eye', 14)} Prévia</button></div>
+      <div class="tabs-ed"><button class="chip" data-aba="editar" aria-pressed="true">${icon('edit', 14)} Editar</button><button class="chip" data-aba="previa" aria-pressed="false">${icon('eye', 14)} Ver prévia</button>
+        <span class="spacer"></span><button class="chip" id="ed-cheio" title="Usar a tela toda para editar">${icon('expand', 14)} <span>Tela cheia</span></button></div>
       <div class="editor-split">
-        <textarea id="content" spellcheck="false" aria-label="Letra e acordes" wrap="off">${esc(formato === 'acima' ? chordProToChordsOverLyrics(corpo) : formato === 'letra' ? letraDe(corpo) : corpo)}</textarea>
+        <textarea id="content" spellcheck="false" aria-label="Letra e acordes" wrap="off">${esc(formato === 'acima' ? chordProToChordsOverLyrics(paraEditor(corpo)) : formato === 'letra' ? letraDe(paraEditor(corpo)) : paraEditor(corpo))}</textarea>
         <div class="editor-prev" id="prev" hidden><div class="song" id="prev-song"></div></div>
       </div>
       <p class="muted" style="font-size:13px;margin:0" id="dica"></p>
@@ -2096,19 +2098,21 @@ function viewEditor(id, setId) {
   const ta = $('#content');
   const campo = (k) => $('#f-' + k);
   // nos dois formatos o texto é normalizado para ChordPro ao salvar (linhas só de acordes viram [acordes])
-  const corpoPro = () => (formato === 'letra' ? aplicarLetra(baseLetra, ta.value) : chordsOverLyricsToChordPro(ta.value));
+  // o texto do editor tem as partes como [Refrão], [Estrofe 2]…; ao salvar vira ChordPro
+  const corpoPro = () => doEditor(formato === 'letra' ? aplicarLetra(baseLetra, ta.value) : ta.value);
   const exibir = (pro) => {
-    if (formato !== 'letra') return formato === 'acima' ? chordProToChordsOverLyrics(pro) : pro;
-    baseLetra = pro;
-    return letraDe(pro);
+    const simples = paraEditor(pro);
+    if (formato !== 'letra') return formato === 'acima' ? chordProToChordsOverLyrics(simples) : simples;
+    baseLetra = simples;
+    return letraDe(simples);
   };
   const montar = () => juntarMeta({
     title: campo('title').value.trim(), artist: campo('artist').value.trim(), key: campo('key').value.trim(), youtube: campo('yt').value.trim(),
     composer: campo('composer').value.trim(), parte: campo('parte').value === '__outra' ? '' : campo('parte').value, extras: meta.extras,
   }, corpoPro());
   const DICAS = {
-    acima: 'Escreva os acordes na linha de cima, alinhados com a sílaba (como num caderno de cifras):<br><code>Am        G<br>Senhor, tende piedade</code>',
-    colchetes: 'Escreva os acordes entre colchetes antes da sílaba: <code>[G]Senhor, tende pie[D]dade</code>. Linhas só com acordes também são aceitas.',
+    acima: 'Toque em <b>Refrão</b>, <b>Estrofe</b> ou <b>Ponte</b> na linha onde a parte começa: tudo dali para baixo pertence a ela, até a próxima. Escreva os acordes na linha de cima, alinhados com a sílaba:<br><code>[Refrão]<br>Am        G<br>Senhor, tende piedade</code>',
+    colchetes: 'Partes numa linha só: <code>[Refrão]</code>, <code>[Estrofe 2]</code>… Os acordes vão entre colchetes antes da sílaba: <code>[G]Senhor, tende pie[D]dade</code>.',
     letra: 'Corrija ou reescreva só o texto, sem se preocupar com os acordes: ao salvar, cada acorde volta para a mesma sílaba. Linhas novas entram sem acordes.',
   };
   const dica = () => {
@@ -2139,7 +2143,28 @@ function viewEditor(id, setId) {
   const inserir = (txt) => { ta.focus(); ta.setRangeText(txt, ta.selectionStart, ta.selectionEnd, 'end'); atualizar(); };
   $('#pal').addEventListener('mousedown', (e) => e.preventDefault()); // mantém o cursor no texto
   $('#pal').addEventListener('click', (e) => { const b = e.target.closest('[data-acorde]'); if (b) inserir(formato === 'acima' ? `${b.dataset.acorde} ` : `[${b.dataset.acorde}]`); });
-  view.querySelectorAll('[data-ins]').forEach((b) => (b.onclick = () => inserir('\n' + b.dataset.ins.replace(/\\n/g, '\n') + '\n')));
+  // parte nova: o nome entra numa linha própria, no começo da linha onde está o cursor
+  const inserirParte = (nome) => {
+    const v = ta.value;
+    if (nome === '(') {
+      const t = '(observação)';
+      inserir(t);
+      ta.setSelectionRange(ta.selectionStart - t.length + 1, ta.selectionStart - 1);
+      return;
+    }
+    if (nome === 'Estrofe') nome = `Estrofe ${(v.match(/^\s*\[estrofe\b/gim) || []).length + 1}`;
+    const pos = ta.selectionStart;
+    const ini = v.lastIndexOf('\n', pos - 1) + 1;
+    let fim = v.indexOf('\n', pos);
+    if (fim < 0) fim = v.length;
+    const vazia = !v.slice(ini, fim).trim();
+    const antes = ini > 0 && v[ini - 2] !== '\n' && v[ini - 2] !== undefined ? '\n' : '';
+    const cab = `${antes}[${nome}]\n`;
+    ta.focus();
+    if (vazia) ta.setRangeText(cab, ini, Math.min(fim + 1, v.length), 'end'); else ta.setRangeText(cab, ini, ini, 'end');
+    atualizar();
+  };
+  view.querySelectorAll('[data-parte-ed]').forEach((b) => { b.addEventListener('mousedown', (e) => e.preventDefault()); b.onclick = () => inserirParte(b.dataset.parteEd); });
   view.querySelectorAll('[data-tr]').forEach((b) => (b.onclick = () => {
     const n = Number(b.dataset.tr);
     ta.value = exibir(transposeChordPro(corpoPro(), n));
@@ -2177,10 +2202,21 @@ function viewEditor(id, setId) {
   };
   view.querySelectorAll('[data-aba]').forEach((b) => (b.onclick = () => {
     const prev = b.dataset.aba === 'previa';
+    if (prev) $('#prev-song').innerHTML = renderSong(montar()).html;
     $('#prev').hidden = !prev;
     ta.hidden = prev;
     view.querySelectorAll('[data-aba]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   }));
+  // tela cheia: só o texto, a barra de partes e os botões (prévia, sair, salvar)
+  const editorEl = view.querySelector('.editor');
+  const alternarCheio = (ligar = !editorEl.classList.contains('cheio')) => {
+    editorEl.classList.toggle('cheio', ligar);
+    document.body.classList.toggle('editando-cheio', ligar);
+    $('#ed-cheio').innerHTML = `${icon(ligar ? 'shrink' : 'expand', 14)} <span>${ligar ? 'Sair da tela cheia' : 'Tela cheia'}</span>`;
+    if (ligar) ta.focus();
+  };
+  $('#ed-cheio').onclick = () => alternarCheio();
+  aoSair(() => document.body.classList.remove('editando-cheio'));
   // "Outra…": nome livre para a parte da missa
   campo('parte').addEventListener('change', async (e) => {
     if (e.target.value !== '__outra') return;

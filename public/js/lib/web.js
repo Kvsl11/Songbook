@@ -9,7 +9,7 @@
 // - YouTube: busca pelo Piped (instâncias públicas, com CORS); o oEmbed confirma um link colado.
 
 import { decodeEntities, normalize } from './html.js';
-import { chordsOverLyricsToChordPro, isChord } from '../chordpro.js';
+import { doEditor, isChord } from '../chordpro.js';
 
 const NO_NAVEGADOR = typeof window !== 'undefined';
 const UA = NO_NAVEGADOR ? {} : { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36', 'Accept-Language': 'pt-BR,pt;q=0.9' };
@@ -63,61 +63,8 @@ export const ehCifraClub = (url) => /^https?:\/\/(www\.|m\.)?cifraclub\.com\.br\
 
 // ------------------------------------------------------------------ Cifra Club: página da cifra
 
-const SECOES = [
-  [/^(refr[ãa]o|coro|chorus)/i, 'chorus'],
-  [/^(ponte|bridge)/i, 'bridge'],
-  [/^(intro|introdu[çc][ãa]o|solo|final|riff|dedilhado|interl[úu]dio|tab|base|instrumental|outro)/i, 'comment'],
-];
-const tipoSecao = (nome) => (SECOES.find(([re]) => re.test(nome.trim())) || [null, 'verse'])[1];
-const linhaTab = (l) => /^\s*[A-Ga-g]?[#b]?\s*\|[-\d|hpbrx/\\~().* ]{4,}\|?\s*$/.test(l) || /^\s*[eBGDAE]\s*[-|][-\d|hpbrx/\\~().* ]{6,}$/.test(l);
-const cabecalho = (l) => {
-  const m = /^\s*\[([^\]]{2,40})\]\s*(.*)$/.exec(l);
-  if (!m || isChord(m[1].trim())) return null;
-  return { nome: m[1].trim().replace(/^tab\s*-\s*/i, ''), resto: m[2], tab: /^tab\b/i.test(m[1].trim()) };
-};
-
 // Texto de cifra (acordes em cima da letra, partes em [Colchetes]) -> ChordPro com seções
-export function cifraTextoParaChordPro(texto) {
-  const linhas = String(texto || '').replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n');
-  const out = [];
-  let aberta = null; // 'chorus' | 'verse' | 'bridge'
-  let emTab = false;
-  const fecharTab = () => { if (emTab) { out.push('{end_of_tab}'); emTab = false; } };
-  const fechar = () => {
-    fecharTab();
-    if (!aberta) return;
-    while (out.length && !out[out.length - 1].trim()) out.pop();
-    out.push(`{end_of_${aberta}}`, '');
-    aberta = null;
-  };
-  for (const linha of linhas) {
-    const cab = cabecalho(linha);
-    if (cab) {
-      fechar();
-      const tipo = tipoSecao(cab.nome);
-      if (tipo === 'comment' || cab.tab) {
-        out.push(`{comment: ${cab.nome}}`);
-        if (cab.resto.trim()) out.push(cab.resto);
-      } else {
-        out.push(`{start_of_${tipo}: ${cab.nome}}`);
-        aberta = tipo;
-        if (cab.resto.trim()) out.push(cab.resto);
-      }
-      continue;
-    }
-    if (linhaTab(linha)) {
-      if (!emTab) { out.push('{start_of_tab}'); emTab = true; }
-      out.push(linha.replace(/\s+$/, ''));
-      continue;
-    }
-    fecharTab();
-    // logo depois do título da parte, linhas em branco são descartadas
-    if (!linha.trim() && /^\{start_of_\w+:/.test(out[out.length - 1] || '')) continue;
-    out.push(linha.replace(/\s+$/, ''));
-  }
-  fechar();
-  return chordsOverLyricsToChordPro(out.join('\n').replace(/\n{3,}/g, '\n\n').trim());
-}
+export const cifraTextoParaChordPro = (texto) => doEditor(texto);
 
 const pegar = (html, re) => { const m = re.exec(html); return m ? decodeEntities(m[1].replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim() : ''; };
 

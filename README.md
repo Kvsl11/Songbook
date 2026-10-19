@@ -73,6 +73,10 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   e entra no repertório. A **Biblioteca** abre em Repertórios.
 - **Parte da missa editável**: no editor, "Parte da missa" (Entrada, Aclamação…) fica sempre disponível; no repertório (ícone de lista na linha, na fila ou tocando no nome da parte
   na música) troque a parte (Entrada, Comunhão…) a qualquer momento; ao adicionar uma música, o app pergunta a parte.
+- **Editor simples**: as partes são uma linha só — toque em **Refrão**, **Estrofe**, **Ponte** ou **Intro** onde a parte
+  começa e tudo dali para baixo pertence a ela, até a próxima (`[Refrão]`, `[Estrofe 2]`…); **Repetir refrão** e
+  **Observação** (ex.: `(2x)`). Sem códigos `{start_of_chorus}`: o app converte para ChordPro ao salvar.
+  O texto ocupa a tela; a prévia abre no botão **Ver prévia** (sem dividir a tela) e há **Tela cheia**.
 - **Editor de cifra**: modo **Só a letra** (corrige o texto e os acordes voltam às mesmas sílabas), campos de
   composição e vídeo (com busca no YouTube), botão "Trazer da internet"; acordes na linha de cima da letra (como num caderno) ou entre [colchetes]; campos de título, autor, tom e vídeo; prévia ao vivo; acordes do tom para
   inserir com um toque; transposição permanente; conversão de "cifra sobre a letra". Cantos vindos da

@@ -204,7 +204,7 @@ export function transposeChordPro(src, semitones, preferFlats = false) {
 export function chordProToChordsOverLyrics(src) {
   const out = [];
   for (const line of String(src || '').replace(/\r\n?/g, '\n').split('\n')) {
-    if (/^\s*\{.*\}\s*$/.test(line) || !/\[[^\]]*\]/.test(line)) { out.push(line); continue; }
+    if (/^\s*\{.*\}\s*$/.test(line) || !/\[[^\]]*\]/.test(line) || ehCabecalho(line)) { out.push(line); continue; }
     let acordes = '';
     let letra = '';
     for (const seg of splitChordLine(line)) {
@@ -323,7 +323,7 @@ export function ehInstrumental(texto) {
 // ---------------------------------------------------------------- editar só a letra
 // Mostra a música sem os acordes (para corrigir a letra) e, ao salvar, devolve cada acorde à
 // mesma sílaba. Linhas só de acordes (introdução, passagens) ficam escondidas e são mantidas.
-const ehDiretiva = (l) => /^\s*\{.*\}\s*$/.test(l);
+const ehDiretiva = (l) => /^\s*\{.*\}\s*$/.test(l) || Boolean(ehCabecalho(l)); // diretiva ou "[Refrão]"
 const semAcordes = (l) => l.replace(/\[[^\]]*\]/g, '');
 const soAcordes = (l) => !ehDiretiva(l) && /\[[^\]]*\]/.test(l) && !semAcordes(l).trim();
 
@@ -415,4 +415,114 @@ export function definirMeta(src, chave, valor) {
   while (i < linhas.length && /^\s*\{\s*(title|t|subtitle|st|artist|a|key|youtube|composer|lyricist|album|year)\s*:/i.test(linhas[i])) i++;
   linhas.splice(i, 0, `{${chave}: ${valor}}`);
   return linhas.join('\n');
+}
+
+// ---------------------------------------------------------------- editor simples
+// No editor, as partes da música são só uma linha com o nome entre colchetes: [Refrão], [Estrofe 2],
+// [Ponte], [Intro]… Tudo o que vem abaixo pertence a ela até a próxima. [Repetir refrão] repete o
+// refrão e uma linha só entre parênteses, como (2x), vira comentário. Ao salvar vira ChordPro.
+
+// "[Refrão]" ou "[Intro] G D" (nome que não é acorde). Devolve { nome, resto, tab } ou null
+export function ehCabecalho(linha) {
+  const m = /^\s*\[([^\]]{2,40})\]\s*(.*)$/.exec(String(linha || ''));
+  if (!m || isChord(m[1].trim()) || !/\p{L}{2,}/u.test(m[1])) return null;
+  return { nome: m[1].trim().replace(/^tab\s*-\s*/i, ''), resto: m[2], tab: /^tab\b/i.test(m[1].trim()) };
+}
+
+const TIPOS_PARTE = [
+  [/^(refr[ãa]o|coro|chorus)/i, 'chorus'],
+  [/^(ponte|bridge)/i, 'bridge'],
+  [/^(intro|introdu[çc][ãa]o|solo|final|riff|dedilhado|interl[úu]dio|tab|base|instrumental|outro)/i, 'comment'],
+];
+const tipoDaParte = (nome) => (TIPOS_PARTE.find(([re]) => re.test(nome.trim())) || [null, 'verse'])[1];
+const linhaDeTab = (l) => /^\s*[A-Ga-g]?[#b]?\s*\|[-\d|hpbrx/\\~().* ]{4,}\|?\s*$/.test(l) || /^\s*[eBGDAE]\s*[-|][-\d|hpbrx/\\~().* ]{6,}$/.test(l);
+
+// texto do editor (ou cifra colada: acordes em cima ou entre colchetes, partes em [Nome]) -> ChordPro
+export function doEditor(texto) {
+  const linhas = String(texto || '').replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n');
+  const out = [];
+  let aberta = null; // tipo da parte aberta: chorus | verse | bridge
+  let emTab = false;
+  let espaco = false; // linha em branco dentro de uma parte
+  const fecharTab = () => { if (emTab) { out.push('{end_of_tab}'); emTab = false; } };
+  const fechar = () => {
+    fecharTab();
+    espaco = false;
+    if (!aberta) return;
+    while (out.length && !out[out.length - 1].trim()) out.pop();
+    out.push(`{end_of_${aberta}}`, '');
+    aberta = null;
+  };
+  for (const bruta of linhas) {
+    const linha = bruta.replace(/\s+$/, '');
+    if (/^\s*\{.*\}\s*$/.test(linha)) {
+      // ChordPro escrito à mão continua valendo
+      if (/^\s*\{\s*(start_of_|so[cvbt]\s*[:}]|end_of_|eo[cvbt]\s*[:}]|chorus\s*[:}])/i.test(linha)) fechar();
+      out.push(linha);
+      continue;
+    }
+    const cab = ehCabecalho(linha);
+    if (cab) {
+      fechar();
+      if (/^repetir\b|^refr[ãa]o\s*\(?(repete|bis|2x)/i.test(cab.nome)) { out.push('{chorus}', ''); continue; }
+      const tipo = cab.tab ? 'comment' : tipoDaParte(cab.nome);
+      if (tipo === 'comment') {
+        out.push(`{comment: ${cab.nome}}`);
+        if (cab.resto.trim()) out.push(cab.resto);
+        continue;
+      }
+      const rotulo = /^(estrofe|refr[ãa]o|ponte)$/i.test(cab.nome) ? '' : cab.nome; // o nome padrão já aparece sozinho
+      out.push(rotulo ? `{start_of_${tipo}: ${rotulo}}` : `{start_of_${tipo}}`);
+      aberta = tipo;
+      if (cab.resto.trim()) out.push(cab.resto);
+      continue;
+    }
+    if (linhaDeTab(linha)) {
+      if (!emTab) { out.push('{start_of_tab}'); emTab = true; }
+      out.push(linha);
+      continue;
+    }
+    fecharTab();
+    if (!linha.trim()) {
+      if (aberta) espaco = /^\{start_of_/.test(out[out.length - 1] || '') ? false : true;
+      else out.push('');
+      continue;
+    }
+    // estrofes separadas por linha em branco dentro de [Estrofe]/[Ponte] continuam separadas
+    if (espaco && aberta && aberta !== 'chorus') {
+      const t = aberta;
+      fechar();
+      out.push(`{start_of_${t}}`);
+      aberta = t;
+    }
+    espaco = false;
+    const coment = /^\s*\(([^()]+)\)\s*$/.exec(linha);
+    if (coment && !isChordOnlyLine(linha)) { out.push(`{comment: ${coment[1].trim()}}`); continue; }
+    out.push(linha);
+  }
+  fechar();
+  return chordsOverLyricsToChordPro(out.join('\n').replace(/\n{3,}/g, '\n\n').trim());
+}
+
+// ChordPro -> texto do editor (partes em [Nome], acordes entre colchetes na letra)
+export function paraEditor(src) {
+  const out = [];
+  let precisaParte = false; // depois de fechar uma parte, a letra solta precisa de um [Estrofe]
+  for (const linha of String(src || '').replace(/\r\n?/g, '\n').split('\n')) {
+    const d = /^\s*\{\s*([^:}]+?)\s*(?::\s*(.*?))?\s*\}\s*$/.exec(linha);
+    if (d) {
+      const n = d[1].toLowerCase();
+      const v = (d[2] || '').trim();
+      const abre = { start_of_chorus: 'Refrão', soc: 'Refrão', start_of_verse: 'Estrofe', sov: 'Estrofe', start_of_bridge: 'Ponte', sob: 'Ponte', start_of_tab: 'Tab', sot: 'Tab' }[n];
+      if (abre) { out.push(`[${v || abre}]`); precisaParte = false; continue; }
+      if (/^(end_of_\w+|eo[cvbt])$/.test(n)) { precisaParte = true; continue; }
+      if (n === 'chorus') { out.push('[Repetir refrão]'); precisaParte = false; continue; }
+      if (/^(comment|c|ci|comment_italic)$/.test(n)) { out.push(`(${v})`); continue; }
+      out.push(linha);
+      continue;
+    }
+    if (linha.trim() && precisaParte) { out.push('[Estrofe]'); precisaParte = false; }
+    out.push(linha);
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '');
 }

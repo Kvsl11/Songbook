@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   cifraTextoParaChordPro, ehCifraClub, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
 } from '../public/js/lib/web.js';
-import { aplicarLetra, definirMeta, letraDe, parseChordPro } from '../public/js/chordpro.js';
+import { aplicarLetra, definirMeta, doEditor, letraDe, paraEditor, parseChordPro } from '../public/js/chordpro.js';
 
 test('lê a busca do Cifra Club (JSONP) e monta links e capas', () => {
   const json = lerJsonp('({"response":{"docs":[{"t":"1","m":"Artista","d":"artista"},{"t":"2","m":"Noites Traiçoeiras","a":"Padre Marcelo Rossi","i":"7/6/4/6/abc-tb.jpg","d":"padre-marcelo-rossi","u":"noite-traicoeira"}]}})');
@@ -42,10 +42,10 @@ B|-----3-----|
   assert.equal(c.tom, 'G');
   assert.match(c.chordpro, /\{youtube: https:\/\/www\.youtube\.com\/watch\?v=abcdefghijk\}/);
   assert.match(c.chordpro, /\{start_of_verse: Primeira Parte\}/);
-  assert.match(c.chordpro, /\{start_of_chorus: Refrão\}\n\[Em\] {3}Eu me ale\[C\]grarei\n\{end_of_chorus\}/);
+  assert.match(c.chordpro, /\{start_of_chorus\}\n\[Em\] {3}Eu me ale\[C\]grarei\n\{end_of_chorus\}/);
   assert.match(c.chordpro, /\{start_of_tab\}\nE\|---3---2---\|/);
   const { sections } = parseChordPro(c.chordpro);
-  assert.ok(sections.some((s) => s.type === 'chorus' && s.label === 'Refrão'));
+  assert.ok(sections.some((s) => s.type === 'chorus'));
   assert.ok(!/\[Primeira Parte\]/.test(c.chordpro));
 });
 
@@ -84,4 +84,16 @@ test('troca e remove diretivas (vídeo, etc.)', () => {
   const com = definirMeta(src, 'spotify', 'https://open.spotify.com/track/x');
   assert.equal(com, '{title: A}\n{artist: B}\n{spotify: https://open.spotify.com/track/x}\n\n[G]x');
   assert.equal(definirMeta(com, 'spotify', ''), src);
+});
+
+test('editor simples: [Refrão] vale até a próxima parte e volta igual', () => {
+  const pro = doEditor('[Refrão]\nG        D\nAleluia aleluia\nsegunda linha\n\n[Estrofe 1]\nPrimeira estrofe\n\nSegunda estrofe\n\n[Repetir refrão]\n(2x)');
+  const secs = parseChordPro(pro).sections.map((x) => `${x.type}:${x.label}:${x.lines.length}`);
+  assert.deepEqual(secs, ['chorus::2', 'verse:Estrofe 1:1', 'verse::1', 'chorus::2', 'verse::1']);
+  assert.match(pro, /\{comment: 2x\}/);
+  const original = '{start_of_chorus}\n[G]Ale[D]luia\n{end_of_chorus}\n\nVerso solto\n\n{chorus}';
+  const ed = paraEditor(original);
+  assert.equal(ed, '[Refrão]\n[G]Ale[D]luia\n\n[Estrofe]\nVerso solto\n\n[Repetir refrão]');
+  const tipos = (x) => parseChordPro(x).sections.map((y) => y.type).join(',');
+  assert.equal(tipos(doEditor(ed)), tipos(original));
 });

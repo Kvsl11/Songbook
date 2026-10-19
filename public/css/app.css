@@ -620,19 +620,31 @@ dialog { max-height: calc(100dvh - 24px); overflow-y: auto; overflow-x: hidden; 
 .editor-split textarea:focus { outline: none; border-color: var(--accent); }
 .editor-prev { background: var(--bg-elev); border-radius: 8px; padding: 16px; max-height: 75vh; overflow: auto; }
 .editor-prev .song { font-size: 15px; }
-.editor .tabs-mob { display: flex; gap: 8px; }
+.editor .tabs-ed { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .chord-pal { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .chord-pal .chip { font-family: var(--sans); font-weight: 800; color: var(--accent-ink); }
 .chord-pal small { color: var(--muted); font-size: 12px; font-weight: 700; margin-right: 4px; }
 .editor .barra { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .editor .barra .seg { height: 36px; }
 .editor .barra .seg button { height: 30px; }
-@media (min-width: 1000px) {
-  .editor-split { grid-template-columns: 1fr 1fr; align-items: start; }
-  .editor .tabs-mob { display: none; }
-  .editor-split > [hidden] { display: block !important; }
-  .editor-prev { position: sticky; top: 70px; }
+.editor .barra .chip.parte { background: var(--accent-soft); color: var(--accent-ink); font-weight: 800; }
+/* editor: o texto ocupa a tela; a prévia abre no botão (sem dividir a tela, nem no tablet) */
+.editor-split textarea { min-height: max(60vh, calc(100dvh - 330px)); }
+.editor-prev { max-height: none; }
+/* tela cheia: só o texto, as partes e os botões */
+.editor.cheio {
+  position: fixed; inset: 0; z-index: 45; background: var(--bg); padding: calc(10px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 10px; overflow: hidden;
 }
+.editor.cheio > .campos, .editor.cheio > #dica, .editor.cheio > .row:not(:last-child) { display: none; }
+.editor.cheio .barra { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; flex: none; }
+.editor.cheio .barra::-webkit-scrollbar { display: none; }
+.editor.cheio .barra > * { flex: none; }
+.editor.cheio .chord-pal { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; flex: none; }
+.editor.cheio .editor-split { flex: 1; min-height: 0; display: flex; }
+.editor.cheio .editor-split textarea { flex: 1; min-height: 0; height: 100%; resize: none; }
+.editor.cheio .editor-prev { flex: 1; overflow: auto; }
+body.editando-cheio .nav, body.editando-cheio #player { display: none !important; }
 @media (max-width: 600px) { .editor .campos { grid-template-columns: 1fr; } }
 
 /* ============================================================ cores / tema */
