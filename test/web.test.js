@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cifraTextoParaChordPro, ehCifraClub, simplificarCifra, parseLetras, resultadosLetras, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
+  cifraTextoParaChordPro, ehCifraClub, simplificarCifra, parseLetras, resultadosLetras, lerLrc, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
 } from '../public/js/lib/web.js';
-import { aplicarLetra, definirMeta, doEditor, letraDe, paraEditor, parseChordPro } from '../public/js/chordpro.js';
+import { aplicarEstrutura, aplicarLetra, definirMeta, doEditor, letraDe, linhasDaLetra, paraEditor, parseChordPro } from '../public/js/chordpro.js';
 
 test('lê a busca do Cifra Club (JSONP) e monta links e capas', () => {
   const json = lerJsonp('({"response":{"docs":[{"t":"1","m":"Artista","d":"artista"},{"t":"2","m":"Noites Traiçoeiras","a":"Padre Marcelo Rossi","i":"7/6/4/6/abc-tb.jpg","d":"padre-marcelo-rossi","u":"noite-traicoeira"}]}})');
@@ -120,4 +120,18 @@ test('Letras.mus.br: busca e página da letra', () => {
   assert.equal(l.artista, 'Padre Marcelo Rossi');
   assert.equal(l.compositor, 'Carlos Papae');
   assert.equal(l.letra, 'Deus está aqui\nneste momento\n\nE ainda se vier\nnoite traíçoeira');
+});
+
+test('letra sincronizada (LRC): tempos em segundos e em ordem', () => {
+  const l = lerLrc('[ar: X]\n[00:11.11] Tu és a minha porção\n[01:02.50][00:16.17] Tu és a minha herança\n[00:20.00]');
+  assert.deepEqual(l.map((x) => [Math.round(x.t * 100) / 100, x.texto]), [[11.11, 'Tu és a minha porção'], [16.17, 'Tu és a minha herança'], [20, ''], [62.5, 'Tu és a minha herança']]);
+});
+
+test('partes vindas da IA: só coloca as marcações, sem mudar a letra', () => {
+  const pro = '[G]Deus está [D]aqui\nNeste momento\n\nE ainda se [C]vier\nnoite traiçoeira\n\nDeus está aqui\nde novo';
+  assert.deepEqual(linhasDaLetra(pro), ['Deus está aqui', 'Neste momento', 'E ainda se vier', 'noite traiçoeira', 'Deus está aqui', 'de novo']);
+  const r = aplicarEstrutura(pro, [{ inicio: 1, tipo: 'estrofe' }, { inicio: 3, tipo: 'refrao' }, { inicio: 5, tipo: 'estrofe' }]);
+  assert.deepEqual(parseChordPro(r).sections.map((x) => `${x.type}:${x.label}`), ['verse:Estrofe 1', 'chorus:', 'verse:Estrofe 2']);
+  assert.deepEqual(linhasDaLetra(r), linhasDaLetra(pro));
+  assert.match(r, /\[G\]Deus está \[D\]aqui/);
 });

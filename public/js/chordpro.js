@@ -526,3 +526,40 @@ export function paraEditor(src) {
   }
   return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '');
 }
+
+// ---------------------------------------------------------------- partes da música (organizar com IA)
+// A IA recebe só as linhas da letra, numeradas, e devolve onde começa cada parte. O app só coloca
+// as marcações ([Refrão], [Estrofe 2]…): nenhuma palavra ou acorde é alterado.
+const NOMES_PARTE = { refrao: 'Refrão', estrofe: 'Estrofe', ponte: 'Ponte', 'pre-refrao': 'Pré-refrão', intro: 'Intro', final: 'Final' };
+const ehLinhaDeLetra = (l) => l.trim() && !ehDiretiva(l) && !soAcordes(l) && !/^\s*\([^()]*\)\s*$/.test(l);
+
+export function linhasDaLetra(src) {
+  return paraEditor(src).split('\n').filter(ehLinhaDeLetra).map((l) => semAcordes(l).replace(/\s+/g, ' ').trim());
+}
+
+// partes: [{ inicio: nº da linha (1 = primeira), tipo: 'refrao' | 'estrofe' | 'ponte' | 'pre-refrao' | 'intro' | 'final' }]
+export function aplicarEstrutura(src, partes) {
+  const inicios = new Map((partes || []).filter((p) => Number.isInteger(p.inicio) && NOMES_PARTE[p.tipo]).map((p) => [p.inicio, p.tipo]));
+  const out = [];
+  let pendentes = []; // linhas de acordes / observações que vêm antes de um verso
+  let n = 0;
+  let estrofes = 0;
+  for (const l of paraEditor(src).split('\n')) {
+    if (ehCabecalho(l)) continue; // as marcações antigas saem; as novas vêm da IA
+    if (!ehLinhaDeLetra(l)) { pendentes.push(l); continue; }
+    n++;
+    const tipo = inicios.get(n);
+    if (tipo) {
+      // linhas em branco vão antes da marcação; acordes e observações ficam junto do verso
+      const brancas = [];
+      while (pendentes.length && !pendentes[0].trim()) brancas.push(pendentes.shift());
+      out.push(...brancas);
+      if (out.length && out[out.length - 1].trim()) out.push('');
+      out.push(`[${tipo === 'estrofe' ? `Estrofe ${++estrofes}` : NOMES_PARTE[tipo]}]`);
+    }
+    out.push(...pendentes, l);
+    pendentes = [];
+  }
+  out.push(...pendentes);
+  return doEditor(out.join('\n'));
+}

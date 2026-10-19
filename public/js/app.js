@@ -3,10 +3,11 @@ import { esc, renderSong } from './render.js';
 import { definirMeta, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra } from './chordpro.js';
 import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
+import { chaveIA, organizarPartes } from './ia.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
 import { buscarYoutube, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
-import { buscarCifraClub, buscarLetras, getCifraClub, getLetra, buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
+import { buscarCifraClub, buscarLetras, buscarLetraSincronizada, getCifraClub, getLetra, buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const view = $('#view');
@@ -41,7 +42,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-67';
+export const APP_VERSAO = '2026.10.19-68';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -388,6 +389,7 @@ const player = (() => {
   let atual = null;
   let estado = 'parado'; // tocando | pausado | parado
   let tempo = 0;
+  let marcaTempo = 0;
   let duracao = 0;
   // na página da própria música o vídeo toca lá (na telinha das Referências); fora dela, no mini player
   let palco = null;
@@ -415,13 +417,27 @@ const player = (() => {
   const mini = $('.pl-video', el); // espaço reservado no mini player
   const noPalco = () => Boolean(atual && palco?.isConnected && palcoDe === atual.youtube);
   const iframeAtual = () => tela.querySelector('iframe');
+  // Na página da música: o vídeo começa na telinha das Referências (dá para pular o anúncio); quando o
+  // clipe começa de verdade, vai para o topo da música, por trás do título (como o Canvas do Spotify).
+  let fundo = null; // topo da música (área do vídeo de fundo)
+  let verAqui = false; // o usuário pediu para ver na telinha
+  const noFundo = () => Boolean(noPalco() && fundo?.isConnected && !verAqui && estado === 'tocando' && tempo > 1.5);
+  let modoAnterior = '';
   const alvo = () => {
     if (!atual) return null;
     if (noPalco()) {
-      let a = palco.querySelector('.pl-alvo');
-      if (!a) { palco.innerHTML = '<div class="video-embed pl-alvo"></div>'; a = palco.querySelector('.pl-alvo'); }
-      return a;
+      const modo = noFundo() ? 'fundo' : 'telinha';
+      if (modo !== modoAnterior) {
+        modoAnterior = modo;
+        fundo?.closest('.song-topo')?.classList.toggle('com-video', modo === 'fundo');
+        palco.innerHTML = modo === 'fundo'
+          ? `<div class="video-no-topo">${icon('video', 18)}<span>O vídeo está passando no topo da música</span><button class="btn small" data-ver-aqui>Ver aqui</button></div>`
+          : '<div class="video-embed pl-alvo"></div>';
+        palco.querySelector('[data-ver-aqui]')?.addEventListener('click', () => { verAqui = true; });
+      }
+      return modo === 'fundo' ? fundo : palco.querySelector('.pl-alvo');
     }
+    modoAnterior = '';
     return el.hidden ? null : mini;
   };
   // acompanha o lugar do vídeo a cada quadro (rolagem, troca de tela, ampliar)
@@ -437,6 +453,7 @@ const player = (() => {
     tela.style.width = r.width + 'px';
     tela.style.height = r.height + 'px';
     tela.classList.toggle('no-palco', noPalco());
+    tela.classList.toggle('no-fundo', a === fundo);
   };
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
   const avisar = () => ouvintes.forEach((fn) => fn());
@@ -465,6 +482,9 @@ const player = (() => {
   const api = {
     get atual() { return atual; },
     get estado() { return estado; },
+    // segundos do vídeo agora (o YouTube avisa algumas vezes por segundo; entre um aviso e outro, estima)
+    get tempoAgora() { return tempo + (estado === 'tocando' && marcaTempo ? (performance.now() - marcaTempo) / 1000 : 0); },
+    get duracao() { return duracao; },
     tocandoAgora: (youtube) => Boolean(atual && atual.youtube === youtube && estado === 'tocando'),
     ouvir(fn) { ouvintes.add(fn); return () => ouvintes.delete(fn); },
     tocar(item) {
@@ -489,9 +509,12 @@ const player = (() => {
       avisar();
     },
     // a página da música avisa onde fica a telinha do vídeo dela (box) — ou null ao sair da página
-    palco(box, youtube = '') {
+    palco(box, youtube = '', topo = null) {
       palco = box;
       palcoDe = box ? youtube : '';
+      fundo = topo;
+      verAqui = false;
+      modoAnterior = '';
       mostrarBarra();
       return noPalco();
     },
@@ -535,7 +558,7 @@ const player = (() => {
       }
       const info = msg?.info;
       if (!info) return;
-      if (typeof info.currentTime === 'number') tempo = info.currentTime;
+      if (typeof info.currentTime === 'number') { tempo = info.currentTime; marcaTempo = performance.now(); }
       if (typeof info.duration === 'number' && info.duration > 0) duracao = info.duration;
       const antes = estado;
       if (info.playerState === 1) estado = 'tocando';
@@ -555,7 +578,10 @@ const player = (() => {
       if (s) escolherVideo(s).then((url) => { if (!url) return; db.saveSong({ ...db.song(s.id), content: definirMeta(db.song(s.id).content, 'youtube', url) }); api.tocar({ ...atual, youtube: youtubeId(url) }); route(); });
     }
     if (b.dataset.pl === 'ampliar') { el.classList.toggle('grande'); b.innerHTML = icon(el.classList.contains('grande') ? 'shrink' : 'expand', 18); }
-    if (b.dataset.pl === 'abrir' && atual?.href && location.hash !== atual.href) location.hash = atual.href;
+    if (b.dataset.pl === 'abrir' && atual) {
+      if (atual.href && location.hash !== atual.href) location.hash = atual.href;
+      else if (!atual.href && atual.abrir) atual.abrir();
+    }
   });
   return api;
 })();
@@ -813,20 +839,15 @@ async function pickSong() {
           + (songs.length ? '' : `<p class="muted">Nada na biblioteca. <button class="link-btn" data-ir-internet>Procurar “${esc(q)}” na internet</button></p>`);
         return;
       }
-      if (!q) { box.innerHTML = '<p class="muted">Digite o nome da música: o app procura a cifra (Cifra Club), os cantos da missa, a letra e o vídeo do YouTube.</p>'; return; }
+      if (!q) { box.innerHTML = '<p class="muted">Digite o nome da música: o app procura a cifra (Cifra Club), a letra (Letras) e o vídeo do YouTube.</p>'; return; }
       const meu = ++seq;
       achados = {};
-      box.innerHTML = secao('Cifras — Cifra Club', 'pk-cc') + secao('Cantos da missa', 'pk-missa') + secao('Letras — Letras.mus.br', 'pk-lt') + secao('Vídeos — YouTube', 'pk-yt');
+      box.innerHTML = secao('Cifras — Cifra Club', 'pk-cc') + secao('Letras — Letras.mus.br', 'pk-lt') + secao('Vídeos — YouTube', 'pk-yt');
       clearTimeout(timer);
       timer = setTimeout(() => {
         const encher = (id, tipo, p, linha = linhaSimples) => p.then((itens) => { if (meu !== seq || !$('#' + id, dlg)) return; achados[tipo] = itens; $('#' + id, dlg).innerHTML = lista(tipo, itens, linha); })
           .catch(() => { if (meu === seq && $('#' + id, dlg)) $('#' + id, dlg).innerHTML = '<p class="muted" style="margin:4px 0">Não respondeu agora.</p>'; });
         encher('pk-cc', 'cifraclub', buscarCifraClub(q).then((l) => l.slice(0, 6)));
-        encher('pk-missa', 'canto', Promise.all([
-          buscarCindy(q).then((l) => l.slice(0, 5).map((c) => ({ titulo: c.titulo, sub: 'cindyferrarezi.com', capa: c.capa, url: c.url }))).catch(() => []),
-          indiceMusicasParaMissa().then((ind) => ind.filter((m) => normalizar(m.titulo + ' ' + (m.artista || '')).includes(normalizar(q))).slice(0, 5)
-            .map((m) => ({ titulo: m.titulo, sub: 'Músicas para Missa' + (m.temCifra ? ' · com cifra' : ''), url: `https://musicasparamissa.com.br/musica/${m.slug}/` }))),
-        ]).then(([a, b]) => [...a, ...b]));
         encher('pk-lt', 'letra', buscarLetras(q).then((l) => l.slice(0, 4)));
         encher('pk-yt', 'video', buscarYoutube(q).then((l) => l.slice(0, 5)), (v, i) => linhaVideo(v, i, `<span class="chip sm">${icon('plus', 13)} Adicionar</span>`));
       }, 400);
@@ -1340,6 +1361,30 @@ const linhaWeb = (r, i, origem, extra = '') => `
     ${capa({ titulo: r.titulo, capa: r.capa }, { ic: origem === 'letra' ? 'text' : 'music' })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${esc([r.artista, r.album].filter(Boolean).join(' · '))}</div></div>
     <span class="acts">${extra}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 
+// vídeo tocado direto da busca: abre como música, já com a letra (Letras) quando encontrar
+async function abrirVideoComoMusica(v) {
+  // "Padre Marcelo Rossi - Deus Está Aqui (Noites Traiçoeiras) ft. Belo" -> artista e título
+  const limpo = tituloDoVideo(v.titulo).replace(/\s+(ft\.?|feat\.?|part\.?|com)\s.+$/i, '').trim();
+  const [artista, titulo] = / - /.test(limpo) ? [limpo.split(' - ')[0].trim(), limpo.split(' - ').slice(1).join(' - ').trim()] : [v.canal, limpo];
+  const extra = (/\(([^)]+)\)/.exec(v.titulo) || [])[1] || ''; // às vezes o nome conhecido vem entre parênteses
+  toast('Abrindo a música…');
+  let content = `{title: ${titulo}}\n{artist: ${artista}}\n{youtube: ${v.url}}\n\n{comment: Sem letra ainda: toque em Editar → Trazer da internet}\n`;
+  try {
+    let achada = null;
+    for (const q of [`${titulo} ${artista}`, extra && !/oficial|official|ao vivo|live|clipe|v[ií]deo|lyric|letra/i.test(extra) ? `${extra} ${artista}` : '', titulo].filter(Boolean)) {
+      achada = (await buscarLetras(q))[0];
+      if (achada) break;
+    }
+    if (achada) {
+      const l = await trazerLetra(achada);
+      content = definirMeta(letraParaChordPro({ titulo: l.titulo, artista: l.artista, compositor: l.compositor, letra: l.letra, fonte: achada.url }), 'youtube', v.url);
+    }
+  } catch { /* fica sem letra */ }
+  const back = location.hash;
+  await abrirPrevia(content, '', back);
+  if (player.atual?.youtube === v.id) player.tocar({ ...player.atual, href: '#/musica/previa' });
+}
+
 // leva para a Buscar já procurando cifras desta música
 function buscarCifraNoApp(song) {
   sessionStorage.setItem('busca', [song.title.replace(/\s*[–—-]\s*cifra.*$/i, ''), song.artist].filter(Boolean).join(' '));
@@ -1474,7 +1519,7 @@ function viewSearch() {
   setTint('#2d2d2d');
   setHeader('Buscar', { actions: [{ icon: 'download', label: 'Importar cifra ou letra da internet', onClick: () => importarDaInternet() }] });
   const q = sessionStorage.getItem('busca') || '';
-  const FILTROS = [['tudo', 'Tudo'], ['cifras', 'Cifras'], ['letras', 'Letras'], ['videos', 'Vídeos'], ['missa', 'Cantos da missa'], ['biblioteca', 'Biblioteca']];
+  const FILTROS = [['tudo', 'Tudo'], ['cifras', 'Cifras'], ['letras', 'Letras'], ['videos', 'Vídeos'], ['biblioteca', 'Biblioteca']];
   let filtro = sessionStorage.getItem('buscaFiltro') || 'tudo';
   if (!FILTROS.some(([k]) => k === filtro)) filtro = 'tudo';
   view.innerHTML = `
@@ -1483,7 +1528,7 @@ function viewSearch() {
     <div class="chips" id="filtros" style="margin-top:12px">${FILTROS.map(([k, n]) => `<button class="chip" data-f="${k}" aria-pressed="${k === filtro}">${n}</button>`).join('')}</div>
     <div id="res"></div>`;
   const res = $('#res');
-  ligarListaCindy(res, '#/buscar');
+  res.addEventListener('click', (e) => { const lm = e.target.closest('li[data-id]'); if (lm) location.hash = '#/musica/' + lm.dataset.id; });
   let achados = { cifraclub: [], letra: [], videos: [] };
   const procurarCifraDe = (termo) => {
     sessionStorage.setItem('busca', termo);
@@ -1496,7 +1541,7 @@ function viewSearch() {
       const v = achados.videos[Number(lv.dataset.video)];
       if (!v) return;
       if (e.target.closest('[data-cifra]')) { procurarCifraDe(tituloDoVideo(v.titulo)); return; }
-      player.tocar({ youtube: v.id, titulo: tituloDoVideo(v.titulo), artista: v.canal });
+      player.tocar({ youtube: v.id, titulo: tituloDoVideo(v.titulo), artista: v.canal, abrir: () => abrirVideoComoMusica(v) });
       return;
     }
     const li = e.target.closest('li[data-web]');
@@ -1515,9 +1560,7 @@ function viewSearch() {
     term = term.trim();
     if (!term) {
       res.innerHTML = `
-        <div class="busca-dica">${icon('sparkles', 18)}<span>Busque qualquer música: cifras do <b>Cifra Club</b>, letras, vídeos do <b>YouTube</b> e os cantos litúrgicos. Achou a cifra em outro site? <button class="link-btn" id="btn-importar">Cole aqui</button>.</span></div>
-        <div class="shelf-head"><h2>Navegar por todas as seções</h2></div>
-        <div class="cat-grid">${CATEGORIAS.map(([n, id, ic], i) => `<a class="cat" href="#/buscar/categoria/${id}/${encodeURIComponent(n)}" style="--h:${(i * 47 + 200) % 360}">${esc(n)}${icon(ic, 60)}</a>`).join('')}</div>`;
+        <div class="busca-dica">${icon('sparkles', 18)}<span>Busque qualquer música: cifras do <b>Cifra Club</b>, letras do <b>Letras</b> e vídeos do <b>YouTube</b>. Achou a cifra em outro site? <button class="link-btn" id="btn-importar">Cole aqui</button>.</span></div>`;
       $('#btn-importar').onclick = () => importarDaInternet();
       return;
     }
@@ -1528,13 +1571,8 @@ function viewSearch() {
     if (mostra('biblioteca') && (locais.length || filtro === 'biblioteca')) blocos.push(`<div class="shelf-head"><h2>Na sua biblioteca</h2></div>${locais.length ? `<ul class="tracks">${locais.map((s) => linhaMusica(s, s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '')).join('')}</ul>` : '<p class="muted">Nada na biblioteca.</p>'}`);
     if (mostra('cifras')) blocos.push(caixa('cc-res', 'Cifra Club', `<a href="https://www.cifraclub.com.br/?q=${encodeURIComponent(term)}" target="_blank" rel="noopener">cifraclub.com.br</a>`));
     if (mostra('videos')) blocos.push(caixa('yt-res', 'Vídeos', `<a href="${esc(ytBusca(term))}" target="_blank" rel="noopener">youtube.com</a>`));
-    if (mostra('missa')) blocos.push(caixa('online', 'Cantos cifrados', `<a href="https://cindyferrarezi.com/?s=${encodeURIComponent(term)}" target="_blank" rel="noopener">cindyferrarezi.com</a>`) + '<div id="mpm-res"></div>');
     if (mostra('letras')) blocos.push(caixa('lt-res', 'Letras', `<a href="https://www.letras.mus.br/?q=${encodeURIComponent(term)}" target="_blank" rel="noopener">letras.mus.br</a>`));
-    if (filtro === 'tudo' || filtro === 'cifras' || filtro === 'letras') blocos.push(`<div class="shelf-head"><h2>Na internet</h2></div><div class="refs-grid">
-      <a class="ref-card" href="https://www.google.com/search?q=${encodeURIComponent('cifra ' + term)}" target="_blank" rel="noopener"><span class="ico">${icon('search', 22)}</span><span><b>Cifra de “${esc(term)}”</b><small>Procurar em todos os sites</small></span></a>
-      <button class="ref-card" id="btn-importar"><span class="ico">${icon('download', 22)}</span><span><b>Colar cifra ou letra</b><small>De qualquer site, o app organiza</small></span></button></div>`);
     res.innerHTML = blocos.join('');
-    $('#btn-importar')?.addEventListener('click', () => importarDaInternet({ titulo: term }));
     const vivo = (id) => meu === seq && $('#' + id);
     clearTimeout(timer);
     timer = setTimeout(() => {
@@ -1561,20 +1599,6 @@ function viewSearch() {
         }).catch(() => {
           if (vivo('yt-res')) $('#yt-res').innerHTML = `<div class="refs-grid"><a class="ref-card" href="${esc(ytBusca(term))}" target="_blank" rel="noopener"><span class="ico">${icon('youtube', 22)}</span><span><b>Procurar “${esc(term)}”</b><small>A busca de vídeos não respondeu: abrir no YouTube</small></span></a></div>`;
         });
-      }
-      if (mostra('missa')) {
-        indiceMusicasParaMissa().then((indice) => {
-          const box = $('#mpm-res');
-          if (!box || meu !== seq) return;
-          const achadas = indice.filter((m) => normalizar(m.titulo + ' ' + (m.artista || '')).includes(t)).slice(0, 12);
-          if (!achadas.length) return;
-          box.innerHTML = `<div class="shelf-head"><h2>Músicas para Missa</h2><a href="https://musicasparamissa.com.br/" target="_blank" rel="noopener">musicasparamissa.com.br</a></div>
-            <ul class="tracks">${achadas.map((m) => linhaCindy({ titulo: m.titulo + (m.artista ? ` (${m.artista})` : ''), url: `https://musicasparamissa.com.br/musica/${m.slug}/`, data: '' }).replace('cindyferrarezi.com · ', `Músicas para Missa${m.temCifra ? ' · com cifra' : ' · só letra'} `)).join('')}</ul>`;
-        });
-        buscarCindy(term).then((lista) => {
-          if (!vivo('online')) return;
-          $('#online').innerHTML = lista.length ? `<ul class="tracks">${lista.map(linhaCindy).join('')}</ul>` : '<p class="muted">Nenhum canto encontrado.</p>';
-        }).catch((e) => vivo('online') && erro('online', e));
       }
     }, 400);
   };
@@ -1729,6 +1753,12 @@ let scrollTimer = null;
 function stopScroll() { cancelAnimationFrame(scrollTimer); scrollTimer = null; }
 
 let preview = null; // música temporária (vinda da busca/liturgia, ainda não salva)
+// a música temporária fica guardada na sessão, para voltar ao recarregar a página
+const CHAVE_PREVIA = 'songbook.previa';
+const guardarPrevia = () => { try { if (preview) sessionStorage.setItem(CHAVE_PREVIA, JSON.stringify({ ...preview, lrc: undefined })); } catch { /* sem espaço */ } };
+try { preview = JSON.parse(sessionStorage.getItem(CHAVE_PREVIA) || 'null'); } catch { preview = null; }
+addEventListener('pagehide', guardarPrevia);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') guardarPrevia(); });
 let keyHandler = null;
 
 function viewSong(id, ctx = {}) {
@@ -1736,6 +1766,7 @@ function viewSong(id, ctx = {}) {
   const isPreview = id === 'previa';
   let song = isPreview ? preview : db.song(id);
   if (!song) return viewNotFound();
+  if (isPreview) guardarPrevia();
   if (isPreview) {
     const r = renderSong(song.content);
     song = { ...song, title: r.meta.title || 'Canto', artist: r.meta.artist || r.meta.subtitle || '', youtube: youtubeId(r.meta.youtube) || '', cover: r.meta.cover || '', pdf: r.meta.pdf || '', key: r.key, composer: r.meta.composer || r.meta.lyricist || '' };
@@ -1774,12 +1805,15 @@ function viewSong(id, ctx = {}) {
            <a class="icon-btn" href="#/editar/${song.id}" aria-label="Editar" title="Editar cifra">${icon('edit', 22)}</a>`}
       <button class="icon-btn" id="btn-palco" aria-label="Só a letra (tela cheia)" title="Só a letra, tela cheia">${icon('expand', 22)}</button>
       <button class="icon-btn" id="btn-pdf" aria-label="Exportar PDF" title="Exportar em PDF (com ou sem cifra)">${icon('file', 22)}</button>
+      <button class="icon-btn" id="btn-ia" aria-label="Organizar as partes com IA" title="Organizar refrão e estrofes com a IA do Claude">${icon('sparkles', 22)}</button>
       ${ctx.set ? `<button class="icon-btn" id="btn-fila" aria-label="Fila do repertório" title="Fila: próximas músicas">${icon('queue', 24)}</button>` : ''}
       ${semCifra ? '<div class="seg-tabs"><span class="chip sm" title="Esta música não tem acordes">Só letra</span></div>' : ''}
     </div>
     ${canvas ? '</div>' : ''}
     <div id="aviso-cifra"></div>
     <div id="aviso-video"></div>
+    <div id="aviso-ia"></div>
+    <div id="aviso-karaoke"></div>
     <div class="song-toolbar ${comCifra ? '' : 'sem-cifra'}" id="tools">
       <div class="seg so-cifra"><button class="tom-btn" data-act="tom" aria-label="Escolher o tom" title="Escolher o tom"><span class="val" id="key"></span>${icon('down', 14)}</button></div>
       <div class="seg so-cifra" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
@@ -2032,6 +2066,116 @@ function viewSong(id, ctx = {}) {
     }
   }
 
+  // ---- organizar as partes (refrão, estrofes…) com a IA do Claude; dá para desfazer
+  const chaveDesfazer = 'desfazerIA:' + (isPreview ? 'previa' : song.id);
+  const gravarConteudo = (content) => { if (isPreview) preview.content = content; else db.saveSong({ ...db.song(song.id), content }); };
+  const avisoIA = () => {
+    const box = $('#aviso-ia');
+    const antes = sessionStorage.getItem(chaveDesfazer);
+    box.innerHTML = antes ? `<div class="aviso">${icon('sparkles', 18)}<span>Partes organizadas pela IA. Confira refrão e estrofes.</span><button class="btn small" data-desfazer-ia>Desfazer</button><button class="icon-btn" data-fechar-ia aria-label="Fechar">${icon('x', 16)}</button></div>` : '';
+  };
+  avisoIA();
+  $('#aviso-ia').addEventListener('click', (e) => {
+    if (e.target.closest('[data-fechar-ia]')) { sessionStorage.removeItem(chaveDesfazer); avisoIA(); }
+    if (e.target.closest('[data-desfazer-ia]')) { gravarConteudo(sessionStorage.getItem(chaveDesfazer)); sessionStorage.removeItem(chaveDesfazer); toast('Voltou como estava'); route(); }
+  });
+  $('#btn-ia').onclick = async () => {
+    if (!chaveIA()) {
+      if (await ask({ title: 'Organizar com IA', text: 'Para usar a IA do Claude, informe uma chave da API da Anthropic em Ajustes → Inteligência artificial. Ela fica só neste aparelho.', ok: 'Abrir Ajustes' })) location.hash = '#/ajustes/ia';
+      return;
+    }
+    const b = $('#btn-ia');
+    b.disabled = true;
+    b.innerHTML = '<span class="spin"></span>';
+    try {
+      const novo = await organizarPartes(song.content, { titulo: song.title, artista: song.artist });
+      sessionStorage.setItem(chaveDesfazer, song.content);
+      gravarConteudo(novo);
+      toast('Partes organizadas pela IA');
+      route();
+    } catch (e) {
+      toast(e.message, 4500);
+      b.disabled = false;
+      b.innerHTML = icon('sparkles', 22);
+    }
+  };
+
+  // ---- letra acompanhando a música (como no Spotify), só no modo sem cifra
+  // Os tempos de cada verso vêm de um banco aberto de letras sincronizadas (LRCLIB); o tempo do vídeo
+  // vem do player. Tocar num verso enquanto toca acerta o tempo (fica salvo na música).
+  if (song.youtube && db.prefs().karaoke !== false) {
+    const dono = isPreview ? preview : db.song(song.id);
+    let lrc = dono?.lrc;
+    let buscando = false;
+    let mapa = [];
+    let mapaDe = null;
+    let atualEl = null;
+    let ultimoToque = 0;
+    const norm = (t) => normalizar(t).split(' ').filter(Boolean);
+    const parecido = (a, b) => { const A = norm(a); const B = new Set(norm(b)); return A.length ? A.filter((w) => B.has(w)).length / Math.max(A.length, B.size) : 0; };
+    // casa cada verso com tempo com uma linha da letra na tela, em ordem
+    const mapear = () => {
+      const linhas = [...songEl.querySelectorAll('.line:not(.chords-only)')].filter((el) => el.textContent.trim());
+      mapa = [];
+      let j = 0;
+      for (const v of lrc.linhas) {
+        if (!v.texto) continue;
+        for (let k = j; k < Math.min(linhas.length, j + 8); k++) {
+          if (parecido(v.texto, linhas[k].textContent) >= 0.6) { mapa.push({ t: v.t, el: linhas[k] }); j = k + 1; break; }
+        }
+      }
+      mapaDe = songEl.firstElementChild;
+    };
+    const limpar = () => {
+      songEl.classList.remove('karaoke');
+      songEl.querySelectorAll('.agora, .cantada').forEach((x) => x.classList.remove('agora', 'cantada'));
+      atualEl = null;
+      $('#aviso-karaoke').innerHTML = '';
+    };
+    const marcar = () => {
+      if (comCifra || player.atual?.youtube !== song.youtube || player.estado === 'parado') { if (songEl.classList.contains('karaoke')) limpar(); return; }
+      if (lrc === undefined && !buscando) {
+        buscando = true;
+        buscarLetraSincronizada({ titulo: song.title, artista: song.artist, duracao: player.duracao })
+          .then((r) => { lrc = r && r.linhas.length ? r : null; }).catch(() => { lrc = null; })
+          .finally(() => { buscando = false; if (dono) { dono.lrc = lrc; if (!isPreview) db.updateSong(song.id, { lrc }); } });
+        return;
+      }
+      if (!lrc) return;
+      if (mapaDe !== songEl.firstElementChild) mapear();
+      if (!mapa.length) return;
+      if (!songEl.classList.contains('karaoke')) {
+        songEl.classList.add('karaoke');
+        $('#aviso-karaoke').innerHTML = `<div class="aviso">${icon('music', 18)}<span>A letra acompanha a música. Se estiver adiantada ou atrasada, toque no verso que está sendo cantado.</span></div>`;
+      }
+      const agora = player.tempoAgora - (dono?.lrcAjuste || 0);
+      let i = -1;
+      for (let k = 0; k < mapa.length && mapa[k].t <= agora; k++) i = k;
+      const el = i >= 0 ? mapa[i].el : null;
+      if (el === atualEl) return;
+      mapa.forEach((m, k) => { m.el.classList.toggle('cantada', k < i); m.el.classList.toggle('agora', k === i); });
+      atualEl = el;
+      // rola sozinho até o verso atual (menos logo depois de o usuário rolar a página)
+      if (el && Date.now() - ultimoToque > 4000) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+    const rolou = () => { ultimoToque = Date.now(); };
+    view.addEventListener('touchmove', rolou, { passive: true });
+    view.addEventListener('wheel', rolou, { passive: true });
+    songEl.addEventListener('click', (e) => {
+      if (!songEl.classList.contains('karaoke')) return;
+      const linha = e.target.closest('.line');
+      const m = mapa.find((x) => x.el === linha);
+      if (!m || !dono) return;
+      dono.lrcAjuste = player.tempoAgora - m.t;
+      if (!isPreview) db.updateSong(song.id, { lrcAjuste: dono.lrcAjuste });
+      atualEl = null;
+      ultimoToque = 0;
+      toast('Tempo da letra acertado');
+    });
+    const relogio = setInterval(marcar, 250);
+    aoSair(() => { clearInterval(relogio); view.removeEventListener('touchmove', rolou); view.removeEventListener('wheel', rolou); });
+  }
+
   // topo com os quadros do clipe: a capa sai quando o 1º quadro carrega; o tipo de quadro fica salvo
   if (canvas) {
     const topo = view.querySelector('.song-topo');
@@ -2050,7 +2194,7 @@ function viewSong(id, ctx = {}) {
 
   // nesta página o vídeo toca aqui (Referências); ao sair, continua no mini player
   if (song.youtube) {
-    player.palco($('#video-box'), song.youtube);
+    player.palco($('#video-box'), song.youtube, view.querySelector('.canvas-fundo'));
     aoSair(() => player.palco(null));
   }
 
@@ -2292,6 +2436,7 @@ function viewEditor(id, setId) {
         <button class="chip" id="completar" title="Repete a sequência de acordes da estrofe cifrada nas estrofes que estão sem acordes">${icon('sparkles', 14)} Completar cifra</button>
         <button class="chip" id="conv" title="Organiza cifra colada de outro site (acordes numa linha, letra na outra)">${icon('sparkles', 14)} Organizar cifra colada</button>
         <button class="chip" id="trazer" title="Buscar no Cifra Club ou colar cifra/letra de qualquer site">${icon('download', 14)} Trazer da internet</button>
+        <button class="chip" id="ed-ia" title="A IA do Claude marca refrão, estrofes e ponte (sem mudar a letra)">${icon('sparkles', 14)} Organizar partes (IA)</button>
       </div>
       <div class="row" style="gap:6px"><span class="muted" style="font-size:12px;font-weight:700">Editar:</span>
         <button class="chip" data-formato="acima" aria-pressed="${formato === 'acima'}">${icon('chord', 14)} Cifra (acordes em cima)</button>
@@ -2408,6 +2553,26 @@ function viewEditor(id, setId) {
     toast('Cifra trazida para o editor — confira e salve');
   } });
   $('#trazer').onclick = trazerDaInternet;
+  let antesDaIA = null;
+  $('#ed-ia').onclick = async () => {
+    const b = $('#ed-ia');
+    if (antesDaIA !== null) { ta.value = antesDaIA; antesDaIA = null; b.innerHTML = `${icon('sparkles', 14)} Organizar partes (IA)`; atualizar(); toast('Voltou como estava'); return; }
+    if (!chaveIA()) { if (await ask({ title: 'Organizar com IA', text: 'Informe a chave da API do Claude em Ajustes → Inteligência artificial.', ok: 'Abrir Ajustes' })) location.hash = '#/ajustes/ia'; return; }
+    b.disabled = true;
+    b.innerHTML = '<span class="spin"></span> Organizando…';
+    try {
+      const novo = await organizarPartes(montar(), { titulo: campo('title').value.trim(), artista: campo('artist').value.trim() });
+      antesDaIA = ta.value;
+      ta.value = exibir(separarMeta(novo).corpo);
+      atualizar();
+      b.innerHTML = `${icon('undo', 14)} Desfazer IA`;
+      toast('Partes organizadas pela IA: confira e salve');
+    } catch (e) {
+      toast(e.message, 4500);
+      b.innerHTML = `${icon('sparkles', 14)} Organizar partes (IA)`;
+    }
+    b.disabled = false;
+  };
   $('#f-yt-buscar').onclick = async () => {
     const url = await escolherVideo({ title: campo('title').value.trim(), artist: campo('artist').value.trim(), youtube: youtubeId(campo('yt').value) });
     if (url !== null) campo('yt').value = url;
@@ -2845,7 +3010,21 @@ function viewSettings() {
 
     <div class="section-title">Página da música</div>
     <div class="settings-group">
+      <label class="setting"><span class="ico">${icon('music', 18)}</span><div class="grow"><div class="t">Letra acompanhando a música</div><div class="s">No modo só letra, enquanto o vídeo toca, o verso cantado fica em destaque e a letra rola sozinha (como no Spotify)</div></div><input type="checkbox" class="switch" id="karaoke" ${p.karaoke !== false ? 'checked' : ''}></label>
       <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo no topo da música</div><div class="s">Um trecho do clipe passa sem som atrás do título, como no Spotify. Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
+    </div>
+
+    <div class="section-title" id="ia">Inteligência artificial (Claude)</div>
+    <div class="settings-group">
+      <div class="setting"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Organizar partes com IA</div><div class="s" id="ia-status"></div></div></div>
+      <details class="setting-ajuda"${p.claudeKey ? '' : ' open'}><summary>Como ativar</summary>
+        <ol>
+          <li>Entre em <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> (conta da Anthropic, a empresa do Claude) e coloque créditos em <b>Billing</b>.</li>
+          <li>Em <b>API Keys</b>, toque em <b>Create Key</b> e copie a chave (começa com <code>sk-ant-</code>).</li>
+          <li>Cole abaixo. Ela fica só neste aparelho. Cada música organizada custa menos de 10 centavos.</li>
+        </ol>
+        <label class="campo-livre">Chave da API do Claude<input class="input" id="ia-chave" type="password" value="${esc(p.claudeKey || '')}" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"></label>
+      </details>
     </div>
 
     ${jaInstalado() ? '' : `<div class="section-title">App</div>
@@ -2921,6 +3100,11 @@ function viewSettings() {
     $('#destaque').querySelectorAll('[data-v]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   };
   $('#video-fundo').onchange = (e) => db.setPref('videoFundo', e.target.checked);
+  $('#karaoke').onchange = (e) => db.setPref('karaoke', e.target.checked);
+  const statusIA = () => { $('#ia-status').textContent = db.prefs().claudeKey ? 'Ativo: use o botão ✨ na música ou no editor para marcar refrão e estrofes' : 'Desligado: informe a chave da API do Claude'; };
+  statusIA();
+  $('#ia-chave').onchange = (e) => { db.setPref('claudeKey', e.target.value.trim()); statusIA(); toast(e.target.value.trim() ? 'Chave salva neste aparelho' : 'Chave removida'); };
+  if (/\/ia$/.test(location.hash)) setTimeout(() => $('#ia')?.scrollIntoView({ block: 'start' }), 50);
   $('#exp').onclick = () => download(`songbook-backup-${hojeISO()}.json`, db.exportAll(), 'application/json');
   $('#imp').onclick = openImport;
   $('#clr').onclick = async () => {
@@ -2934,6 +3118,13 @@ function viewSettings() {
 }
 
 function viewNotFound() {
+  // ao recarregar numa tela que não existe mais (música temporária, item excluído), volta ao início
+  if (rotaInicial) {
+    rotaInicial = false;
+    history.replaceState(null, '', '#/');
+    route();
+    return;
+  }
   setHeader('Não encontrado', { back: '#/' });
   view.innerHTML = `<div class="empty"><div class="bubble">${icon('search', 30)}</div><h3>Item não encontrado</h3><p>Ele pode ter sido excluído.</p><a class="btn" href="#/">Voltar ao início</a></div>`;
 }
@@ -3081,7 +3272,9 @@ function route() {
 $('#side-sets').addEventListener('click', (e) => { const li = e.target.closest('li[data-href]'); if (li && !e.target.closest('a')) location.hash = li.dataset.href; });
 window.addEventListener('hashchange', route);
 applyTheme();
+let rotaInicial = true; // a 1ª tela ao abrir/recarregar o app
 route();
+rotaInicial = false;
 
 // Service worker: sempre procura a versão nova; quando ela assume, recarrega a página uma vez.
 // ---------------------------------------------------------------- instalar como app

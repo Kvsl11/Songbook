@@ -11,9 +11,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 
 - **Início**: saudação, atalhos, a liturgia de hoje, seus repertórios, tocadas e adicionadas recentemente.
 - **Buscar (qualquer música)**: digite música, artista ou trecho e o app procura ao mesmo tempo no
-  **Cifra Club** (cifras, com capas), em **letras** (Letras.mus.br), no **YouTube** (vídeos), nos cantos cifrados de
-  cindyferrarezi.com e do Músicas para Missa e na sua biblioteca. Filtros: Tudo, Cifras, Letras, Vídeos,
-  Cantos da missa, Biblioteca. Também traz atalhos para procurar a cifra em toda a internet, no Letras.mus.br e no YouTube.
+  **Cifra Club** (cifras), no **Letras** (letras) e no **YouTube** (vídeos), além da sua biblioteca.
+  Filtros: Tudo, Cifras, Letras, Vídeos, Biblioteca. Um vídeo tocado direto da busca abre como música (com a letra) ao tocar no mini player.
 - **Importar da internet**: tocar numa cifra do Cifra Club abre a cifra já organizada (partes, refrão, tom e
   capotraste), na **versão simplificada**: sem tablaturas, riffs e solos. Como o site não deixa outros apps lerem a página, o app a lê pelo Jina Reader
   (serviço público); se ele não responder, abre o "Importar da internet": copie a cifra no site e cole
@@ -21,6 +20,11 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   Ao abrir uma música da busca (Cifra Club, letras, cantos), o app procura o vídeo no YouTube sozinho e já
   vincula; se não achar, mostra o aviso com "Escolher vídeo".
 
+- **Organizar partes com IA (Claude)**: o botão ✨ na música e no editor pede à IA do Claude (chave da API da
+  Anthropic informada em Ajustes, guardada só no aparelho) que marque refrão, estrofes, ponte; só as marcações mudam,
+  nunca a letra ou os acordes, e dá para desfazer (`js/ia.js`).
+- **Letra acompanhando a música**: no modo só letra, enquanto o vídeo toca, o verso cantado acende e a letra rola
+  sozinha, com os tempos de cada verso de um banco aberto de letras sincronizadas (LRCLIB); tocar num verso acerta o tempo.
 - **Player como no Spotify**: na página da música o vídeo toca na telinha das Referências; ao sair dela, continua no mini player
   sem parar nem repetir anúncio (é o mesmo vídeo, que só muda de lugar na tela) fixo acima do menu, com o vídeo do YouTube
   pequeno, nome, parte da missa, tempo e barra de progresso; a música continua tocando enquanto você navega.

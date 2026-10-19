@@ -7,7 +7,7 @@ import { getMissa as getMissaDireto } from './lib/missa.js';
 import { buscarCantos as buscarDireto, getCanto as getCantoDireto } from './lib/cindy.js';
 import { ehMpm, getMusicaMpm } from './lib/mpm.js';
 import { getLiturgia as getLiturgiaDireto } from './lib/cnbb.js';
-import { buscarCifraClub as buscarCifraClubDireto, buscarLetras as buscarLetrasDireto, getCifraClub as getCifraClubDireto, getLetra as getLetraDireto, PROXIES_PUBLICOS } from './lib/web.js';
+import { buscarCifraClub as buscarCifraClubDireto, buscarLetras as buscarLetrasDireto, getCifraClub as getCifraClubDireto, getLetra as getLetraDireto, buscarLetraSincronizada as buscarSincronizadaDireto, PROXIES_PUBLICOS } from './lib/web.js';
 
 const PREFIXO = 'songbook.cache.';
 const VALIDADE = 12 * 3600e3;
@@ -163,4 +163,10 @@ export function getLetra(url) {
     try { return await viaServidor('api/letra?url=' + encodeURIComponent(url)); } catch { /* sem servidor: segue */ }
     return getLetraDireto(url, { proxies: PROXIES_PUBLICOS });
   }, 'api/letra?url=' + encodeURIComponent(url));
+}
+
+// letra com os tempos dos versos (para acompanhar a música)
+export function buscarLetraSincronizada(dados) {
+  const chave = `lrc:${dados.titulo}|${dados.artista}|${Math.round(dados.duracao || 0)}`.toLowerCase();
+  return obter(chave, () => buscarSincronizadaDireto(dados), 'api/lrc?' + new URLSearchParams({ titulo: dados.titulo || '', artista: dados.artista || '' }));
 }
