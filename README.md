@@ -10,9 +10,12 @@ ofertório, comunhão etc.).
 Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em degradê e player embutido:
 
 - **Início**: saudação, atalhos, a liturgia de hoje, seus repertórios, tocadas e adicionadas recentemente.
-- **Buscar (qualquer música)**: digite música, artista ou trecho e o app procura ao mesmo tempo no
-  **Cifra Club** (cifras), no **Letras** (letras) e no **YouTube** (vídeos), além da sua biblioteca.
-  Filtros: Tudo, Cifras, Letras, Vídeos, Biblioteca. Um vídeo tocado direto da busca abre como música (com a letra) ao tocar no mini player.
+- **Buscar (qualquer música)**: digite música, artista ou trecho e aparece uma lista só de **Músicas** (resultados do
+  Cifra Club e do Letras juntos) e os **Vídeos** do YouTube. Tocar numa música já traz tudo junto: a **cifra** (Cifra
+  Club, que já tem a letra; sem cifra, a letra do Letras), o **vídeo** do YouTube e o compositor. Um vídeo tocado
+  direto da busca abre como música do mesmo jeito, com cifra e letra. Filtros: Tudo, Músicas, Vídeos, Biblioteca.
+- **Cifra automática**: uma letra que veio da internet sem acordes procura sozinha a cifra da mesma música no
+  Cifra Club e troca (mantendo vídeo, parte da missa e quadros); se não achar, fica como está, sem aviso.
 - **Importar da internet**: tocar numa cifra do Cifra Club abre a cifra já organizada (partes, refrão, tom e
   capotraste), na **versão simplificada**: sem tablaturas, riffs e solos. Como o site não deixa outros apps lerem a página, o app a lê pelo Jina Reader
   (serviço público); se ele não responder, abre o "Importar da internet": copie a cifra no site e cole
@@ -25,7 +28,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   nunca a letra ou os acordes, e dá para desfazer (`js/ia.js`).
 - **Letra acompanhando a música**: no modo só letra, enquanto o vídeo toca, o verso cantado acende e a letra rola
   sozinha, com os tempos de cada verso de um banco aberto de letras sincronizadas (LRCLIB); tocar num verso leva a
-  música até ele (como no Spotify), e os botões "Letra atrasada/adiantada" acertam o tempo. O vídeo começa no topo
+  música até ele (como no Spotify). É automático: os tempos só são usados se forem da mesma gravação do vídeo
+  (mesma duração) e se a letra bater com a da página; refrão repetido volta para o refrão escrito; se não der, a letra não acompanha. O vídeo começa no topo
   da música (onde dá para pular o anúncio) e depois fica atrás do título; em Referências dá para assisti-lo com os controles.
 - **Player como no Spotify**: na página da música o vídeo toca no topo, atrás do título; ao sair dela, continua no mini player
   sem parar nem repetir anúncio (é o mesmo vídeo, que só muda de lugar na tela) fixo acima do menu, com o vídeo do YouTube

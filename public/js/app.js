@@ -6,7 +6,7 @@ import { diagramaSvg } from './acordes.js';
 import { chaveIA, organizarPartes } from './ia.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
-import { buscarYoutube, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { buscarYoutube, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, mesmaDuracao, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarCifraClub, buscarLetras, buscarLetraSincronizada, getCifraClub, getLetra, buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -42,7 +42,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-70';
+export const APP_VERSAO = '2026.10.19-71';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -861,16 +861,15 @@ async function pickSong() {
           + (songs.length ? '' : `<p class="muted">Nada na biblioteca. <button class="link-btn" data-ir-internet>Procurar “${esc(q)}” na internet</button></p>`);
         return;
       }
-      if (!q) { box.innerHTML = '<p class="muted">Digite o nome da música: o app procura a cifra (Cifra Club), a letra (Letras) e o vídeo do YouTube.</p>'; return; }
+      if (!q) { box.innerHTML = '<p class="muted">Digite o nome da música: ao escolher, ela já vem com a cifra (Cifra Club), a letra (Letras) e o vídeo do YouTube.</p>'; return; }
       const meu = ++seq;
       achados = {};
-      box.innerHTML = secao('Cifras — Cifra Club', 'pk-cc') + secao('Letras — Letras.mus.br', 'pk-lt') + secao('Vídeos — YouTube', 'pk-yt');
+      box.innerHTML = secao('Músicas — com cifra, letra e vídeo', 'pk-mu') + secao('Vídeos — YouTube', 'pk-yt');
       clearTimeout(timer);
       timer = setTimeout(() => {
         const encher = (id, tipo, p, linha = linhaSimples) => p.then((itens) => { if (meu !== seq || !$('#' + id, dlg)) return; achados[tipo] = itens; $('#' + id, dlg).innerHTML = lista(tipo, itens, linha); })
           .catch(() => { if (meu === seq && $('#' + id, dlg)) $('#' + id, dlg).innerHTML = '<p class="muted" style="margin:4px 0">Não respondeu agora.</p>'; });
-        encher('pk-cc', 'cifraclub', buscarCifraClub(q).then((l) => l.slice(0, 6)));
-        encher('pk-lt', 'letra', buscarLetras(q).then((l) => l.slice(0, 4)));
+        encher('pk-mu', 'musica', buscarMusicas(q).then((l) => l.slice(0, 8)));
         encher('pk-yt', 'video', buscarYoutube(q).then((l) => l.slice(0, 5)), (v, i) => linhaVideo(v, i, `<span class="chip sm">${icon('plus', 13)} Adicionar</span>`));
       }, 400);
     };
@@ -892,39 +891,22 @@ async function pickSong() {
   return salvarDaInternet(r.tipo, r.item);
 }
 
-// Salva na biblioteca uma música achada na internet e devolve o id (ou null se não deu)
+// Salva na biblioteca uma música achada na internet (já com cifra, letra e vídeo) e devolve o id
 async function salvarDaInternet(tipo, item) {
-  const ja = db.songBySource(item.url);
+  const ja = db.songBySource(item.cifra || item.letra?.url || item.url);
   if (ja) return ja.id;
   toast('Trazendo a música…');
-  let content = '';
-  let source = item.url || '';
+  let r;
   try {
-    if (tipo === 'cifraclub') {
-      try { content = (await getCifraClub(item.url)).chordpro; } catch {
-        const r = await importarDaInternet({ titulo: item.titulo, artista: item.artista, url: item.url, aviso: true, paraEditor: (x) => x });
-        if (!r) return null;
-        content = r.content;
-      }
-    } else if (tipo === 'canto') {
-      const c = await getCanto(item.url);
-      content = c.chordpro;
-      source = c.url;
-    } else if (tipo === 'letra') {
-      const l = await trazerLetra(item);
-      content = letraParaChordPro({ titulo: l.titulo, artista: l.artista, compositor: l.compositor, letra: l.letra, fonte: item.url });
-    } else if (tipo === 'video') {
-      content = `{title: ${tituloDoVideo(item.titulo)}}\n{artist: ${item.canal}}\n{youtube: ${item.url}}\n\n{comment: Sem letra ainda: toque em Editar → Trazer da internet}\n`;
-      source = '';
-    }
+    r = await trazerMusica(tipo === 'video' ? { ...nomesDoVideo(item), video: item, artistaIncerto: true } : item);
   } catch (e) {
     toast('Não consegui trazer: ' + e.message);
     return null;
   }
-  const salva = db.saveSong({ content, source });
-  // sem vídeo: procura o do YouTube (dá para trocar depois em Referências)
+  const salva = db.saveSong({ content: r.content, source: r.source });
+  // o vídeo do YouTube (se ainda não veio com a música); dá para trocar depois em Referências
   if (!salva.youtube) {
-    buscarYoutube([salva.title, salva.artist].filter(Boolean).join(' ')).then((vs) => {
+    r.video.then((vs) => {
       const s = db.song(salva.id);
       if (!vs[0] || !s || s.youtube) return;
       db.saveSong({ ...s, content: definirMeta(s.content, 'youtube', vs[0].url) });
@@ -1378,39 +1360,84 @@ function ligarListaCindy(box, back) {
 
 // ---- busca na internet: Cifra Club, Letras e vídeos do YouTube
 
-const linhaWeb = (r, i, origem, extra = '') => `
-  <li class="track clickable" data-web="${origem}" data-i="${i}" style="grid-template-columns:auto 1fr auto">
-    ${capa({ titulo: r.titulo, capa: r.capa }, { ic: origem === 'letra' ? 'text' : 'music' })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${esc([r.artista, r.album].filter(Boolean).join(' · '))}</div></div>
-    <span class="acts">${extra}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
+// ---- a música completa: cifra (Cifra Club), letra (Letras) e vídeo (YouTube), procurados juntos
 
-// vídeo tocado direto da busca: abre como música, já com a letra (Letras) quando encontrar
-async function abrirVideoComoMusica(v) {
-  // "Padre Marcelo Rossi - Deus Está Aqui (Noites Traiçoeiras) ft. Belo" -> artista e título
+const tituloLimpo = (t) => String(t || '').replace(/\s*[([].*?[)\]]\s*/g, ' ').replace(/\s*[–—-]\s*(cifra|letra|ao vivo|live|clipe|oficial).*$/i, '').trim();
+const mesmoNome = (a, b) => { const A = normalizar(a); const B = normalizar(b); return !!A && !!B && (A === B || ` ${A} `.includes(` ${B} `) || ` ${B} `.includes(` ${A} `)); };
+// entre os resultados de uma busca, a mesma música: mesmo título e (quando se sabe) mesmo artista
+function mesmaMusica(lista, titulo, artista, artistaIncerto = false) {
+  const t = tituloLimpo(titulo);
+  const doTitulo = lista.filter((r) => mesmoNome(tituloLimpo(r.titulo), t));
+  return doTitulo.find((r) => !artista || mesmoNome(r.artista, artista)) || (artistaIncerto || !artista ? doTitulo[0] : null) || null;
+}
+
+// "Padre Marcelo Rossi - Deus Está Aqui (Noites Traiçoeiras) ft. Belo" -> artista e título
+function nomesDoVideo(v) {
   const limpo = tituloDoVideo(v.titulo).replace(/\s+(ft\.?|feat\.?|part\.?|com)\s.+$/i, '').trim();
-  const [artista, titulo] = / - /.test(limpo) ? [limpo.split(' - ')[0].trim(), limpo.split(' - ').slice(1).join(' - ').trim()] : [v.canal, limpo];
-  const extra = (/\(([^)]+)\)/.exec(v.titulo) || [])[1] || ''; // às vezes o nome conhecido vem entre parênteses
-  toast('Abrindo a música…');
-  let content = `{title: ${titulo}}\n{artist: ${artista}}\n{youtube: ${v.url}}\n\n{comment: Sem letra ainda: toque em Editar → Trazer da internet}\n`;
+  const [artista, titulo] = / - /.test(limpo) ? [limpo.split(' - ')[0].trim(), limpo.split(' - ').slice(1).join(' - ').trim()] : [v.canal || '', limpo];
+  return { titulo: tituloLimpo(titulo) || titulo, artista };
+}
+
+// Traz tudo de uma vez: a cifra do Cifra Club (que já tem a letra); sem cifra, a letra do Letras; e o
+// vídeo do YouTube. Devolve { content, source, video } (video é a busca, que pode ainda estar andando).
+async function trazerMusica({ titulo, artista = '', cifra = '', letra = null, video = null, artistaIncerto = false }) {
+  const termo = `${tituloLimpo(titulo)} ${artista}`.trim();
+  const pVideo = video ? Promise.resolve([video]) : buscarYoutube(termo).catch(() => []);
+  const pCifra = (async () => {
+    const url = cifra || mesmaMusica(await buscarCifraClub(termo), titulo, artista, artistaIncerto)?.url;
+    return url ? { ...(await getCifraClub(url)), url } : null;
+  })().catch(() => null);
+  const pLetra = (async () => {
+    const item = letra || mesmaMusica(await buscarLetras(termo), titulo, artista, artistaIncerto);
+    return item ? { ...(await trazerLetra(item)), url: item.url } : null;
+  })().catch(() => null);
+  const c = await pCifra;
+  let content;
+  let source;
+  if (c) {
+    content = c.chordpro;
+    source = c.url;
+    // o Letras costuma ter o compositor: entra nos créditos se chegar logo
+    const l = await Promise.race([pLetra, new Promise((r) => setTimeout(() => r(null), 1500))]);
+    if (l?.compositor && !renderSong(content).meta.composer) content = definirMeta(content, 'composer', l.compositor);
+  } else {
+    const l = await pLetra;
+    if (l) {
+      content = letraParaChordPro({ titulo: l.titulo, artista: l.artista, compositor: l.compositor, letra: l.letra, fonte: l.url });
+      source = l.url;
+    } else {
+      content = `{title: ${titulo}}\n${artista ? `{artist: ${artista}}\n` : ''}\n{comment: Não achei a letra nem a cifra: toque em Editar → Trazer da internet}\n`;
+      source = '';
+    }
+  }
+  if (video) content = definirMeta(content, 'youtube', video.url); // o vídeo escolhido vale mais que o da página da cifra
+  return { content, source, video: pVideo };
+}
+
+// abre a música da busca já com cifra, letra e vídeo
+async function abrirMusica(dados, back, el) {
+  const acts = el?.querySelector('.acts');
+  const antes = acts?.innerHTML;
+  if (acts) acts.innerHTML = '<span class="spin"></span>';
+  else toast('Trazendo a música…');
   try {
-    let achada = null;
-    for (const q of [`${titulo} ${artista}`, extra && !/oficial|official|ao vivo|live|clipe|v[ií]deo|lyric|letra/i.test(extra) ? `${extra} ${artista}` : '', titulo].filter(Boolean)) {
-      achada = (await buscarLetras(q))[0];
-      if (achada) break;
-    }
-    if (achada) {
-      const l = await trazerLetra(achada);
-      content = definirMeta(letraParaChordPro({ titulo: l.titulo, artista: l.artista, compositor: l.compositor, letra: l.letra, fonte: achada.url }), 'youtube', v.url);
-    }
-  } catch { /* fica sem letra */ }
-  const back = location.hash;
-  await abrirPrevia(content, '', back);
+    const r = await trazerMusica(dados);
+    await abrirPrevia(r.content, r.source, back, r.video);
+  } catch (e) {
+    toast('Não consegui trazer: ' + e.message);
+  } finally { if (acts && acts.isConnected) acts.innerHTML = antes; }
+}
+
+// vídeo tocado direto da busca: abre como música, com a cifra e a letra
+async function abrirVideoComoMusica(v) {
+  await abrirMusica({ ...nomesDoVideo(v), video: v, artistaIncerto: true }, location.hash);
   if (player.atual?.youtube === v.id) player.tocar({ ...player.atual, href: '#/musica/previa' });
 }
 
 // leva para a Buscar já procurando cifras desta música
 function buscarCifraNoApp(song) {
   sessionStorage.setItem('busca', [song.title.replace(/\s*[–—-]\s*cifra.*$/i, ''), song.artist].filter(Boolean).join(' '));
-  sessionStorage.setItem('buscaFiltro', 'cifras');
+  sessionStorage.setItem('buscaFiltro', 'musicas');
   location.hash = '#/buscar';
 }
 
@@ -1440,21 +1467,6 @@ async function abrirPrevia(content, source, back, videoJa = null) {
   if (jaNaPrevia) route(); else location.hash = '#/musica/previa';
 }
 
-// Cifra do Cifra Club: tenta abrir direto; se o site não deixar, oferece colar a cifra copiada
-async function abrirCifraClub(item, el, back) {
-  const acts = el?.querySelector('.acts');
-  const antes = acts?.innerHTML;
-  if (acts) acts.innerHTML = '<span class="spin"></span>';
-  try {
-    const video = buscarYoutube(`${item.titulo} ${item.artista || ''}`).catch(() => []); // ao mesmo tempo que a cifra
-    const c = await getCifraClub(item.url);
-    await abrirPrevia(c.chordpro, item.url, back, video);
-  } catch {
-    if (acts) acts.innerHTML = antes;
-    importarDaInternet({ ...item, back, aviso: true });
-  }
-}
-
 // Letra: do Letras (lida na hora) ou do LRCLIB (já vem com a letra); se o Letras não abrir, tenta o LRCLIB
 async function trazerLetra(item) {
   if (item.letra) return item;
@@ -1462,20 +1474,6 @@ async function trazerLetra(item) {
     const alt = (await buscarLetras(`${item.titulo} ${item.artista}`).catch(() => [])).find((x) => x.letra);
     if (alt) return { ...alt, url: item.url };
     throw new Error('O Letras não respondeu agora');
-  }
-}
-
-async function abrirLetra(item, back, el) {
-  const acts = el?.querySelector('.acts');
-  const antes = acts?.innerHTML;
-  if (acts) acts.innerHTML = '<span class="spin"></span>';
-  try {
-    const video = buscarYoutube(`${item.titulo} ${item.artista || ''}`).catch(() => []); // ao mesmo tempo que a letra
-    const l = await trazerLetra(item);
-    await abrirPrevia(letraParaChordPro({ titulo: l.titulo, artista: l.artista, compositor: l.compositor, letra: l.letra, fonte: item.url }), item.url, back, video);
-  } catch {
-    if (acts) acts.innerHTML = antes;
-    importarDaInternet({ titulo: item.titulo, artista: item.artista, url: item.url, back });
   }
 }
 
@@ -1536,12 +1534,36 @@ function importarDaInternet({ titulo = '', artista = '', url = '', back = locati
   });
 }
 
+// Busca de músicas: junta os resultados do Cifra Club e do Letras numa lista só (a mesma música aparece
+// uma vez, com o link da cifra e o da letra)
+async function buscarMusicas(termo) {
+  const [cc, lt] = await Promise.all([buscarCifraClub(termo).catch(() => null), buscarLetras(termo).catch(() => null)]);
+  if (!cc && !lt) throw new Error('As buscas não responderam agora');
+  const lista = [];
+  const chave = (r) => normalizar(tituloLimpo(r.titulo)) + '|' + normalizar(r.artista || '');
+  const por = new Map();
+  for (const r of cc || []) { const k = chave(r); if (!por.has(k)) { const m = { titulo: r.titulo, artista: r.artista, capa: r.capa, cifra: r.url }; por.set(k, m); lista.push(m); } }
+  for (const r of lt || []) {
+    const k = chave(r);
+    const m = por.get(k) || [...por.values()].find((x) => mesmoNome(tituloLimpo(x.titulo), tituloLimpo(r.titulo)) && mesmoNome(x.artista, r.artista));
+    if (m) { m.letra = m.letra || r; m.capa = m.capa || r.capa; continue; }
+    const novo = { titulo: r.titulo, artista: r.artista, capa: r.capa, letra: r };
+    por.set(k, novo);
+    lista.push(novo);
+  }
+  return lista;
+}
+const linhaMusicaWeb = (r, i, extra = '') => `
+  <li class="track clickable" data-web="musica" data-i="${i}" style="grid-template-columns:auto 1fr auto">
+    ${capa({ titulo: r.titulo, capa: r.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${esc(r.artista || '')}${r.cifra ? ' · com cifra' : ''}</div></div>
+    <span class="acts">${extra}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
+
 function viewSearch() {
   setTab('buscar');
   setTint('#2d2d2d');
   setHeader('Buscar', { actions: [{ icon: 'download', label: 'Importar cifra ou letra da internet', onClick: () => importarDaInternet() }] });
   const q = sessionStorage.getItem('busca') || '';
-  const FILTROS = [['tudo', 'Tudo'], ['cifras', 'Cifras'], ['letras', 'Letras'], ['videos', 'Vídeos'], ['biblioteca', 'Biblioteca']];
+  const FILTROS = [['tudo', 'Tudo'], ['musicas', 'Músicas'], ['videos', 'Vídeos'], ['biblioteca', 'Biblioteca']];
   let filtro = sessionStorage.getItem('buscaFiltro') || 'tudo';
   if (!FILTROS.some(([k]) => k === filtro)) filtro = 'tudo';
   view.innerHTML = `
@@ -1551,18 +1573,12 @@ function viewSearch() {
     <div id="res"></div>`;
   const res = $('#res');
   res.addEventListener('click', (e) => { const lm = e.target.closest('li[data-id]'); if (lm) location.hash = '#/musica/' + lm.dataset.id; });
-  let achados = { cifraclub: [], letra: [], videos: [] };
-  const procurarCifraDe = (termo) => {
-    sessionStorage.setItem('busca', termo);
-    $('.search').value = termo;
-    definirFiltro('cifras');
-  };
+  let achados = { musica: [], videos: [] };
   res.addEventListener('click', (e) => {
     const lv = e.target.closest('li[data-video]');
     if (lv) {
       const v = achados.videos[Number(lv.dataset.video)];
       if (!v) return;
-      if (e.target.closest('[data-cifra]')) { procurarCifraDe(tituloDoVideo(v.titulo)); return; }
       player.tocar({ youtube: v.id, titulo: tituloDoVideo(v.titulo), artista: v.canal, abrir: () => abrirVideoComoMusica(v) });
       return;
     }
@@ -1570,8 +1586,7 @@ function viewSearch() {
     if (!li) return;
     const item = achados[li.dataset.web][Number(li.dataset.i)];
     if (!item) return;
-    if (li.dataset.web === 'cifraclub') abrirCifraClub(item, li, '#/buscar');
-    else if (li.dataset.web === 'letra') abrirLetra(item, '#/buscar', li);
+    abrirMusica(item, '#/buscar', li);
   });
   let timer;
   let seq = 0;
@@ -1582,7 +1597,7 @@ function viewSearch() {
     term = term.trim();
     if (!term) {
       res.innerHTML = `
-        <div class="busca-dica">${icon('sparkles', 18)}<span>Busque qualquer música: cifras do <b>Cifra Club</b>, letras do <b>Letras</b> e vídeos do <b>YouTube</b>. Achou a cifra em outro site? <button class="link-btn" id="btn-importar">Cole aqui</button>.</span></div>`;
+        <div class="busca-dica">${icon('sparkles', 18)}<span>Busque qualquer música: ao abrir, ela já vem com a cifra (<b>Cifra Club</b>), a letra (<b>Letras</b>) e o vídeo (<b>YouTube</b>). Achou a cifra em outro site? <button class="link-btn" id="btn-importar">Cole aqui</button>.</span></div>`;
       $('#btn-importar').onclick = () => importarDaInternet();
       return;
     }
@@ -1591,33 +1606,25 @@ function viewSearch() {
     const locais = db.songs().filter((s) => normalizar(s.title + ' ' + s.artist + ' ' + s.content).includes(t)).slice(0, filtro === 'biblioteca' ? 50 : 6);
     const blocos = [];
     if (mostra('biblioteca') && (locais.length || filtro === 'biblioteca')) blocos.push(`<div class="shelf-head"><h2>Na sua biblioteca</h2></div>${locais.length ? `<ul class="tracks">${locais.map((s) => linhaMusica(s, s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '')).join('')}</ul>` : '<p class="muted">Nada na biblioteca.</p>'}`);
-    if (mostra('cifras')) blocos.push(caixa('cc-res', 'Cifra Club', `<a href="https://www.cifraclub.com.br/?q=${encodeURIComponent(term)}" target="_blank" rel="noopener">cifraclub.com.br</a>`));
+    if (mostra('musicas')) blocos.push(caixa('mu-res', 'Músicas'));
     if (mostra('videos')) blocos.push(caixa('yt-res', 'Vídeos', `<a href="${esc(ytBusca(term))}" target="_blank" rel="noopener">youtube.com</a>`));
-    if (mostra('letras')) blocos.push(caixa('lt-res', 'Letras', `<a href="https://www.letras.mus.br/?q=${encodeURIComponent(term)}" target="_blank" rel="noopener">letras.mus.br</a>`));
     res.innerHTML = blocos.join('');
     const vivo = (id) => meu === seq && $('#' + id);
     clearTimeout(timer);
     timer = setTimeout(() => {
       if (meu !== seq) return;
-      if (mostra('cifras')) {
-        buscarCifraClub(term).then((lista) => {
-          if (!vivo('cc-res')) return;
-          achados.cifraclub = lista.slice(0, filtro === 'cifras' ? 25 : 8);
-          $('#cc-res').innerHTML = achados.cifraclub.length ? `<ul class="tracks">${achados.cifraclub.map((r, i) => linhaWeb(r, i, 'cifraclub')).join('')}</ul>` : '<p class="muted">Nenhuma cifra encontrada no Cifra Club.</p>';
-        }).catch((e) => vivo('cc-res') && erro('cc-res', 'Não consegui buscar no Cifra Club: ' + e.message));
-      }
-      if (mostra('letras')) {
-        buscarLetras(term).then((lista) => {
-          if (!vivo('lt-res')) return;
-          achados.letra = lista.slice(0, filtro === 'letras' ? 12 : 5);
-          $('#lt-res').innerHTML = achados.letra.length ? `<ul class="tracks">${achados.letra.map((r, i) => linhaWeb(r, i, 'letra')).join('')}</ul>` : '<p class="muted">Nenhuma letra encontrada.</p>';
-        }).catch((e) => vivo('lt-res') && erro('lt-res', 'Não consegui buscar letras: ' + e.message));
+      if (mostra('musicas')) {
+        buscarMusicas(term).then((lista) => {
+          if (!vivo('mu-res')) return;
+          achados.musica = lista.slice(0, filtro === 'musicas' ? 25 : 8);
+          $('#mu-res').innerHTML = achados.musica.length ? `<ul class="tracks">${achados.musica.map((r, i) => linhaMusicaWeb(r, i)).join('')}</ul>` : '<p class="muted">Nenhuma música encontrada.</p>';
+        }).catch((e) => vivo('mu-res') && erro('mu-res', 'Não consegui buscar músicas: ' + e.message));
       }
       if (mostra('videos')) {
         buscarYoutube(term).then((lista) => {
           if (!vivo('yt-res')) return;
           achados.videos = lista.slice(0, filtro === 'videos' ? 15 : 5);
-          $('#yt-res').innerHTML = achados.videos.length ? `<ul class="tracks">${achados.videos.map((v, i) => linhaVideo(v, i, `<button class="icon-btn" aria-label="Tocar" title="Tocar no player">${icon('play', 16)}</button><button class="icon-btn" data-cifra aria-label="Procurar a cifra" title="Procurar a cifra desta música">${icon('chord', 17)}</button>`)).join('')}</ul>` : '<p class="muted">Nenhum vídeo encontrado.</p>';
+          $('#yt-res').innerHTML = achados.videos.length ? `<ul class="tracks">${achados.videos.map((v, i) => linhaVideo(v, i, `<button class="icon-btn" aria-label="Tocar" title="Tocar no player">${icon('play', 16)}</button>`)).join('')}</ul>` : '<p class="muted">Nenhum vídeo encontrado.</p>';
         }).catch(() => {
           if (vivo('yt-res')) $('#yt-res').innerHTML = `<div class="refs-grid"><a class="ref-card" href="${esc(ytBusca(term))}" target="_blank" rel="noopener"><span class="ico">${icon('youtube', 22)}</span><span><b>Procurar “${esc(term)}”</b><small>A busca de vídeos não respondeu: abrir no YouTube</small></span></a></div>`;
         });
@@ -1835,7 +1842,6 @@ function viewSong(id, ctx = {}) {
     <div id="aviso-cifra"></div>
     <div id="aviso-video"></div>
     <div id="aviso-ia"></div>
-    <div id="aviso-karaoke"></div>
     <div class="song-toolbar ${comCifra ? '' : 'sem-cifra'}" id="tools">
       <div class="seg so-cifra"><button class="tom-btn" data-act="tom" aria-label="Escolher o tom" title="Escolher o tom"><span class="val" id="key"></span>${icon('down', 14)}</button></div>
       <div class="seg so-cifra" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
@@ -1929,6 +1935,40 @@ function viewSong(id, ctx = {}) {
   aoSair(() => { fecharPop(); document.removeEventListener('click', fora); view.removeEventListener('scroll', rolouPop); });
   draw();
 
+  // letra que veio da internet sem acordes: procura a cifra da mesma música no Cifra Club e troca sozinho,
+  // mantendo o vídeo, a parte da missa e os quadros (uma vez só; se não achar, fica como está, sem aviso)
+  const trazerCifraSozinho = async () => {
+    const meta = renderSong(song.content).meta;
+    const daInternet = isPreview ? !String(song.source || '').startsWith('cnbb:') : /letras\.mus\.br|lrclib/.test(song.source || '');
+    if (!daInternet || meta.x_sem_cifra || !song.title) return;
+    const conteudoAntes = song.content;
+    const hashAntes = location.hash;
+    let novo = null;
+    try {
+      const achada = mesmaMusica(await buscarCifraClub(`${tituloLimpo(song.title)} ${song.artist || ''}`), song.title, song.artist);
+      if (achada) {
+        const c = await getCifraClub(achada.url);
+        if (temCifra(c.chordpro)) novo = { content: c.chordpro, source: achada.url };
+      }
+    } catch { return; } // sem conexão: tenta de novo na próxima vez
+    const dono = isPreview ? preview : db.song(song.id);
+    const semQuadros = (t) => definirMeta(t, 'x_canvas', ''); // os quadros do vídeo podem ter sido gravados nesse meio-tempo
+    if (!dono || semQuadros(dono.content) !== semQuadros(conteudoAntes)) return; // a letra mudou enquanto procurava
+    if (novo) {
+      const atual = renderSong(dono.content).meta;
+      for (const k of ['youtube', 'x_canvas', 'x_parte', 'composer']) if (atual[k]) novo.content = definirMeta(novo.content, k, atual[k]);
+    }
+    if (!novo) {
+      const content = definirMeta(dono.content, 'x_sem_cifra', '1');
+      if (isPreview) preview.content = content; else db.saveSong({ ...dono, content });
+      song.content = content;
+      return;
+    }
+    if (isPreview) { preview.content = novo.content; preview.source = novo.source; } else db.saveSong({ ...dono, content: novo.content, source: novo.source });
+    toast('Cifra do Cifra Club adicionada');
+    if (location.hash === hashAntes) route();
+  };
+
   // aviso de cifra completada automaticamente / estrofes sem acordes
   const avisoCifra = () => {
     const box = $('#aviso-cifra');
@@ -1936,24 +1976,8 @@ function viewSong(id, ctx = {}) {
     const meta = renderSong(song.content).meta;
     const faltam = !semCifra && completarCifra(song.content).completadas;
     if (semCifra) {
-      box.innerHTML = `<div class="aviso">${icon('info', 18)}<span>Esta versão não tem cifra. <span id="alternativas">Procurando versões com acordes…</span></span>
-        <button class="btn small" data-buscar-cifra title="Procurar a cifra no Cifra Club, aqui no app">${icon('chord', 15)} Buscar cifra</button></div>`;
-      box.querySelector('[data-buscar-cifra]').onclick = () => buscarCifraNoApp(song);
-      buscarAlternativas(song.title).then((alts) => {
-        const el = $('#alternativas');
-        if (!el) return;
-        el.innerHTML = alts.length ? 'Versões com acordes: ' + alts.map((a, i) => `<a href="#" data-alt="${i}" style="color:var(--accent-ink);font-weight:800">${esc(a.titulo)}${a.artista ? ' (' + esc(a.artista) + ')' : ''}</a>`).join(', ')
-          : 'Não achei outra versão com acordes nas fontes do app.';
-        el.onclick = async (e) => {
-          const a = e.target.closest('[data-alt]');
-          if (!a) return;
-          e.preventDefault();
-          try {
-            const c = await getCanto(alts[Number(a.dataset.alt)].url);
-            await abrirPrevia(c.chordpro, c.url, location.hash);
-          } catch (err) { toast('Erro: ' + err.message); }
-        };
-      });
+      box.innerHTML = '';
+      trazerCifraSozinho();
     } else if (meta.x_cifra_completada) {
       box.innerHTML = `<div class="aviso">${icon('sparkles', 18)}<span>A cifra original só tinha acordes em parte da música. Repeti a mesma sequência nas outras estrofes${song.youtube ? ' — confira ouvindo o vídeo' : ''}.</span></div>`;
     } else if (faltam) {
@@ -2124,29 +2148,42 @@ function viewSong(id, ctx = {}) {
 
   // ---- letra acompanhando a música (como no Spotify), só no modo sem cifra
   // Os tempos de cada verso vêm de um banco aberto de letras sincronizadas (LRCLIB); o tempo do vídeo
-  // vem do player. Tocar num verso leva a música até ele (como no Spotify); os botões do aviso acertam
-  // o tempo quando a letra está adiantada ou atrasada (fica salvo na música).
+  // vem do player. Tocar num verso leva a música até ele (como no Spotify). É tudo automático: se os tempos
+  // não forem da mesma gravação do vídeo ou a letra for muito diferente da da página, ela só não acompanha.
   if (song.youtube && db.prefs().karaoke !== false) {
     const dono = isPreview ? preview : db.song(song.id);
-    let lrc = dono?.lrc;
+    // a letra sincronizada guardada só vale para o vídeo com que foi buscada
+    let lrc = dono?.lrc !== undefined && (dono.lrc === null ? dono.lrcVideo === song.youtube : dono.lrc.video === song.youtube) ? dono.lrc : undefined;
     let buscando = false;
+    let conferida = false; // a duração dos tempos já foi comparada com a do vídeo tocando
     let mapa = [];
     let mapaDe = null;
     let atualEl = null;
     let ultimoToque = 0;
     const norm = (t) => normalizar(t).split(' ').filter(Boolean);
     const parecido = (a, b) => { const A = norm(a); const B = new Set(norm(b)); return A.length ? A.filter((w) => B.has(w)).length / Math.max(A.length, B.size) : 0; };
-    // casa cada verso com tempo com uma linha da letra na tela, em ordem
+    // casa cada verso com tempo com uma linha da letra na tela. Segue em frente, mas volta quando o verso
+    // se repete (o refrão costuma estar escrito uma vez só e é cantado várias). Verso cantado que não está
+    // na página (ou trecho sem voz) fica sem linha: nada acende enquanto ele toca.
     const mapear = () => {
       const linhas = [...songEl.querySelectorAll('.line:not(.chords-only)')].filter((el) => el.textContent.trim());
+      const textos = linhas.map((el) => el.textContent);
       mapa = [];
       let j = 0;
       for (const v of lrc.linhas) {
-        if (!v.texto) continue;
-        for (let k = j; k < Math.min(linhas.length, j + 8); k++) {
-          if (parecido(v.texto, linhas[k].textContent) >= 0.6) { mapa.push({ t: v.t, el: linhas[k] }); j = k + 1; break; }
+        if (!v.texto) { mapa.push({ t: v.t, el: null }); continue; }
+        let achou = -1;
+        for (let k = j; k < Math.min(linhas.length, j + 6) && achou < 0; k++) if (parecido(v.texto, textos[k]) >= 0.6) achou = k;
+        if (achou < 0) {
+          let melhor = 0.6;
+          textos.forEach((t, k) => { const p = parecido(v.texto, t) - Math.abs(k - j) * 0.001; if (p >= melhor) { melhor = p; achou = k; } });
         }
+        mapa.push({ t: v.t, el: achou >= 0 ? linhas[achou] : null, n: achou });
+        if (achou >= 0) j = achou + 1;
       }
+      // letra muito diferente da que está na página: melhor não acompanhar do que acompanhar errado
+      const comTexto = mapa.filter((m, k) => lrc.linhas[k].texto);
+      if (!comTexto.length || comTexto.filter((m) => m.el).length / comTexto.length < 0.7) mapa = [];
       mapaDe = songEl.firstElementChild;
     };
     const tocandoEsta = () => player.atual?.youtube === song.youtube && player.estado !== 'parado';
@@ -2154,50 +2191,54 @@ function viewSong(id, ctx = {}) {
       songEl.classList.remove('karaoke', 'karaoke-pronta');
       songEl.querySelectorAll('.agora, .cantada').forEach((x) => x.classList.remove('agora', 'cantada'));
       atualEl = null;
-      $('#aviso-karaoke').innerHTML = '';
     };
-    const carregar = () => {
-      if (lrc !== undefined || buscando) return;
+    const guardar = () => {
+      if (!dono) return;
+      dono.lrc = lrc;
+      dono.lrcVideo = song.youtube;
+      if (!isPreview) db.updateSong(song.id, { lrc, lrcVideo: song.youtube });
+    };
+    const carregar = (duracao = 0) => {
+      if (buscando) return;
       buscando = true;
-      buscarLetraSincronizada({ titulo: song.title, artista: song.artist, duracao: player.atual?.youtube === song.youtube ? player.duracao : 0 })
-        .then((r) => { lrc = r && r.linhas.length ? r : null; }).catch(() => { lrc = null; })
-        .finally(() => { buscando = false; if (dono) { dono.lrc = lrc; if (!isPreview) db.updateSong(song.id, { lrc }); } });
+      buscarLetraSincronizada({ titulo: song.title, artista: song.artist, duracao })
+        .then((r) => { lrc = r && r.linhas.length ? { ...r, video: song.youtube } : null; }).catch(() => { lrc = null; })
+        .finally(() => { buscando = false; mapaDe = null; guardar(); });
     };
-    const avisoKaraoke = (tocando) => {
-      const box = $('#aviso-karaoke');
-      const html = tocando
-        ? `<div class="aviso">${icon('music', 18)}<span>Toque num verso para a música ir até ele.</span><span class="spacer"></span><button class="btn small" data-ajuste="-0.5" title="A letra está atrasada (aparece depois do canto)">Letra atrasada</button><button class="btn small" data-ajuste="0.5" title="A letra está adiantada (aparece antes do canto)">Letra adiantada</button></div>`
-        : `<div class="aviso">${icon('music', 18)}<span>Letra sincronizada: toque num verso para ouvir a partir dele.</span></div>`;
-      if (box.dataset.tocando !== String(tocando)) { box.innerHTML = html; box.dataset.tocando = String(tocando); }
+    // os tempos precisam ser da mesma gravação do vídeo (a versão ao vivo, por exemplo, tem outro ritmo):
+    // se a duração não bate, procura outra; se não houver, a letra não acompanha este vídeo
+    const conferir = () => {
+      if (conferida || buscando || !tocandoEsta() || !(player.duracao > 0)) return;
+      conferida = true;
+      if (lrc && !mesmaDuracao(lrc.duracao, player.duracao)) { lrc = undefined; limpar(); carregar(player.duracao); }
     };
-    $('#aviso-karaoke').addEventListener('click', (e) => {
-      const b = e.target.closest('[data-ajuste]');
-      if (!b || !dono) return;
-      dono.lrcAjuste = (dono.lrcAjuste || 0) + Number(b.dataset.ajuste);
-      if (!isPreview) db.updateSong(song.id, { lrcAjuste: dono.lrcAjuste });
-      atualEl = null;
-      toast(`Tempo da letra: ${dono.lrcAjuste > 0 ? '+' : ''}${dono.lrcAjuste.toFixed(1)} s`);
-    });
     const marcar = () => {
       if (comCifra) { if (songEl.classList.contains('karaoke-pronta')) limpar(); return; }
-      carregar();
-      if (!lrc) return;
+      if (lrc === undefined) carregar(tocandoEsta() ? player.duracao : 0);
+      conferir();
+      if (!lrc) { if (songEl.classList.contains('karaoke-pronta')) limpar(); return; }
       if (mapaDe !== songEl.firstElementChild) mapear();
       if (!mapa.length) return;
       songEl.classList.add('karaoke-pronta');
       const tocando = tocandoEsta();
-      avisoKaraoke(tocando);
       if (!tocando) {
         if (songEl.classList.contains('karaoke')) { songEl.classList.remove('karaoke'); songEl.querySelectorAll('.agora, .cantada').forEach((x) => x.classList.remove('agora', 'cantada')); atualEl = null; }
         return;
       }
       songEl.classList.add('karaoke');
-      const agora = player.tempoAgora - (dono?.lrcAjuste || 0);
+      const agora = player.tempoAgora;
       let i = -1;
       for (let k = 0; k < mapa.length && mapa[k].t <= agora; k++) i = k;
       const el = i >= 0 ? mapa[i].el : null;
       if (el === atualEl) return;
-      mapa.forEach((m, k) => { m.el.classList.toggle('cantada', k < i); m.el.classList.toggle('agora', k === i); });
+      // as linhas antes do verso atual ficam como já cantadas (pela posição na página)
+      const n = el ? mapa[i].n : -1;
+      const ate = n >= 0 ? n : -1;
+      [...new Set(mapa.map((m) => m.el).filter(Boolean))].forEach((x) => {
+        const k = mapa.find((m) => m.el === x).n;
+        x.classList.toggle('agora', x === el);
+        x.classList.toggle('cantada', x !== el && k < ate);
+      });
       atualEl = el;
       // rola sozinho até o verso atual (menos logo depois de o usuário rolar a página)
       if (el && Date.now() - ultimoToque > 4000) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2209,10 +2250,13 @@ function viewSong(id, ctx = {}) {
     songEl.addEventListener('click', (e) => {
       if (!songEl.classList.contains('karaoke-pronta')) return;
       const linha = e.target.closest('.line');
-      const m = mapa.find((x) => x.el === linha);
-      if (!m) return;
+      // um verso repetido (refrão) vai para a vez mais próxima do ponto em que a música está
+      const vezes = mapa.filter((x) => x.el && x.el === linha);
+      if (!vezes.length) return;
+      const agoraSeg = tocandoEsta() ? player.tempoAgora : 0;
+      const m = tocandoEsta() ? vezes.reduce((a, b) => (Math.abs(b.t - agoraSeg) < Math.abs(a.t - agoraSeg) ? b : a)) : vezes[0];
       if (e.target.closest('.chord') && db.prefs().diagramas) return; // o toque no acorde mostra o desenho
-      const alvoSeg = Math.max(0, m.t + (dono?.lrcAjuste || 0) - 0.3);
+      const alvoSeg = Math.max(0, m.t - 0.3);
       if (!tocandoEsta()) player.tocar(itemDoPlayer(song, ctx.set ? db.set(ctx.set.id) : null, ctx.set ? ctx.index : -1));
       player.irPara(alvoSeg);
       atualEl = null;

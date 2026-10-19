@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cifraTextoParaChordPro, ehCifraClub, simplificarCifra, parseLetras, resultadosLetras, lerLrc, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
+  cifraTextoParaChordPro, ehCifraClub, simplificarCifra, parseLetras, resultadosLetras, lerLrc, mesmaDuracao, buscarLetraSincronizada, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
 } from '../public/js/lib/web.js';
 import { aplicarEstrutura, aplicarLetra, definirMeta, doEditor, letraDe, linhasDaLetra, paraEditor, parseChordPro } from '../public/js/chordpro.js';
 
@@ -134,4 +134,15 @@ test('partes vindas da IA: só coloca as marcações, sem mudar a letra', () => 
   assert.deepEqual(parseChordPro(r).sections.map((x) => `${x.type}:${x.label}`), ['verse:Estrofe 1', 'chorus:', 'verse:Estrofe 2']);
   assert.deepEqual(linhasDaLetra(r), linhasDaLetra(pro));
   assert.match(r, /\[G\]Deus está \[D\]aqui/);
+});
+
+test('letra sincronizada só da mesma gravação do vídeo (ao vivo ≠ estúdio)', async () => {
+  assert.ok(mesmaDuracao(194, 196) && mesmaDuracao(348, 0) && !mesmaDuracao(348, 196));
+  const lista = [
+    { id: 1, duration: 348, syncedLyrics: '[00:15.00] Não me sinto só' },
+    { id: 2, duration: 195, syncedLyrics: '[00:10.00] Não me sinto só' },
+  ];
+  const fetchImpl = async () => new Response(JSON.stringify(lista), { status: 200 });
+  assert.equal((await buscarLetraSincronizada({ titulo: 'Aba', artista: 'Kemuel', duracao: 194 }, fetchImpl)).fonte, 'https://lrclib.net/api/get/2');
+  assert.equal(await buscarLetraSincronizada({ titulo: 'Aba', artista: 'Kemuel', duracao: 250 }, fetchImpl), null);
 });

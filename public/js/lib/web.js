@@ -302,6 +302,9 @@ export function lerLrc(texto) {
 }
 
 // a versão com tempos mais parecida com a música (mesmo artista; duração mais próxima do vídeo)
+// duas durações (em segundos) que são da mesma gravação
+export const mesmaDuracao = (a, b) => !(a > 0 && b > 0) || Math.abs(a - b) <= Math.max(5, b * 0.03);
+
 export async function buscarLetraSincronizada({ titulo = '', artista = '', duracao = 0 } = {}, fetchImpl) {
   const t = String(titulo).replace(/\s*[([].*?[)\]]\s*/g, ' ').trim();
   if (!t) return null;
@@ -314,7 +317,12 @@ export async function buscarLetraSincronizada({ titulo = '', artista = '', durac
   let lista = await consultar(artista ? { track_name: t, artist_name: artista } : { track_name: t });
   if (!lista.length) lista = await consultar({ q: `${t} ${artista}`.trim() });
   if (!lista.length) return null;
-  if (duracao > 0) lista.sort((a, b) => Math.abs(a.duration - duracao) - Math.abs(b.duration - duracao));
+  if (duracao > 0) {
+    // os tempos só servem se forem da mesma gravação do vídeo (ao vivo, acústico… têm outra duração)
+    lista = lista.filter((r) => mesmaDuracao(r.duration, duracao));
+    lista.sort((a, b) => Math.abs(a.duration - duracao) - Math.abs(b.duration - duracao));
+    if (!lista.length) return null;
+  }
   const r = lista[0];
   return { linhas: lerLrc(r.syncedLyrics), duracao: r.duration || 0, fonte: `https://lrclib.net/api/get/${r.id}` };
 }
