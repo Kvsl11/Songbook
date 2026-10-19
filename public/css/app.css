@@ -1053,3 +1053,19 @@ body.editando-cheio #pl-tela { visibility: hidden !important; }
 body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 120px; }
 /* tema claro: o painel some no branco da página; o texto (branco) fica dentro da parte colorida */
 :root[data-theme="light"] .song.lyrics-mode { padding-top: 72px; }
+
+/* biblioteca: excluir um item (lixeira) ou vários (modo Selecionar) */
+.lib-item .marca-sel { display: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--subtle); place-items: center; color: transparent; flex: none; }
+#lib.selecionando .lib-item .marca-sel { display: grid; }
+#lib.selecionando .lib-item .acts { display: none; }
+#lib .lib-item { grid-template-columns: auto 1fr auto; }
+#lib.selecionando .lib-item { grid-template-columns: auto auto 1fr; }
+.lib-item.marcado { background: var(--accent-soft); }
+.lib-item.marcado .marca-sel { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.lib-item .lixo { color: var(--muted); }
+.lib-item .lixo:hover { color: var(--danger); }
+.barra-sel {
+  position: sticky; bottom: 10px; z-index: 16; display: flex; align-items: center; gap: 10px; margin: 12px 0 0;
+  padding: 10px 12px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-lg); font-weight: 700; font-size: 14px;
+}
+.barra-sel[hidden] { display: none; }

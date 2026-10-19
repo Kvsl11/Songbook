@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-66';
+export const APP_VERSAO = '2026.10.19-67';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1610,44 +1610,101 @@ async function viewCategoria(id, nome) {
 
 // ------------------------------------------------------------- biblioteca
 
-function viewLibrary(filtro = 'repertorios') {
+function viewLibrary(filtro = 'repertorios', { selecionando = false, marcados = new Set() } = {}) {
   setTab('biblioteca');
   setTint('#2b3d4f');
   setHeader('Sua biblioteca', { actions: [{ icon: 'edit', label: 'Criar música do zero', href: '#/editar/novo' }, { icon: 'upload', label: 'Importar arquivos', onClick: openImport }] });
   const FILTROS = [['repertorios', 'Repertórios'], ['musicas', 'Músicas'], ['video', 'Com vídeo'], ['proprias', 'Cifras próprias']];
-  view.innerHTML = `
-    <h2 class="greet">Sua biblioteca</h2>
-    <div class="chips">${FILTROS.map(([k, n]) => `<a class="chip" href="#/biblioteca/${k}" aria-pressed="${k === filtro}">${n}</a>`).join('')}</div>
-    <div class="actions-row" style="margin:4px 0 14px"><a class="btn small primary" href="#/editar/novo" title="Escrever título, estrutura, letra e cifra">${icon('edit', 15)} Criar música do zero</a><button class="btn small" id="lib-novo-rep">${icon('plus', 15)} Novo repertório</button></div>
-    <div id="lib"></div>
-    <button class="fab" aria-label="${filtro === 'repertorios' ? 'Novo repertório' : 'Nova música'}">${icon('plus', 24)}<span>${filtro === 'repertorios' ? 'Novo repertório' : 'Nova música'}</span></button>`;
-  const lib = $('#lib');
-  $('.fab').onclick = () => (filtro === 'repertorios' ? novoRepertorio() : (location.hash = '#/editar/novo'));
-  $('#lib-novo-rep').onclick = novoRepertorio;
-  if (filtro === 'repertorios') {
-    const sets = db.sets();
-    lib.innerHTML = sets.length ? `<ul class="tracks">${sets.map((s) => `
-      <li class="track clickable" data-href="#/repertorio/${s.id}" style="grid-template-columns:auto 1fr auto">${capaRepertorio(s)}
-        <a class="info" href="#/repertorio/${s.id}"><div class="t">${esc(s.name)}</div><div class="s">Repertório · ${fmtData(s.date)} · ${s.items.length} músicas</div></a>
-        <span class="acts">${s.items.length ? `<a class="icon-btn" href="#/repertorio/${s.id}/0" aria-label="Tocar">${icon('play', 16)}</a>` : ''}</span></li>`).join('')}</ul>`
-      : `<div class="empty"><div class="bubble">${icon('list', 32)}</div><h3>Crie seu primeiro repertório</h3><p>Monte o da missa de hoje automaticamente ou crie uma lista do zero.</p>
-        <div class="row"><a class="btn primary" href="#/editar/novo">Criar música</a><a class="btn" href="#/liturgia">Missa de hoje</a></div></div>`;
-    lib.onclick = (e) => { const li = e.target.closest('li[data-href]'); if (li && !e.target.closest('a')) location.hash = li.dataset.href; };
-    return;
-  }
+  const ehRep = filtro === 'repertorios';
   let songs = db.songs();
   if (filtro === 'video') songs = songs.filter((s) => s.youtube);
   if (filtro === 'proprias') songs = songs.filter((s) => !/^https?:|^cnbb:/.test(s.source || ''));
-  lib.innerHTML = songs.length ? `<ul class="tracks">${songs.map((s) => linhaMusica(s, `<span class="acts">${s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : ''}${s.youtube ? `<button class="icon-btn" data-play="${s.id}" aria-label="Tocar referência">${icon('play', 16)}</button>` : ''}</span>`)).join('')}</ul>`
+  const itens = ehRep ? db.sets() : songs;
+  const marca = (id) => `<span class="marca-sel" aria-hidden="true">${icon('check', 14)}</span>`;
+  const lixeira = (id, nome) => `<button class="icon-btn lixo" data-excluir="${id}" aria-label="Excluir ${esc(nome)}" title="Excluir">${icon('trash', 16)}</button>`;
+  const linha = ehRep
+    ? (s) => `<li class="track clickable lib-item" data-k="${s.id}">${marca(s.id)}${capaRepertorio(s)}
+        <div class="info"><div class="t">${esc(s.name)}</div><div class="s">Repertório · ${fmtData(s.date)} · ${s.items.length} músicas</div></div>
+        <span class="acts">${s.items.length ? `<a class="icon-btn" href="#/repertorio/${s.id}/0" aria-label="Tocar">${icon('play', 16)}</a>` : ''}${lixeira(s.id, s.name)}</span></li>`
+    : (s) => `<li class="track clickable lib-item" data-k="${s.id}">${marca(s.id)}${capa(s)}
+        <div class="info"><div class="t">${esc(s.title)}</div><div class="s">${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>
+        <span class="acts">${s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : ''}${s.youtube ? `<button class="icon-btn" data-play="${s.id}" aria-label="Tocar referência">${icon('play', 16)}</button>` : ''}${lixeira(s.id, s.title)}</span></li>`;
+  const vazio = ehRep
+    ? `<div class="empty"><div class="bubble">${icon('list', 32)}</div><h3>Crie seu primeiro repertório</h3><p>Monte o da missa de hoje automaticamente ou crie uma lista do zero.</p>
+        <div class="row"><a class="btn primary" href="#/editar/novo">Criar música</a><a class="btn" href="#/liturgia">Missa de hoje</a></div></div>`
     : `<div class="empty"><div class="bubble">${icon('music', 32)}</div><h3>${db.songs().length ? 'Nada nesta lista' : 'Sua biblioteca está vazia'}</h3>
       <p>Busque cantos, monte a missa do dia ou importe arquivos ChordPro.</p>
       <div class="row"><a class="btn primary" href="#/editar/novo">Criar música</a><a class="btn" href="#/liturgia">Missa de hoje</a><a class="btn" href="#/buscar">Buscar</a><button class="btn" id="imp">Importar</button></div></div>`;
+  view.innerHTML = `
+    <h2 class="greet">Sua biblioteca</h2>
+    <div class="chips">${FILTROS.map(([k, n]) => `<a class="chip" href="#/biblioteca/${k}" aria-pressed="${k === filtro}">${n}</a>`).join('')}</div>
+    <div class="actions-row" style="margin:4px 0 14px"><a class="btn small primary" href="#/editar/novo" title="Escrever título, estrutura, letra e cifra">${icon('edit', 15)} Criar música do zero</a><button class="btn small" id="lib-novo-rep">${icon('plus', 15)} Novo repertório</button>
+      ${itens.length ? `<button class="btn small" id="lib-sel" aria-pressed="${selecionando}">${icon('check', 15)} ${selecionando ? 'Cancelar seleção' : 'Selecionar'}</button>` : ''}</div>
+    <div id="lib" class="${selecionando ? 'selecionando' : ''}">${itens.length ? `<ul class="tracks">${itens.map(linha).join('')}</ul>` : vazio}</div>
+    <div class="barra-sel" id="barra-sel" ${selecionando ? '' : 'hidden'}>
+      <span id="sel-n"></span><button class="btn small ghost" id="sel-todos"></button><span class="spacer"></span>
+      <button class="btn small danger solid" id="sel-excluir">${icon('trash', 15)} Excluir</button></div>
+    <button class="fab" ${selecionando ? 'hidden' : ''} aria-label="${ehRep ? 'Novo repertório' : 'Nova música'}">${icon('plus', 24)}<span>${ehRep ? 'Novo repertório' : 'Nova música'}</span></button>`;
+  const lib = $('#lib');
+  $('.fab').onclick = () => (ehRep ? novoRepertorio() : (location.hash = '#/editar/novo'));
+  $('#lib-novo-rep').onclick = novoRepertorio;
   $('#imp')?.addEventListener('click', openImport);
+  const redesenhar = (sel = selecionando) => viewLibrary(filtro, { selecionando: sel, marcados: sel ? marcados : new Set() });
+  const atualizarSel = () => {
+    lib.querySelectorAll('.lib-item').forEach((li) => li.classList.toggle('marcado', marcados.has(li.dataset.k)));
+    const n = marcados.size;
+    $('#sel-n').textContent = n ? `${n} selecionad${n > 1 ? 'os' : 'o'}` : 'Toque para selecionar';
+    $('#sel-todos').textContent = n === itens.length ? 'Desmarcar todos' : 'Selecionar todos';
+    $('#sel-excluir').disabled = !n;
+  };
+  if (selecionando) atualizarSel();
+  $('#lib-sel')?.addEventListener('click', () => redesenhar(!selecionando));
+  $('#sel-todos').onclick = () => { if (marcados.size === itens.length) marcados.clear(); else itens.forEach((x) => marcados.add(x.id)); atualizarSel(); };
+  // exclui e confirma antes; músicas saem também dos repertórios
+  const excluir = async (ids) => {
+    if (!ids.length) return;
+    const nomes = ids.map((id) => (ehRep ? db.set(id)?.name : db.song(id)?.title)).filter(Boolean);
+    const qual = ehRep ? (ids.length > 1 ? `${ids.length} repertórios` : 'o repertório') : (ids.length > 1 ? `${ids.length} músicas` : 'a música');
+    const texto = ids.length === 1 ? `“${nomes[0]}” será apagad${ehRep ? 'o' : 'a'}.${ehRep ? ' As músicas continuam na biblioteca.' : ' Ela sai também dos repertórios.'}`
+      : `${nomes.slice(0, 4).map((n) => `“${n}”`).join(', ')}${nomes.length > 4 ? ` e mais ${nomes.length - 4}` : ''}.${ehRep ? ' As músicas continuam na biblioteca.' : ' Elas saem também dos repertórios.'}`;
+    if (!(await ask({ title: `Excluir ${qual}?`, text: texto, ok: 'Excluir', danger: true }))) return;
+    for (const id of ids) {
+      if (ehRep) db.deleteSet(id);
+      else { if (player.atual?.songId === id) player.fechar(); db.deleteSong(id); }
+    }
+    desenharLateral();
+    toast(ids.length > 1 ? `${ids.length} ${ehRep ? 'repertórios excluídos' : 'músicas excluídas'}` : `${ehRep ? 'Repertório excluído' : 'Música excluída'}`);
+    marcados.clear();
+    redesenhar(false);
+  };
+  $('#sel-excluir').onclick = () => excluir([...marcados]);
+  // segurar o dedo numa linha entra no modo de seleção (no celular)
+  let segurar = null;
+  lib.addEventListener('pointerdown', (e) => {
+    const li = e.target.closest('.lib-item');
+    if (!li || selecionando || e.target.closest('button, a')) return;
+    segurar = setTimeout(() => { segurar = 'feito'; marcados.add(li.dataset.k); redesenhar(true); }, 550);
+  });
+  const soltar = () => { if (segurar !== 'feito') clearTimeout(segurar); };
+  lib.addEventListener('pointerup', soltar);
+  lib.addEventListener('pointercancel', soltar);
+  lib.addEventListener('pointermove', (e) => { if (e.movementY > 4 || e.movementY < -4) soltar(); });
   lib.onclick = (e) => {
+    if (segurar === 'feito') { segurar = null; return; }
+    const del = e.target.closest('[data-excluir]');
+    if (del) { excluir([del.dataset.excluir]); return; }
+    const li = e.target.closest('.lib-item');
+    if (!li) return;
+    if (selecionando) {
+      e.preventDefault();
+      if (marcados.has(li.dataset.k)) marcados.delete(li.dataset.k); else marcados.add(li.dataset.k);
+      atualizarSel();
+      return;
+    }
     const p = e.target.closest('[data-play]');
     if (p) { const s = db.song(p.dataset.play); if (s) tocarReferencia(s); return; }
-    const li = e.target.closest('li[data-id]');
-    if (li) location.hash = '#/musica/' + li.dataset.id;
+    if (e.target.closest('a')) return;
+    location.hash = ehRep ? '#/repertorio/' + li.dataset.k : '#/musica/' + li.dataset.k;
   };
 }
 
