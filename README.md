@@ -19,13 +19,15 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   próprio (Ajustes) ou proxies públicos; se nenhum responder, abre o "Importar da internet": copie a cifra no
   site e cole (botão "Colar copiado"). Serve para cifra ou letra de **qualquer site**.
 
-- **Player como no Spotify**: na página da música o vídeo toca na telinha das Referências; ao sair dela, continua no mini player fixo acima do menu, com o vídeo do YouTube
+- **Player como no Spotify**: na página da música o vídeo toca na telinha das Referências; ao sair dela, continua no mini player
+  sem parar nem repetir anúncio (é o mesmo vídeo, que só muda de lugar na tela) fixo acima do menu, com o vídeo do YouTube
   pequeno, nome, parte da missa, tempo e barra de progresso; a música continua tocando enquanto você navega.
   Dá para ampliar o vídeo, pausar e fechar; no repertório, ao terminar, toca a próxima que tiver vídeo.
 - **Vídeo do YouTube em cada música**: "Escolher vídeo" procura no YouTube dentro do app (instâncias públicas do
   Piped, sem chave nem login) ou aceita o link colado. Se o dono não deixar tocar fora do YouTube, o player avisa.
 - **Biblioteca**: músicas e repertórios, com filtros (com vídeo, cifras próprias).
-- **Música (estilo Spotify)**: o clipe do YouTube aparece mudo, em loop, no lugar da capa; seção **Créditos**
+- **Música (estilo Spotify)**: o clipe do YouTube passa mudo no topo da música inteiro (do alto da tela até os botões),
+  repetindo um trecho de 30 s, e a capa sai de cena; seção **Créditos**
   (intérprete, composição, tom original, fonte). A letra tem o mesmo peso em tudo; o refrão é marcado pelo rótulo.
   Capa, botão verde para ouvir a **referência no YouTube**, botão **#** que liga a cifra ou deixa só a letra
   (letra grande, estilo Spotify), **tabela de tons** para trocar o tom com um toque, capotraste, rolagem automática (o ícone liga e mostra embaixo uma barra de velocidade), tamanho da letra,

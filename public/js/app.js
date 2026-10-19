@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-57';
+export const APP_VERSAO = '2026.10.19-59';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -197,11 +197,6 @@ function capa(item = {}, { ic = 'music', cls = '' } = {}) {
   if (src) return `<div class="cover ${cls}"><img src="${esc(src)}" alt="${esc(titulo)}" loading="lazy"></div>`;
   return `<div class="cover gen ${cls}" style="--h:${hue(titulo)}">${icon(ic, 24)}</div>`;
 }
-// só a imagem da capa (o Canvas põe o vídeo por cima dela)
-function capaImagem(item) {
-  const src = item.cover || (item.youtube ? `https://i.ytimg.com/vi/${item.youtube}/hqdefault.jpg` : '');
-  return src ? `<img src="${esc(src)}" alt="" loading="lazy">` : '';
-}
 function capaRepertorio(set, cls = '') {
   const songs = set.items.map((it) => db.song(it.songId)).filter(Boolean);
   const comImg = [...new Map(songs.filter((s) => s.cover || s.youtube).map((s) => [s.cover || s.youtube, s])).values()];
@@ -302,8 +297,10 @@ function ytEmbed(id, { inicio = 0, autoplay = true } = {}) {
 }
 
 // vídeo no lugar da capa (como o "Canvas" do Spotify): mudo, em loop, sem controles
+const CANVAS_INICIO = 40; // o trecho do vídeo que fica repetindo: de 0:40 a 1:10
+const CANVAS_DURACAO = 30;
 function ytFundo(id) {
-  const p = new URLSearchParams({ autoplay: '1', mute: '1', loop: '1', playlist: id, controls: '0', playsinline: '1', rel: '0', modestbranding: '1', disablekb: '1', iv_load_policy: '3', start: '30', enablejsapi: '1' });
+  const p = new URLSearchParams({ autoplay: '1', mute: '1', loop: '1', playlist: id, controls: '0', playsinline: '1', rel: '0', modestbranding: '1', disablekb: '1', iv_load_policy: '3', start: String(CANVAS_INICIO), enablejsapi: '1' });
   if (/^https?:/.test(location.origin)) p.set('origin', location.origin);
   return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?${p}`;
 }
@@ -400,9 +397,38 @@ const player = (() => {
     </div>
     <div class="pl-prog"><i></i></div>`;
   $('.main-col').append(el);
-  const mini = $('.pl-video', el);
+  // O vídeo é UM só e nunca é recriado (recriar pausa e repete o anúncio): ele fica numa "tela"
+  // solta e só muda de lugar, acompanhando a telinha da página da música ou o espaço do mini player.
+  const tela = document.createElement('div');
+  tela.id = 'pl-tela';
+  tela.hidden = true;
+  $('.main-col').append(tela);
+  const mini = $('.pl-video', el); // espaço reservado no mini player
   const noPalco = () => Boolean(atual && palco?.isConnected && palcoDe === atual.youtube);
-  const iframeAtual = () => (noPalco() ? palco : mini).querySelector('iframe');
+  const iframeAtual = () => tela.querySelector('iframe');
+  const alvo = () => {
+    if (!atual) return null;
+    if (noPalco()) {
+      let a = palco.querySelector('.pl-alvo');
+      if (!a) { palco.innerHTML = '<div class="video-embed pl-alvo"></div>'; a = palco.querySelector('.pl-alvo'); }
+      return a;
+    }
+    return el.hidden ? null : mini;
+  };
+  // acompanha o lugar do vídeo a cada quadro (rolagem, troca de tela, ampliar)
+  let quadro = 0;
+  const seguir = () => {
+    quadro = requestAnimationFrame(seguir);
+    const a = alvo();
+    const r = a?.isConnected ? a.getBoundingClientRect() : null;
+    if (!r || !r.width || !r.height) { tela.style.visibility = 'hidden'; return; }
+    const base = tela.parentElement.getBoundingClientRect();
+    tela.style.visibility = 'visible';
+    tela.style.transform = `translate(${r.left - base.left}px, ${r.top - base.top}px)`;
+    tela.style.width = r.width + 'px';
+    tela.style.height = r.height + 'px';
+    tela.classList.toggle('no-palco', noPalco());
+  };
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
   const avisar = () => ouvintes.forEach((fn) => fn());
   const mostrarBarra = () => {
@@ -417,15 +443,14 @@ const player = (() => {
     $('.pl-play', el).innerHTML = icon(estado === 'tocando' ? 'pause' : 'play', 20);
     $('.pl-prog i', el).style.width = duracao ? `${Math.min(100, (tempo / duracao) * 100)}%` : '0';
   };
-  // cria o vídeo onde ele deve tocar agora, continuando do ponto em que estava
-  const montar = (tocar) => {
-    mini.innerHTML = '';
-    const alvo = noPalco() ? palco : mini;
-    const ifr = `<iframe src="${esc(ytEmbed(atual.youtube, { inicio: tempo > 2 ? tempo - 1 : 0, autoplay: tocar }))}" title="${esc(atual.titulo || 'Vídeo')}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
-    alvo.innerHTML = alvo === mini ? ifr : `<div class="video-embed">${ifr}</div>`;
-    const f = $('iframe', alvo);
+  // cria o vídeo (só quando muda de vídeo)
+  const montar = () => {
+    tela.innerHTML = `<iframe src="${esc(ytEmbed(atual.youtube))}" title="${esc(atual.titulo || 'Vídeo')}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
+    const f = $('iframe', tela);
     f.addEventListener('load', () => f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'));
+    tela.hidden = false;
     mostrarBarra();
+    if (!quadro) seguir();
   };
   const comando = (func, args = []) => iframeAtual()?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
   const api = {
@@ -440,12 +465,11 @@ const player = (() => {
         if (estado !== 'tocando') api.alternar(); else desenhar();
         return;
       }
-      if (palco && palcoDe !== item.youtube && atual && palcoDe === atual.youtube) palco.innerHTML = '';
       atual = item;
       tempo = 0;
       duracao = 0;
       estado = 'tocando';
-      montar(true);
+      montar();
       desenhar();
       avisar();
     },
@@ -457,15 +481,16 @@ const player = (() => {
     },
     // a página da música avisa onde fica a telinha do vídeo dela (box) — ou null ao sair da página
     palco(box, youtube = '') {
-      const estava = noPalco();
       palco = box;
       palcoDe = box ? youtube : '';
-      if (atual && estado !== 'parado' && estava !== noPalco()) montar(estado === 'tocando');
-      else mostrarBarra();
+      mostrarBarra();
       return noPalco();
     },
     fechar() {
-      mini.innerHTML = '';
+      tela.innerHTML = '';
+      tela.hidden = true;
+      cancelAnimationFrame(quadro);
+      quadro = 0;
       el.hidden = true;
       el.classList.remove('grande');
       document.body.classList.remove('com-player');
@@ -526,16 +551,23 @@ const player = (() => {
   return api;
 })();
 
-// Capa com vídeo (Canvas): o vídeo aparece por cima da capa depois que os controles do YouTube somem;
-// se o YouTube avisar erro (vídeo bloqueado fora do site), some e a capa fica.
+// Vídeo no topo da música (Canvas do Spotify): ocupa do alto da tela até os botões, mudo, repetindo
+// um trecho de 30 s. Se o YouTube avisar erro (vídeo bloqueado fora do site), some e a capa volta.
 window.addEventListener('message', (e) => {
   if (!/youtube(-nocookie)?\.com$/.test((() => { try { return new URL(e.origin).hostname; } catch { return ''; } })())) return;
-  const f = [...document.querySelectorAll('.canvas iframe')].find((x) => x.contentWindow === e.source);
+  const f = [...document.querySelectorAll('.canvas-fundo iframe')].find((x) => x.contentWindow === e.source);
   if (!f) return;
+  const cmd = (func, args = []) => f.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
   try {
     const msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-    if (msg?.event === 'onReady') for (const func of ['mute', 'playVideo']) f.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*');
-    if (msg?.event === 'onError') f.remove();
+    if (msg?.event === 'onReady' && !f.dataset.pronto) {
+      f.dataset.pronto = '1';
+      cmd('mute');
+      cmd('playVideo');
+      // volta ao começo do trecho a cada 30 s (enquanto a página estiver aberta)
+      const t = setInterval(() => { if (!f.isConnected) { clearInterval(t); return; } cmd('seekTo', [CANVAS_INICIO, true]); }, CANVAS_DURACAO * 1000);
+    }
+    if (msg?.event === 'onError') { f.closest('.song-topo')?.classList.remove('canvas-on'); f.closest('.canvas-fundo')?.remove(); }
   } catch { /* outro formato */ }
 });
 
@@ -1625,6 +1657,7 @@ function viewSong(id, ctx = {}) {
   setTint(corDaMusica(song.title));
   const prefs = db.prefs();
   let { transpose = 0, capo = 0 } = song;
+  const canvas = Boolean(song.youtube && prefs.videoFundo !== false);
   // música sem nenhum acorde: só existe a letra. O botão # liga/desliga a cifra (sem ele, só a letra).
   const semCifra = !temCifra(song.content);
   let comCifra = !semCifra && prefs.modo !== 'letra' && prefs.showChords !== false;
@@ -1640,9 +1673,9 @@ function viewSong(id, ctx = {}) {
   const fonte = song.source && /^https?:/.test(song.source) ? host(song.source) : song.source?.startsWith('cnbb:') ? 'Liturgia Diária – CNBB' : '';
   view.innerHTML = `
     ${ctx.set ? `<div class="set-progress"><i style="width:${((ctx.index + 1) / ctx.set.items.length) * 100}%"></i></div>` : ''}
-    <section class="page-hero song-hero">${song.youtube && prefs.videoFundo !== false
-      ? `<div class="cover canvas" aria-hidden="true">${capaImagem(song)}<iframe src="${esc(ytFundo(song.youtube))}" data-inicio="30" tabindex="-1" title="" allow="autoplay; encrypted-media" onload="this.contentWindow.postMessage(JSON.stringify({event:'listening',id:2}),'*')"></iframe></div>`
-      : capa(song)}
+    ${canvas ? '<div class="song-topo canvas-on">' : ''}
+    ${canvas ? `<div class="canvas-fundo" aria-hidden="true"><iframe src="${esc(ytFundo(song.youtube))}" tabindex="-1" title="" allow="autoplay; encrypted-media" onload="this.contentWindow.postMessage(JSON.stringify({event:'listening',id:2}),'*')"></iframe></div>` : ''}
+    <section class="page-hero song-hero">${capa(song)}
       <div>${ctx.set ? `<button class="kind kind-btn" id="btn-parte" title="Trocar a parte da missa desta música no repertório">${esc(ctx.set.items[ctx.index]?.label || 'Definir a parte da missa')} ${icon('edit', 12)}</button>` : `<div class="kind">${esc(kind)}</div>`}<h2 id="song-title">${esc(song.title)}</h2>
         <div class="meta" id="song-meta"></div></div></section>
     <div class="actions-row">
@@ -1656,6 +1689,7 @@ function viewSong(id, ctx = {}) {
       ${ctx.set ? `<button class="icon-btn" id="btn-fila" aria-label="Fila do repertório" title="Fila: próximas músicas">${icon('queue', 24)}</button>` : ''}
       ${semCifra ? '<div class="seg-tabs"><span class="chip sm" title="Esta música não tem acordes">Só letra</span></div>' : ''}
     </div>
+    ${canvas ? '</div>' : ''}
     <div id="aviso-cifra"></div>
     <div class="song-toolbar ${comCifra ? '' : 'sem-cifra'}" id="tools">
       <div class="seg so-cifra"><button class="tom-btn" data-act="tom" aria-label="Escolher o tom" title="Escolher o tom"><span class="val" id="key"></span>${icon('down', 14)}</button></div>

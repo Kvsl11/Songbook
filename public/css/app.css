@@ -897,7 +897,7 @@ body.performance .convite-instalar { display: none; }
   .ref-card { transition: background 0.2s, transform 0.2s; }
   .ref-card:hover { transform: translateY(-2px); }
   .hero { background-size: 200% 200%; animation: surgir 0.5s backwards, deslizar-fundo 14s ease-in-out infinite; }
-  .song-hero > .cover:not(.canvas) { animation: respirar 7s ease-in-out infinite; }
+  .song-hero > .cover { animation: respirar 7s ease-in-out infinite; }
 }
 /* prévia do vídeo no card (mouse parado em cima) */
 .tile-video { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; animation: surgir 0.4s both; pointer-events: none; }
@@ -906,16 +906,25 @@ body.performance .convite-instalar { display: none; }
 
 /* ============================================================ página da música estilo Spotify */
 .song-hero { position: relative; isolation: isolate; }
-/* Canvas (como no Spotify): o vídeo, mudo e em loop, aparece no lugar da capa */
-.cover.canvas { container-type: size; background: #000; }
-.cover.canvas img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.cover.canvas iframe {
-  position: absolute; top: 50%; left: 50%; border: 0; pointer-events: none;
-  width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.35);
-  opacity: 0.01; animation: aparecer-video 0.8s 5s forwards; /* quase invisível no começo (o navegador não toca vídeo oculto) */
+/* Canvas (como no Spotify): o vídeo, mudo, ocupa o topo da música — do alto da tela até os botões —
+   por trás da capa, do título e dos botões. Depois de 5 s (quando os controles do YouTube já sumiram) o
+   vídeo aparece e a capa some, deixando o lugar dela livre para o vídeo. */
+.song-topo { position: relative; isolation: isolate; }
+.canvas-fundo {
+  position: absolute; z-index: -1; inset: -64px calc(-1 * var(--gutter)) -10px; overflow: hidden; pointer-events: none;
+  container-type: size; background: #000; opacity: 0.01; animation: aparecer-video 1s 5s forwards;
 }
+.canvas-fundo iframe { position: absolute; top: 50%; left: 50%; border: 0; width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.2); }
+/* escurece para o título e os botões ficarem legíveis, e funde com a página embaixo */
+.canvas-fundo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(0 0 0 / 0.35) 0%, rgb(0 0 0 / 0.15) 35%, rgb(0 0 0 / 0.55) 75%, var(--bg) 100%); }
 @keyframes aparecer-video { to { opacity: 1; } }
-@media (max-width: 640px) { .song-hero .cover.canvas { width: min(78vw, 320px); height: min(78vw * 1.25, 400px); border-radius: 10px; } }
+@keyframes sumir-capa { to { opacity: 0; visibility: hidden; } }
+.song-topo.canvas-on .song-hero > .cover { animation: sumir-capa 1s 5s forwards; }
+.song-topo.canvas-on .song-hero, .song-topo.canvas-on .actions-row { color: #fff; }
+.song-topo.canvas-on .page-hero .meta, .song-topo.canvas-on .page-hero .meta b { color: rgb(255 255 255 / 0.9); }
+.song-topo.canvas-on .actions-row .icon-btn { color: #fff; }
+.song-topo.canvas-on .song-hero h2 { text-shadow: 0 2px 16px rgb(0 0 0 / 0.5); }
+@media (min-width: 900px) { .canvas-fundo { border-radius: var(--radius) var(--radius) 0 0; } }
 .kind-btn { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; padding: 4px 10px; margin-left: -10px; border-radius: 999px; }
 .kind-btn:hover, .kind-btn:focus-visible { background: rgb(255 255 255 / 0.12); }
 .creditos { background: var(--bg-elev); border-radius: 12px; padding: 16px 18px; max-width: 640px; margin: 0 0 24px; }
@@ -1010,3 +1019,10 @@ body.performance #player { bottom: calc(env(safe-area-inset-bottom) + 70px); }
 
 /* barra da música centralizada (sem cortar quando não cabe) */
 .song-toolbar::before, .song-toolbar::after { content: ""; margin: auto; }
+@media (min-width: 900px) { .canvas-fundo iframe { transform: translate(-50%, -50%) scale(1.4); } }
+
+/* o vídeo do player (um só): acompanha a telinha da página da música ou o espaço do mini player */
+#pl-tela { position: absolute; left: 0; top: 0; z-index: 26; border-radius: 6px; overflow: hidden; background: #000; will-change: transform; }
+#pl-tela.no-palco { z-index: 14; border-radius: var(--radius); box-shadow: var(--shadow); } /* abaixo do topo e da barra da música */
+#pl-tela iframe { display: block; width: 100%; height: 100%; border: 0; }
+body.editando-cheio #pl-tela { visibility: hidden !important; }
