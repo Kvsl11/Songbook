@@ -1265,4 +1265,19 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
   #res .tracks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
 }
 /* celular, música de repertório: voltar/pular no lugar do ampliar (o vídeo amplia tocando na barra da música) */
-@media (max-width: 899px) { #player.com-fila [data-pl="ampliar"] { display: none; } }
+@media (max-width: 599px) { #player .pl-pulo { width: 30px; height: 30px; } #player .icon-btn { width: 34px; } }
+
+/* aleatório e repetir (como no Spotify): ligados ficam na cor de destaque, com um pontinho embaixo;
+   "repetir esta música" mostra um 1. O aleatório só aparece numa música de repertório. */
+#player .pl-modo { position: relative; width: 34px; height: 34px; color: rgb(255 255 255 / 0.7); }
+#player .pl-aleat { display: none; }
+#player.com-fila .pl-aleat { display: grid; }
+#player .pl-modo.ligado { color: var(--accent-ink); }
+#player .pl-modo.ligado::after { content: ""; position: absolute; left: 50%; bottom: 2px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: currentColor; }
+#player .pl-um { display: none; position: absolute; top: 5px; right: 4px; min-width: 12px; height: 12px; border-radius: 6px; background: var(--accent); color: var(--on-accent); font: 800 9px/12px var(--sans); text-align: center; font-style: normal; }
+#player .pl-repetir.uma .pl-um { display: block; }
+/* celular: a barra é estreita — aleatório e repetir aparecem com o vídeo ampliado */
+@media (max-width: 599px) {
+  #player .pl-modo, #player.com-fila .pl-aleat { display: none; }
+  #player.grande .pl-repetir, #player.grande.com-fila .pl-aleat { display: grid; }
+}
