@@ -1180,13 +1180,12 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 }
 
 /* letra no computador: o painel colorido vai de ponta a ponta da tela (sem as faixas pretas dos lados) e,
-   nas telas largas, a letra se divide em colunas para aproveitar o espaço */
+   nas telas largas, a letra fica em duas colunas (a opção "Duas colunas") para aproveitar o espaço */
 @media (min-width: 900px) {
   .song.lyrics-mode { margin: 0 calc(-1 * var(--gutter)); border-radius: 0; padding: 72px var(--gutter) 110px; }
   .song.lyrics-mode.columns { padding-inline: clamp(32px, 4vw, 80px); column-gap: clamp(40px, 5vw, 96px); }
 }
 @media (min-width: 1200px) { .song.lyrics-mode.columns { column-count: 2; } .song.lyrics-mode.columns .section { break-inside: avoid; } }
-@media (min-width: 1700px) { .song.lyrics-mode.columns { column-count: 3; } }
 
 /* fileiras horizontais: setas ‹ › nos lados no computador (com mouse) e barra de rolagem fina */
 .shelf-wrap { position: relative; }
