@@ -133,6 +133,14 @@ export function isChordOnlyLine(line) {
   return ok === tokens.length && tokens.some(isChord);
 }
 
+// "( C  Em  G  Bm )" — sequência de acordes entre parênteses (passagem, introdução de uma parte):
+// devolve os acordes, para virar uma linha de acordes de verdade, ou null
+export function acordesEntreParenteses(texto) {
+  const t = String(texto || '').trim().replace(/^\((.*)\)$/, '$1').replace(/[()]/g, ' ');
+  return isChordOnlyLine(t) ? t.trim().split(/\s+/) : null;
+}
+const linhaDeAcordesPro = (tokens) => tokens.map((x) => (isChord(x) ? `[${x}]` : x)).join(' ');
+
 // Funde uma linha de acordes com a linha de letra seguinte em ChordPro.
 export function mergeChordLine(chordLine, lyricLine = '') {
   const positions = [];
@@ -533,6 +541,8 @@ export function doEditor(texto) {
     }
     espaco = false;
     const coment = /^\s*\(([^()]+)\)\s*$/.exec(linha);
+    const acordesParen = coment && acordesEntreParenteses(coment[1]);
+    if (acordesParen) { out.push(linhaDeAcordesPro(acordesParen)); continue; } // acordes entre parênteses são acordes
     if (coment && !isChordOnlyLine(linha) && ehObservacao(coment[1])) { out.push(`{comment: ${coment[1].trim()}}`); continue; }
     out.push(linha);
   }

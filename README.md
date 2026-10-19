@@ -21,7 +21,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   os participantes ("part.", "feat."); a fonte mostrada é a da cifra (Cifra Club) ou, só quando não há cifra, a da letra.
   Se não achou, tenta de novo depois de uma semana.
 - **Eco entre parênteses**: uma linha cantada entre parênteses, como "(Você não está sozinho)", é letra, do tamanho
-  normal; só instruções como "(2x)", "(bis)", "(só as mulheres)" ou acordes ficam como observação.
+  normal; só instruções como "(2x)", "(bis)", "(só as mulheres)" ficam como observação. Acordes entre parênteses,
+  como "( C Em G Bm )", aparecem como acordes (na cor dos acordes e no tom escolhido).
 - **Sem introdução**: a parte de Intro das cifras não aparece (nem é trazida do Cifra Club) — a cifra começa na letra.
 - **Indicadores nas listas**: na biblioteca, na busca e nas faixas do repertório, ícones bem pequenos mostram se a
   música tem cifra e/ou vídeo.

@@ -1,5 +1,5 @@
 // Renderização de ChordPro em HTML (acordes sobre a letra).
-import { ehInstrumental, ehObservacao, parseChordPro, preferFlatsFor, semIntro, transposeChord, transposeKey } from './chordpro.js';
+import { acordesEntreParenteses, ehInstrumental, ehObservacao, isChord, parseChordPro, preferFlatsFor, semIntro, transposeChord, transposeKey } from './chordpro.js';
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -21,6 +21,12 @@ export function renderSong(content, { transpose = 0, capo = 0, key = '' } = {}) 
     if (label) html.push(`<div class="section-label">${esc(label)}</div>`);
     for (const line of sec.lines) {
       if (line.kind === 'comment') {
+        // acordes entre parênteses guardados como observação ("( C Em G Bm )"): mostra como acordes, no tom escolhido
+        const acordes = acordesEntreParenteses(line.text);
+        if (acordes) {
+          html.push(`<div class="line chords-only">${acordes.map((a) => `<span class="chunk"><span class="chord">${esc(isChord(a) ? transposeChord(a, shift, flats) : a)}</span><span class="lyric"> </span></span>`).join('')}</div>`);
+          continue;
+        }
         // cifras antigas guardaram o eco entre parênteses como observação: ele é letra, do tamanho normal
         const t = line.text.trim().replace(/^\((.*)\)$/, '$1');
         if (sec.type !== 'comment' && t.length <= 90 && !/[:]/.test(t) && !ehObservacao(t) && /\p{L}{3,}/u.test(t) && /\S\s+\S/.test(t)) {

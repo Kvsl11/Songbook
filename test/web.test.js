@@ -165,3 +165,13 @@ test('linha entre parênteses: observação fica observação, eco cantado é le
   assert.match(html, /class="line lyrics-only eco"[^]*\(Você não está sozinho\)/);
   assert.match(html, /<div class="comment">2x<\/div>/);
 });
+
+test('acordes entre parênteses viram acordes (não observação)', async () => {
+  const pro = doEditor('[Estrofe]\n( C  Em  G  Bm )\n\nIt ain\'t about');
+  assert.match(pro, /^\[C\] \[Em\] \[G\] \[Bm\]$/m);
+  const { renderSong } = await import('../public/js/render.js');
+  const html = renderSong('{key: C}\n{start_of_verse}\n{comment: C Em G Bm}\n{end_of_verse}', { transpose: 2 }).html;
+  assert.match(html, /class="line chords-only"/);
+  assert.match(html, /<span class="chord">D<\/span>[^]*<span class="chord">F#m<\/span>/);
+  assert.doesNotMatch(html, /class="comment"/);
+});
