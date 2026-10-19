@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-96';
+export const APP_VERSAO = '2026.10.19-97';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -449,6 +449,15 @@ const player = (() => {
         }
       }
       tela.classList.toggle('na-frente', modo === 'frente');
+      if (modo === 'frente') {
+        // na frente (anúncio/começo), o vídeo cobre o topo só até acima dos botões: eles continuam à vista
+        const topoEl = fundo.closest('.song-topo');
+        let frente = topoEl?.querySelector('.canvas-frente');
+        if (topoEl && !frente) { topoEl.insertAdjacentHTML('afterbegin', '<div class="canvas-frente" aria-hidden="true"></div>'); frente = topoEl.querySelector('.canvas-frente'); }
+        const botoes = topoEl?.querySelector('.actions-row');
+        if (frente && botoes) frente.style.bottom = `${Math.max(0, topoEl.getBoundingClientRect().bottom - botoes.getBoundingClientRect().top + 6)}px`;
+        return frente || fundo;
+      }
       return modo === 'telinha' ? palco.querySelector('.pl-alvo') : fundo;
     }
     modoAnterior = '';
@@ -485,6 +494,7 @@ const player = (() => {
     $('.pl-txt small', el).innerHTML = esc([atual.parte, atual.artista].filter(Boolean).join(' · ')) + (duracao ? `<span class="pl-tmini">${atual.parte || atual.artista ? ' · ' : ''}${fmt(tempo)} / ${fmt(duracao)}</span>` : '');
     $('.pl-play', el).innerHTML = icon(estado === 'tocando' ? 'pause' : 'play', 20);
     $('.pl-prog i', el).style.width = duracao ? `${Math.min(100, (tempo / duracao) * 100)}%` : '0';
+    sessaoDeMidia();
     // voltar/pular: só numa música de repertório (como numa playlist)
     const noRepertorio = Boolean(atual.setId && db.set(atual.setId));
     if (filaDe !== (atual.setId || '')) { filaDe = atual.setId || ''; tocadas = new Set([atual.index]); historico = []; }
@@ -556,6 +566,8 @@ const player = (() => {
       return noPalco();
     },
     fechar() {
+      if ('mediaSession' in navigator) { navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none'; }
+      sessaoDe = '';
       tela.innerHTML = '';
       tela.hidden = true;
       cancelAnimationFrame(quadro);
@@ -610,6 +622,34 @@ const player = (() => {
     return true;
   };
   const proxima = () => pular(1);
+  // Controles na notificação e na tela de bloqueio do celular (e nas teclas de mídia do computador):
+  // nome, artista, capa, tocar/pausar, anterior/próxima e a barra de tempo
+  let sessaoDe = '';
+  const sessaoDeMidia = () => {
+    if (!('mediaSession' in navigator) || !atual) return;
+    const ms = navigator.mediaSession;
+    const chave = `${atual.youtube}|${atual.titulo}|${atual.artista}`;
+    if (sessaoDe !== chave && typeof MediaMetadata === 'function') {
+      sessaoDe = chave;
+      const capa = atual.capa && /^https?:/.test(atual.capa) ? atual.capa : `https://i.ytimg.com/vi/${atual.youtube}/hqdefault.jpg`;
+      ms.metadata = new MediaMetadata({
+        title: atual.titulo || 'Vídeo', artist: atual.artista || 'Songbook Litúrgico', album: atual.parte || 'Songbook Litúrgico',
+        artwork: [{ src: capa, sizes: '480x360', type: 'image/jpeg' }, { src: `https://i.ytimg.com/vi/${atual.youtube}/mqdefault.jpg`, sizes: '320x180', type: 'image/jpeg' }],
+      });
+      const acao = (nome, fn) => { try { ms.setActionHandler(nome, fn); } catch { /* ação não suportada */ } };
+      acao('play', () => { if (estado !== 'tocando') api.alternar(); });
+      acao('pause', () => { if (estado === 'tocando') api.alternar(); });
+      acao('stop', () => api.fechar());
+      acao('seekto', (d) => { if (typeof d.seekTime === 'number') api.irPara(d.seekTime); });
+      acao('seekbackward', (d) => api.irPara(Math.max(0, tempo - (d.seekOffset || 10))));
+      acao('seekforward', (d) => api.irPara(Math.min(duracao || Infinity, tempo + (d.seekOffset || 10))));
+      const naFila = Boolean(atual.setId && db.set(atual.setId));
+      acao('previoustrack', naFila ? () => { if (tempo > 3 || anteriorIndice() < 0) api.irPara(0); else pular(-1); } : null);
+      acao('nexttrack', naFila ? () => pular(1) : null);
+    }
+    ms.playbackState = estado === 'tocando' ? 'playing' : 'paused';
+    if (duracao > 0 && ms.setPositionState) { try { ms.setPositionState({ duration: duracao, position: Math.min(duracao, Math.max(0, tempo)), playbackRate: 1 }); } catch { /* fora do intervalo */ } }
+  };
   // a música acabou: repete, vai para a próxima (na ordem ou aleatória) ou para
   const fimDaMusica = () => {
     if (repetir === 'uma' || (repetir === 'todas' && !atual?.setId)) { api.irPara(0); return true; }

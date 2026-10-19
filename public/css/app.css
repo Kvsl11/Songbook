@@ -355,7 +355,8 @@ a.chip.sm { cursor: pointer; }
   --painel: color-mix(in srgb, var(--tint) 75%, #000);
   max-width: none; margin: 0 calc(-1 * var(--gutter)); padding: 64px var(--gutter) 110px;
   /* sem cortes secos: a cor do painel surge e some aos poucos */
-  background: linear-gradient(180deg, transparent 0, var(--painel) 56px, var(--painel) calc(100% - 100px), transparent 100%); color: #fff;
+  background: linear-gradient(180deg, transparent 0, color-mix(in srgb, var(--painel) 45%, transparent) 60px, color-mix(in srgb, var(--painel) 85%, transparent) 120px, var(--painel) 180px,
+    var(--painel) calc(100% - 240px), color-mix(in srgb, var(--painel) 70%, transparent) calc(100% - 140px), color-mix(in srgb, var(--painel) 25%, transparent) calc(100% - 60px), transparent 100%); color: #fff;
   font-size: calc(25px * var(--font-scale)); font-weight: 800; letter-spacing: -0.015em; line-height: 1.32;
 }
 .song.lyrics-mode .chord, .song.lyrics-mode .line.chords-only, .song.lyrics-mode .comment { display: none; }
@@ -1281,3 +1282,9 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
   #player .pl-modo, #player.com-fila .pl-aleat { display: none; }
   #player.grande .pl-repetir, #player.grande.com-fila .pl-aleat { display: grid; }
 }
+
+/* durante o anúncio/começo o vídeo fica na frente só no topo, até acima dos botões (que continuam à vista) */
+.canvas-frente { position: absolute; z-index: -2; pointer-events: none; left: calc(-1 * var(--gutter)); right: calc(-1 * var(--gutter)); top: -64px; bottom: 80px; }
+/* letra: entra e sai em degradês longos (do vídeo para a letra e da letra para as Referências) */
+.song.lyrics-mode { padding-top: 96px; padding-bottom: 170px; }
+@media (min-width: 900px) { .song.lyrics-mode { padding-top: 110px; padding-bottom: 190px; } }
