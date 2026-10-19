@@ -23,6 +23,14 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   mais tocadas de artistas como Frei Gilson, Colo de Deus, Padre Fábio de Melo, Ministério Amor e Adoração, Shalom, Padre Reginaldo Manzotti, Canção Nova, Anjos de Resgate,
   Fraternidade São João Paulo II, Rosa de Saron),
   em ordem de popularidade; tocar numa abre com cifra, letra e vídeo.
+- **Capotraste do Cifra Club**: cifra "Tom Bb (com forma de G), capo na 3ª casa" entra com os acordes no tom real
+  e o capo marcado (`{capo: 3}`): com o capo ligado aparecem os desenhos da cifra (G…); tirando o capo, os acordes
+  do tom real (Bb…). Cifras guardadas antes com a observação "Capotraste na Nª casa" são convertidas ao abrir.
+- **Salvar na biblioteca** (como o "curtir" do Spotify): o círculo com + na música e nas listas (busca, artista,
+  álbum) salva a música já com cifra, letra e vídeo e fica preenchido na cor de destaque escolhida em Ajustes; tocar
+  de novo tira da biblioteca (pergunta antes se ela estiver num repertório). "Adicionar a um repertório" é outro botão.
+- **Duração do repertório**: como no Spotify, "5 músicas, 23 min 10 s" no repertório e na Biblioteca, e a duração
+  de cada faixa; vem do vídeo do YouTube de cada música (guardada; procurada uma vez pelo Piped).
 - **Cifra automática**: uma letra que veio da internet sem acordes procura sozinha a cifra da mesma música no
   Cifra Club e troca (mantendo vídeo, parte da missa e quadros). Só depois de procurar, um aviso simples diz o que
   falta ("Esta música não tem cifra nem vídeo").

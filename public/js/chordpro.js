@@ -456,6 +456,27 @@ export function definirMeta(src, chave, valor) {
   return linhas.join('\n');
 }
 
+// Cifra "com capotraste" (ex.: Cifra Club "Tom: F (forma de D)", capo na 3ª casa): os acordes vêm desenhados
+// para tocar com capo. Guarda os acordes no tom real e o capo em {capo: N}; com o capo ligado o app mostra os
+// mesmos desenhos da cifra, e tirando o capo mostra os acordes do tom real.
+export function cifraComCapo(src, capo, real = '') {
+  const n = Number(capo) || 0;
+  if (!n) return src;
+  const forma = (/\{\s*key\s*:\s*([^}]+)\}/i.exec(src) || [])[1]?.trim() || '';
+  const tomReal = real || transposeKey(forma, n);
+  let out = transposeChordPro(src, n, preferFlatsFor(tomReal));
+  if (tomReal) out = /\{\s*key\s*:/i.test(out) ? out.replace(/\{\s*key\s*:[^}]*\}/i, `{key: ${tomReal}}`) : definirMeta(out, 'key', tomReal);
+  return definirMeta(out, 'capo', String(n));
+}
+export const capoDaCifra = (src) => Number((/\{\s*capo\s*:\s*(\d{1,2})\s*\}/i.exec(src || '') || [])[1]) || 0;
+// cifras guardadas antes: a observação "Capotraste na Nª casa (tom real: X)" vira o capo de verdade
+export function capoDaObservacao(src) {
+  if (/\{\s*capo\s*:/i.test(src || '')) return null;
+  const m = /^[ \t]*\{\s*(?:comment|c)\s*:\s*Capotraste na (\d{1,2})ª casa(?:\s*\(tom real:\s*([A-G][#b]?m?)\))?\s*\}[ \t]*\n?/im.exec(src || '');
+  if (!m) return null;
+  return { content: cifraComCapo(src.replace(m[0], ''), m[1], m[2] || ''), capo: Number(m[1]) };
+}
+
 // ---------------------------------------------------------------- editor simples
 // No editor, as partes da música são só uma linha com o nome entre colchetes: [Refrão], [Estrofe 2],
 // [Ponte], [Intro]… Tudo o que vem abaixo pertence a ela até a próxima. [Repetir refrão] repete o

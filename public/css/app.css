@@ -1139,3 +1139,15 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 .track.faixa .num { width: 22px; text-align: right; color: var(--subtle); font-variant-numeric: tabular-nums; font-size: 13px; }
 .track.faixa.sem-cifra .t { color: var(--muted); }
 #art-abas[hidden] { display: none; }
+
+/* salvar na biblioteca (como o "curtir" do Spotify): círculo com +; salva = preenchido na cor de destaque */
+.salvar-btn { width: 34px; height: 34px; flex: none; border-radius: 50%; border: 2px solid var(--muted); background: transparent; color: var(--muted); display: inline-grid; place-items: center; cursor: pointer; padding: 0; transition: transform 0.15s, background 0.2s, border-color 0.2s, color 0.2s; }
+.salvar-btn:hover { border-color: var(--text); color: var(--text); transform: scale(1.06); }
+.salvar-btn.salva { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.salvar-btn.salva:hover { background: var(--accent-2); border-color: var(--accent-2); color: var(--on-accent); }
+.salvar-btn:active { transform: scale(0.92); }
+.salvar-btn.salva svg { animation: salvar-pop 0.25s ease-out; }
+@keyframes salvar-pop { from { transform: scale(0.4); } to { transform: scale(1); } }
+.salvar-btn.mini { width: 26px; height: 26px; border-width: 1.5px; }
+.salvar-btn.mini svg { width: 13px; height: 13px; }
+.salvar-btn .spin { width: 12px; height: 12px; }

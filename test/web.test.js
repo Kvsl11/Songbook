@@ -52,8 +52,26 @@ B|-----3-----|
 test('Cifra Club novo: tom com forma e capotraste', () => {
   const html = '<h1 class="t1">X</h1><div><span>Tom<!-- -->: </span> <button type="button" class="eVroG" data-anchor="--chord-tone">A<!-- --> (com forma de G)</button></div><div><span>Capotraste<!-- -->:</span> <b>2ª casa</b></div><pre><b>G</b>\nLetra</pre>';
   const c = parseCifraClub(html, 'https://www.cifraclub.com.br/a/b/');
-  assert.equal(c.tom, 'G');
-  assert.match(c.chordpro, /\{comment: Capotraste na 2ª casa \(tom real: A\)\}/);
+  // acordes guardados no tom real (A) e o capo marcado: com capo 2 o app mostra o desenho G
+  assert.equal(c.tom, 'A');
+  assert.equal(c.capo, 2);
+  assert.match(c.chordpro, /\{key: A\}/);
+  assert.match(c.chordpro, /\{capo: 2\}/);
+  assert.match(c.chordpro, /\[A\]/);
+  assert.doesNotMatch(c.chordpro, /Capotraste na/);
+});
+
+test('cifra antiga com a observação de capotraste vira capo de verdade', async () => {
+  const { capoDaObservacao, capoDaCifra } = await import('../public/js/chordpro.js');
+  const { renderSong } = await import('../public/js/render.js');
+  const r = capoDaObservacao('{title: X}\n{key: D}\n{comment: Capotraste na 3ª casa (tom real: F)}\n\n[D]Letra [G]aqui');
+  assert.equal(r.capo, 3);
+  assert.equal(capoDaCifra(r.content), 3);
+  assert.match(r.content, /\{key: F\}/);
+  assert.match(r.content, /\[F\]Letra \[Bb\]aqui/);
+  // com o capo 3 aparecem os desenhos de antes; sem capo, o tom real
+  assert.match(renderSong(r.content, { capo: 3 }).html, /<span class="chord">D<\/span>[^]*<span class="chord">G<\/span>/);
+  assert.match(renderSong(r.content, { capo: 0 }).html, /<span class="chord">F<\/span>/);
 });
 
 test('cifra colada: acordes no fim da parte não grudam na diretiva', () => {

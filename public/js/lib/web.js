@@ -10,7 +10,7 @@
 // - YouTube: busca pelo Piped (instâncias públicas, com CORS); o oEmbed confirma um link colado.
 
 import { decodeEntities, normalize } from './html.js';
-import { doEditor, isChord, semIntro } from '../chordpro.js';
+import { cifraComCapo, doEditor, isChord, semIntro } from '../chordpro.js';
 
 const NO_NAVEGADOR = typeof window !== 'undefined';
 const UA = NO_NAVEGADOR ? {} : { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36', 'Accept-Language': 'pt-BR,pt;q=0.9' };
@@ -88,9 +88,12 @@ export function parseCifraClub(html, url = '') {
   if (artista) cab.push(`{artist: ${artista}}`);
   if (isChord(tom)) cab.push(`{key: ${tom}}`);
   if (yt) cab.push(`{youtube: https://www.youtube.com/watch?v=${yt}}`);
-  if (capo && Number(capo) > 0) cab.push(`{comment: Capotraste na ${capo}ª casa${forma && real && real !== forma ? ` (tom real: ${real})` : ''}}`);
   if (url) cab.push(`{source: ${url}}`);
-  return { titulo, artista, tom: isChord(tom) ? tom : '', url, chordpro: cab.join('\n') + '\n\n' + simplificarCifra(cifraTextoParaChordPro(texto)) };
+  let chordpro = cab.join('\n') + '\n\n' + simplificarCifra(cifraTextoParaChordPro(texto));
+  // com capotraste: acordes guardados no tom real e o capo marcado (o app mostra os desenhos com o capo)
+  const n = Number(capo) || 0;
+  if (n > 0) chordpro = cifraComCapo(chordpro, n, isChord(real) && forma ? real : '');
+  return { titulo, artista, tom: n > 0 ? ((/\{key:\s*([^}]+)\}/.exec(chordpro) || [])[1] || '') : isChord(tom) ? tom : '', capo: n, url, chordpro };
 }
 
 // Versão simplificada: sem tablaturas, riffs, solos e introdução — só letra e acordes
@@ -359,6 +362,7 @@ export function videosDoPiped(json) {
         titulo: v.title || '',
         canal: (v.uploaderName || '').replace(/\s*-\s*Topic$/, ''),
         duracao: v.duration > 0 ? `${Math.floor(v.duration / 60)}:${String(v.duration % 60).padStart(2, '0')}` : '',
+        segundos: v.duration > 0 ? v.duration : 0,
         capa: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
         url: `https://www.youtube.com/watch?v=${id}`,
         fonte: 'youtube',
@@ -383,6 +387,23 @@ export async function buscarYoutube(termo, { fetchImpl, instancias = PIPED } = {
 }
 
 // confere um link colado (título e canal), sem login, pelo oEmbed do YouTube
+// duração do vídeo (em segundos), pelo Piped: a busca pelo código do vídeo traz a duração (a página do vídeo,
+// /streams/ID, às vezes é barrada pelo YouTube); 0 se nada responder
+export async function duracaoDoVideo(id, { fetchImpl, instancias = PIPED } = {}) {
+  if (!/^[\w-]{11}$/.test(id || '')) return 0;
+  const achado = (await buscarYoutube(id, { fetchImpl, instancias }).catch(() => [])).find((v) => v.id === id);
+  if (achado?.segundos > 0) return achado.segundos;
+  for (const base of instancias) {
+    try {
+      const res = await buscar(`${base}/streams/${id}`, { fetchImpl, timeout: 12000 });
+      if (!res.ok) continue;
+      const d = Number((await res.json())?.duration) || 0;
+      if (d > 0) return d;
+    } catch { /* tenta a próxima */ }
+  }
+  return 0;
+}
+
 export async function youtubeOEmbed(url, fetchImpl) {
   const res = await buscar(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`, { fetchImpl });
   if (!res.ok) throw new Error('Vídeo não encontrado');

@@ -54,6 +54,9 @@ export const db = {
   saveSong(song) {
     const now = Date.now();
     const full = { transpose: 0, capo: 0, createdAt: now, ...song, ...metaFrom(song.content), id: song.id || uid(), updatedAt: now };
+    // trocou o vídeo: a duração guardada era a do vídeo antigo
+    const antes = state.songs.find((s) => s.id === full.id);
+    if (antes && antes.youtube !== full.youtube) delete full.duracao;
     if (song.source && !full.source) full.source = song.source;
     const i = state.songs.findIndex((s) => s.id === full.id);
     if (i >= 0) state.songs[i] = full; else state.songs.push(full);

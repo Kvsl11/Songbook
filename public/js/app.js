@@ -1,11 +1,11 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
-import { definirMeta, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra } from './chordpro.js';
+import { definirMeta, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, capoDaCifra, capoDaObservacao } from './chordpro.js';
 import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
-import { buscarYoutube, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, mesmaDuracao, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, mesmaDuracao, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, buscarLetraSincronizada, getCifraClub, getLetra, buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-83';
+export const APP_VERSAO = '2026.10.19-84';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -580,7 +580,10 @@ const player = (() => {
         tentativasIda = 0;
       }
       if (typeof info.currentTime === 'number') { tempo = info.currentTime; marcaTempo = performance.now(); }
-      if (typeof info.duration === 'number' && info.duration > 0) duracao = info.duration;
+      if (typeof info.duration === 'number' && info.duration > 0 && Math.round(info.duration) !== Math.round(duracao)) {
+        duracao = info.duration;
+        guardarDuracao(atual?.youtube, duracao);
+      }
       const antes = estado;
       if (info.playerState === 1) estado = 'tocando';
       else if (info.playerState === 2) estado = 'pausado';
@@ -614,7 +617,7 @@ function desenharLateral() {
   const sets = db.sets();
   box.innerHTML = sets.length ? `<ul class="tracks">${sets.map((s) => `
     <li class="track clickable" style="grid-template-columns:auto 1fr" data-href="#/repertorio/${s.id}">
-      ${capaRepertorio(s)}<a class="info" href="#/repertorio/${s.id}"><div class="t">${esc(s.name)}</div><div class="s">Repertório · ${s.items.length} músicas</div></a></li>`).join('')}</ul>`
+      ${capaRepertorio(s)}<a class="info" href="#/repertorio/${s.id}"><div class="t">${esc(s.name)}</div><div class="s">Repertório · ${resumoRepertorio(s)}</div></a></li>`).join('')}</ul>`
     : `<p class="muted" style="padding:8px 12px;font-size:13px">Seus repertórios aparecem aqui. Monte o da missa de hoje na aba Liturgia.</p>`;
 }
 
@@ -912,7 +915,13 @@ async function salvarDaInternet(tipo, item) {
     toast('Não consegui trazer: ' + e.message);
     return null;
   }
-  const salva = db.saveSong({ content: r.content, source: r.source });
+  // espera um pouco pelo vídeo, para a música já entrar com ele (o resto segue depois)
+  let content = r.content;
+  if (!/\{\s*youtube\s*:/i.test(content)) {
+    const vs = await Promise.race([r.video.catch(() => []), new Promise((ok) => setTimeout(() => ok(null), 4000))]);
+    if (vs?.[0]) content = definirMeta(content, 'youtube', vs[0].url);
+  }
+  const salva = db.saveSong({ content, source: r.source, capo: capoDaCifra(content) });
   // o vídeo do YouTube (se ainda não veio com a música); dá para trocar depois em Referências
   if (!salva.youtube) {
     r.video.then((vs) => {
@@ -1055,12 +1064,41 @@ function ativarArrastar(lista, aoSoltar) {
 const mover = (arr, de, para) => { const [x] = arr.splice(de, 1); arr.splice(para, 0, x); };
 
 // linha de um item de repertório (página do repertório e fila)
+// ---- duração das músicas (a do vídeo do YouTube), para o total do repertório, como no Spotify
+// fica guardada na música; vem do player quando o vídeo toca ou é procurada uma vez no Piped
+function guardarDuracao(youtube, seg) {
+  if (!youtube || !(seg > 0)) return;
+  for (const s of db.songs()) if (s.youtube === youtube && Math.round(s.duracao || 0) !== Math.round(seg)) db.updateSong(s.id, { duracao: Math.round(seg) });
+}
+const procurandoDuracao = new Map();
+function duracaoDaMusica(s) {
+  if (!s?.youtube) return Promise.resolve(0);
+  if (s.duracao > 0) return Promise.resolve(s.duracao);
+  if (!procurandoDuracao.has(s.youtube)) procurandoDuracao.set(s.youtube, duracaoDoVideo(s.youtube).then((d) => { guardarDuracao(s.youtube, d); return d; }));
+  return procurandoDuracao.get(s.youtube);
+}
+const fmtTempo = (seg) => `${Math.floor(seg / 60)}:${String(Math.round(seg % 60)).padStart(2, '0')}`;
+// "9 min 30 s" / "1 h 5 min"
+function fmtDuracaoTotal(seg) {
+  const t = Math.round(seg);
+  if (t >= 3600) return `${Math.floor(t / 3600)} h ${Math.floor((t % 3600) / 60)} min`;
+  return t % 60 ? `${Math.floor(t / 60)} min ${t % 60} s` : `${Math.floor(t / 60)} min`;
+}
+// "5 músicas, 23 min 10 s" (com "cerca de" se falta a duração de alguma)
+function resumoRepertorio(set) {
+  const songs = set.items.map((it) => db.song(it.songId)).filter(Boolean);
+  const n = set.items.length;
+  const total = songs.reduce((t, s) => t + (s.duracao || 0), 0);
+  const faltam = songs.some((s) => !s.duracao);
+  return `${n} ${n === 1 ? 'música' : 'músicas'}${total ? `, ${faltam ? 'cerca de ' : ''}${fmtDuracaoTotal(total)}` : ''}`;
+}
+
 function linhaItemRepertorio(set, it, i, { atual = -1, fila = false } = {}) {
   const s = db.song(it.songId);
   return `<li class="track set-item ${i === atual ? 'atual' : ''}" data-i="${i}">
     <span class="lead">${capa(s || {})}</span>
     <a class="info" href="#/repertorio/${set.id}/${i}" ${fila ? 'data-ir' : ''}><div class="t ${i === atual ? 'playing' : ''}">${i === atual ? icon('music', 13, 'style="display:inline;vertical-align:-1px;margin-right:4px"') : ''}${esc(s?.title || '(música removida)')}</div>
-      <div class="s">${it.label ? `<b class="parte-tag">${esc(it.label)}</b> ` : ''}${indicadores(s)}${esc(s?.artist || '')}</div></a>
+      <div class="s">${it.label ? `<b class="parte-tag">${esc(it.label)}</b> ` : ''}${indicadores(s)}${esc(s?.artist || '')}<span class="dur-faixa">${s?.duracao ? ` · ${fmtTempo(s.duracao)}` : ''}</span></div></a>
     ${s?.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '<span></span>'}
     <span class="acts">
       <button class="icon-btn" data-parte aria-label="Parte da missa" title="${it.label ? 'Trocar a parte da missa (' + esc(it.label) + ')' : 'Definir a parte da missa'}">${icon('list', 17)}</button>
@@ -1209,7 +1247,7 @@ function tileMusica(s) {
 function tileRepertorio(s) {
   return `<a class="tile" href="#/repertorio/${s.id}"><div class="tile-art">${capaRepertorio(s)}
     ${s.items.length ? `<button class="tile-play" data-href="#/repertorio/${s.id}/0" aria-label="Tocar repertório">${icon('play', 18)}</button>` : ''}</div>
-    <b>${esc(s.name)}</b><small>${fmtData(s.date)} · ${s.items.length} músicas</small></a>`;
+    <b>${esc(s.name)}</b><small>${fmtData(s.date)} · ${resumoRepertorio(s)}</small></a>`;
 }
 function ligarTiles(box) {
   box.addEventListener('click', (e) => {
@@ -1479,7 +1517,7 @@ function buscarCifraNoApp(song) {
 // Abre a música da busca já com o vídeo do YouTube (procura por até 3 s antes de abrir, para a página
 // ser desenhada uma vez só); se a busca demorar mais, ela continua com a página aberta
 async function abrirPrevia(content, source, back, videoJa = null) {
-  const novo = { id: 'previa', content, source, transpose: 0, capo: 0, back };
+  const novo = { id: 'previa', content, source, transpose: 0, capo: capoDaCifra(content), back }; // capo da cifra (Cifra Club)
   const m = renderSong(content).meta;
   if (!youtubeId(m.youtube) && !String(source || '').startsWith('cnbb:')) {
     const busca = (videoJa || buscarYoutube([m.title, m.artist].filter(Boolean).join(' '))).then((vs) => vs[0] || null).catch(() => null);
@@ -1593,10 +1631,56 @@ const tileArtista = (a) => `<a class="tile tile-artista" href="#/artista/${encod
   <div class="cover">${a.capa ? `<img src="${esc(a.capa)}" alt="" loading="lazy">` : icon('mic', 40)}</div><b>${esc(a.nome)}</b><small>Artista</small></a>`;
 const artistaCerto = (lista, nome) => lista.find((a) => mesmoNome(a.nome, nome)) || null;
 
+// ---- salvar na biblioteca (como o "curtir" do Spotify): círculo com +; salva, fica preenchido na cor de destaque
+// a música da busca já está na biblioteca? (pelo link da cifra/letra ou pelo título e artista)
+function musicaSalva({ titulo = '', artista = '', cifra = '', letra = '' } = {}) {
+  return (cifra && db.songBySource(cifra)) || (letra && db.songBySource(letra))
+    || db.songs().find((s) => normalizar(s.title) === normalizar(tituloLimpo(titulo)) && (!artista || mesmoNome(s.artist, artista))) || null;
+}
+const botaoSalvar = (item, cls = '') => {
+  const salva = musicaSalva(item);
+  return `<button class="salvar-btn ${cls}${salva ? ' salva' : ''}" data-salvar data-titulo="${esc(item.titulo || '')}" data-artista="${esc(item.artista || '')}" data-cifra="${esc(item.cifra || '')}" data-letra="${esc(item.letra || '')}"
+    aria-pressed="${!!salva}" aria-label="${salva ? 'Na biblioteca (tocar para tirar)' : 'Salvar na biblioteca'}" title="${salva ? 'Na sua biblioteca — tocar para tirar' : 'Salvar na biblioteca'}">${icon(salva ? 'check' : 'plus', 16)}</button>`;
+};
+const marcarSalvar = (b, salva) => {
+  b.classList.toggle('salva', salva);
+  b.setAttribute('aria-pressed', String(salva));
+  b.title = salva ? 'Na sua biblioteca — tocar para tirar' : 'Salvar na biblioteca';
+  b.setAttribute('aria-label', salva ? 'Na biblioteca (tocar para tirar)' : 'Salvar na biblioteca');
+  b.innerHTML = icon(salva ? 'check' : 'plus', 16);
+};
+// tirar da biblioteca: se a música estiver em algum repertório, pergunta antes (ela sai dele também)
+async function tirarDaBiblioteca(song) {
+  const reps = db.sets().filter((st) => st.items.some((it) => it.songId === song.id));
+  if (reps.length && !(await ask({ title: 'Tirar da biblioteca?', text: `“${song.title}” está em ${reps.length > 1 ? `${reps.length} repertórios` : `“${reps[0].name}”`} e sai de lá também.`, ok: 'Tirar', danger: true }))) return false;
+  if (player.atual?.songId === song.id) player.fechar();
+  db.deleteSong(song.id);
+  desenharLateral();
+  toast('Removida da biblioteca');
+  return true;
+}
+// os círculos das listas (busca, artista, álbum): salvam a música já com cifra, letra e vídeo
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-salvar]');
+  if (!b || b.id === 'btn-biblio') return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (b.disabled) return;
+  const item = { titulo: b.dataset.titulo, artista: b.dataset.artista, cifra: b.dataset.cifra, letra: b.dataset.letra };
+  const salva = musicaSalva(item);
+  if (salva) { if (await tirarDaBiblioteca(salva)) marcarSalvar(b, false); return; }
+  b.disabled = true;
+  b.innerHTML = '<span class="spin"></span>';
+  const id = await salvarDaInternet('musica', { titulo: item.titulo, artista: item.artista, cifra: item.cifra, letra: item.letra ? { url: item.letra, titulo: item.titulo, artista: item.artista } : null });
+  b.disabled = false;
+  marcarSalvar(b, !!id);
+  if (id) toast('Salva na biblioteca');
+}, true);
+
 const linhaMusicaWeb = (r, i, extra = '') => `
   <li class="track clickable" data-web="musica" data-i="${i}" style="grid-template-columns:auto 1fr auto">
     ${capa({ titulo: r.titulo, capa: r.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${r.cifra ? `<span class="ind"><span class="ind-i" title="Tem cifra">${icon('chord', 11)}</span></span>` : ''}${esc(r.artista || '')}</div></div>
-    <span class="acts">${extra}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
+    <span class="acts">${extra}${botaoSalvar({ titulo: r.titulo, artista: r.artista, cifra: r.cifra || '', letra: r.letra?.url || '' }, 'mini')}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 
 // Busca vazia: as músicas católicas mais procuradas agora no Cifra Club — as mais tocadas de cada um dos
 // artistas católicos mais ouvidos, em ordem de popularidade (o índice da própria busca do Cifra Club)
@@ -1756,10 +1840,10 @@ async function todasDoArtista(d) {
   return [...porUrl.values()];
 }
 
-const linhaFaixa = (f, i, n, foto) => `<li class="track clickable faixa${f.url ? '' : ' sem-cifra'}" data-i="${i}" style="grid-template-columns:auto auto 1fr auto">
+const linhaFaixa = (f, i, n, foto, artista = '') => `<li class="track clickable faixa${f.url ? '' : ' sem-cifra'}" data-i="${i}" style="grid-template-columns:auto auto 1fr auto">
   <span class="num">${n}</span>${capa({ titulo: f.titulo, capa: f.capa || foto })}<div class="info"><div class="t">${esc(f.titulo)}</div>
   <div class="s">${f.url ? `<span class="ind"><span class="ind-i" title="Tem cifra">${icon('chord', 11)}</span></span>${f.tom ? `Tom ${esc(f.tom)}` : 'Cifra'}` : 'Sem cifra no Cifra Club'}</div></div>
-  <span class="acts"><button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
+  <span class="acts">${botaoSalvar({ titulo: f.titulo, artista, cifra: f.url || '' }, 'mini')}<button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 
 async function viewArtista(slug, nome) {
   setTab('buscar');
@@ -1778,7 +1862,7 @@ async function viewArtista(slug, nome) {
   let lista = [];
   let foto = '';
   const box = () => $('#art-conteudo');
-  const listaHtml = (itens) => (itens.length ? `<ul class="tracks">${itens.map((f, i) => linhaFaixa(f, i, i + 1, foto)).join('')}</ul>` : '<p class="muted">Nenhuma música encontrada.</p>');
+  const listaHtml = (itens) => (itens.length ? `<ul class="tracks">${itens.map((f, i) => linhaFaixa(f, i, i + 1, foto, nome)).join('')}</ul>` : '<p class="muted">Nenhuma música encontrada.</p>');
   const carregando = (txt) => { box().innerHTML = `<div class="loading-note"><span class="spin"></span>${txt}</div>`; };
   let vez = 0;
   const desenhar = async () => {
@@ -1888,7 +1972,7 @@ async function viewAlbum(slug, nome, albumUrl) {
     <section class="page-hero"><div class="cover">${al.capaGrande ? `<img src="${esc(al.capaGrande)}" alt="">` : icon('disc', 48)}</div>
       <div><div class="kind">Álbum</div><h2>${esc(al.titulo.trim())}</h2>
       <div class="meta"><a href="${voltar}"><b>${esc(nome)}</b></a>${al.ano ? ` · ${esc(al.ano)}` : ''} · ${al.faixas.length} faixas${comCifra < al.faixas.length ? ` (${comCifra} com cifra)` : ''}</div></div></section>
-    <ul class="tracks" id="faixas">${al.faixas.map((f, i) => linhaFaixa({ ...f, capa: al.capa }, i, i + 1, al.capa)).join('')}</ul>`;
+    <ul class="tracks" id="faixas">${al.faixas.map((f, i) => linhaFaixa({ ...f, capa: al.capa }, i, i + 1, al.capa, nome)).join('')}</ul>`;
   $('#faixas').addEventListener('click', (e) => {
     const li = e.target.closest('li[data-i]');
     const f = li && al.faixas[Number(li.dataset.i)];
@@ -1931,7 +2015,7 @@ function viewLibrary(filtro = 'repertorios', { selecionando = false, marcados = 
   const lixeira = (id, nome) => `<button class="icon-btn lixo" data-excluir="${id}" aria-label="Excluir ${esc(nome)}" title="Excluir">${icon('trash', 16)}</button>`;
   const linha = ehRep
     ? (s) => `<li class="track clickable lib-item" data-k="${s.id}">${marca(s.id)}${capaRepertorio(s)}
-        <div class="info"><div class="t">${esc(s.name)}</div><div class="s">Repertório · ${fmtData(s.date)} · ${s.items.length} músicas</div></div>
+        <div class="info"><div class="t">${esc(s.name)}</div><div class="s">Repertório · ${fmtData(s.date)} · ${resumoRepertorio(s)}</div></div>
         <span class="acts">${s.items.length ? `<a class="icon-btn" href="#/repertorio/${s.id}/0" aria-label="Tocar">${icon('play', 16)}</a>` : ''}${lixeira(s.id, s.name)}</span></li>`
     : (s) => `<li class="track clickable lib-item" data-k="${s.id}">${marca(s.id)}${capa(s)}
         <div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>
@@ -2049,6 +2133,13 @@ function viewSong(id, ctx = {}) {
   const isPreview = id === 'previa';
   let song = isPreview ? preview : db.song(id);
   if (!song) return viewNotFound();
+  // cifra guardada antes com a observação "Capotraste na Nª casa": vira o capo de verdade (uma vez)
+  const capoAntigo = capoDaObservacao(song.content);
+  if (capoAntigo) {
+    if (isPreview) { preview.content = capoAntigo.content; preview.capo = Math.min(11, (preview.capo || 0) + capoAntigo.capo); }
+    else db.saveSong({ ...song, content: capoAntigo.content, capo: Math.min(11, (song.capo || 0) + capoAntigo.capo) });
+    return viewSong(id, ctx);
+  }
   if (isPreview) guardarPrevia();
   if (isPreview) {
     const r = renderSong(song.content);
@@ -2082,10 +2173,10 @@ function viewSong(id, ctx = {}) {
         <div class="meta" id="song-meta"></div></div></section>
     <div class="actions-row">
       <button class="play-big ${song.youtube ? '' : 'off'}" id="btn-play" aria-label="${song.youtube ? 'Tocar' : 'Escolher vídeo'}" title="${song.youtube ? 'Tocar (continua tocando no player enquanto você navega)' : 'Sem vídeo: escolher um no YouTube'}">${icon(song.youtube ? (player.tocandoAgora(song.youtube) ? 'pause' : 'play') : 'youtube', 24)}</button>
-      ${isPreview ? `<button class="icon-btn" id="btn-save" aria-label="Salvar na biblioteca" title="Salvar na biblioteca">${icon('plus', 24)}</button>
-           <button class="icon-btn" id="btn-edit-prev" aria-label="Editar cifra" title="Salvar e editar a cifra">${icon('edit', 22)}</button>`
-        : `<button class="icon-btn" id="btn-add" aria-label="Adicionar a repertório" title="Adicionar a repertório">${icon('plus', 24)}</button>
-           <a class="icon-btn" href="#/editar/${song.id}" aria-label="Editar" title="Editar cifra">${icon('edit', 22)}</a>`}
+      <button class="salvar-btn${isPreview ? '' : ' salva'}" id="btn-biblio" data-salvar aria-pressed="${!isPreview}" aria-label="${isPreview ? 'Salvar na biblioteca' : 'Na biblioteca (tocar para tirar)'}" title="${isPreview ? 'Salvar na biblioteca' : 'Na sua biblioteca — tocar para tirar'}">${icon(isPreview ? 'plus' : 'check', 18)}</button>
+      <button class="icon-btn" id="btn-add" aria-label="Adicionar a repertório" title="Adicionar a um repertório">${icon('list', 22)}</button>
+      ${isPreview ? `<button class="icon-btn" id="btn-edit-prev" aria-label="Editar cifra" title="Salvar e editar a cifra">${icon('edit', 22)}</button>`
+        : `<a class="icon-btn" href="#/editar/${song.id}" aria-label="Editar" title="Editar cifra">${icon('edit', 22)}</a>`}
       <button class="icon-btn" id="btn-palco" aria-label="Só a letra (tela cheia)" title="Só a letra, tela cheia">${icon('expand', 22)}</button>
       <button class="icon-btn" id="btn-pdf" aria-label="Exportar PDF" title="Exportar em PDF (com ou sem cifra)">${icon('file', 22)}</button>
       ${ctx.set ? `<button class="icon-btn" id="btn-fila" aria-label="Fila do repertório" title="Fila: próximas músicas">${icon('queue', 24)}</button>` : ''}
@@ -2227,7 +2318,9 @@ function viewSong(id, ctx = {}) {
       avisoFalta();
       return;
     }
-    if (isPreview) { preview.content = novo.content; preview.source = novo.source; } else db.saveSong({ ...dono, content: novo.content, source: novo.source });
+    const capoNovo = capoDaCifra(novo.content);
+    if (isPreview) { preview.content = novo.content; preview.source = novo.source; if (capoNovo && !preview.capo) preview.capo = capoNovo; }
+    else db.saveSong({ ...dono, content: novo.content, source: novo.source, capo: dono.capo || capoNovo });
     toast('Cifra do Cifra Club adicionada');
     if (location.hash === hashAntes) route();
   };
@@ -2514,9 +2607,21 @@ function viewSong(id, ctx = {}) {
     toast(existing ? 'Já estava na biblioteca' : 'Salva na biblioteca');
     return saved;
   };
-  $('#btn-save')?.addEventListener('click', () => { location.hash = '#/musica/' + salvarPrevia().id; });
+  // salvar / tirar da biblioteca (a página continua a mesma: vira a música salva, ou volta a ser só da busca)
+  $('#btn-biblio').addEventListener('click', async () => {
+    if (isPreview) { const salva = salvarPrevia(); location.replace('#/musica/' + salva.id); return; }
+    const atual = db.song(song.id);
+    if (!atual || !(await tirarDaBiblioteca(atual))) return;
+    preview = { id: 'previa', content: atual.content, source: atual.source, transpose, capo, back: '#/biblioteca/musicas' };
+    location.replace('#/musica/previa');
+  });
   $('#btn-edit-prev')?.addEventListener('click', () => { location.hash = '#/editar/' + salvarPrevia().id; });
-  $('#btn-add')?.addEventListener('click', () => addToSetDialog(song.id));
+  $('#btn-add').addEventListener('click', async () => {
+    if (!isPreview) { addToSetDialog(song.id); return; }
+    const salva = salvarPrevia();
+    location.replace('#/musica/' + salva.id);
+    addToSetDialog(salva.id);
+  });
   // rolagem automática: o ícone liga e abre a barra de velocidade embaixo (esquerda devagar, direita rápido)
   const btnScroll = $('#btn-scroll');
   const barra = $('#rolagem');
@@ -2954,7 +3059,7 @@ function viewSet(id) {
   view.innerHTML = `
     <section class="page-hero">${capaRepertorio(set)}
       <div><div class="kind">Repertório</div><h2>${esc(set.name)}</h2>
-        <div class="meta"><b>${dataPorExtenso(set.date)}</b><span>· ${set.items.length} música(s)</span></div></div></section>
+        <div class="meta"><b>${dataPorExtenso(set.date)}</b><span id="set-resumo">· ${resumoRepertorio(set)}</span></div></div></section>
     <div class="actions-row">
       ${set.items.length ? `<a class="play-big" href="#/repertorio/${id}/0" aria-label="Tocar repertório" title="Tocar">${icon('play', 24)}</a>` : ''}
       <button class="icon-btn" id="add" aria-label="Adicionar música da biblioteca" title="Adicionar música da biblioteca">${icon('plus', 24)}</button>
@@ -2986,6 +3091,20 @@ function viewSet(id) {
       db.deleteSet(id); desenharLateral(); toast('Repertório excluído'); location.hash = '#/biblioteca/repertorios';
     }
   };
+  // durações que faltam: procura (três de cada vez) e atualiza o total e as faixas, como no Spotify
+  const faltando = set.items.map((it, k) => [db.song(it.songId), k]).filter(([sg]) => sg?.youtube && !sg.duracao);
+  const proximaDuracao = async () => {
+    const item = faltando.shift();
+    if (!item || !$('#set-resumo')) return;
+    const [sg, k] = item;
+    const d = await duracaoDaMusica(sg).catch(() => 0);
+    if (!$('#set-resumo')) return;
+    if (d) view.querySelectorAll(`.set-item[data-i="${k}"] .dur-faixa`).forEach((x) => { x.textContent = ` · ${fmtTempo(d)}`; });
+    const atual = db.set(id);
+    if (atual) $('#set-resumo').textContent = `· ${resumoRepertorio(atual)}`;
+    return proximaDuracao();
+  };
+  proximaDuracao(); proximaDuracao(); proximaDuracao();
   const ul = view.querySelector('.tracks');
   if (ul) {
     ativarArrastar(ul, (de, para) => { mover(set.items, de, para); db.saveSet(set); viewSet(id); });
