@@ -42,7 +42,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-69';
+export const APP_VERSAO = '2026.10.19-70';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -390,6 +390,8 @@ const player = (() => {
   let estado = 'parado'; // tocando | pausado | parado
   let tempo = 0;
   let marcaTempo = 0;
+  let pendente = null; // ida para um ponto do vídeo pedida antes de ele estar pronto
+  let tentativasIda = 0;
   let duracao = 0;
   // na página da própria música o vídeo toca lá (na telinha das Referências); fora dela, no mini player
   let palco = null;
@@ -417,25 +419,30 @@ const player = (() => {
   const mini = $('.pl-video', el); // espaço reservado no mini player
   const noPalco = () => Boolean(atual && palco?.isConnected && palcoDe === atual.youtube);
   const iframeAtual = () => tela.querySelector('iframe');
-  // Na página da música: o vídeo começa na telinha das Referências (dá para pular o anúncio); quando o
-  // clipe começa de verdade, vai para o topo da música, por trás do título (como o Canvas do Spotify).
+  // Na página da música o vídeo toca no topo (como o Canvas do Spotify): enquanto carrega e passa o
+  // anúncio fica na frente (dá para pular o anúncio); quando o clipe começa, vai para trás do título.
+  // Nas Referências dá para escolher assistir com os controles do YouTube, na telinha.
   let fundo = null; // topo da música (área do vídeo de fundo)
   let verAqui = false; // o usuário pediu para ver na telinha
-  const noFundo = () => Boolean(noPalco() && fundo?.isConnected && !verAqui && estado === 'tocando' && tempo > 1.5);
   let modoAnterior = '';
   const alvo = () => {
     if (!atual) return null;
     if (noPalco()) {
-      const modo = noFundo() ? 'fundo' : 'telinha';
+      const topo = fundo?.isConnected && !verAqui;
+      const modo = !topo ? 'telinha' : estado === 'tocando' && tempo <= 1.5 ? 'frente' : 'fundo';
       if (modo !== modoAnterior) {
+        const mudouLugar = (modo === 'telinha') !== (modoAnterior === 'telinha') || !modoAnterior;
         modoAnterior = modo;
-        fundo?.closest('.song-topo')?.classList.toggle('com-video', modo === 'fundo');
-        palco.innerHTML = modo === 'fundo'
-          ? `<div class="video-no-topo">${icon('video', 18)}<span>O vídeo está passando no topo da música</span><button class="btn small" data-ver-aqui>Ver aqui</button></div>`
-          : '<div class="video-embed pl-alvo"></div>';
-        palco.querySelector('[data-ver-aqui]')?.addEventListener('click', () => { verAqui = true; });
+        fundo?.closest('.song-topo')?.classList.toggle('com-video', modo !== 'telinha');
+        if (mudouLugar) {
+          palco.innerHTML = modo === 'telinha' ? '<div class="video-embed pl-alvo"></div>'
+            : `<button class="video-card" data-ver-aqui aria-label="Assistir aqui"><img src="https://i.ytimg.com/vi/${esc(atual.youtube)}/hqdefault.jpg" alt="" loading="lazy">
+              <span class="vplay"><span>${icon('expand', 24)}</span></span><span class="vtitle">O vídeo está tocando no topo<small>Toque para assistir aqui, com os controles</small></span></button>`;
+          palco.querySelector('[data-ver-aqui]')?.addEventListener('click', () => { verAqui = true; });
+        }
       }
-      return modo === 'fundo' ? fundo : palco.querySelector('.pl-alvo');
+      tela.classList.toggle('na-frente', modo === 'frente');
+      return modo === 'telinha' ? palco.querySelector('.pl-alvo') : fundo;
     }
     modoAnterior = '';
     return el.hidden ? null : mini;
@@ -453,7 +460,7 @@ const player = (() => {
     tela.style.width = r.width + 'px';
     tela.style.height = r.height + 'px';
     tela.classList.toggle('no-palco', noPalco());
-    tela.classList.toggle('no-fundo', a === fundo);
+    tela.classList.toggle('no-fundo', a === fundo && !tela.classList.contains('na-frente'));
   };
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
   const avisar = () => ouvintes.forEach((fn) => fn());
@@ -501,6 +508,15 @@ const player = (() => {
       montar();
       desenhar();
       avisar();
+    },
+    // vai para o segundo s do vídeo (se ele ainda está abrindo, vai assim que puder)
+    irPara(seg) {
+      if (!atual) return;
+      tempo = Math.max(0, seg);
+      marcaTempo = performance.now();
+      pendente = tempo;
+      comando('seekTo', [tempo, true]);
+      if (estado !== 'tocando') { comando('playVideo'); estado = 'tocando'; desenhar(); avisar(); }
     },
     alternar() {
       if (!atual) return;
@@ -558,6 +574,12 @@ const player = (() => {
       }
       const info = msg?.info;
       if (!info) return;
+      if (pendente !== null) {
+        // o vídeo começou: aplica a ida pedida (e não deixa o tempo antigo voltar)
+        if (typeof info.currentTime === 'number' && Math.abs(info.currentTime - pendente) > 2 && ++tentativasIda < 12) { comando('seekTo', [pendente, true]); return; }
+        pendente = null;
+        tentativasIda = 0;
+      }
       if (typeof info.currentTime === 'number') { tempo = info.currentTime; marcaTempo = performance.now(); }
       if (typeof info.duration === 'number' && info.duration > 0) duracao = info.duration;
       const antes = estado;
@@ -2102,7 +2124,8 @@ function viewSong(id, ctx = {}) {
 
   // ---- letra acompanhando a música (como no Spotify), só no modo sem cifra
   // Os tempos de cada verso vêm de um banco aberto de letras sincronizadas (LRCLIB); o tempo do vídeo
-  // vem do player. Tocar num verso enquanto toca acerta o tempo (fica salvo na música).
+  // vem do player. Tocar num verso leva a música até ele (como no Spotify); os botões do aviso acertam
+  // o tempo quando a letra está adiantada ou atrasada (fica salvo na música).
   if (song.youtube && db.prefs().karaoke !== false) {
     const dono = isPreview ? preview : db.song(song.id);
     let lrc = dono?.lrc;
@@ -2126,28 +2149,49 @@ function viewSong(id, ctx = {}) {
       }
       mapaDe = songEl.firstElementChild;
     };
+    const tocandoEsta = () => player.atual?.youtube === song.youtube && player.estado !== 'parado';
     const limpar = () => {
-      songEl.classList.remove('karaoke');
+      songEl.classList.remove('karaoke', 'karaoke-pronta');
       songEl.querySelectorAll('.agora, .cantada').forEach((x) => x.classList.remove('agora', 'cantada'));
       atualEl = null;
       $('#aviso-karaoke').innerHTML = '';
     };
+    const carregar = () => {
+      if (lrc !== undefined || buscando) return;
+      buscando = true;
+      buscarLetraSincronizada({ titulo: song.title, artista: song.artist, duracao: player.atual?.youtube === song.youtube ? player.duracao : 0 })
+        .then((r) => { lrc = r && r.linhas.length ? r : null; }).catch(() => { lrc = null; })
+        .finally(() => { buscando = false; if (dono) { dono.lrc = lrc; if (!isPreview) db.updateSong(song.id, { lrc }); } });
+    };
+    const avisoKaraoke = (tocando) => {
+      const box = $('#aviso-karaoke');
+      const html = tocando
+        ? `<div class="aviso">${icon('music', 18)}<span>Toque num verso para a música ir até ele.</span><span class="spacer"></span><button class="btn small" data-ajuste="-0.5" title="A letra está atrasada (aparece depois do canto)">Letra atrasada</button><button class="btn small" data-ajuste="0.5" title="A letra está adiantada (aparece antes do canto)">Letra adiantada</button></div>`
+        : `<div class="aviso">${icon('music', 18)}<span>Letra sincronizada: toque num verso para ouvir a partir dele.</span></div>`;
+      if (box.dataset.tocando !== String(tocando)) { box.innerHTML = html; box.dataset.tocando = String(tocando); }
+    };
+    $('#aviso-karaoke').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-ajuste]');
+      if (!b || !dono) return;
+      dono.lrcAjuste = (dono.lrcAjuste || 0) + Number(b.dataset.ajuste);
+      if (!isPreview) db.updateSong(song.id, { lrcAjuste: dono.lrcAjuste });
+      atualEl = null;
+      toast(`Tempo da letra: ${dono.lrcAjuste > 0 ? '+' : ''}${dono.lrcAjuste.toFixed(1)} s`);
+    });
     const marcar = () => {
-      if (comCifra || player.atual?.youtube !== song.youtube || player.estado === 'parado') { if (songEl.classList.contains('karaoke')) limpar(); return; }
-      if (lrc === undefined && !buscando) {
-        buscando = true;
-        buscarLetraSincronizada({ titulo: song.title, artista: song.artist, duracao: player.duracao })
-          .then((r) => { lrc = r && r.linhas.length ? r : null; }).catch(() => { lrc = null; })
-          .finally(() => { buscando = false; if (dono) { dono.lrc = lrc; if (!isPreview) db.updateSong(song.id, { lrc }); } });
-        return;
-      }
+      if (comCifra) { if (songEl.classList.contains('karaoke-pronta')) limpar(); return; }
+      carregar();
       if (!lrc) return;
       if (mapaDe !== songEl.firstElementChild) mapear();
       if (!mapa.length) return;
-      if (!songEl.classList.contains('karaoke')) {
-        songEl.classList.add('karaoke');
-        $('#aviso-karaoke').innerHTML = `<div class="aviso">${icon('music', 18)}<span>A letra acompanha a música. Se estiver adiantada ou atrasada, toque no verso que está sendo cantado.</span></div>`;
+      songEl.classList.add('karaoke-pronta');
+      const tocando = tocandoEsta();
+      avisoKaraoke(tocando);
+      if (!tocando) {
+        if (songEl.classList.contains('karaoke')) { songEl.classList.remove('karaoke'); songEl.querySelectorAll('.agora, .cantada').forEach((x) => x.classList.remove('agora', 'cantada')); atualEl = null; }
+        return;
       }
+      songEl.classList.add('karaoke');
       const agora = player.tempoAgora - (dono?.lrcAjuste || 0);
       let i = -1;
       for (let k = 0; k < mapa.length && mapa[k].t <= agora; k++) i = k;
@@ -2161,16 +2205,18 @@ function viewSong(id, ctx = {}) {
     const rolou = () => { ultimoToque = Date.now(); };
     view.addEventListener('touchmove', rolou, { passive: true });
     view.addEventListener('wheel', rolou, { passive: true });
+    // tocar num verso: a música vai até ele (e começa a tocar, se estava parada)
     songEl.addEventListener('click', (e) => {
-      if (!songEl.classList.contains('karaoke')) return;
+      if (!songEl.classList.contains('karaoke-pronta')) return;
       const linha = e.target.closest('.line');
       const m = mapa.find((x) => x.el === linha);
-      if (!m || !dono) return;
-      dono.lrcAjuste = player.tempoAgora - m.t;
-      if (!isPreview) db.updateSong(song.id, { lrcAjuste: dono.lrcAjuste });
+      if (!m) return;
+      if (e.target.closest('.chord') && db.prefs().diagramas) return; // o toque no acorde mostra o desenho
+      const alvoSeg = Math.max(0, m.t + (dono?.lrcAjuste || 0) - 0.3);
+      if (!tocandoEsta()) player.tocar(itemDoPlayer(song, ctx.set ? db.set(ctx.set.id) : null, ctx.set ? ctx.index : -1));
+      player.irPara(alvoSeg);
       atualEl = null;
       ultimoToque = 0;
-      toast('Tempo da letra acertado');
     });
     const relogio = setInterval(marcar, 250);
     aoSair(() => { clearInterval(relogio); view.removeEventListener('touchmove', rolou); view.removeEventListener('wheel', rolou); });

@@ -24,8 +24,10 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   Anthropic informada em Ajustes, guardada só no aparelho) que marque refrão, estrofes, ponte; só as marcações mudam,
   nunca a letra ou os acordes, e dá para desfazer (`js/ia.js`).
 - **Letra acompanhando a música**: no modo só letra, enquanto o vídeo toca, o verso cantado acende e a letra rola
-  sozinha, com os tempos de cada verso de um banco aberto de letras sincronizadas (LRCLIB); tocar num verso acerta o tempo.
-- **Player como no Spotify**: na página da música o vídeo toca na telinha das Referências; ao sair dela, continua no mini player
+  sozinha, com os tempos de cada verso de um banco aberto de letras sincronizadas (LRCLIB); tocar num verso leva a
+  música até ele (como no Spotify), e os botões "Letra atrasada/adiantada" acertam o tempo. O vídeo começa no topo
+  da música (onde dá para pular o anúncio) e depois fica atrás do título; em Referências dá para assisti-lo com os controles.
+- **Player como no Spotify**: na página da música o vídeo toca no topo, atrás do título; ao sair dela, continua no mini player
   sem parar nem repetir anúncio (é o mesmo vídeo, que só muda de lugar na tela) fixo acima do menu, com o vídeo do YouTube
   pequeno, nome, parte da missa, tempo e barra de progresso; a música continua tocando enquanto você navega.
   Dá para ampliar o vídeo, pausar e fechar; no repertório, ao terminar, toca a próxima que tiver vídeo.

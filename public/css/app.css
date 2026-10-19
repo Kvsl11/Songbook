@@ -1085,3 +1085,7 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 .song-topo.com-video .song-hero > .cover { opacity: 0; visibility: hidden; }
 .video-no-topo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-radius: var(--radius); background: var(--bg-elev); font-size: 14px; font-weight: 600; }
 .video-no-topo .ic { color: var(--accent-ink); }
+.song.karaoke-pronta .line { cursor: pointer; }
+.song.karaoke-pronta .line:not(.chords-only):active { opacity: 0.8; }
+/* vídeo no topo durante o anúncio: na frente, com os controles do YouTube (dá para pular o anúncio) */
+#pl-tela.na-frente { z-index: 14; border-radius: 0; background: #000; }
