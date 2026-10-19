@@ -166,7 +166,7 @@ export function chordsOverLyricsToChordPro(text) {
     }
     if (isChordOnlyLine(line)) {
       const next = lines[i + 1];
-      if (next !== undefined && next.trim() && !isChordOnlyLine(next)) {
+      if (next !== undefined && next.trim() && !isChordOnlyLine(next) && !/^\s*\{.*\}\s*$/.test(next)) {
         out.push(mergeChordLine(line, next));
         i++;
       } else {
@@ -318,4 +318,101 @@ export function ehInstrumental(texto) {
   if (/^(intro(du[cç][aã]o)?|solo|riff|interl[uú]dio|ponte instrumental|instrumental|final|tom)\b\s*[:\-–]/i.test(t)) return true;
   const partes = t.replace(/[|()\[\]\-–.,]/g, ' ').split(/\s+/).filter((x) => x && !/^(\d+x|x\d+|bis)$/i.test(x));
   return partes.length >= 2 && partes.every((x) => ACORDE_TXT.test(x));
+}
+
+// ---------------------------------------------------------------- editar só a letra
+// Mostra a música sem os acordes (para corrigir a letra) e, ao salvar, devolve cada acorde à
+// mesma sílaba. Linhas só de acordes (introdução, passagens) ficam escondidas e são mantidas.
+const ehDiretiva = (l) => /^\s*\{.*\}\s*$/.test(l);
+const semAcordes = (l) => l.replace(/\[[^\]]*\]/g, '');
+const soAcordes = (l) => !ehDiretiva(l) && /\[[^\]]*\]/.test(l) && !semAcordes(l).trim();
+
+export function letraDe(src) {
+  return String(src || '').replace(/\r\n?/g, '\n').split('\n').filter((l) => !soAcordes(l)).map((l) => (ehDiretiva(l) ? l : semAcordes(l))).join('\n');
+}
+
+// recoloca os acordes da linha original numa versão editada do texto
+export function reaplicarAcordes(original, novoTexto) {
+  const acordes = [];
+  let velho = '';
+  for (const s of splitChordLine(original)) {
+    if (s.chord !== null) acordes.push({ chord: s.chord, at: velho.length });
+    velho += s.text;
+  }
+  if (!acordes.length) return novoTexto;
+  let ini = 0;
+  while (ini < velho.length && ini < novoTexto.length && velho[ini] === novoTexto[ini]) ini++;
+  let fim = 0;
+  while (fim < velho.length - ini && fim < novoTexto.length - ini && velho[velho.length - 1 - fim] === novoTexto[novoTexto.length - 1 - fim]) fim++;
+  const meioVelho = velho.length - ini - fim;
+  const meioNovo = novoTexto.length - ini - fim;
+  const mapa = (at) => {
+    if (at < ini) return at;
+    // o acorde vai junto com a sílaba: se ela ficou no trecho final igual, acompanha o deslocamento
+    if (at >= velho.length - fim) return at + (novoTexto.length - velho.length);
+    return ini + Math.round(((at - ini) / Math.max(1, meioVelho)) * meioNovo);
+  };
+  let out = novoTexto;
+  const pos = acordes.map((a) => ({ ...a, at: Math.min(novoTexto.length, Math.max(0, mapa(a.at))) }));
+  for (const a of pos.reverse()) out = out.slice(0, a.at) + `[${a.chord}]` + out.slice(a.at);
+  return out;
+}
+
+export function aplicarLetra(src, novaLetra) {
+  const linhas = String(src || '').replace(/\r\n?/g, '\n').split('\n');
+  // linhas visíveis no modo letra, cada uma com as linhas só de acordes que vinham antes dela
+  const vis = [];
+  let pendentes = [];
+  for (const l of linhas) {
+    if (soAcordes(l)) { pendentes.push(l); continue; }
+    vis.push({ original: l, texto: ehDiretiva(l) ? l : semAcordes(l), antes: pendentes });
+    pendentes = [];
+  }
+  const novas = String(novaLetra ?? '').replace(/\r\n?/g, '\n').split('\n');
+  // alinhamento por maior subsequência comum (linhas iguais ficam com os acordes de antes)
+  const n = vis.length;
+  const m = novas.length;
+  const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = vis[i].texto === novas[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const out = [];
+  let i = 0;
+  let j = 0;
+  const trecho = (ai, aj) => {
+    // linhas trocadas entre dois pontos iguais: a k-ésima removida empresta os acordes à k-ésima nova
+    const rem = vis.slice(i, ai);
+    const ins = novas.slice(j, aj);
+    rem.forEach((v, k) => {
+      out.push(...v.antes);
+      if (k < ins.length) out.push(ehDiretiva(ins[k]) || ehDiretiva(v.original) ? ins[k] : reaplicarAcordes(v.original, ins[k]));
+    });
+    out.push(...ins.slice(rem.length));
+    i = ai;
+    j = aj;
+  };
+  // pares de linhas iguais (na ordem); entre dois pares ficam as linhas trocadas
+  const pares = [];
+  for (let a = 0, b = 0; a < n && b < m;) {
+    if (vis[a].texto === novas[b]) { pares.push([a, b]); a++; b++; } else if (L[a + 1][b] >= L[a][b + 1]) a++; else b++;
+  }
+  for (const [a, b] of pares) {
+    trecho(a, b);
+    out.push(...vis[a].antes, vis[a].original);
+    i = a + 1;
+    j = b + 1;
+  }
+  trecho(n, m);
+  out.push(...pendentes);
+  return out.join('\n');
+}
+
+// Troca (ou cria, logo depois do cabeçalho) uma diretiva {chave: valor}; valor vazio remove
+export function definirMeta(src, chave, valor) {
+  const re = new RegExp(`^[ \\t]*\\{[ \\t]*${chave}[ \\t]*:[^}\\n]*\\}[ \\t]*\\n?`, 'im');
+  const sem = String(src || '').replace(re, '');
+  if (!valor) return sem;
+  const linhas = sem.split('\n');
+  let i = 0;
+  while (i < linhas.length && /^\s*\{\s*(title|t|subtitle|st|artist|a|key|youtube|composer|lyricist|album|year)\s*:/i.test(linhas[i])) i++;
+  linhas.splice(i, 0, `{${chave}: ${valor}}`);
+  return linhas.join('\n');
 }

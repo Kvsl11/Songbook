@@ -850,3 +850,97 @@ body.performance .convite-instalar { display: none; }
 .nav a.active em { font-weight: 800; }
 .ref-card .ico.ico-logo { background: none; overflow: hidden; border-radius: 13px; }
 .ref-card .ico.ico-logo svg { width: 100%; height: 100%; }
+
+/* ============================================================ acordes em destaque (Ajustes → Destaque dos acordes) */
+/* padrão "forte": acordes maiores, mais grossos e com um fundo leve, para achar de relance */
+:root[data-cifra="forte"] .song.lyrics-mode.with-chords .chord,
+:root:not([data-cifra]) .song.lyrics-mode.with-chords .chord { font-size: 0.86em; font-weight: 900; color: var(--tint-cifra, #9be7b4); text-shadow: 0 1px 8px rgb(0 0 0 / 0.35); letter-spacing: 0.01em; }
+:root[data-cifra="maximo"] .song.lyrics-mode.with-chords .chord { font-size: 0.95em; font-weight: 900; color: var(--tint-cifra, #9be7b4); letter-spacing: 0.01em; }
+:root[data-cifra="maximo"] .song.lyrics-mode.with-chords .chord:not(:empty) {
+  align-self: flex-start; background: rgb(0 0 0 / 0.32); border-radius: 6px; padding: 0 0.22em; margin-bottom: 0.08em;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tint-cifra, #9be7b4) 45%, transparent);
+}
+:root[data-cifra="suave"] .song.lyrics-mode.with-chords .chord { font-size: 0.74em; font-weight: 700; opacity: 0.9; }
+:root:not([data-cifra="suave"]) .song .chord { font-weight: 900; }
+:root:not([data-cifra="suave"]) .song.lyrics-mode.with-chords .line.chords-only .chord { font-size: 0.9em; }
+
+/* ============================================================ cards com vida */
+@keyframes surgir { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
+@keyframes respirar { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+@keyframes deslizar-fundo { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+@keyframes flutuar { 0%, 100% { transform: rotate(25deg) translateY(0); } 50% { transform: rotate(18deg) translateY(-6px); } }
+@media (prefers-reduced-motion: no-preference) {
+  [data-anim] { animation: surgir 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 45ms); }
+  .tile .cover { transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.35s; }
+  .tile:hover .cover { transform: translateY(-4px) scale(1.03); box-shadow: 0 18px 36px rgb(0 0 0 / 0.55); }
+  .cover img { transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .tile:hover .cover img, .track:hover .cover img, .quick a:hover .cover img, .ref-card:hover .cover img { transform: scale(1.08); }
+  .quick a { transition: background 0.2s, transform 0.2s; }
+  .quick a:hover { transform: translateY(-2px); }
+  .track .cover { transition: transform 0.25s; }
+  .track:hover .cover { transform: scale(1.06); }
+  .cat { transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s; }
+  .cat:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 12px 28px rgb(0 0 0 / 0.45); }
+  .cat .ic { animation: flutuar 5s ease-in-out infinite; animation-delay: calc(var(--i, 0) * -0.4s); }
+  .ref-card { transition: background 0.2s, transform 0.2s; }
+  .ref-card:hover { transform: translateY(-2px); }
+  .hero { background-size: 200% 200%; animation: surgir 0.5s backwards, deslizar-fundo 14s ease-in-out infinite; }
+  .song-hero > .cover { animation: respirar 7s ease-in-out infinite; }
+}
+/* prévia do vídeo no card (mouse parado em cima) */
+.tile-video { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; animation: surgir 0.4s both; pointer-events: none; }
+.tile-video { container-type: size; }
+.tile-video iframe { position: absolute; top: 50%; left: 50%; width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.15); border: 0; }
+.badge-sp { position: absolute; left: 8px; top: 8px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: rgb(0 0 0 / 0.55); color: #1ed760; --sp-onda: #000; z-index: 1; }
+
+/* ============================================================ página da música estilo Spotify */
+.song-hero { position: relative; isolation: isolate; }
+.hero-video {
+  position: absolute; z-index: -1; inset: -64px calc(-1 * var(--gutter)) -8px; overflow: hidden; pointer-events: none;
+  opacity: 0; animation: aparecer-video 1.2s 1.5s forwards;
+  -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent 100%); mask-image: linear-gradient(180deg, #000 30%, transparent 100%);
+}
+.hero-video::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.15) 60%, rgb(0 0 0 / 0.4)); }
+.hero-video { container-type: size; }
+.hero-video iframe { position: absolute; top: 50%; left: 50%; width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.2); border: 0; }
+@keyframes aparecer-video { to { opacity: 0.6; } }
+.kind-btn { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; padding: 4px 10px; margin-left: -10px; border-radius: 999px; }
+.kind-btn:hover, .kind-btn:focus-visible { background: rgb(255 255 255 / 0.12); }
+.seg.midia button { padding: 0 12px; gap: 6px; display: inline-flex; }
+.seg.midia button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+.spotify-btn { color: var(--muted); --sp-onda: var(--bg); }
+.spotify-btn.on { color: #1ed760; }
+.ico.spotify { color: #1ed760 !important; --sp-onda: var(--surface-2); }
+.spotify-box { max-width: 640px; margin-bottom: 12px; border-radius: 12px; transition: box-shadow 0.3s, transform 0.3s; }
+.spotify-box iframe { display: block; width: 100%; border: 0; border-radius: 12px; }
+.spotify-box.destaque { box-shadow: 0 0 0 3px #1ed760; transform: scale(1.01); }
+.spotify-inline { list-style: none; padding: 0 0 8px; }
+.spotify-inline iframe { width: 100%; border: 0; border-radius: 12px; display: block; }
+.creditos { background: var(--bg-elev); border-radius: 12px; padding: 16px 18px; max-width: 640px; margin: 0 0 24px; }
+.creditos h3 { margin: 0 0 10px; font-size: 18px; font-weight: 800; }
+.creditos .cred { display: flex; flex-direction: column; padding: 6px 0; }
+.creditos .cred span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.creditos .cred b { font-size: 15px; }
+.creditos .cred a { color: inherit; }
+.creditos .link-btn { display: inline-flex; gap: 4px; align-items: center; margin-top: 8px; }
+.parte-tag { color: var(--accent-ink); font-weight: 800; }
+
+/* ============================================================ busca e importação */
+.busca-dica { display: flex; gap: 10px; align-items: flex-start; margin: 16px 0 0; padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); font-size: 14px; }
+.busca-dica .ic { color: var(--accent-ink); flex: none; margin-top: 2px; }
+.link-btn { all: unset; cursor: pointer; color: var(--accent-ink); font-weight: 800; }
+.link-btn:hover { text-decoration: underline; }
+.campo-livre { display: grid; gap: 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.campo-livre textarea { font-family: var(--mono); font-size: 13px; line-height: 1.45; resize: vertical; min-height: 160px; white-space: pre; }
+.campos-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 520px) { .campos-2 { grid-template-columns: 1fr; } }
+.partes-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.input-btn { display: flex; gap: 6px; align-items: center; }
+.input-btn .input { flex: 1; min-width: 0; }
+.input-btn .icon-btn { color: #1ed760; --sp-onda: var(--bg); flex: none; }
+.setting-ajuda { padding: 4px 16px 14px; font-size: 14px; }
+.setting-ajuda summary { cursor: pointer; font-weight: 700; color: var(--accent-ink); padding: 8px 0; }
+.setting-ajuda ol { padding-left: 20px; margin: 6px 0 12px; line-height: 1.6; }
+.setting-ajuda code { background: var(--surface-2); padding: 2px 6px; border-radius: 4px; word-break: break-all; font-size: 12px; }
+.setting.wrap { flex-wrap: wrap; }
+.setting.wrap .seg { margin-left: auto; }

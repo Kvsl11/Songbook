@@ -10,10 +10,22 @@ ofertório, comunhão etc.).
 Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em degradê e player embutido:
 
 - **Início**: saudação, atalhos, a liturgia de hoje, seus repertórios, tocadas e adicionadas recentemente.
-- **Buscar**: seções da missa (Entrada, Salmos, Aclamação, Comunhão, Maria, Natal…) e busca online
-  nos cantos cifrados de cindyferrarezi.com, com as capas do site.
+- **Buscar (qualquer música)**: digite música, artista ou trecho e o app procura ao mesmo tempo no
+  **Cifra Club** (cifras, com capas), em **letras** (LRCLIB), no **Spotify**, nos cantos cifrados de
+  cindyferrarezi.com e do Músicas para Missa e na sua biblioteca. Filtros: Tudo, Cifras, Letras, Spotify,
+  Cantos da missa, Biblioteca. Também traz atalhos para procurar a cifra em toda a internet, no Letras.mus.br e no YouTube.
+- **Importar da internet**: tocar numa cifra do Cifra Club abre a cifra já organizada (partes, refrão,
+  tablatura). Como o site não deixa outros apps lerem a página, o app usa o servidor do projeto, um proxy
+  próprio (Ajustes) ou proxies públicos; se nenhum responder, abre o "Importar da internet": copie a cifra no
+  site e cole (botão "Colar copiado"). Serve para cifra ou letra de **qualquer site**.
+- **Spotify**: cada música pode ter a faixa do Spotify vinculada (player embutido nas Referências, botão
+  verde do Spotify, modo **Vídeo/Áudio**). Sem login, o app abre a busca do Spotify e aceita o link colado;
+  conectando a conta em Ajustes (Client ID de um app grátis em developer.spotify.com, login seguro PKCE), a busca
+  e a escolha da faixa acontecem dentro do app.
 - **Biblioteca**: músicas e repertórios, com filtros (com vídeo, cifras próprias).
-- **Música**: capa, botão verde para ouvir a **referência no YouTube**, botão **#** que liga a cifra ou deixa só a letra
+- **Música (estilo Spotify)**: o clipe do YouTube passa mudo, em loop, atrás da capa; Vídeo/Áudio
+  alterna entre o vídeo e o Spotify; seção **Créditos** (intérprete, composição, tom original, fonte).
+  Capa, botão verde para ouvir a **referência no YouTube**, botão **#** que liga a cifra ou deixa só a letra
   (letra grande, estilo Spotify), **tabela de tons** para trocar o tom com um toque, capotraste, rolagem automática (o ícone liga e mostra embaixo uma barra de velocidade), tamanho da letra,
   duas colunas, modo apresentação e cartões de referência (vídeo, cifra original, partitura em PDF,
   outras versões no YouTube).
@@ -50,7 +62,13 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 - **Criar música do zero**: botão "Criar música do zero" na Biblioteca e "Criar música" no repertório (e na fila / em "Adicionar").
   O editor já abre com um modelo (refrão, estrofes, ponte) para preencher título, autor, tom, vídeo, letra e cifra;
   criando a partir de um repertório, você escolhe a parte da missa e a música entra direto nele.
-- **Editor de cifra**: acordes na linha de cima da letra (como num caderno) ou entre [colchetes]; campos de título, autor, tom e vídeo; prévia ao vivo; acordes do tom para
+- **Cards com movimento**: entrada em cascata, capas que crescem ao passar o mouse e prévia do vídeo no card
+  (mouse parado em cima), ícones flutuando nas seções, fundo da liturgia em movimento (respeita "reduzir movimento").
+- **Acordes em destaque** por padrão (maiores e mais fortes); em Ajustes → Destaque dos acordes: Suave, Forte ou Máximo (acorde num "selo").
+- **Parte da missa editável**: no repertório (ícone de lista na linha, na fila ou tocando no nome da parte
+  na música) troque a parte (Entrada, Comunhão…) a qualquer momento; ao adicionar uma música, o app pergunta a parte.
+- **Editor de cifra**: modo **Só a letra** (corrige o texto e os acordes voltam às mesmas sílabas), campos de
+  composição e Spotify, botão "Trazer da internet"; acordes na linha de cima da letra (como num caderno) ou entre [colchetes]; campos de título, autor, tom e vídeo; prévia ao vivo; acordes do tom para
   inserir com um toque; transposição permanente; conversão de "cifra sobre a letra". Cantos vindos da
   busca ou da liturgia também podem ser editados (são salvos na biblioteca antes).
 - **Personalização**: modo escuro, claro ou automático; cor padrão ciano (a da logo), outras 8 cores de destaque, cor livre ou a
@@ -67,7 +85,9 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 | **Músicas para Missa** | sugestões por data e por parte da missa, cifras, vídeos | cópia diária feita pelo GitHub Actions (`scripts/mpm-sync.mjs`) em `data/mpm/`, porque o site não permite acesso direto |
 | **Pocket Terço** | missal do dia (antífonas, coleta, oferendas, comunhão, leituras, homilia) e orações (orações eucarísticas, prefácios, ordinário da missa) | cópia diária pelo GitHub Actions (`scripts/liturgia-sync.mjs`) em `data/pt/` |
 | **Junior Música Católica** | diretório de hinários da CNBB, salmos, partituras, documentos e formação | cópia diária em `data/junior.json` (aba Orações → Fontes litúrgicas) |
-| **Cifra Club** | outras versões de cifra | link de busca; a cifra copiada é colada no editor ("Organizar cifra colada") |
+| **Cifra Club** | busca de cifras de qualquer música | busca direta (serviço de busca do site libera CORS); a página da cifra via servidor/proxy ou colando o texto |
+| **LRCLIB** | letras de músicas | direto do navegador (API aberta com CORS) |
+| **Spotify** | faixa de referência, player | player embutido + oEmbed sem login; busca com o login do usuário (Web API, PKCE) |
 
 As sugestões das fontes são misturadas em cada parte da missa (as do Músicas para Missa aparecem com a
 etiqueta **MpM**). Na Liturgia, "Sugestão principal em cada parte" escolhe qual fonte vem marcada primeiro
@@ -124,11 +144,14 @@ public/
   js/lib/cnbb.js  cliente/parser da Liturgia Diária da CNBB          (navegador e Node)
   js/lib/cindy.js cliente do WordPress da Cindy: busca, repertório, cifras -> ChordPro (navegador e Node)
   js/lib/missa.js junta CNBB + Cindy na estrutura de partes da missa
+  js/lib/web.js   Cifra Club (busca e página -> ChordPro), letras (LRCLIB), links do Spotify
+  js/spotify.js   login PKCE e busca na Web API do Spotify (opcional)
   js/fonte.js     busca direta + cache local, com o servidor como reserva
   js/chordpro.js  parser ChordPro, transposição, conversão "cifra sobre a letra" (usado também no servidor)
   js/render.js    ChordPro -> HTML
   js/store.js     biblioteca/repertórios/preferências em localStorage
   js/app.js       interface (rotas por hash)
+scripts/proxy-cifras-worker.js  proxy opcional (Cloudflare Worker) para abrir cifras do Cifra Club
 test/             testes com node:test
 ```
 
@@ -141,6 +164,9 @@ test/             testes com node:test
 | `GET /api/cindy/canto?url=…` | Canto da Cindy convertido em ChordPro (com tom, YouTube e partitura) |
 | `GET /api/cindy/repertorio?url=…` | Partes/cantos de um post de repertório |
 | `GET /api/cindy/busca?q=…&tipo=salmo\|aclamacao\|todos` | Busca no site da Cindy |
+| `GET /api/cifraclub?url=…` | Cifra do Cifra Club em ChordPro |
+| `GET /api/cifraclub/busca?q=…` | Busca no Cifra Club |
+| `GET /api/letras?q=…` | Busca de letras (LRCLIB) |
 
 ### Como as fontes foram mapeadas (engenharia reversa das páginas web)
 

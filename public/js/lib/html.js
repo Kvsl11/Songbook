@@ -1,12 +1,15 @@
 // Utilidades mínimas de HTML -> texto.
 
-const ENTITIES = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", ndash: '–', mdash: '—', hellip: '…', laquo: '«', raquo: '»', ordm: 'º', ordf: 'ª' };
+const ENTITIES = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", ndash: '–', mdash: '—', hellip: '…', laquo: '«', raquo: '»', ordm: 'º', ordf: 'ª', ccedil: 'ç', Ccedil: 'Ç', ntilde: 'ñ', Ntilde: 'Ñ', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“' };
+// letras acentuadas: &aacute; &atilde; &ecirc; &Agrave; &uuml; …
+const ACENTOS = { acute: '\u0301', grave: '\u0300', tilde: '\u0303', circ: '\u0302', uml: '\u0308' };
+for (const l of 'aeiouAEIOU') for (const [n, c] of Object.entries(ACENTOS)) ENTITIES[l + n] = (l + c).normalize('NFC');
 
 export function decodeEntities(s) {
   return String(s)
     .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
     .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
-    .replace(/&([a-z]+);/gi, (all, name) => ENTITIES[name.toLowerCase()] ?? all);
+    .replace(/&([a-z]+);/gi, (all, name) => ENTITIES[name] ?? ENTITIES[name.toLowerCase()] ?? all);
 }
 
 export function stripTags(s) {

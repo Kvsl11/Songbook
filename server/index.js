@@ -1,5 +1,5 @@
 // Servidor do Songbook Litúrgico: arquivos estáticos (PWA) + API proxy para
-// a Liturgia Diária da CNBB e os cantos de cindyferrarezi.com.
+// a Liturgia Diária da CNBB, os cantos de cindyferrarezi.com e as cifras do Cifra Club.
 
 import './node-dom.js';
 import http from 'node:http';
@@ -10,6 +10,7 @@ import { getLiturgia } from '../public/js/lib/cnbb.js';
 import { buscarCantos, buscarPorTexto, getCanto, getRepertorio } from '../public/js/lib/cindy.js';
 import { getMissa } from '../public/js/lib/missa.js';
 import { getMusicaMpm } from '../public/js/lib/mpm.js';
+import { buscarCifraClub, buscarLetras, ehCifraClub, getCifraClub } from '../public/js/lib/web.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const PORT = Number(process.env.PORT || 3000);
@@ -48,6 +49,13 @@ const routes = {
   '/api/mpm/musica': (q) => cached('mpm:' + q.get('url'), () => getMusicaMpm(q.get('url'))),
   '/api/cindy/canto': (q) => cached('canto:' + q.get('url'), () => getCanto(q.get('url'))),
   '/api/cindy/repertorio': (q) => cached('rep:' + q.get('url'), () => getRepertorio(q.get('url'))),
+  '/api/cifraclub': (q) => {
+    const url = q.get('url') || '';
+    if (!ehCifraClub(url)) throw Object.assign(new Error('endereço do Cifra Club inválido'), { status: 400 });
+    return cached('cc:' + url, () => getCifraClub(url));
+  },
+  '/api/cifraclub/busca': (q) => cached('cc-busca:' + (q.get('q') || ''), () => buscarCifraClub(q.get('q') || '')),
+  '/api/letras': (q) => cached('letras:' + (q.get('q') || ''), () => buscarLetras(q.get('q') || '')),
   '/api/cindy/busca': async (q) => {
     const termo = (q.get('q') || '').trim();
     const tipo = q.get('tipo') || 'todos';

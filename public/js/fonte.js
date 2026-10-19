@@ -7,6 +7,8 @@ import { getMissa as getMissaDireto } from './lib/missa.js';
 import { buscarCantos as buscarDireto, getCanto as getCantoDireto } from './lib/cindy.js';
 import { ehMpm, getMusicaMpm } from './lib/mpm.js';
 import { getLiturgia as getLiturgiaDireto } from './lib/cnbb.js';
+import { buscarCifraClub as buscarCifraClubDireto, buscarLetras as buscarLetrasDireto, getCifraClub as getCifraClubDireto, PROXIES_PUBLICOS } from './lib/web.js';
+import { db } from './store.js';
 
 const PREFIXO = 'songbook.cache.';
 const VALIDADE = 12 * 3600e3;
@@ -136,3 +138,28 @@ export const missalDoDia = (data) => dadosLocais('pt-lit:' + data, `data/pt/litu
 export const indiceOracoes = () => dadosLocais('pt-oracoes', 'data/pt/oracoes.json');
 export const getOracao = (slug) => dadosLocais('pt-oracao:' + slug, `data/pt/oracoes/${encodeURIComponent(slug)}.json`);
 export const diretorioJunior = () => dadosLocais('junior', 'data/junior.json');
+
+// ------------------------------------------------------------------ busca na internet (Cifra Club, letras)
+export function buscarCifraClub(termo) {
+  const t = String(termo || '').trim();
+  return obter('cc-busca:' + t.toLowerCase(), () => buscarCifraClubDireto(t), 'api/cifraclub/busca?q=' + encodeURIComponent(t));
+}
+
+export function buscarLetras(termo) {
+  const t = String(termo || '').trim();
+  return obter('letras:' + t.toLowerCase(), () => buscarLetrasDireto(t), 'api/letras?q=' + encodeURIComponent(t));
+}
+
+// proxies usados para abrir a página da cifra: o próprio (Ajustes) e, se permitido, os públicos
+export function proxiesCifra() {
+  const p = db.prefs();
+  return [(p.proxyCifra || '').trim(), ...(p.proxiesPublicos === false ? [] : PROXIES_PUBLICOS)].filter(Boolean);
+}
+
+// A página da cifra não libera CORS: tenta o servidor do projeto (se houver) e depois os proxies
+export function getCifraClub(url) {
+  return obter('cc:' + url, async () => {
+    try { return await viaServidor('api/cifraclub?url=' + encodeURIComponent(url)); } catch { /* sem servidor: segue */ }
+    return getCifraClubDireto(url, { proxies: proxiesCifra() });
+  }, 'api/cifraclub?url=' + encodeURIComponent(url));
+}
