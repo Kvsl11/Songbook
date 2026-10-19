@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-64';
+export const APP_VERSAO = '2026.10.19-66';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -296,13 +296,22 @@ function ytEmbed(id, { inicio = 0, autoplay = true } = {}) {
   return `https://www.youtube.com/embed/${encodeURIComponent(id)}?${p}`;
 }
 
-// vídeo no lugar da capa (como o "Canvas" do Spotify): mudo, em loop, sem controles
-const CANVAS_INICIO = 40; // o trecho do vídeo que fica repetindo: de 0:40 a 1:10
-const CANVAS_DURACAO = 30;
-function ytFundo(id) {
-  const p = new URLSearchParams({ autoplay: '1', mute: '1', loop: '1', playlist: id, controls: '0', playsinline: '1', rel: '0', modestbranding: '1', disablekb: '1', iv_load_policy: '3', start: String(CANVAS_INICIO), enablejsapi: '1' });
-  if (/^https?:/.test(location.origin)) p.set('origin', location.origin);
-  return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?${p}`;
+// "Canvas" (como no Spotify) sem tocar o vídeo: quadros de verdade do clipe, que o YouTube publica como
+// imagens (de vários pontos do vídeo), passando com zoom lento e troca suave. Sem anúncio, sem botões
+// do player e com poucos dados. 'hd' = quadros em alta (nem todo vídeo tem); 'sd' = 640x480, com
+// faixas pretas em cima e embaixo (o CSS corta). O tipo é descoberto uma vez e fica salvo na música.
+const QUADROS = { hd: ['maxres1', 'maxres2', 'maxres3', 'maxresdefault'], sd: ['sd1', 'sd2', 'sd3', 'hqdefault'] };
+function htmlQuadros(id, tipo = 'sd') {
+  return QUADROS[tipo].map((q, n) => `<img class="q ${tipo === 'sd' && q !== 'hqdefault' ? 'lb' : ''}" style="--n:${n}" src="https://i.ytimg.com/vi/${esc(id)}/${q}.jpg" alt="" ${n ? 'loading="lazy"' : ''}>`).join('');
+}
+// tem quadros em alta? (quando não tem, o YouTube devolve uma imagem cinza de 120x90)
+function tipoDosQuadros(id) {
+  return new Promise((ok) => {
+    const img = new Image();
+    img.onload = () => ok(img.naturalWidth >= 640 ? 'hd' : 'sd');
+    img.onerror = () => ok('sd');
+    img.src = `https://i.ytimg.com/vi/${id}/maxres1.jpg`;
+  });
 }
 
 // linha de um vídeo do YouTube (busca no app)
@@ -550,35 +559,6 @@ const player = (() => {
   });
   return api;
 })();
-
-// Vídeo no topo da música (Canvas do Spotify): ocupa do alto da tela até os botões, mudo, repetindo
-// um trecho de 30 s. Se o YouTube avisar erro (vídeo bloqueado fora do site), some e a capa volta.
-window.addEventListener('message', (e) => {
-  if (!/youtube(-nocookie)?\.com$/.test((() => { try { return new URL(e.origin).hostname; } catch { return ''; } })())) return;
-  const f = [...document.querySelectorAll('.canvas-fundo iframe')].find((x) => x.contentWindow === e.source);
-  if (!f) return;
-  const cmd = (func, args = []) => f.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
-  try {
-    const msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-    if (msg?.event === 'onReady' && !f.dataset.pronto) {
-      f.dataset.pronto = '1';
-      cmd('mute');
-      cmd('playVideo');
-      // os controles do YouTube (pausa, pular) aparecem quando o vídeo começa e quando volta ao início
-      // do trecho: nesses momentos o vídeo fica escondido (aparece a imagem do clipe, desfocada)
-      const topo = f.closest('.song-topo');
-      const mostrar = () => { if (!f.isConnected) return; f.classList.remove('oculto'); topo?.classList.add('video-visivel'); };
-      setTimeout(mostrar, 4500);
-      const t = setInterval(() => {
-        if (!f.isConnected) { clearInterval(t); return; }
-        f.classList.add('oculto');
-        setTimeout(() => cmd('seekTo', [CANVAS_INICIO, true]), 700);
-        setTimeout(mostrar, 4200);
-      }, CANVAS_DURACAO * 1000);
-    }
-    if (msg?.event === 'onError') { f.closest('.song-topo')?.classList.remove('canvas-on'); f.closest('.canvas-fundo')?.remove(); }
-  } catch { /* outro formato */ }
-});
 
 // barra lateral (desktop): repertórios
 function desenharLateral() {
@@ -1236,7 +1216,7 @@ if (matchMedia('(hover: hover)').matches) {
     tirarPrevia();
     previaTimer = setTimeout(() => {
       const art = t.querySelector('.tile-art .cover');
-      if (art && t.matches(':hover')) art.insertAdjacentHTML('beforeend', `<div class="tile-video"><iframe src="${esc(ytFundo(t.dataset.yt))}" tabindex="-1" title="" allow="autoplay; encrypted-media"></iframe></div>`);
+      if (art && t.matches(':hover')) art.insertAdjacentHTML('beforeend', `<div class="tile-video quadros">${htmlQuadros(t.dataset.yt, 'sd')}</div>`);
     }, 700);
   });
   view.addEventListener('mouseout', (e) => { const t = e.target.closest('.tile[data-yt]'); if (t && !t.contains(e.relatedTarget)) tirarPrevia(); });
@@ -1338,8 +1318,7 @@ async function abrirCindy(url, el, back) {
   el?.querySelector('.acts')?.replaceChildren(document.createRange().createContextualFragment('<span class="spin"></span>'));
   try {
     const c = await getCanto(url);
-    preview = { id: 'previa', content: c.chordpro, source: c.url, transpose: 0, capo: 0, back };
-    location.hash = '#/musica/previa';
+    await abrirPrevia(c.chordpro, c.url, back);
   } catch (e) {
     toast('Erro: ' + e.message);
   }
@@ -1368,9 +1347,30 @@ function buscarCifraNoApp(song) {
   location.hash = '#/buscar';
 }
 
-function abrirPrevia(content, source, back) {
-  preview = { id: 'previa', content, source, transpose: 0, capo: 0, back };
-  location.hash = '#/musica/previa';
+// Abre a música da busca já com o vídeo do YouTube (procura por até 3 s antes de abrir, para a página
+// ser desenhada uma vez só); se a busca demorar mais, ela continua com a página aberta
+async function abrirPrevia(content, source, back, videoJa = null) {
+  const novo = { id: 'previa', content, source, transpose: 0, capo: 0, back };
+  const m = renderSong(content).meta;
+  if (!youtubeId(m.youtube) && !String(source || '').startsWith('cnbb:')) {
+    const busca = (videoJa || buscarYoutube([m.title, m.artist].filter(Boolean).join(' '))).then((vs) => vs[0] || null).catch(() => null);
+    const v = await Promise.race([busca, new Promise((r) => setTimeout(() => r(undefined), 3000))]);
+    if (v) novo.content = definirMeta(content, 'youtube', v.url);
+    else if (v === null) novo.semVideo = true; // procurou e não achou
+    novo.videoProcurado = v !== undefined;
+    if (v === undefined) {
+      // demorou: segue procurando com a página aberta
+      novo.videoProcurado = true;
+      busca.then((vv) => {
+        if (preview !== novo) return;
+        if (vv) { novo.content = definirMeta(novo.content, 'youtube', vv.url); toast('Vídeo do YouTube encontrado'); } else novo.semVideo = true;
+        if (location.hash === '#/musica/previa') route();
+      });
+    }
+  }
+  const jaNaPrevia = location.hash === '#/musica/previa';
+  preview = novo;
+  if (jaNaPrevia) route(); else location.hash = '#/musica/previa';
 }
 
 // Cifra do Cifra Club: tenta abrir direto; se o site não deixar, oferece colar a cifra copiada
@@ -1379,8 +1379,9 @@ async function abrirCifraClub(item, el, back) {
   const antes = acts?.innerHTML;
   if (acts) acts.innerHTML = '<span class="spin"></span>';
   try {
+    const video = buscarYoutube(`${item.titulo} ${item.artista || ''}`).catch(() => []); // ao mesmo tempo que a cifra
     const c = await getCifraClub(item.url);
-    abrirPrevia(c.chordpro, item.url, back);
+    await abrirPrevia(c.chordpro, item.url, back, video);
   } catch {
     if (acts) acts.innerHTML = antes;
     importarDaInternet({ ...item, back, aviso: true });
@@ -1402,8 +1403,9 @@ async function abrirLetra(item, back, el) {
   const antes = acts?.innerHTML;
   if (acts) acts.innerHTML = '<span class="spin"></span>';
   try {
+    const video = buscarYoutube(`${item.titulo} ${item.artista || ''}`).catch(() => []); // ao mesmo tempo que a letra
     const l = await trazerLetra(item);
-    abrirPrevia(letraParaChordPro({ titulo: l.titulo, artista: l.artista, compositor: l.compositor, letra: l.letra, fonte: item.url }), item.url, back);
+    await abrirPrevia(letraParaChordPro({ titulo: l.titulo, artista: l.artista, compositor: l.compositor, letra: l.letra, fonte: item.url }), item.url, back, video);
   } catch {
     if (acts) acts.innerHTML = antes;
     importarDaInternet({ titulo: item.titulo, artista: item.artista, url: item.url, back });
@@ -1686,6 +1688,7 @@ function viewSong(id, ctx = {}) {
   const prefs = db.prefs();
   let { transpose = 0, capo = 0 } = song;
   const canvas = Boolean(song.youtube && prefs.videoFundo !== false);
+  const tipoQuadros = renderSong(song.content).meta.x_canvas;
   // música sem nenhum acorde: só existe a letra. O botão # liga/desliga a cifra (sem ele, só a letra).
   const semCifra = !temCifra(song.content);
   let comCifra = !semCifra && prefs.modo !== 'letra' && prefs.showChords !== false;
@@ -1702,7 +1705,7 @@ function viewSong(id, ctx = {}) {
   view.innerHTML = `
     ${ctx.set ? `<div class="set-progress"><i style="width:${((ctx.index + 1) / ctx.set.items.length) * 100}%"></i></div>` : ''}
     ${canvas ? '<div class="song-topo canvas-on">' : ''}
-    ${canvas ? `<div class="canvas-fundo" aria-hidden="true"><img class="canvas-img" src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt=""><iframe class="oculto" src="${esc(ytFundo(song.youtube))}" tabindex="-1" title="" allow="autoplay; encrypted-media" onload="this.contentWindow.postMessage(JSON.stringify({event:'listening',id:2}),'*')"></iframe></div>` : ''}
+    ${canvas ? `<div class="canvas-fundo quadros" aria-hidden="true"><img class="canvas-img" src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt="">${htmlQuadros(song.youtube, tipoQuadros || 'sd')}</div>` : ''}
     <section class="page-hero song-hero">${capa(song)}
       <div>${ctx.set ? `<button class="kind kind-btn" id="btn-parte" title="Trocar a parte da missa desta música no repertório">${esc(ctx.set.items[ctx.index]?.label || 'Definir a parte da missa')} ${icon('edit', 12)}</button>` : `<div class="kind">${esc(kind)}</div>`}<h2 id="song-title">${esc(song.title)}</h2>
         <div class="meta" id="song-meta"></div></div></section>
@@ -1834,8 +1837,7 @@ function viewSong(id, ctx = {}) {
           e.preventDefault();
           try {
             const c = await getCanto(alts[Number(a.dataset.alt)].url);
-            preview = { id: 'previa', content: c.chordpro, source: c.url, transpose: 0, capo: 0, back: location.hash };
-            location.hash = '#/musica/previa';
+            await abrirPrevia(c.chordpro, c.url, location.hash);
           } catch (err) { toast('Erro: ' + err.message); }
         };
       });
@@ -1953,7 +1955,7 @@ function viewSong(id, ctx = {}) {
   if (ctx.tocar && song.youtube) setTimeout(tocar, 60);
   // música vinda da busca (Cifra Club, letras, cantos) sem vídeo: procura no YouTube sozinho e já vincula;
   // se não achar, avisa e oferece escolher
-  if (isPreview && !song.youtube) {
+  if (isPreview && !song.youtube && !String(song.source || '').startsWith('cnbb:')) {
     const box = $('#aviso-video');
     if (preview.semVideo) {
       box.innerHTML = `<div class="aviso">${icon('youtube', 18)}<span>Não achei o vídeo desta música no YouTube.</span><button class="btn small" data-escolher-video>Escolher vídeo</button></div>`;
@@ -1969,6 +1971,22 @@ function viewSong(id, ctx = {}) {
           toast('Vídeo do YouTube encontrado');
         } else esta.semVideo = true;
         if (location.hash === '#/musica/previa') route();
+      });
+    }
+  }
+
+  // topo com os quadros do clipe: a capa sai quando o 1º quadro carrega; o tipo de quadro fica salvo
+  if (canvas) {
+    const topo = view.querySelector('.song-topo');
+    const primeiro = topo.querySelector('.quadros img.q');
+    const mostrar = () => setTimeout(() => topo.classList.add('video-visivel'), 1200);
+    if (primeiro.complete && primeiro.naturalWidth > 200) mostrar(); else primeiro.addEventListener('load', () => { if (primeiro.naturalWidth > 200) mostrar(); });
+    if (!tipoQuadros) {
+      tipoDosQuadros(song.youtube).then((tipo) => {
+        const content = definirMeta(song.content, 'x_canvas', tipo);
+        if (isPreview) { if (preview?.content === song.content) preview.content = content; } else if (db.song(song.id)) db.updateSong(song.id, { content });
+        song.content = content;
+        if (tipo === 'hd' && topo.isConnected) topo.querySelector('.quadros').innerHTML = topo.querySelector('.canvas-img').outerHTML + htmlQuadros(song.youtube, 'hd');
       });
     }
   }
@@ -2663,8 +2681,8 @@ async function viewLiturgia(data) {
     try {
       b.disabled = true;
       b.innerHTML = '<span class="spin"></span>';
-      preview = { ...(await songFromChoice(p, b.dataset.ver, lit)), back: '#/liturgia/' + data };
-      location.hash = '#/musica/previa';
+      const esc0 = await songFromChoice(p, b.dataset.ver, lit);
+      await abrirPrevia(esc0.content, esc0.source, '#/liturgia/' + data);
     } catch (err) {
       // cifra do Músicas para Missa ainda não copiada para o app: abre no site
       if (/musicasparamissa/.test(b.dataset.ver)) { window.open(b.dataset.ver, '_blank', 'noopener'); toast('Abrindo no site Músicas para Missa'); }

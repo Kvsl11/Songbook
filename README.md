@@ -28,8 +28,9 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 - **Vídeo do YouTube em cada música**: "Escolher vídeo" procura no YouTube dentro do app (instâncias públicas do
   Piped, sem chave nem login) ou aceita o link colado. Se o dono não deixar tocar fora do YouTube, o player avisa.
 - **Biblioteca**: músicas e repertórios, com filtros (com vídeo, cifras próprias).
-- **Música (estilo Spotify)**: o clipe do YouTube passa mudo no topo da música inteiro (do alto da tela até os botões),
-  repetindo um trecho de 30 s, e a capa sai de cena; seção **Créditos**
+- **Música (estilo Spotify)**: no topo da música (do alto da tela até os botões) passam quadros de verdade do clipe
+  — imagens que o YouTube publica de vários pontos do vídeo —, com zoom lento e troca suave, e a capa sai de cena.
+  Sem anúncio e sem os botões do player; o tipo de quadro (alta ou normal) fica salvo na música; seção **Créditos**
   (intérprete, composição, tom original, fonte). A letra tem o mesmo peso em tudo; o refrão é marcado pelo rótulo.
   Capa, botão verde para ouvir a **referência no YouTube**, botão **#** que liga a cifra ou deixa só a letra
   (letra grande, estilo Spotify), **tabela de tons** para trocar o tom com um toque, capotraste, rolagem automática (o ícone liga e mostra embaixo uma barra de velocidade), tamanho da letra,
