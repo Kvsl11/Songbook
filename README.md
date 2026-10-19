@@ -15,7 +15,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   Club, que já tem a letra; sem cifra, a letra do Letras), o **vídeo** do YouTube e o compositor. Um vídeo tocado
   direto da busca abre como música do mesmo jeito, com cifra e letra. Filtros: Tudo, Músicas, Vídeos, Biblioteca.
 - **Católicas em alta**: com a busca vazia, aparecem as músicas católicas mais procuradas agora no Cifra Club (as
-  mais tocadas de artistas como Frei Gilson, Colo de Deus, Padre Fábio de Melo, Ministério Amor e Adoração, Shalom),
+  mais tocadas de artistas como Frei Gilson, Colo de Deus, Padre Fábio de Melo, Ministério Amor e Adoração, Shalom, Padre Reginaldo Manzotti, Canção Nova, Anjos de Resgate,
+  Fraternidade São João Paulo II),
   em ordem de popularidade; tocar numa abre com cifra, letra e vídeo.
 - **Cifra automática**: uma letra que veio da internet sem acordes procura sozinha a cifra da mesma música no
   Cifra Club e troca (mantendo vídeo, parte da missa e quadros). Só depois de procurar, um aviso simples diz o que
