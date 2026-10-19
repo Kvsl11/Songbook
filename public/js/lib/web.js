@@ -1,11 +1,12 @@
-// Busca de músicas na internet: Cifra Club (cifras), LRCLIB (letras) e YouTube (vídeos).
+// Busca de músicas na internet: Cifra Club (cifras), Letras.mus.br (letras) e YouTube (vídeos).
 // Módulo compartilhado entre o navegador e o servidor (sem DOM: só expressões regulares).
 //
 // - Cifra Club: a busca usa o mesmo serviço do campo de busca do site (solr.sscdn.co), que libera
 //   CORS. A página da cifra não libera: no navegador ela é lida por um "proxy" (o servidor do
 //   projeto, um proxy próprio configurado em Ajustes ou proxies públicos), e, se nenhum responder,
 //   o app oferece colar a cifra copiada do site.
-// - LRCLIB (lrclib.net): banco aberto de letras, com CORS.
+// - Letras.mus.br: a busca usa o serviço do campo de busca do site (com CORS); a página da letra é lida
+//   pelo Jina Reader, como a do Cifra Club. Reserva: LRCLIB (lrclib.net), banco aberto de letras.
 // - YouTube: busca pelo Piped (instâncias públicas, com CORS); o oEmbed confirma um link colado.
 
 import { decodeEntities, normalize } from './html.js';
@@ -130,16 +131,15 @@ export const viaProxy = (modelo, url) => (modelo.includes('{raw}') ? modelo.repl
 const cabecalhosDoProxy = (modelo) => (/r\.jina\.ai/.test(modelo) ? { 'X-Return-Format': 'html' } : {});
 
 // Baixa a cifra: direto (no Node) e pelos proxies, na ordem. proxies = lista de modelos.
-export async function getCifraClub(url, { proxies = [], fetchImpl } = {}) {
-  if (!ehCifraClub(url)) throw new Error('Endereço do Cifra Club inválido');
-  const limpo = url.replace(/^https?:\/\/(m\.)?cifraclub/, 'https://www.cifraclub').replace(/[?#].*$/, '').replace(/\/?$/, '/');
-  const tentativas = [...(NO_NAVEGADOR ? [[limpo, {}]] : []), ...proxies.filter(Boolean).map((p) => [viaProxy(p, limpo), cabecalhosDoProxy(p)])];
-  let erro = new Error('Sem acesso ao Cifra Club');
+// Lê uma página que não libera CORS: direto (no Node) e pelos proxies, na ordem; ler(html) interpreta
+async function lerPagina(url, ler, { proxies = [], fetchImpl, nome = 'o site' } = {}) {
+  const tentativas = [...(NO_NAVEGADOR ? [[url, {}]] : []), ...proxies.filter(Boolean).map((p) => [viaProxy(p, url), cabecalhosDoProxy(p)])];
+  let erro = new Error(`Sem acesso a ${nome}`);
   for (const [alvo, headers] of tentativas) {
     try {
       const res = await buscar(alvo, { fetchImpl, timeout: 25000, headers });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return parseCifraClub(await res.text(), limpo);
+      return ler(await res.text());
     } catch (e) {
       erro = e;
     }
@@ -147,11 +147,62 @@ export async function getCifraClub(url, { proxies = [], fetchImpl } = {}) {
   throw erro;
 }
 
-// ------------------------------------------------------------------ letras (LRCLIB)
+export async function getCifraClub(url, opcoes = {}) {
+  if (!ehCifraClub(url)) throw new Error('Endereço do Cifra Club inválido');
+  const limpo = url.replace(/^https?:\/\/(m\.)?cifraclub/, 'https://www.cifraclub').replace(/[?#].*$/, '').replace(/\/?$/, '/');
+  return lerPagina(limpo, (html) => parseCifraClub(html, limpo), { ...opcoes, nome: 'o Cifra Club' });
+}
+
+// ------------------------------------------------------------------ letras (Letras.mus.br; reserva: LRCLIB)
+
+export const ehLetras = (url) => /^https?:\/\/(www\.|m\.)?letras\.mus\.br\/[^/?#]+\/[^/?#]+/.test(url || '');
+
+export function resultadosLetras(json) {
+  return (json?.response?.docs || [])
+    .filter((d) => String(d.t) === '2' && d.dns && d.url)
+    .map((d) => ({
+      titulo: String(d.txt || '').trim(),
+      artista: d.art || '',
+      capa: d.imgm || d.img || '',
+      url: `https://www.letras.mus.br/${d.dns}/${d.url}/`,
+      fonte: 'letras',
+    }));
+}
+
+// página da letra: <div class="lyric-original"><p>verso<br>verso</p>…</div>
+export function parseLetras(html, url = '') {
+  const bloco = /<div class="lyric-original"[^>]*>([\s\S]*?)<\/div>/i.exec(html);
+  if (!bloco) throw new Error('Letra não encontrada na página');
+  const estrofes = [...bloco[1].matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+    .map((m) => decodeEntities(m[1].replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '')).split('\n').map((l) => l.trim()).filter(Boolean).join('\n'))
+    .filter(Boolean);
+  if (!estrofes.length) throw new Error('Letra vazia');
+  const doTitulo = pegar(html, /<title[^>]*>([\s\S]*?)<\/title>/i).split(/\s+-\s+/);
+  const titulo = pegar(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i) || doTitulo[0] || 'Sem título';
+  const artista = doTitulo.length > 2 ? doTitulo[1] : '';
+  const compositor = (/Composição:\s*([^<]+?)\.?\s*</i.exec(html) || [])[1]?.trim() || '';
+  return { titulo, artista, compositor, url, letra: estrofes.join('\n\n') };
+}
+
+export async function getLetra(url, opcoes = {}) {
+  if (!ehLetras(url)) throw new Error('Endereço do Letras inválido');
+  const limpo = url.replace(/^https?:\/\/(m\.)?letras/, 'https://www.letras').replace(/[?#].*$/, '').replace(/\/?$/, '/');
+  return lerPagina(limpo, (html) => parseLetras(html, limpo), { ...opcoes, nome: 'o Letras' });
+}
 
 export async function buscarLetras(termo, fetchImpl) {
   const q = String(termo || '').trim();
   if (!q) return [];
+  try {
+    const res = await buscar(`https://solr.sscdn.co/letras/m1/?q=${encodeURIComponent(q)}`, { fetchImpl });
+    if (!res.ok) throw new Error(`Letras respondeu ${res.status}`);
+    const lista = resultadosLetras(lerJsonp(await res.text()));
+    if (lista.length) return lista.slice(0, 12);
+  } catch { /* busca do Letras fora do ar: usa o LRCLIB */ }
+  return buscarLetrasLrclib(q, fetchImpl);
+}
+
+async function buscarLetrasLrclib(q, fetchImpl) {
   const res = await buscar(`https://lrclib.net/api/search?q=${encodeURIComponent(q)}`, { fetchImpl });
   if (!res.ok) throw new Error(`LRCLIB respondeu ${res.status}`);
   const vistos = new Set();
@@ -163,13 +214,14 @@ export async function buscarLetras(termo, fetchImpl) {
 }
 
 // Letra simples -> ChordPro: estrofes separadas por linha em branco; a estrofe que se repete vira refrão.
-export function letraParaChordPro({ titulo = '', artista = '', letra = '', fonte = '' } = {}) {
+export function letraParaChordPro({ titulo = '', artista = '', letra = '', fonte = '', compositor = '' } = {}) {
   const estrofes = String(letra).replace(/\r\n?/g, '\n').split(/\n\s*\n/).map((e) => e.split('\n').map((l) => l.trim()).filter(Boolean).join('\n')).filter(Boolean);
   const conta = new Map();
   for (const e of estrofes) conta.set(normalize(e), (conta.get(normalize(e)) || 0) + 1);
   const refrao = [...conta].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1])[0]?.[0];
   const cab = [`{title: ${titulo || 'Sem título'}}`];
   if (artista) cab.push(`{artist: ${artista}}`);
+  if (compositor) cab.push(`{composer: ${compositor}}`);
   if (fonte) cab.push(`{source: ${fonte}}`);
   const corpo = [];
   let refraoEscrito = false;

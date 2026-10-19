@@ -11,7 +11,7 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 
 - **Início**: saudação, atalhos, a liturgia de hoje, seus repertórios, tocadas e adicionadas recentemente.
 - **Buscar (qualquer música)**: digite música, artista ou trecho e o app procura ao mesmo tempo no
-  **Cifra Club** (cifras, com capas), em **letras** (LRCLIB), no **YouTube** (vídeos), nos cantos cifrados de
+  **Cifra Club** (cifras, com capas), em **letras** (Letras.mus.br), no **YouTube** (vídeos), nos cantos cifrados de
   cindyferrarezi.com e do Músicas para Missa e na sua biblioteca. Filtros: Tudo, Cifras, Letras, Vídeos,
   Cantos da missa, Biblioteca. Também traz atalhos para procurar a cifra em toda a internet, no Letras.mus.br e no YouTube.
 - **Importar da internet**: tocar numa cifra do Cifra Club abre a cifra já organizada (partes, refrão, tom e
@@ -100,7 +100,7 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 | **Pocket Terço** | missal do dia (antífonas, coleta, oferendas, comunhão, leituras, homilia) e orações (orações eucarísticas, prefácios, ordinário da missa) | cópia diária pelo GitHub Actions (`scripts/liturgia-sync.mjs`) em `data/pt/` |
 | **Junior Música Católica** | diretório de hinários da CNBB, salmos, partituras, documentos e formação | cópia diária em `data/junior.json` (aba Orações → Fontes litúrgicas) |
 | **Cifra Club** | busca e cifra completa de qualquer música | busca direta (serviço de busca do site libera CORS); a página da cifra pelo Jina Reader (r.jina.ai, público, com CORS), com proxies de reserva; se nada responder, colando o texto |
-| **LRCLIB** | letras de músicas | direto do navegador (API aberta com CORS) |
+| **Letras.mus.br** | letras de músicas (com compositor) | busca direta (serviço de busca do site, com CORS); a página da letra pelo Jina Reader; reserva: LRCLIB (API aberta) |
 | **YouTube** | vídeo de referência, player | busca pelo Piped (público, com CORS), oEmbed para links colados, player embutido |
 
 As sugestões das fontes são misturadas em cada parte da missa (as do Músicas para Missa aparecem com a
@@ -158,7 +158,7 @@ public/
   js/lib/cnbb.js  cliente/parser da Liturgia Diária da CNBB          (navegador e Node)
   js/lib/cindy.js cliente do WordPress da Cindy: busca, repertório, cifras -> ChordPro (navegador e Node)
   js/lib/missa.js junta CNBB + Cindy na estrutura de partes da missa
-  js/lib/web.js   Cifra Club (busca e página -> ChordPro), letras (LRCLIB), vídeos do YouTube (Piped)
+  js/lib/web.js   Cifra Club (busca e página -> ChordPro), Letras.mus.br (letras), vídeos do YouTube (Piped)
   js/acordes.js   desenho dos acordes no violão
   js/fonte.js     busca direta + cache local, com o servidor como reserva
   js/chordpro.js  parser ChordPro, transposição, conversão "cifra sobre a letra" (usado também no servidor)

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cifraTextoParaChordPro, ehCifraClub, simplificarCifra, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
+  cifraTextoParaChordPro, ehCifraClub, simplificarCifra, parseLetras, resultadosLetras, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
 } from '../public/js/lib/web.js';
 import { aplicarLetra, definirMeta, doEditor, letraDe, paraEditor, parseChordPro } from '../public/js/chordpro.js';
 
@@ -109,4 +109,15 @@ test('editor simples: [Refrão] vale até a próxima parte e volta igual', () =>
 test('versão simplificada: tira tablaturas, "Parte 1 de 3" e solos vazios', () => {
   const pro = '{comment: Intro}\n[E]   [A]\n\n{comment: Intro}\n\nParte 1 de 2\n  [E]    [A]\n{start_of_tab}\nE|---3---|\n{end_of_tab}\n\n{start_of_verse: Primeira Parte}\n[E]Deus está [A]aqui\n{end_of_verse}\n\n{comment: Solo}\n{start_of_tab}\nB|--5--|\n{end_of_tab}';
   assert.equal(simplificarCifra(pro), '{comment: Intro}\n[E]   [A]\n\n{start_of_verse: Primeira Parte}\n[E]Deus está [A]aqui\n{end_of_verse}');
+});
+
+test('Letras.mus.br: busca e página da letra', () => {
+  const r = resultadosLetras(lerJsonp('LetrasSug({"response":{"docs":[{"t":"1","art":"X","dns":"x"},{"t":"2","txt":"Noites Traiçoeiras ","art":"Padre Marcelo Rossi","dns":"padre-marcelo-rossi","url":"77580","imgm":"https://img/a.jpg"}]}})'));
+  assert.deepEqual(r, [{ titulo: 'Noites Traiçoeiras', artista: 'Padre Marcelo Rossi', capa: 'https://img/a.jpg', url: 'https://www.letras.mus.br/padre-marcelo-rossi/77580/', fonte: 'letras' }]);
+  const html = '<title>Noites Traiçoeiras - Padre Marcelo Rossi - LETRAS.MUS.BR</title><h1>Noites Traiçoeiras</h1><div class="lyric-original"><p>Deus está aqui<br>neste momento</p><p>E ainda se vier<br/>noite tra&iacute;çoeira</p></div><div>Composição: Carlos Papae. <a>x</a></div>';
+  const l = parseLetras(html, 'u');
+  assert.equal(l.titulo, 'Noites Traiçoeiras');
+  assert.equal(l.artista, 'Padre Marcelo Rossi');
+  assert.equal(l.compositor, 'Carlos Papae');
+  assert.equal(l.letra, 'Deus está aqui\nneste momento\n\nE ainda se vier\nnoite traíçoeira');
 });

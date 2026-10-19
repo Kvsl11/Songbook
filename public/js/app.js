@@ -6,7 +6,7 @@ import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
 import { buscarYoutube, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
-import { buscarCifraClub, buscarLetras, getCifraClub, buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
+import { buscarCifraClub, buscarLetras, getCifraClub, getLetra, buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const view = $('#view');
@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-63';
+export const APP_VERSAO = '2026.10.19-64';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -836,7 +836,7 @@ async function pickSong() {
       if (!q) { box.innerHTML = '<p class="muted">Digite o nome da música: o app procura a cifra (Cifra Club), os cantos da missa, a letra e o vídeo do YouTube.</p>'; return; }
       const meu = ++seq;
       achados = {};
-      box.innerHTML = secao('Cifras — Cifra Club', 'pk-cc') + secao('Cantos da missa', 'pk-missa') + secao('Letras', 'pk-lt') + secao('Vídeos — YouTube', 'pk-yt');
+      box.innerHTML = secao('Cifras — Cifra Club', 'pk-cc') + secao('Cantos da missa', 'pk-missa') + secao('Letras — Letras.mus.br', 'pk-lt') + secao('Vídeos — YouTube', 'pk-yt');
       clearTimeout(timer);
       timer = setTimeout(() => {
         const encher = (id, tipo, p, linha = linhaSimples) => p.then((itens) => { if (meu !== seq || !$('#' + id, dlg)) return; achados[tipo] = itens; $('#' + id, dlg).innerHTML = lista(tipo, itens, linha); })
@@ -888,7 +888,8 @@ async function salvarDaInternet(tipo, item) {
       content = c.chordpro;
       source = c.url;
     } else if (tipo === 'letra') {
-      content = letraParaChordPro({ titulo: item.titulo, artista: item.artista, letra: item.letra, fonte: item.url });
+      const l = await trazerLetra(item);
+      content = letraParaChordPro({ titulo: l.titulo, artista: l.artista, compositor: l.compositor, letra: l.letra, fonte: item.url });
     } else if (tipo === 'video') {
       content = `{title: ${tituloDoVideo(item.titulo)}}\n{artist: ${item.canal}}\n{youtube: ${item.url}}\n\n{comment: Sem letra ainda: toque em Editar → Trazer da internet}\n`;
       source = '';
@@ -1353,7 +1354,7 @@ function ligarListaCindy(box, back) {
   });
 }
 
-// ---- busca na internet: Cifra Club, letras (LRCLIB) e vídeos do YouTube
+// ---- busca na internet: Cifra Club, Letras e vídeos do YouTube
 
 const linhaWeb = (r, i, origem, extra = '') => `
   <li class="track clickable" data-web="${origem}" data-i="${i}" style="grid-template-columns:auto 1fr auto">
@@ -1386,8 +1387,27 @@ async function abrirCifraClub(item, el, back) {
   }
 }
 
-function abrirLetra(item, back) {
-  abrirPrevia(letraParaChordPro({ titulo: item.titulo, artista: item.artista, letra: item.letra, fonte: item.url }), item.url, back);
+// Letra: do Letras (lida na hora) ou do LRCLIB (já vem com a letra); se o Letras não abrir, tenta o LRCLIB
+async function trazerLetra(item) {
+  if (item.letra) return item;
+  try { return { ...item, ...(await getLetra(item.url)) }; } catch {
+    const alt = (await buscarLetras(`${item.titulo} ${item.artista}`).catch(() => [])).find((x) => x.letra);
+    if (alt) return { ...alt, url: item.url };
+    throw new Error('O Letras não respondeu agora');
+  }
+}
+
+async function abrirLetra(item, back, el) {
+  const acts = el?.querySelector('.acts');
+  const antes = acts?.innerHTML;
+  if (acts) acts.innerHTML = '<span class="spin"></span>';
+  try {
+    const l = await trazerLetra(item);
+    abrirPrevia(letraParaChordPro({ titulo: l.titulo, artista: l.artista, compositor: l.compositor, letra: l.letra, fonte: item.url }), item.url, back);
+  } catch {
+    if (acts) acts.innerHTML = antes;
+    importarDaInternet({ titulo: item.titulo, artista: item.artista, url: item.url, back });
+  }
 }
 
 // texto colado (cifra de qualquer site, letra pura ou ChordPro) -> ChordPro com título e autor
@@ -1482,7 +1502,7 @@ function viewSearch() {
     const item = achados[li.dataset.web][Number(li.dataset.i)];
     if (!item) return;
     if (li.dataset.web === 'cifraclub') abrirCifraClub(item, li, '#/buscar');
-    else if (li.dataset.web === 'letra') abrirLetra(item, '#/buscar');
+    else if (li.dataset.web === 'letra') abrirLetra(item, '#/buscar', li);
   });
   let timer;
   let seq = 0;
@@ -1507,10 +1527,9 @@ function viewSearch() {
     if (mostra('cifras')) blocos.push(caixa('cc-res', 'Cifra Club', `<a href="https://www.cifraclub.com.br/?q=${encodeURIComponent(term)}" target="_blank" rel="noopener">cifraclub.com.br</a>`));
     if (mostra('videos')) blocos.push(caixa('yt-res', 'Vídeos', `<a href="${esc(ytBusca(term))}" target="_blank" rel="noopener">youtube.com</a>`));
     if (mostra('missa')) blocos.push(caixa('online', 'Cantos cifrados', `<a href="https://cindyferrarezi.com/?s=${encodeURIComponent(term)}" target="_blank" rel="noopener">cindyferrarezi.com</a>`) + '<div id="mpm-res"></div>');
-    if (mostra('letras')) blocos.push(caixa('lt-res', 'Letras', '<a href="https://lrclib.net/" target="_blank" rel="noopener">lrclib.net</a>'));
+    if (mostra('letras')) blocos.push(caixa('lt-res', 'Letras', `<a href="https://www.letras.mus.br/?q=${encodeURIComponent(term)}" target="_blank" rel="noopener">letras.mus.br</a>`));
     if (filtro === 'tudo' || filtro === 'cifras' || filtro === 'letras') blocos.push(`<div class="shelf-head"><h2>Na internet</h2></div><div class="refs-grid">
       <a class="ref-card" href="https://www.google.com/search?q=${encodeURIComponent('cifra ' + term)}" target="_blank" rel="noopener"><span class="ico">${icon('search', 22)}</span><span><b>Cifra de “${esc(term)}”</b><small>Procurar em todos os sites</small></span></a>
-      <a class="ref-card" href="https://www.letras.mus.br/?q=${encodeURIComponent(term)}" target="_blank" rel="noopener"><span class="ico">${icon('text', 22)}</span><span><b>Letras.mus.br</b><small>Procurar a letra</small></span></a>
       <button class="ref-card" id="btn-importar"><span class="ico">${icon('download', 22)}</span><span><b>Colar cifra ou letra</b><small>De qualquer site, o app organiza</small></span></button></div>`);
     res.innerHTML = blocos.join('');
     $('#btn-importar')?.addEventListener('click', () => importarDaInternet({ titulo: term }));

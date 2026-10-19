@@ -10,7 +10,7 @@ import { getLiturgia } from '../public/js/lib/cnbb.js';
 import { buscarCantos, buscarPorTexto, getCanto, getRepertorio } from '../public/js/lib/cindy.js';
 import { getMissa } from '../public/js/lib/missa.js';
 import { getMusicaMpm } from '../public/js/lib/mpm.js';
-import { buscarCifraClub, buscarLetras, ehCifraClub, getCifraClub, PROXIES_PUBLICOS } from '../public/js/lib/web.js';
+import { buscarCifraClub, buscarLetras, ehCifraClub, ehLetras, getCifraClub, getLetra, PROXIES_PUBLICOS } from '../public/js/lib/web.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const PORT = Number(process.env.PORT || 3000);
@@ -55,6 +55,11 @@ const routes = {
     return cached('cc:' + url, () => getCifraClub(url, { proxies: PROXIES_PUBLICOS }));
   },
   '/api/cifraclub/busca': (q) => cached('cc-busca:' + (q.get('q') || ''), () => buscarCifraClub(q.get('q') || '')),
+  '/api/letra': (q) => {
+    const url = q.get('url') || '';
+    if (!ehLetras(url)) throw Object.assign(new Error('endereço do Letras inválido'), { status: 400 });
+    return cached('letra:' + url, () => getLetra(url, { proxies: PROXIES_PUBLICOS }));
+  },
   '/api/letras': (q) => cached('letras:' + (q.get('q') || ''), () => buscarLetras(q.get('q') || '')),
   '/api/cindy/busca': async (q) => {
     const termo = (q.get('q') || '').trim();

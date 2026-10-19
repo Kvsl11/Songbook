@@ -7,7 +7,7 @@ import { getMissa as getMissaDireto } from './lib/missa.js';
 import { buscarCantos as buscarDireto, getCanto as getCantoDireto } from './lib/cindy.js';
 import { ehMpm, getMusicaMpm } from './lib/mpm.js';
 import { getLiturgia as getLiturgiaDireto } from './lib/cnbb.js';
-import { buscarCifraClub as buscarCifraClubDireto, buscarLetras as buscarLetrasDireto, getCifraClub as getCifraClubDireto, PROXIES_PUBLICOS } from './lib/web.js';
+import { buscarCifraClub as buscarCifraClubDireto, buscarLetras as buscarLetrasDireto, getCifraClub as getCifraClubDireto, getLetra as getLetraDireto, PROXIES_PUBLICOS } from './lib/web.js';
 
 const PREFIXO = 'songbook.cache.';
 const VALIDADE = 12 * 3600e3;
@@ -155,4 +155,12 @@ export function getCifraClub(url) {
     try { return await viaServidor('api/cifraclub?url=' + encodeURIComponent(url)); } catch { /* sem servidor: segue */ }
     return getCifraClubDireto(url, { proxies: PROXIES_PUBLICOS });
   }, 'api/cifraclub?url=' + encodeURIComponent(url));
+}
+
+// A página da letra (Letras.mus.br) também não libera CORS: servidor do projeto (se houver) e proxies
+export function getLetra(url) {
+  return obter('letra:' + url, async () => {
+    try { return await viaServidor('api/letra?url=' + encodeURIComponent(url)); } catch { /* sem servidor: segue */ }
+    return getLetraDireto(url, { proxies: PROXIES_PUBLICOS });
+  }, 'api/letra?url=' + encodeURIComponent(url));
 }
