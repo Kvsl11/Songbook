@@ -376,7 +376,7 @@ a.chip.sm { cursor: pointer; }
 .song.lyrics-mode .section-label, .song.lyrics-mode .comment { text-align: center; }
 /* duas colunas: só em telas largas (tablet deitado/computador); no celular o botão some */
 @media (min-width: 700px) { .song.lyrics-mode.columns { column-count: 2; column-gap: 48px; } .song.lyrics-mode.columns .section { break-inside: avoid; } }
-@media (max-width: 699px) { .song-toolbar [data-act="cols"] { display: none; } }
+@media (max-width: 699px) { .song-toolbar .so-largo { display: none; } }
 .song.lyrics-mode .chunk { display: inline; white-space: pre-wrap; }
 .song.lyrics-mode .line { display: block; min-height: 0; }
 @media (min-width: 900px) { .song.lyrics-mode { border-radius: var(--radius); margin: 0; font-size: calc(32px * var(--font-scale)); padding: 36px 40px; } }
@@ -912,7 +912,7 @@ body.performance .convite-instalar { display: none; }
 .cover.canvas iframe {
   position: absolute; top: 50%; left: 50%; border: 0; pointer-events: none;
   width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.35);
-  opacity: 0; animation: aparecer-video 0.8s 5.5s forwards; /* depois que os controles do YouTube somem */
+  opacity: 0.01; animation: aparecer-video 0.8s 5s forwards; /* quase invisível no começo (o navegador não toca vídeo oculto) */
 }
 @keyframes aparecer-video { to { opacity: 1; } }
 @media (max-width: 640px) { .song-hero .cover.canvas { width: min(78vw, 320px); height: min(78vw * 1.25, 400px); border-radius: 10px; } }
@@ -1007,3 +1007,6 @@ body.performance #player { bottom: calc(env(safe-area-inset-bottom) + 70px); }
 .pk-sec { margin: 4px 0 10px; }
 .pk-sec > b { display: block; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 6px 0 2px; }
 #player .pl-txt small a, #player .pl-txt small .link-btn { color: #fff; font-weight: 800; text-decoration: underline; font-size: 12px; }
+
+/* barra da música centralizada (sem cortar quando não cabe) */
+.song-toolbar::before, .song-toolbar::after { content: ""; margin: auto; }

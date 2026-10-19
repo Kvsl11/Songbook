@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-55';
+export const APP_VERSAO = '2026.10.19-57';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -294,15 +294,17 @@ function itemDoPlayer(song, set = null, index = -1) {
 }
 
 // endereço do player do YouTube embutido (enablejsapi permite pausar/tocar pelo botão verde)
-function ytEmbed(id) {
-  const p = new URLSearchParams({ autoplay: '1', playsinline: '1', enablejsapi: '1', rel: '0', modestbranding: '1' });
+function ytEmbed(id, { inicio = 0, autoplay = true } = {}) {
+  const p = new URLSearchParams({ autoplay: autoplay ? '1' : '0', playsinline: '1', enablejsapi: '1', rel: '0', modestbranding: '1' });
+  if (inicio > 0) p.set('start', String(Math.floor(inicio)));
   if (/^https?:/.test(location.origin)) p.set('origin', location.origin);
   return `https://www.youtube.com/embed/${encodeURIComponent(id)}?${p}`;
 }
 
 // vídeo no lugar da capa (como o "Canvas" do Spotify): mudo, em loop, sem controles
 function ytFundo(id) {
-  const p = new URLSearchParams({ autoplay: '1', mute: '1', loop: '1', playlist: id, controls: '0', playsinline: '1', rel: '0', modestbranding: '1', disablekb: '1', iv_load_policy: '3', start: '30' });
+  const p = new URLSearchParams({ autoplay: '1', mute: '1', loop: '1', playlist: id, controls: '0', playsinline: '1', rel: '0', modestbranding: '1', disablekb: '1', iv_load_policy: '3', start: '30', enablejsapi: '1' });
+  if (/^https?:/.test(location.origin)) p.set('origin', location.origin);
   return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?${p}`;
 }
 
@@ -381,6 +383,9 @@ const player = (() => {
   let estado = 'parado'; // tocando | pausado | parado
   let tempo = 0;
   let duracao = 0;
+  // na página da própria música o vídeo toca lá (na telinha das Referências); fora dela, no mini player
+  let palco = null;
+  let palcoDe = '';
   const ouvintes = new Set();
   const el = document.createElement('div');
   el.id = 'player';
@@ -395,8 +400,16 @@ const player = (() => {
     </div>
     <div class="pl-prog"><i></i></div>`;
   $('.main-col').append(el);
+  const mini = $('.pl-video', el);
+  const noPalco = () => Boolean(atual && palco?.isConnected && palcoDe === atual.youtube);
+  const iframeAtual = () => (noPalco() ? palco : mini).querySelector('iframe');
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
   const avisar = () => ouvintes.forEach((fn) => fn());
+  const mostrarBarra = () => {
+    const ver = Boolean(atual) && !noPalco();
+    el.hidden = !ver;
+    document.body.classList.toggle('com-player', ver);
+  };
   const desenhar = () => {
     if (!atual) return;
     $('.pl-txt b', el).textContent = atual.titulo || 'Vídeo';
@@ -404,7 +417,17 @@ const player = (() => {
     $('.pl-play', el).innerHTML = icon(estado === 'tocando' ? 'pause' : 'play', 20);
     $('.pl-prog i', el).style.width = duracao ? `${Math.min(100, (tempo / duracao) * 100)}%` : '0';
   };
-  const comando = (func, args = []) => $('iframe', el)?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+  // cria o vídeo onde ele deve tocar agora, continuando do ponto em que estava
+  const montar = (tocar) => {
+    mini.innerHTML = '';
+    const alvo = noPalco() ? palco : mini;
+    const ifr = `<iframe src="${esc(ytEmbed(atual.youtube, { inicio: tempo > 2 ? tempo - 1 : 0, autoplay: tocar }))}" title="${esc(atual.titulo || 'Vídeo')}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
+    alvo.innerHTML = alvo === mini ? ifr : `<div class="video-embed">${ifr}</div>`;
+    const f = $('iframe', alvo);
+    f.addEventListener('load', () => f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'));
+    mostrarBarra();
+  };
+  const comando = (func, args = []) => iframeAtual()?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
   const api = {
     get atual() { return atual; },
     get estado() { return estado; },
@@ -417,16 +440,12 @@ const player = (() => {
         if (estado !== 'tocando') api.alternar(); else desenhar();
         return;
       }
+      if (palco && palcoDe !== item.youtube && atual && palcoDe === atual.youtube) palco.innerHTML = '';
       atual = item;
       tempo = 0;
       duracao = 0;
       estado = 'tocando';
-      $('.pl-video', el).innerHTML = `<iframe src="${esc(ytEmbed(item.youtube))}" title="${esc(item.titulo || 'Vídeo')}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
-      const f = $('iframe', el);
-      f.addEventListener('load', () => f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'));
-      el.hidden = false;
-      document.body.classList.add('com-player');
-      document.querySelectorAll('.canvas iframe').forEach((x) => x.remove()); // a capa animada para enquanto toca
+      montar(true);
       desenhar();
       avisar();
     },
@@ -436,8 +455,17 @@ const player = (() => {
       desenhar();
       avisar();
     },
+    // a página da música avisa onde fica a telinha do vídeo dela (box) — ou null ao sair da página
+    palco(box, youtube = '') {
+      const estava = noPalco();
+      palco = box;
+      palcoDe = box ? youtube : '';
+      if (atual && estado !== 'parado' && estava !== noPalco()) montar(estado === 'tocando');
+      else mostrarBarra();
+      return noPalco();
+    },
     fechar() {
-      $('.pl-video', el).innerHTML = '';
+      mini.innerHTML = '';
       el.hidden = true;
       el.classList.remove('grande');
       document.body.classList.remove('com-player');
@@ -459,7 +487,7 @@ const player = (() => {
   window.addEventListener('message', (e) => {
     let h = '';
     try { h = new URL(e.origin).hostname; } catch { return; }
-    if (!/(^|\.)youtube(-nocookie)?\.com$/.test(h) || !atual || e.source !== $('iframe', el)?.contentWindow) return;
+    if (!/(^|\.)youtube(-nocookie)?\.com$/.test(h) || !atual || e.source !== iframeAtual()?.contentWindow) return;
     try {
       const msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
       // vídeo que o dono não deixa tocar fora do YouTube (erros 101/150) ou que saiu do ar
@@ -467,6 +495,7 @@ const player = (() => {
         estado = 'parado';
         $('.pl-txt small', el).innerHTML = `Este vídeo não toca fora do YouTube · <a href="https://www.youtube.com/watch?v=${esc(atual.youtube)}" target="_blank" rel="noopener">abrir</a>${atual.songId ? ' · <button class="link-btn" data-pl="trocar">escolher outro</button>' : ''}`;
         $('.pl-play', el).innerHTML = icon('play', 20);
+        if (noPalco()) toast('Este vídeo não toca fora do YouTube: escolha outro em “Trocar vídeo”');
         avisar();
         return;
       }
@@ -496,6 +525,19 @@ const player = (() => {
   });
   return api;
 })();
+
+// Capa com vídeo (Canvas): o vídeo aparece por cima da capa depois que os controles do YouTube somem;
+// se o YouTube avisar erro (vídeo bloqueado fora do site), some e a capa fica.
+window.addEventListener('message', (e) => {
+  if (!/youtube(-nocookie)?\.com$/.test((() => { try { return new URL(e.origin).hostname; } catch { return ''; } })())) return;
+  const f = [...document.querySelectorAll('.canvas iframe')].find((x) => x.contentWindow === e.source);
+  if (!f) return;
+  try {
+    const msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+    if (msg?.event === 'onReady') for (const func of ['mute', 'playVideo']) f.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*');
+    if (msg?.event === 'onError') f.remove();
+  } catch { /* outro formato */ }
+});
 
 // barra lateral (desktop): repertórios
 function desenharLateral() {
@@ -1598,8 +1640,8 @@ function viewSong(id, ctx = {}) {
   const fonte = song.source && /^https?:/.test(song.source) ? host(song.source) : song.source?.startsWith('cnbb:') ? 'Liturgia Diária – CNBB' : '';
   view.innerHTML = `
     ${ctx.set ? `<div class="set-progress"><i style="width:${((ctx.index + 1) / ctx.set.items.length) * 100}%"></i></div>` : ''}
-    <section class="page-hero song-hero">${song.youtube && prefs.videoFundo !== false && navigator.connection?.saveData !== true
-      ? `<div class="cover canvas" aria-hidden="true">${capaImagem(song)}<iframe src="${esc(ytFundo(song.youtube))}" tabindex="-1" title="" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`
+    <section class="page-hero song-hero">${song.youtube && prefs.videoFundo !== false
+      ? `<div class="cover canvas" aria-hidden="true">${capaImagem(song)}<iframe src="${esc(ytFundo(song.youtube))}" data-inicio="30" tabindex="-1" title="" allow="autoplay; encrypted-media" onload="this.contentWindow.postMessage(JSON.stringify({event:'listening',id:2}),'*')"></iframe></div>`
       : capa(song)}
       <div>${ctx.set ? `<button class="kind kind-btn" id="btn-parte" title="Trocar a parte da missa desta música no repertório">${esc(ctx.set.items[ctx.index]?.label || 'Definir a parte da missa')} ${icon('edit', 12)}</button>` : `<div class="kind">${esc(kind)}</div>`}<h2 id="song-title">${esc(song.title)}</h2>
         <div class="meta" id="song-meta"></div></div></section>
@@ -1615,12 +1657,13 @@ function viewSong(id, ctx = {}) {
       ${semCifra ? '<div class="seg-tabs"><span class="chip sm" title="Esta música não tem acordes">Só letra</span></div>' : ''}
     </div>
     <div id="aviso-cifra"></div>
-    <div class="song-toolbar" id="tools">
+    <div class="song-toolbar ${comCifra ? '' : 'sem-cifra'}" id="tools">
       <div class="seg so-cifra"><button class="tom-btn" data-act="tom" aria-label="Escolher o tom" title="Escolher o tom"><span class="val" id="key"></span>${icon('down', 14)}</button></div>
       <div class="seg so-cifra" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
       <div class="seg"><button data-act="scroll" aria-pressed="false" aria-label="Rolagem automática" title="Rolagem automática (ajuste a velocidade na barra)" id="btn-scroll">${icon('gauge', 18)}</button></div>
       <div class="seg"><button data-act="f-" aria-label="Diminuir letra" title="Diminuir letra">A−</button><button data-act="f+" aria-label="Aumentar letra" title="Aumentar letra">A+</button></div>
-      <div class="seg">${semCifra ? '' : `<button data-act="chords" aria-pressed="${comCifra}" title="Cifra: ligado mostra os acordes; desligado, só a letra" aria-label="Mostrar cifra">${icon('chord', 17)}</button>`}<button data-act="cols" aria-pressed="${prefs.columns}" title="Letra em duas colunas (telas largas)" aria-label="Duas colunas">${icon('columns', 17)}</button></div>
+      ${semCifra ? '' : `<div class="seg"><button data-act="chords" aria-pressed="${comCifra}" title="Cifra: ligado mostra os acordes; desligado, só a letra" aria-label="Mostrar cifra">${icon('chord', 17)}</button></div>`}
+      <div class="seg so-largo"><button data-act="cols" aria-pressed="${prefs.columns}" title="Letra em duas colunas (telas largas)" aria-label="Duas colunas">${icon('columns', 17)}</button></div>
     </div>
     <div class="acordes-musica" id="acordes-musica" hidden></div>
     <div class="song" id="song"></div>
@@ -1792,8 +1835,8 @@ function viewSong(id, ctx = {}) {
   // referências: vídeo, fonte, partitura, outras versões
   const refs = [];
   if (song.youtube) {
-    refs.push(`<div class="video-ref"><button class="video-card" id="video-ref" aria-label="Tocar o vídeo"><img src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt="" loading="lazy">
-      <span class="vplay"><span>${icon('play', 26)}</span></span><span class="vtitle">${esc(song.title)}<small>Tocar no player</small></span></button></div>`);
+    refs.push(`<div class="video-ref" id="video-box"><button class="video-card" id="video-ref" aria-label="Tocar o vídeo"><img src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt="" loading="lazy">
+      <span class="vplay"><span>${icon('play', 26)}</span></span><span class="vtitle">${esc(song.title)}<small>Toque para assistir aqui</small></span></button></div>`);
   }
   const cards = [];
   cards.push(`<button class="ref-card" data-video><span class="ico">${icon('youtube', 22)}</span><span><b>${song.youtube ? 'Trocar vídeo' : 'Escolher vídeo'}</b><small>${song.youtube ? 'Outra versão no YouTube' : 'Procurar no YouTube'}</small></span></button>`);
@@ -1823,15 +1866,15 @@ function viewSong(id, ctx = {}) {
     const content = definirMeta(song.content, 'youtube', url);
     if (isPreview) preview.content = content; else db.saveSong({ ...db.song(song.id), content });
     toast(url ? 'Vídeo escolhido' : 'Vídeo removido');
-    if (url) { song.youtube = youtubeId(url); song.content = content; tocar(); }
     route();
+    if (url) setTimeout(() => $('#btn-play')?.click(), 50); // já toca o vídeo novo, aqui na página
   };
   const mudarVideo = async () => { const url = await escolherVideo(song); if (url !== null) salvarVideo(url); };
   const tocar = () => player.tocar(itemDoPlayer(song, ctx.set ? db.set(ctx.set.id) : null, ctx.set ? ctx.index : -1));
   $('#refs').addEventListener('click', (e) => {
     if (e.target.closest('[data-video]')) mudarVideo();
     if (e.target.closest('[data-buscar-cifra]')) buscarCifraNoApp(song);
-    if (e.target.closest('#video-ref')) { tocar(); $('#player').classList.add('grande'); }
+    if (e.target.closest('#video-ref')) tocar();
   });
   const iconePlay = () => { const b = $('#btn-play'); if (b && song.youtube) b.innerHTML = icon(player.tocandoAgora(song.youtube) ? 'pause' : 'play', 24); };
   aoSair(player.ouvir(iconePlay));
@@ -1840,7 +1883,11 @@ function viewSong(id, ctx = {}) {
     if (player.atual?.youtube === song.youtube) player.alternar(); else tocar();
   };
   if (ctx.tocar && song.youtube) setTimeout(tocar, 60);
-  if (player.atual?.youtube === song.youtube) $('.canvas iframe')?.remove();
+  // nesta página o vídeo toca aqui (Referências); ao sair, continua no mini player
+  if (song.youtube) {
+    player.palco($('#video-box'), song.youtube);
+    aoSair(() => player.palco(null));
+  }
 
   const salvarPrevia = () => {
     const existing = db.songBySource(song.source);

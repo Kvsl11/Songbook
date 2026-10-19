@@ -75,34 +75,43 @@ export function parseCifraClub(html, url = '') {
   const doTitulo = pegar(html, /<title[^>]*>([\s\S]*?)<\/title>/i).split(/\s+-\s+/);
   const titulo = pegar(html, /<h1[^>]*class="[^"]*\bt1\b[^"]*"[^>]*>([\s\S]*?)<\/h1>/i) || doTitulo[0] || 'Cifra';
   const artista = pegar(html, /<h2[^>]*class="[^"]*\bt3\b[^"]*"[^>]*>([\s\S]*?)<\/h2>/i) || (doTitulo.length > 2 ? doTitulo[1] : '');
-  const tom = pegar(html, /id="cifra_tom"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i).replace(/^tom:\s*/i, '');
-  const capo = /id="cifra_capo"[\s\S]{0,300}?(\d{1,2})\s*ª?\s*casa/i.exec(html)?.[1] || '';
+  // "Tom: A (com forma de G)": os acordes estão desenhados em G, com capotraste
+  const tomTexto = pegar(html, /id="cifra_tom"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i) || pegar(html, /data-anchor="--chord-tone"[^>]*>([\s\S]*?)<\/button>/i);
+  const real = (/^(?:tom:\s*)?([A-G][#b]?m?)/i.exec(tomTexto) || [])[1] || '';
+  const forma = (/forma de\s*([A-G][#b]?m?)/i.exec(tomTexto) || [])[1] || '';
+  const tom = forma || real;
+  const capo = (/id="cifra_capo"[\s\S]{0,300}?(\d{1,2})\s*ª?\s*casa/i.exec(html) || /Capotraste(?:<!-- -->)?:\s*<\/span>[\s\S]{0,200}?(\d{1,2})\s*ª?\s*casa/i.exec(html) || [])[1] || '';
   const yt = /(?:youtube(?:-nocookie)?\.com\/(?:embed\/|watch\?v=|vi\/)|youtu\.be\/|data-(?:video-)?id="|"youtubeId"\s*:\s*")([\w-]{11})/.exec(html)?.[1] || '';
   const cab = [`{title: ${titulo}}`];
   if (artista) cab.push(`{artist: ${artista}}`);
   if (isChord(tom)) cab.push(`{key: ${tom}}`);
   if (yt) cab.push(`{youtube: https://www.youtube.com/watch?v=${yt}}`);
-  if (capo && Number(capo) > 0) cab.push(`{comment: Capotraste na ${capo}ª casa}`);
+  if (capo && Number(capo) > 0) cab.push(`{comment: Capotraste na ${capo}ª casa${forma && real && real !== forma ? ` (tom real: ${real})` : ''}}`);
   if (url) cab.push(`{source: ${url}}`);
   return { titulo, artista, tom: isChord(tom) ? tom : '', url, chordpro: cab.join('\n') + '\n\n' + cifraTextoParaChordPro(texto) };
 }
 
-// proxies públicos de reserva (o 1º que responder com a cifra vence). "{url}" = endereço codificado
+// serviços públicos que abrem a página por nós (o 1º que responder com a cifra vence).
+// "{url}" = endereço codificado; "{raw}" = endereço como está. O Jina Reader (r.jina.ai) devolve
+// o HTML da página com CORS liberado quando pedimos X-Return-Format: html.
 export const PROXIES_PUBLICOS = [
+  'https://r.jina.ai/{raw}',
   'https://api.allorigins.win/raw?url={url}',
   'https://api.codetabs.com/v1/proxy/?quest={url}',
 ];
-export const viaProxy = (modelo, url) => (modelo.includes('{url}') ? modelo.replace('{url}', encodeURIComponent(url)) : modelo + encodeURIComponent(url));
+export const viaProxy = (modelo, url) => (modelo.includes('{raw}') ? modelo.replace('{raw}', url)
+  : modelo.includes('{url}') ? modelo.replace('{url}', encodeURIComponent(url)) : modelo + encodeURIComponent(url));
+const cabecalhosDoProxy = (modelo) => (/r\.jina\.ai/.test(modelo) ? { 'X-Return-Format': 'html' } : {});
 
 // Baixa a cifra: direto (no Node) e pelos proxies, na ordem. proxies = lista de modelos.
 export async function getCifraClub(url, { proxies = [], fetchImpl } = {}) {
   if (!ehCifraClub(url)) throw new Error('Endereço do Cifra Club inválido');
   const limpo = url.replace(/^https?:\/\/(m\.)?cifraclub/, 'https://www.cifraclub').replace(/[?#].*$/, '').replace(/\/?$/, '/');
-  const tentativas = [...(NO_NAVEGADOR ? [] : [limpo]), ...proxies.filter(Boolean).map((p) => viaProxy(p, limpo))];
+  const tentativas = [...(NO_NAVEGADOR ? [[limpo, {}]] : []), ...proxies.filter(Boolean).map((p) => [viaProxy(p, limpo), cabecalhosDoProxy(p)])];
   let erro = new Error('Sem acesso ao Cifra Club');
-  for (const alvo of tentativas) {
+  for (const [alvo, headers] of tentativas) {
     try {
-      const res = await buscar(alvo, { fetchImpl, timeout: 15000 });
+      const res = await buscar(alvo, { fetchImpl, timeout: 25000, headers });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return parseCifraClub(await res.text(), limpo);
     } catch (e) {

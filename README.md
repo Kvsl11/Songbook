@@ -19,7 +19,7 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   próprio (Ajustes) ou proxies públicos; se nenhum responder, abre o "Importar da internet": copie a cifra no
   site e cole (botão "Colar copiado"). Serve para cifra ou letra de **qualquer site**.
 
-- **Player como no Spotify**: tocar uma música abre o mini player fixo acima do menu, com o vídeo do YouTube
+- **Player como no Spotify**: na página da música o vídeo toca na telinha das Referências; ao sair dela, continua no mini player fixo acima do menu, com o vídeo do YouTube
   pequeno, nome, parte da missa, tempo e barra de progresso; a música continua tocando enquanto você navega.
   Dá para ampliar o vídeo, pausar e fechar; no repertório, ao terminar, toca a próxima que tiver vídeo.
 - **Vídeo do YouTube em cada música**: "Escolher vídeo" procura no YouTube dentro do app (instâncias públicas do
@@ -95,7 +95,7 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 | **Músicas para Missa** | sugestões por data e por parte da missa, cifras, vídeos | cópia diária feita pelo GitHub Actions (`scripts/mpm-sync.mjs`) em `data/mpm/`, porque o site não permite acesso direto |
 | **Pocket Terço** | missal do dia (antífonas, coleta, oferendas, comunhão, leituras, homilia) e orações (orações eucarísticas, prefácios, ordinário da missa) | cópia diária pelo GitHub Actions (`scripts/liturgia-sync.mjs`) em `data/pt/` |
 | **Junior Música Católica** | diretório de hinários da CNBB, salmos, partituras, documentos e formação | cópia diária em `data/junior.json` (aba Orações → Fontes litúrgicas) |
-| **Cifra Club** | busca de cifras de qualquer música | busca direta (serviço de busca do site libera CORS); a página da cifra via servidor/proxy ou colando o texto |
+| **Cifra Club** | busca e cifra completa de qualquer música | busca direta (serviço de busca do site libera CORS); a página da cifra pelo Jina Reader (r.jina.ai, público, com CORS), com proxies de reserva; se nada responder, colando o texto |
 | **LRCLIB** | letras de músicas | direto do navegador (API aberta com CORS) |
 | **YouTube** | vídeo de referência, player | busca pelo Piped (público, com CORS), oEmbed para links colados, player embutido |
 

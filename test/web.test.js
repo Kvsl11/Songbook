@@ -49,6 +49,13 @@ B|-----3-----|
   assert.ok(!/\[Primeira Parte\]/.test(c.chordpro));
 });
 
+test('Cifra Club novo: tom com forma e capotraste', () => {
+  const html = '<h1 class="t1">X</h1><div><span>Tom<!-- -->: </span> <button type="button" class="eVroG" data-anchor="--chord-tone">A<!-- --> (com forma de G)</button></div><div><span>Capotraste<!-- -->:</span> <b>2ª casa</b></div><pre><b>G</b>\nLetra</pre>';
+  const c = parseCifraClub(html, 'https://www.cifraclub.com.br/a/b/');
+  assert.equal(c.tom, 'G');
+  assert.match(c.chordpro, /\{comment: Capotraste na 2ª casa \(tom real: A\)\}/);
+});
+
 test('cifra colada: acordes no fim da parte não grudam na diretiva', () => {
   const pro = cifraTextoParaChordPro('[Refrão]\nG       D\nAleluia\nC  G\n');
   assert.match(pro, /\[C\] +\[G\]\n\{end_of_chorus\}/);
@@ -67,6 +74,7 @@ test('lê vídeos do YouTube (Piped), limpa o título e monta o proxy', () => {
   assert.deepEqual([v[0].id, v[0].canal, v[0].duracao, v[0].url], ['xV7ZzeBR3oc', 'Padre Marcelo Rossi', '4:05', 'https://www.youtube.com/watch?v=xV7ZzeBR3oc']);
   assert.equal(tituloDoVideo('Padre Marcelo Rossi - Noites Traiçoeiras (Vídeo Oficial) [4K] | Canal'), 'Padre Marcelo Rossi - Noites Traiçoeiras');
   assert.equal(viaProxy('https://p.dev/?url={url}', 'https://a.b/c d'), 'https://p.dev/?url=https%3A%2F%2Fa.b%2Fc%20d');
+  assert.equal(viaProxy('https://r.jina.ai/{raw}', 'https://a.b/c/'), 'https://r.jina.ai/https://a.b/c/');
 });
 
 test('editar só a letra mantém os acordes nas sílabas', () => {
