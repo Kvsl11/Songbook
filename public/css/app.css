@@ -1223,3 +1223,7 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 @media (min-width: 900px) { .refs-area:has(#creditos:empty) { grid-template-columns: 1fr; } }
 /* textos da liturgia e das orações no computador: mais largos (ainda numa largura boa de ler) */
 @media (min-width: 900px) { .texto-liturgico { max-width: 1040px; } }
+/* busca no computador: as listas de músicas e vídeos em duas colunas lado a lado (mostra o dobro sem rolar) */
+@media (min-width: 1200px) {
+  #res .tracks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
+}
