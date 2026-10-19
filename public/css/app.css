@@ -1002,7 +1002,7 @@ body.performance .convite-instalar { display: none; }
 /* ============================================================ mini player (fixo acima do menu) */
 #player {
   position: absolute; z-index: 25; left: 8px; right: 8px; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 6px);
-  border-radius: 10px; overflow: hidden; background: color-mix(in srgb, var(--tint) 55%, #121212); color: #fff;
+  border-radius: 10px; overflow: hidden; background: color-mix(in srgb, var(--cor-musica, var(--tint)) 75%, #000); color: #fff; transition: background 0.4s;
   box-shadow: 0 10px 30px rgb(0 0 0 / 0.5); display: grid; grid-template-columns: auto 1fr; animation: surgir 0.3s both;
 }
 #player .pl-video { width: 96px; aspect-ratio: 16 / 9; background: #000; align-self: center; margin: 6px 0 8px 6px; border-radius: 6px; overflow: hidden; position: relative; }

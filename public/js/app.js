@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-84';
+export const APP_VERSAO = '2026.10.19-85';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -282,7 +282,7 @@ function tocarReferencia(song) {
 // o que o player precisa saber de uma música (e de onde ela veio: repertório e parte da missa)
 function itemDoPlayer(song, set = null, index = -1) {
   return {
-    youtube: song.youtube, titulo: song.title, artista: song.artist || '', capa: song.cover || '', songId: song.id,
+    youtube: song.youtube, titulo: song.title, artista: song.artist || '', capa: song.cover || '', songId: song.id, cor: corDaMusica(song.title),
     href: set ? `#/repertorio/${set.id}/${index}` : song.id && song.id !== 'previa' ? `#/musica/${song.id}` : location.hash,
     parte: set ? set.items[index]?.label || '' : '', setId: set?.id || '', index,
   };
@@ -470,6 +470,8 @@ const player = (() => {
   };
   const desenhar = () => {
     if (!atual) return;
+    // a barra tem a cor do fundo da letra da música que está tocando (não a da tela em que se está)
+    el.style.setProperty('--cor-musica', atual.cor || corDaMusica(atual.titulo || ''));
     $('.pl-txt b', el).textContent = atual.titulo || 'Vídeo';
     $('.pl-txt small', el).textContent = [atual.parte, atual.artista, duracao ? `${fmt(tempo)} / ${fmt(duracao)}` : ''].filter(Boolean).join(' · ');
     $('.pl-play', el).innerHTML = icon(estado === 'tocando' ? 'pause' : 'play', 20);
@@ -509,6 +511,8 @@ const player = (() => {
       avisar();
     },
     // vai para o segundo s do vídeo (se ele ainda está abrindo, vai assim que puder)
+    // a página da música tocando abriu (ex.: vídeo da busca que virou música): nome, artista e cor dela
+    atualizar(dados) { if (!atual) return; atual = { ...atual, ...dados }; desenhar(); },
     irPara(seg) {
       if (!atual) return;
       tempo = Math.max(0, seg);
@@ -2147,6 +2151,7 @@ function viewSong(id, ctx = {}) {
   } else db.touchRecent(song.id);
   setTab(ctx.set ? 'biblioteca' : isPreview ? (song.back?.startsWith('#/buscar') ? 'buscar' : 'liturgia') : 'biblioteca');
   setTint(corDaMusica(song.title));
+  if (song.youtube && player.atual?.youtube === song.youtube) player.atualizar({ titulo: song.title, artista: song.artist || '', cor: corDaMusica(song.title) });
   const prefs = db.prefs();
   let { transpose = 0, capo = 0 } = song;
   const canvas = Boolean(song.youtube && prefs.videoFundo !== false);
