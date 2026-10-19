@@ -64,6 +64,7 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   criando a partir de um repertório, você escolhe a parte da missa e a música entra direto nele.
 - **Cards com movimento**: entrada em cascata, capas que crescem ao passar o mouse e prévia do vídeo no card
   (mouse parado em cima), ícones flutuando nas seções, fundo da liturgia em movimento (respeita "reduzir movimento").
+- **Desenho dos acordes**: em Ajustes → Cifras, "Desenho dos acordes" mostra no início da música como montar cada acorde no violão (no tom e capo atuais) e o desenho de um acorde ao tocar nele na letra (`js/acordes.js`).
 - **Acordes em destaque** por padrão (maiores e mais fortes); em Ajustes → Destaque dos acordes: Suave, Forte ou Máximo (acorde num "selo").
 - **Parte da missa editável**: no repertório (ícone de lista na linha, na fila ou tocando no nome da parte
   na música) troque a parte (Entrada, Comunhão…) a qualquer momento; ao adicionar uma música, o app pergunta a parte.

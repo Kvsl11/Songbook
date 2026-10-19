@@ -944,3 +944,21 @@ body.performance .convite-instalar { display: none; }
 .setting-ajuda code { background: var(--surface-2); padding: 2px 6px; border-radius: 4px; word-break: break-all; font-size: 12px; }
 .setting.wrap { flex-wrap: wrap; }
 .setting.wrap .seg { margin-left: auto; }
+
+/* ============================================================ desenho dos acordes */
+.acordes-musica { margin: 0 0 16px; }
+.acordes-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.acordes-head b { font-size: 16px; font-weight: 800; flex: 1; }
+.acordes-lista { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 6px; }
+.acordes-lista::-webkit-scrollbar { display: none; }
+.acorde-card { margin: 0; flex: none; display: grid; justify-items: center; gap: 2px; padding: 8px 8px 6px; border-radius: 10px; background: var(--bg-elev); }
+.acorde-card figcaption { font-weight: 900; font-size: 15px; color: var(--chord); }
+.diagrama { display: block; color: var(--text); }
+.diagrama .traste, .diagrama .corda { stroke: currentColor; stroke-width: 1.4; opacity: 0.55; }
+.diagrama .pestana-topo { fill: currentColor; }
+.diagrama .dedo { fill: var(--accent); }
+.diagrama .solta { fill: none; stroke: currentColor; stroke-width: 1.6; }
+.diagrama .marca, .diagrama .casa-n { fill: currentColor; font: 700 13px var(--sans); }
+.diagrama .casa-n { font-size: 11px; opacity: 0.8; }
+.acorde-pop { position: fixed; z-index: 60; display: grid; justify-items: center; gap: 2px; padding: 10px 10px 8px; border-radius: 12px; background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg); animation: pop 0.15s ease; }
+.acorde-pop b { color: var(--chord); font-size: 16px; font-weight: 900; }

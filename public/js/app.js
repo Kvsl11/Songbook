@@ -2,6 +2,7 @@ import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
 import { definirMeta, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra } from './chordpro.js';
 import { icon, iconeMenu, logo } from './icons.js';
+import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
 import { cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, spotifyBusca, spotifyEmbed, spotifyOEmbed, spotifyRef, spotifyUrl } from './lib/web.js';
@@ -41,7 +42,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-50';
+export const APP_VERSAO = '2026.10.19-51';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1390,6 +1391,7 @@ function viewSong(id, ctx = {}) {
       <div class="seg"><button data-act="f-" aria-label="Diminuir letra" title="Diminuir letra">A−</button><button data-act="f+" aria-label="Aumentar letra" title="Aumentar letra">A+</button></div>
       <div class="seg">${semCifra ? '' : `<button data-act="chords" aria-pressed="${comCifra}" title="Cifra: ligado mostra os acordes; desligado, só a letra" aria-label="Mostrar cifra">${icon('chord', 17)}</button>`}<button data-act="cols" aria-pressed="${prefs.columns}" title="Letra em duas colunas (telas largas)" aria-label="Duas colunas">${icon('columns', 17)}</button></div>
     </div>
+    <div class="acordes-musica" id="acordes-musica" hidden></div>
     <div class="song" id="song"></div>
     <div class="rolagem" id="rolagem" hidden>
       <button class="icon-btn" data-rol="-" aria-label="Mais devagar" title="Mais devagar">${icon('minus', 18)}</button>
@@ -1430,7 +1432,43 @@ function viewSong(id, ctx = {}) {
     const tomAtual = tomBase ? transposeKey(tomBase, transpose) : '';
     $('#key').innerHTML = `<small>Tom</small>${tomAtual ? esc(tomAtual) : (transpose ? (transpose > 0 ? '+' : '') + transpose : '—')}`;
     $('#capo').innerHTML = `<small>Capo</small>${capo || '—'}`;
+    desenharAcordes();
   };
+  // tabela com o desenho de cada acorde da música (no tom e capo atuais), se ligada em Ajustes
+  const acordesDaMusica = () => [...new Set([...songEl.querySelectorAll('.chord')].map((c) => c.textContent.trim()).filter(Boolean))];
+  function desenharAcordes() {
+    const box = $('#acordes-musica');
+    const lista = comCifra && db.prefs().diagramas ? acordesDaMusica().map((c) => [c, diagramaSvg(c)]).filter(([, svg]) => svg) : [];
+    box.hidden = !lista.length;
+    box.innerHTML = lista.length ? `<div class="acordes-head"><b>Acordes${capo ? ` (capo ${capo})` : ''}</b><button class="link-btn" id="esconder-diagramas" title="Desligar o desenho dos acordes (volta em Ajustes)">Ocultar</button></div>
+      <div class="acordes-lista">${lista.map(([c, svg]) => `<figure class="acorde-card">${svg}<figcaption>${esc(c)}</figcaption></figure>`).join('')}</div>` : '';
+    $('#esconder-diagramas')?.addEventListener('click', () => { db.setPref('diagramas', false); fecharPop(); desenharAcordes(); toast('Desenho dos acordes desligado (religue em Ajustes)'); });
+  }
+  // tocar num acorde da letra mostra o desenho dele
+  const fecharPop = () => document.querySelector('.acorde-pop')?.remove();
+  let rolagemPop = 0;
+  const rolouPop = () => { if (Math.abs(view.scrollTop - rolagemPop) > 60) fecharPop(); };
+  songEl.addEventListener('click', (e) => {
+    const c = e.target.closest('.chord');
+    fecharPop();
+    if (!c || !comCifra || !db.prefs().diagramas) return;
+    const svg = diagramaSvg(c.textContent.trim());
+    if (!svg) return;
+    const r = c.getBoundingClientRect();
+    const pop = document.createElement('div');
+    pop.className = 'acorde-pop';
+    pop.innerHTML = `${svg}<b>${esc(c.textContent.trim())}</b>`;
+    document.body.append(pop);
+    rolagemPop = view.scrollTop;
+    const w = pop.offsetWidth;
+    pop.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
+    pop.style.top = (r.top - pop.offsetHeight - 8 > 8 ? r.top - pop.offsetHeight - 8 : r.bottom + 8) + 'px';
+    e.stopPropagation();
+  });
+  const fora = (e) => { if (!e.target.closest('.acorde-pop')) fecharPop(); };
+  document.addEventListener('click', fora);
+  view.addEventListener('scroll', rolouPop, { passive: true });
+  aoSair(() => { fecharPop(); document.removeEventListener('click', fora); view.removeEventListener('scroll', rolouPop); });
   draw();
 
   // aviso de cifra completada automaticamente / estrofes sem acordes
@@ -2355,6 +2393,7 @@ function viewSettings() {
     <div class="section-title">Cifras</div>
     <div class="settings-group">
       <label class="setting"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Mostrar acordes</div><div class="s">Desligue para usar só a letra (coral, telão)</div></div><input type="checkbox" class="switch" id="chords" ${p.modo !== 'letra' && p.showChords !== false ? 'checked' : ''}></label>
+      <label class="setting"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Desenho dos acordes</div><div class="s">Mostra como montar cada acorde no violão (tabela no início da música e ao tocar num acorde)</div></div><input type="checkbox" class="switch" id="diagramas" ${p.diagramas ? 'checked' : ''}></label>
       <label class="setting"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns ? 'checked' : ''}></label>
       <div class="setting wrap"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div><div class="s">Tamanho, cor e fundo dos acordes sobre a letra</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
@@ -2448,6 +2487,7 @@ function viewSettings() {
   $('#pptx-apagar').onclick = async () => { if (await ask({ title: 'Remover o modelo?', text: 'O arquivo sai deste aparelho; os repertórios continuam.', ok: 'Remover', danger: true })) { await apagarModelo(); infoModelo(); } };
   $('#chords').onchange = (e) => { db.setPref('modo', e.target.checked ? 'cifra' : 'letra'); db.setPref('showChords', true); };
   $('#cols').onchange = (e) => db.setPref('columns', e.target.checked);
+  $('#diagramas').onchange = (e) => { db.setPref('diagramas', e.target.checked); toast(e.target.checked ? 'Desenho dos acordes ligado' : 'Desenho dos acordes desligado'); };
   $('#destaque').onclick = (e) => {
     const b = e.target.closest('[data-v]');
     if (!b) return;
