@@ -3,7 +3,7 @@ import { esc, renderSong } from './render.js';
 import { definirMeta, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra } from './chordpro.js';
 import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
-import { chaveIA, organizarPartes } from './ia.js';
+import { chaveIA, organizarPartes, resumirArquivo } from './ia.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
 import { buscarYoutube, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, mesmaDuracao, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
@@ -42,7 +42,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-73';
+export const APP_VERSAO = '2026.10.19-74';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -3369,8 +3369,10 @@ async function viewFontes() {
   view.innerHTML = `<h2 class="greet">Hinários e formação</h2>
     <p class="muted" style="margin:-6px 0 14px">Hinários da CNBB, preces, partituras, documentos e formação para músicos — reunidos por <a href="https://sites.google.com/view/juniormusicacatolica/m%C3%BAsica-lit%C3%BArgica-para-missa" target="_blank" rel="noopener">Junior Música Católica</a>. Partituras e arquivos abrem aqui no app; os vídeos tocam no player.</p>
     <label class="field" style="margin-bottom:12px">${icon('search', 18)}<input class="search" id="busca-fonte" type="search" placeholder="Buscar (ex.: salmos, Advento, partitura, Glória)"></label>
+    <button class="btn small" id="btn-enviar-resumo" style="margin:-2px 0 12px" title="Envie um PDF, foto ou texto do seu aparelho e a IA faz o resumo">${icon('sparkles', 14)} Resumir um arquivo seu</button>
     <div class="chips" id="fonte-abas" style="margin-bottom:14px"></div>
     <div id="fontes"><div class="loading-note"><span class="spin"></span>Carregando…</div></div>`;
+  $('#btn-enviar-resumo').onclick = resumirArquivoEnviado;
   let d;
   try { d = await diretorioJunior(); } catch {
     $('#fontes').innerHTML = '<p class="muted">Ainda não disponível. Tente mais tarde.</p>';
@@ -3436,17 +3438,101 @@ async function viewFontes() {
   $('#busca-fonte').addEventListener('input', (e) => desenhar(e.target.value));
 }
 
-// leitor de arquivos (partituras, hinários, preces do Google Drive, PDFs) dentro do app
+// ---- resumo de arquivos com a IA (para não ter de ler um arquivo gigante)
+// PDFs vão inteiros (a API baixa pelo link, ou o arquivo enviado do aparelho) e o Claude lê até páginas
+// escaneadas; de outros sites, o texto da página (Jina Reader). O resumo fica guardado neste aparelho.
+const blobBase64 = (blob) => new Promise((ok, erro) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = () => erro(r.error); r.readAsDataURL(blob); });
+const LIMITE_ARQUIVO_IA = 22 * 1024 * 1024; // o pedido à IA aceita até 32 MB (o base64 cresce um terço)
+// o texto do arquivo, lido pelo Jina Reader (serve para PDFs com texto, documentos e páginas)
+async function textoDoArquivo(url) {
+  const id = idDrive(url);
+  const res = await fetch('https://r.jina.ai/' + (id ? `https://drive.google.com/uc?export=download&id=${id}` : url)).catch(() => null);
+  const texto = res?.ok ? await res.text() : '';
+  if (texto.replace(/^[\s\S]*?Markdown Content:/, '').trim().length < 80) throw new Error('Não consegui ler este arquivo daqui (pode ser escaneado). Baixe o arquivo e envie em Hinários e formação → "Resumir um arquivo seu".');
+  return { texto };
+}
+// PDF do Drive (ou link de PDF): a própria API baixa o arquivo inteiro e lê até páginas escaneadas
+// (o Drive não deixa o navegador baixar). Se não der, vai o texto.
+function arquivoParaIA(url) {
+  const id = idDrive(url);
+  const pdfUrl = id ? `https://drive.usercontent.google.com/download?id=${id}&export=download` : /\.pdf(\?|#|$)/i.test(url) ? url : '';
+  return pdfUrl ? { pdfUrl, reserva: () => textoDoArquivo(url) } : textoDoArquivo(url);
+}
+async function arquivoEnviadoParaIA(file) {
+  if (file.size > LIMITE_ARQUIVO_IA) throw new Error('O arquivo é grande demais (até 22 MB)');
+  if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) return { pdf: await blobBase64(file) };
+  if (/^image\/(png|jpe?g|gif|webp)$/.test(file.type)) return { imagem: { data: await blobBase64(file), tipo: file.type.replace('jpg', 'jpeg') } };
+  if (/^text\//.test(file.type) || /\.(txt|md|cho|pro|chordpro)$/i.test(file.name)) return { texto: await file.text() };
+  throw new Error('Envie um PDF, uma foto ou um arquivo de texto');
+}
+const CHAVE_RESUMO = 'songbook.resumo:';
+const resumoGuardado = (chave) => { try { return JSON.parse(localStorage.getItem(CHAVE_RESUMO + chave) || 'null'); } catch { return null; } };
+const guardarResumo = (chave, r) => { try { localStorage.setItem(CHAVE_RESUMO + chave, JSON.stringify(r)); } catch { /* sem espaço: só não guarda */ } };
+const htmlResumo = (r) => `<p class="resumo-assunto">${esc(r.assunto)}</p>
+  ${(r.topicos || []).map((t) => `<div class="resumo-topico"><h4>${esc(t.titulo)}</h4><ul>${t.itens.map((i) => `<li>${esc(i)}</li>`).join('')}</ul></div>`).join('')}
+  <p class="resumo-nota">${icon('sparkles', 13)} Resumo feito pela IA (Claude): confira no arquivo antes de usar.</p>`;
+// desenha o resumo na caixa: o guardado, ou lê o arquivo e pede à IA
+async function mostrarResumo(box, { chave, titulo, ler, refazer = false }) {
+  const guardado = !refazer && resumoGuardado(chave);
+  if (guardado) { box.innerHTML = htmlResumo(guardado); return; }
+  if (!chaveIA()) {
+    box.innerHTML = `<div class="aviso">${icon('sparkles', 18)}<span>Para resumir arquivos, coloque a chave da API do Claude em <a href="#/ajustes">Ajustes → Inteligência artificial</a>.</span></div>`;
+    return;
+  }
+  box.innerHTML = `<div class="loading-note"><span class="spin"></span>Lendo o arquivo e resumindo… (arquivos grandes levam até um minuto)</div>`;
+  try {
+    const conteudo = await ler();
+    const r = await resumirArquivo(conteudo, { titulo }).catch(async (e) => {
+      if (e.semLink && conteudo.reserva) return resumirArquivo(await conteudo.reserva(), { titulo });
+      throw e;
+    });
+    guardarResumo(chave, r);
+    if (box.isConnected) box.innerHTML = htmlResumo(r);
+  } catch (e) {
+    if (box.isConnected) box.innerHTML = `<div class="aviso">${icon('info', 18)}<span>${esc(e.message)}</span><button class="btn small" data-tentar>Tentar de novo</button></div>`;
+    box.querySelector('[data-tentar]')?.addEventListener('click', () => mostrarResumo(box, { chave, titulo, ler }));
+  }
+}
+// enviar um arquivo do aparelho e ver o resumo dele
+function resumirArquivoEnviado() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/pdf,.pdf,image/*,text/plain,.txt,.md';
+  input.onchange = () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    openDialog(`<h3>${icon('sparkles', 18)} Resumo: ${esc(file.name)}</h3><div class="resumo-box" id="resumo-env"></div>
+      <div class="acts"><button class="btn primary" data-no>Fechar</button></div>`, (dlg, done) => {
+      $('[data-no]', dlg).onclick = () => done(null);
+      mostrarResumo($('#resumo-env', dlg), { chave: `env:${file.name}:${file.size}:${file.lastModified}`, titulo: file.name, ler: () => arquivoEnviadoParaIA(file) });
+    });
+  };
+  input.click();
+}
+
+// leitor de arquivos (partituras, hinários, preces do Google Drive, PDFs) dentro do app, com resumo
 function viewArquivo(url, titulo) {
   setTab('oracoes');
   setTint('#24425c');
   setHeader(titulo || 'Arquivo', { back: '#/fontes', eyebrow: host(url) });
   const leitor = leitorDoArquivo(url || '');
   if (!leitor) { location.hash = '#/fontes'; return; }
+  const resumivel = !idPastaDrive(url);
   view.innerHTML = `<div class="leitor">
     <div class="leitor-barra"><b>${esc(titulo || 'Arquivo')}</b><span class="spacer"></span>
-      <a class="btn small" href="${esc(url)}" target="_blank" rel="noopener">${icon('external', 14)} Abrir no ${idDrive(url) || idPastaDrive(url) ? 'Drive' : 'site'}</a></div>
+      ${resumivel ? `<button class="btn small primary" id="btn-resumo">${icon('sparkles', 14)} ${resumoGuardado(url) ? 'Ver resumo' : 'Resumir'}</button>` : ''}
+      <a class="btn small" href="${esc(url)}" target="_blank" rel="noopener" aria-label="Abrir fora do app">${icon('external', 14)}</a></div>
+    <div class="resumo-box leitor-resumo" id="resumo" hidden></div>
     <div class="leitor-tela"><div class="loading-note"><span class="spin"></span>Abrindo o arquivo…</div><iframe src="${esc(leitor)}" title="${esc(titulo || 'Arquivo')}" allow="autoplay; fullscreen" loading="eager"></iframe></div></div>`;
+  const btn = $('#btn-resumo');
+  btn?.addEventListener('click', () => {
+    const box = $('#resumo');
+    const abrir = box.hidden;
+    box.hidden = !abrir;
+    view.querySelector('.leitor-tela').hidden = abrir;
+    btn.innerHTML = abrir ? `${icon('file', 14)} Ver arquivo` : `${icon('sparkles', 14)} Ver resumo`;
+    if (abrir && !box.innerHTML) mostrarResumo(box, { chave: url, titulo, ler: () => arquivoParaIA(url) });
+  });
 }
 const tituloBonitoPagina = (t) => t.charAt(0) + t.slice(1).toLowerCase().replace(/\bcnbb\b/g, 'CNBB').replace(/\(preces\)/, '(Preces)');
 

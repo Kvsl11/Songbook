@@ -1126,3 +1126,15 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 .fonte-cantos { grid-template-columns: minmax(0, 1fr); }
 .fonte-cantos li, .fonte-cantos .bts { min-width: 0; }
 .fonte-item.mini { max-width: 100%; }
+
+/* resumo de arquivos feito pela IA */
+.resumo-box { background: var(--surface); border-radius: 12px; padding: 16px; min-height: 120px; }
+.leitor-resumo { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; }
+.resumo-box[hidden], .leitor-tela[hidden] { display: none; }
+.resumo-assunto { font-size: 16px; line-height: 1.5; margin: 0 0 14px; font-weight: 600; }
+.resumo-topico { margin-bottom: 14px; }
+.resumo-topico h4 { margin: 0 0 6px; font-size: 14px; color: var(--accent-ink); text-transform: uppercase; letter-spacing: 0.04em; }
+.resumo-topico ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.resumo-topico li { line-height: 1.45; font-size: 14.5px; }
+.resumo-nota { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; color: var(--subtle); font-size: 12px; }
+dialog .resumo-box { max-height: 60vh; overflow: auto; margin: 10px 0; }
