@@ -182,13 +182,14 @@ test('página do artista no Cifra Club: nome, foto e músicas mais tocadas com o
     <a href="/frei-gilson/">Cifra</a>
     <ol><li><a href="/frei-gilson/eu-seguirei/"><p>01</p><p class="primaryLabel">Eu Seguirei</p><span>74.872</span><span>E</span><span>Opções</span></a></li>
     <li><a href="/frei-gilson/colo-de-mae/"><p>02</p><p>Colo de Mãe</p><span>25.048</span><span>D</span></a></li>
-    <li><a href="/frei-gilson/eu-seguirei/">Eu Seguirei</a></li></ol>`;
+    <li><a href="/frei-gilson/eu-seguirei/">Eu Seguirei</a></li></ol>
+    <script>self.__next_f.push([1,"{\\"songs\\":[{\\"name\\":\\"Eu Seguirei\\",\\"slug\\":\\"eu-seguirei\\",\\"thumbs\\":{\\"x1\\":\\"https://akamai.sscdn.co/letras/100x100/albuns/e/6/x.jpg\\",\\"x2\\":\\"https://akamai.sscdn.co/letras/150x150/albuns/e/6/x.jpg\\"}},{\\"name\\":\\"Colo de Mãe\\",\\"slug\\":\\"colo-de-mae\\",\\"thumbs\\":{\\"x1\\":\\"\\"}}]}"])</script>`;
   const a = parseArtistaCifraClub(html, 'frei-gilson');
   assert.equal(a.nome, 'Frei Gilson');
   assert.equal(a.foto, 'https://akamai.sscdn.co/f.jpg');
   assert.deepEqual(a.musicas, [
-    { titulo: 'Eu Seguirei', tom: 'E', url: 'https://www.cifraclub.com.br/frei-gilson/eu-seguirei/' },
-    { titulo: 'Colo de Mãe', tom: 'D', url: 'https://www.cifraclub.com.br/frei-gilson/colo-de-mae/' },
+    { titulo: 'Eu Seguirei', tom: 'E', url: 'https://www.cifraclub.com.br/frei-gilson/eu-seguirei/', capa: 'https://akamai.sscdn.co/letras/250x250/albuns/e/6/x.jpg' },
+    { titulo: 'Colo de Mãe', tom: 'D', url: 'https://www.cifraclub.com.br/frei-gilson/colo-de-mae/', capa: '' },
   ]);
   const ar = artistasCifraClub({ response: { docs: [{ t: '1', m: 'Frei Gilson', d: 'frei-gilson', i: 'b/2/x-tb.jpg', s: 259 }, { t: '2', m: 'Eu Seguirei', d: 'frei-gilson', u: 'eu-seguirei' }] } });
   assert.deepEqual(ar.map((x) => [x.nome, x.slug]), [['Frei Gilson', 'frei-gilson']]);

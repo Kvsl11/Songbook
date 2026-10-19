@@ -154,7 +154,7 @@ export function buscarArtistasCifraClub(termo) {
   return obter('cca:' + termo, () => buscarArtistasDireto(termo));
 }
 export function getArtistaCifraClub(slug) {
-  return obter('ccart:' + slug, () => getArtistaDireto(slug, { proxies: PROXIES_PUBLICOS }));
+  return obter('ccart2:' + slug, () => getArtistaDireto(slug, { proxies: PROXIES_PUBLICOS }));
 }
 
 // A página da cifra não libera CORS: tenta o servidor do projeto (se houver) e depois os proxies

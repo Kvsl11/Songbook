@@ -167,8 +167,14 @@ export async function buscarArtistasCifraClub(termo, fetchImpl) {
   if (!res.ok) throw new Error(`Cifra Club respondeu ${res.status}`);
   return artistasCifraClub(lerJsonp(await res.text()));
 }
-// Página do artista: nome, foto e as músicas na ordem de mais tocadas (com o tom de cada uma)
+// Página do artista: nome, foto e as músicas na ordem de mais tocadas (com o tom e a capa do álbum de cada uma;
+// as capas vêm nos dados da página: "songs":[{"name","slug","thumbs":{"x1","x2"}}])
 export function parseArtistaCifraClub(html, slug) {
+  const capas = new Map();
+  for (const m of String(html).replace(/\\"/g, '"').matchAll(/"slug":"([a-z0-9-]+)","thumbs":\{"x1":"([^"]*)"(?:,"x2":"([^"]*)")?/g)) {
+    const url = m[3] || m[2];
+    if (url && !capas.has(m[1])) capas.set(m[1], url.replace(/\/\d+x\d+\//, '/250x250/'));
+  }
   const texto = (h) => decodeEntities(String(h).replace(/<[^>]+>/g, '|')).split('|').map((x) => x.trim()).filter(Boolean);
   const nome = texto((/<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html) || [])[1] || '')[0] || '';
   const foto = (/property="og:image"\s+content="([^"]+)"|content="([^"]+)"\s+property="og:image"/.exec(html) || []).slice(1).find(Boolean) || '';
@@ -183,7 +189,7 @@ export function parseArtistaCifraClub(html, slug) {
     if (!titulo) continue;
     vistas.add(m[1]);
     const tom = partes.slice(i + 1).find((x) => isChord(x)) || '';
-    musicas.push({ titulo, tom, url: `${CIFRACLUB}/${slug}/${m[1]}/` });
+    musicas.push({ titulo, tom, url: `${CIFRACLUB}/${slug}/${m[1]}/`, capa: capas.get(m[1]) || '' });
   }
   return { nome, foto, slug, musicas };
 }

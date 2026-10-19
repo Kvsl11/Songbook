@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-81';
+export const APP_VERSAO = '2026.10.19-82';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1743,7 +1743,7 @@ async function viewArtista(slug, nome) {
   $('#art-musicas').addEventListener('click', (e) => {
     const li = e.target.closest('li[data-i]');
     const m = li && musicas[Number(li.dataset.i)];
-    if (m) abrirMusica({ titulo: m.titulo, artista: nome, cifra: m.url }, location.hash, li);
+    if (m) abrirMusica({ titulo: m.titulo, artista: nome, cifra: m.url, video: m.video || null }, location.hash, li);
   });
   try {
     const a = await getArtistaCifraClub(slug);
@@ -1751,6 +1751,22 @@ async function viewArtista(slug, nome) {
     foto = a.foto;
     if (a.foto) $('#art-foto').innerHTML = `<img src="${esc(a.foto)}" alt="">`;
     desenhar(a.musicas);
+    // sem capa de álbum: a imagem do vídeo da música no YouTube (o vídeo achado já vai junto ao abrir)
+    const semCapa = a.musicas.map((m, i) => [m, i]).filter(([m]) => !m.capa);
+    const proximo = async () => {
+      const item = semCapa.shift();
+      if (!item || !$('#art-musicas')) return;
+      const [m, i] = item;
+      const v = (await buscarYoutube(`${m.titulo} ${nome}`).catch(() => []))[0];
+      if (v) {
+        m.video = v;
+        m.capa = `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`;
+        const capaEl = $(`#art-musicas li[data-i="${i}"] .cover`);
+        if (capaEl) { capaEl.classList.remove('gen'); capaEl.innerHTML = `<img src="${esc(m.capa)}" alt="" loading="lazy">`; }
+      }
+      return proximo();
+    };
+    proximo(); proximo(); proximo(); // três de cada vez
   } catch {
     // a página do artista não abriu: as mais tocadas pela busca do Cifra Club
     const lista = (await buscarCifraClub(nome || slug).catch(() => [])).filter((r) => r.url.includes(`/${slug}/`));
