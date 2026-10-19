@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-98';
+export const APP_VERSAO = '2026.10.19-99';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1623,6 +1623,9 @@ async function trazerMusica({ titulo, artista = '', cifra = '', letra = null, vi
 
 // abre a música da busca já com cifra, letra e vídeo
 async function abrirMusica(dados, back, el) {
+  // já está na biblioteca: abre a música salva (com o botão marcado), sem trazer de novo
+  const ja = !dados.video && musicaSalva({ titulo: dados.titulo, artista: dados.artista, cifra: dados.cifra || '', letra: dados.letra?.url || '' });
+  if (ja) { location.hash = '#/musica/' + ja.id; return; }
   const acts = el?.querySelector('.acts');
   const antes = acts?.innerHTML;
   if (acts) acts.innerHTML = '<span class="spin"></span>';
@@ -2267,6 +2270,12 @@ function viewSong(id, ctx = {}) {
   const isPreview = id === 'previa';
   let song = isPreview ? preview : db.song(id);
   if (!song) return viewNotFound();
+  // a prévia de uma música que já foi salva (aberta de novo pela busca, pelo player…): mostra a salva
+  if (isPreview && !String(song.source || '').startsWith('cnbb:')) {
+    const m = renderSong(song.content).meta;
+    const ja = musicaSalva({ titulo: m.title || '', artista: m.artist || '', cifra: song.source || '' });
+    if (ja) { history.replaceState(null, '', '#/musica/' + ja.id); return viewSong(ja.id, ctx); }
+  }
   // cifra guardada antes com a observação "Capotraste na Nª casa": vira o capo de verdade (uma vez)
   const capoAntigo = capoDaObservacao(song.content);
   if (capoAntigo) {
