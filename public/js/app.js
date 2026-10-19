@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-94';
+export const APP_VERSAO = '2026.10.19-95';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -404,7 +404,11 @@ const player = (() => {
   el.innerHTML = `
     <div class="pl-video"></div>
     <button class="pl-info" data-pl="abrir" title="Abrir a música"><span class="pl-txt"><b></b><small></small></span></button>
-    <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button>
+    <div class="pl-ctrl">
+      <button class="icon-btn pl-pulo" data-pl="anterior" aria-label="Música anterior" title="Anterior">${icon('back', 20)}</button>
+      <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button>
+      <button class="icon-btn pl-pulo" data-pl="proxima" aria-label="Próxima música" title="Próxima">${icon('next', 20)}</button>
+    </div>
     <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
     <div class="pl-lado">
       <button class="icon-btn" data-pl="ampliar" aria-label="Ampliar o vídeo" title="Ampliar o vídeo">${icon('expand', 18)}</button>
@@ -479,6 +483,11 @@ const player = (() => {
     $('.pl-txt small', el).innerHTML = esc([atual.parte, atual.artista].filter(Boolean).join(' · ')) + (duracao ? `<span class="pl-tmini">${atual.parte || atual.artista ? ' · ' : ''}${fmt(tempo)} / ${fmt(duracao)}</span>` : '');
     $('.pl-play', el).innerHTML = icon(estado === 'tocando' ? 'pause' : 'play', 20);
     $('.pl-prog i', el).style.width = duracao ? `${Math.min(100, (tempo / duracao) * 100)}%` : '0';
+    // voltar/pular: só numa música de repertório (como numa playlist)
+    const noRepertorio = Boolean(atual.setId && db.set(atual.setId));
+    el.classList.toggle('com-fila', noRepertorio);
+    $('[data-pl="anterior"]', el).disabled = !noRepertorio || (vizinha(-1) < 0 && tempo < 3);
+    $('[data-pl="proxima"]', el).disabled = !noRepertorio || vizinha(1) < 0;
     $('.pl-t0', el).textContent = duracao ? fmt(tempo) : '';
     $('.pl-t1', el).textContent = duracao ? fmt(duracao) : '';
   };
@@ -556,15 +565,25 @@ const player = (() => {
     },
   };
   // ao terminar, no repertório, segue para a próxima música que tiver vídeo
-  const proxima = () => {
+  // a música com vídeo antes/depois desta no repertório (ou -1)
+  const vizinha = (lado) => {
     const set = atual?.setId && db.set(atual.setId);
-    if (!set) return false;
-    for (let i = atual.index + 1; i < set.items.length; i++) {
-      const s = db.song(set.items[i].songId);
-      if (s?.youtube) { api.tocar(itemDoPlayer(s, set, i)); toast(`Tocando: ${s.title}`); return true; }
-    }
-    return false;
+    if (!set) return -1;
+    for (let i = atual.index + lado; i >= 0 && i < set.items.length; i += lado) if (db.song(set.items[i].songId)?.youtube) return i;
+    return -1;
   };
+  const pular = (lado) => {
+    const i = vizinha(lado);
+    if (i < 0) return false;
+    const set = db.set(atual.setId);
+    const s = db.song(set.items[i].songId);
+    const mesmoVideo = s.youtube === atual.youtube;
+    api.tocar(itemDoPlayer(s, set, i));
+    if (mesmoVideo) api.irPara(0); // outra música do repertório com o mesmo vídeo: começa do início
+    toast(`Tocando: ${s.title}`);
+    return true;
+  };
+  const proxima = () => pular(1);
   window.addEventListener('message', (e) => {
     let h = '';
     try { h = new URL(e.origin).hostname; } catch { return; }
@@ -607,6 +626,9 @@ const player = (() => {
     const b = e.target.closest('[data-pl]');
     if (!b) return;
     if (b.dataset.pl === 'play') api.alternar();
+    if (b.dataset.pl === 'proxima') pular(1);
+    // voltar, como no Spotify: depois dos 3 primeiros segundos volta ao começo da música; antes, vai para a anterior
+    if (b.dataset.pl === 'anterior') { if (tempo > 3 || vizinha(-1) < 0) api.irPara(0); else pular(-1); }
     if (b.dataset.pl === 'fechar') api.fechar();
     if (b.dataset.pl === 'trocar') {
       const s = db.song(atual?.songId);

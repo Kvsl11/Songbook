@@ -1016,7 +1016,11 @@ body.performance .convite-instalar { display: none; }
 #player .pl-txt b { display: block; font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #player .pl-txt small { display: block; font-size: 12px; color: rgb(255 255 255 / 0.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #player .icon-btn { color: #fff; width: 38px; height: 38px; flex: none; }
-#player .pl-play { grid-area: play; width: 42px; height: 42px; }
+#player .pl-ctrl { grid-area: play; display: flex; align-items: center; gap: 2px; }
+#player .pl-play { width: 42px; height: 42px; }
+#player .pl-pulo { display: none; width: 34px; height: 34px; }
+#player.com-fila .pl-pulo { display: grid; }
+#player .pl-pulo:disabled { opacity: 0.35; cursor: default; }
 #player .pl-lado { grid-area: lado; display: flex; align-items: center; padding-right: 4px; }
 #player .pl-lado [data-pl="ampliar"] { order: -1; }
 #player .pl-tempo { grid-area: tempo; display: flex; align-items: center; gap: 8px; margin: 0 8px 4px; }
@@ -1039,7 +1043,10 @@ body.com-player main { padding-bottom: calc(var(--nav-h) + 140px + env(safe-area
   #player .pl-video { grid-area: esq; width: 112px; margin: 0; justify-self: start; }
   #player .pl-info { grid-area: esq; margin-left: 124px; align-self: center; }
   #player .pl-txt small { font-size: 12.5px; }
-  #player .pl-play { justify-self: center; align-self: end; width: 40px; height: 40px; background: #fff; color: #000; border-radius: 50%; }
+  #player .pl-ctrl { justify-self: center; align-self: end; gap: 14px; }
+  #player .pl-play { width: 40px; height: 40px; background: #fff; color: #000; border-radius: 50%; }
+  #player .pl-pulo { width: 36px; height: 36px; color: rgb(255 255 255 / 0.85); }
+  #player .pl-pulo:hover:not(:disabled) { color: #fff; transform: scale(1.06); }
   #player .pl-play:hover { transform: scale(1.06); }
   #player .pl-tempo { margin: 4px 0 0; }
   #player .pl-t0, #player .pl-t1 { display: block; }
@@ -1257,3 +1264,5 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 @media (min-width: 1200px) {
   #res .tracks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
 }
+/* celular, música de repertório: voltar/pular no lugar do ampliar (o vídeo amplia tocando na barra da música) */
+@media (max-width: 899px) { #player.com-fila [data-pl="ampliar"] { display: none; } }
