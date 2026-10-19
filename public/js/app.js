@@ -42,7 +42,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-68';
+export const APP_VERSAO = '2026.10.19-69';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2236,23 +2236,7 @@ function viewSong(id, ctx = {}) {
   // tabela de tons (como no Cifra Club): toca no tom e a cifra muda
   async function escolherTom() {
     if (!tomBase) { toast('Esta música não informa o tom'); return; }
-    const menor = /m$/.test(tomBase);
-    const opcoes = Array.from({ length: 12 }, (_, i) => {
-      const t = ((i + 18) % 12) - 6; // -6..5, igual à transposição salva
-      return { t, nome: transposeKey(tomBase, t) };
-    });
-    const ORDEM = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'];
-    opcoes.sort((a, b) => ORDEM.indexOf(a.nome.replace(/m$/, '')) - ORDEM.indexOf(b.nome.replace(/m$/, '')));
-    const atual = ((transpose % 12) + 18) % 12 - 6;
-    const r = await openDialog(`
-      <h3>Escolher o tom</h3>
-      <p>Tom original: <b>${esc(tomBase)}</b>${menor ? ' (menor)' : ''}</p>
-      <div class="tons">${opcoes.map((o) => `<button class="tom ${o.t === 0 ? 'orig' : ''}" data-t="${o.t}" aria-pressed="${o.t === atual}">${esc(o.nome)}${o.t === 0 ? '<small>original</small>' : ''}</button>`).join('')}</div>
-      <div class="acts"><button class="btn ghost" data-no>Fechar</button></div>`,
-    (dlg, done) => {
-      $('.tons', dlg).onclick = (e) => { const b = e.target.closest('[data-t]'); if (b) done(Number(b.dataset.t)); };
-      $('[data-no]', dlg).onclick = () => done(null);
-    });
+    const r = await dialogoTons(tomBase, transpose);
     if (r === null) return;
     transpose = r;
     save();
@@ -2327,6 +2311,28 @@ function sairPalco() {
   if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
 }
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('performance')) sairPalco(); });
+
+// Tabela de tons (como no Cifra Club): devolve quantos semitons mudar (-6..5) ou null.
+// "original" é o tom de referência; o marcado é o atual.
+async function dialogoTons(tomBase, transpose = 0, { titulo = 'Escolher o tom', rotuloOriginal = 'original' } = {}) {
+  const menor = /m$/.test(tomBase);
+  const opcoes = Array.from({ length: 12 }, (_, i) => {
+    const t = ((i + 18) % 12) - 6; // -6..5, igual à transposição salva
+    return { t, nome: transposeKey(tomBase, t) };
+  });
+  const ORDEM = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'];
+  opcoes.sort((a, b) => ORDEM.indexOf(a.nome.replace(/m$/, '')) - ORDEM.indexOf(b.nome.replace(/m$/, '')));
+  const atual = ((transpose % 12) + 18) % 12 - 6;
+  return openDialog(`
+    <h3>${esc(titulo)}</h3>
+    <p>Tom ${esc(rotuloOriginal)}: <b>${esc(tomBase)}</b>${menor ? ' (menor)' : ''}</p>
+    <div class="tons">${opcoes.map((o) => `<button class="tom ${o.t === 0 ? 'orig' : ''}" data-t="${o.t}" aria-pressed="${o.t === atual}">${esc(o.nome)}${o.t === 0 ? `<small>${esc(rotuloOriginal)}</small>` : ''}</button>`).join('')}</div>
+    <div class="acts"><button class="btn ghost" data-no>Fechar</button></div>`,
+  (dlg, done) => {
+    $('.tons', dlg).onclick = (e) => { const b = e.target.closest('[data-t]'); if (b) done(Number(b.dataset.t)); };
+    $('[data-no]', dlg).onclick = () => done(null);
+  });
+}
 
 // ------------------------------------------------------------- editor
 
@@ -2426,7 +2432,7 @@ function viewEditor(id, setId) {
           <option value="">(nenhuma)</option>${[...new Set([...PARTES_MISSA.filter((n) => n !== 'Outro'), meta.parte].filter(Boolean))].map((n) => `<option ${n === meta.parte ? 'selected' : ''}>${esc(n)}</option>`).join('')}<option value="__outra">Outra…</option></select></label>
       </div>
       <div class="barra">
-        <div class="seg" title="Transpor a cifra inteira (altera o texto)"><button data-tr="-1" aria-label="Meio tom abaixo">${icon('minus', 16)}</button><span class="val"><small>Transpor</small>cifra</span><button data-tr="1" aria-label="Meio tom acima">${icon('plus', 16)}</button></div>
+        <div class="seg"><button class="tom-btn" id="ed-tom" aria-label="Escolher o tom" title="Mudar o tom da cifra inteira (altera o texto)"><span class="val" id="ed-tom-val"></span>${icon('down', 14)}</button></div>
         <button class="chip parte" data-parte-ed="Refrão" title="Daqui para baixo é o refrão (até a próxima parte)">${icon('plus', 14)} Refrão</button>
         <button class="chip parte" data-parte-ed="Estrofe" title="Daqui para baixo é uma estrofe (até a próxima parte)">${icon('plus', 14)} Estrofe</button>
         <button class="chip parte" data-parte-ed="Ponte" title="Daqui para baixo é a ponte">${icon('plus', 14)} Ponte</button>
@@ -2522,13 +2528,22 @@ function viewEditor(id, setId) {
     atualizar();
   };
   view.querySelectorAll('[data-parte-ed]').forEach((b) => { b.addEventListener('mousedown', (e) => e.preventDefault()); b.onclick = () => inserirParte(b.dataset.parteEd); });
-  view.querySelectorAll('[data-tr]').forEach((b) => (b.onclick = () => {
-    const n = Number(b.dataset.tr);
+  // tom: a mesma tabela de tons da música; aqui a mudança vale para o texto da cifra
+  const tomDoEditor = () => campo('key').value.trim() || (/\[([A-G][#b]?m?)(?![a-z])/.exec(corpoPro()) || [])[1] || '';
+  const mostrarTom = () => { const t = tomDoEditor(); $('#ed-tom-val').innerHTML = `<small>Tom</small>${t ? esc(t) : '—'}`; };
+  mostrarTom();
+  campo('key').addEventListener('input', mostrarTom);
+  $('#ed-tom').onclick = async () => {
+    const base = tomDoEditor();
+    if (!base) { toast('Escreva o tom ou coloque acordes na cifra'); campo('key').focus(); return; }
+    const n = await dialogoTons(base, 0, { titulo: 'Mudar o tom da cifra', rotuloOriginal: 'atual' });
+    if (!n) return;
     ta.value = exibir(transposeChordPro(corpoPro(), n));
-    if (campo('key').value.trim()) campo('key').value = transposeKey(campo('key').value.trim(), n);
+    campo('key').value = transposeKey(base, n);
     atualizar();
-    toast(`Cifra transposta ${n > 0 ? '+' : '−'}½ tom`);
-  }));
+    mostrarTom();
+    toast(`Cifra passada para ${campo('key').value}`);
+  };
   $('#completar').onclick = () => {
     const r = completarCifra(corpoPro());
     if (!r.completadas) { toast(temCifra(corpoPro()) ? 'Todas as estrofes já têm acordes' : 'Coloque os acordes em pelo menos uma estrofe'); return; }
