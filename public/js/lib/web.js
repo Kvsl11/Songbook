@@ -49,6 +49,7 @@ export function resultadosCifraClub(json) {
       url: `${CIFRACLUB}/${d.d}/${d.u}/`,
       capa: d.i ? CAPAS + String(d.i).replace(/-tb(\.\w+)$/, '$1') : '',
       fonte: 'cifraclub',
+      popularidade: Number(d.s) || 0,
     }));
 }
 

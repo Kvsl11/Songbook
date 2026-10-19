@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-77';
+export const APP_VERSAO = '2026.10.19-78';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1593,6 +1593,19 @@ const linhaMusicaWeb = (r, i, extra = '') => `
     ${capa({ titulo: r.titulo, capa: r.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${r.cifra ? `<span class="ind"><span class="ind-i" title="Tem cifra">${icon('chord', 11)}</span></span>` : ''}${esc(r.artista || '')}</div></div>
     <span class="acts">${extra}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 
+// Busca vazia: as músicas católicas mais procuradas agora no Cifra Club — as mais tocadas de cada um dos
+// artistas católicos mais ouvidos, em ordem de popularidade (o índice da própria busca do Cifra Club)
+const ARTISTAS_CATOLICOS = ['Frei Gilson', 'Colo de Deus', 'Padre Fábio de Melo', 'Ministério Amor e Adoração', 'Comunidade Católica Shalom',
+  'Eliana Ribeiro', 'Padre Marcelo Rossi', 'Davidson Silva', 'Walmir Alencar', 'Thiago Brado', 'Adoração e Vida', 'Celina Borges'];
+async function catolicasEmAlta() {
+  const listas = await Promise.all(ARTISTAS_CATOLICOS.map((a) => buscarCifraClub(a)
+    .then((r) => r.filter((x) => mesmoNome(x.artista, a) || mesmoNome(x.artista.replace(/^(comunidade cat[óo]lica|minist[ée]rio|padre|pe\.?)\s+/i, ''), a.replace(/^(comunidade cat[óo]lica|minist[ée]rio|padre)\s+/i, ''))).slice(0, 3))
+    .catch(() => [])));
+  const vistas = new Set();
+  return listas.flat().filter((x) => !vistas.has(x.url) && vistas.add(x.url)).sort((a, b) => b.popularidade - a.popularidade).slice(0, 24)
+    .map((r) => ({ titulo: r.titulo, artista: r.artista, capa: r.capa, cifra: r.url }));
+}
+
 function viewSearch() {
   setTab('buscar');
   setTint('#2d2d2d');
@@ -1634,6 +1647,13 @@ function viewSearch() {
       res.innerHTML = `
         <div class="busca-dica">${icon('sparkles', 18)}<span>Busque qualquer música: ao abrir, ela já vem com a cifra (<b>Cifra Club</b>), a letra (<b>Letras</b>) e o vídeo (<b>YouTube</b>). Achou a cifra em outro site? <button class="link-btn" id="btn-importar">Cole aqui</button>.</span></div>`;
       $('#btn-importar').onclick = () => importarDaInternet();
+      res.insertAdjacentHTML('beforeend', `<div class="shelf-head"><h2>Católicas em alta</h2></div><div id="em-alta"><div class="loading-note"><span class="spin"></span>Carregando as mais tocadas…</div></div>`);
+      const meu = ++seq;
+      catolicasEmAlta().then((lista) => {
+        if (meu !== seq || !$('#em-alta')) return;
+        achados.musica = lista;
+        $('#em-alta').innerHTML = lista.length ? `<ul class="tracks">${lista.map((r, i) => linhaMusicaWeb(r, i)).join('')}</ul>` : '<p class="muted">Não consegui carregar agora. Digite o nome de uma música acima.</p>';
+      });
       return;
     }
     const meu = ++seq;

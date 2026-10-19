@@ -14,6 +14,9 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   Cifra Club e do Letras juntos) e os **Vídeos** do YouTube. Tocar numa música já traz tudo junto: a **cifra** (Cifra
   Club, que já tem a letra; sem cifra, a letra do Letras), o **vídeo** do YouTube e o compositor. Um vídeo tocado
   direto da busca abre como música do mesmo jeito, com cifra e letra. Filtros: Tudo, Músicas, Vídeos, Biblioteca.
+- **Católicas em alta**: com a busca vazia, aparecem as músicas católicas mais procuradas agora no Cifra Club (as
+  mais tocadas de artistas como Frei Gilson, Colo de Deus, Padre Fábio de Melo, Ministério Amor e Adoração, Shalom),
+  em ordem de popularidade; tocar numa abre com cifra, letra e vídeo.
 - **Cifra automática**: uma letra que veio da internet sem acordes procura sozinha a cifra da mesma música no
   Cifra Club e troca (mantendo vídeo, parte da missa e quadros). Só depois de procurar, um aviso simples diz o que
   falta ("Esta música não tem cifra nem vídeo").
