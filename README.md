@@ -53,11 +53,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   Ao abrir uma música da busca (Cifra Club, letras, cantos), o app procura o vídeo no YouTube sozinho e já
   vincula; se não achar, mostra o aviso com "Escolher vídeo".
 
-- **Letra acompanhando a música**: no modo só letra, enquanto o vídeo toca, o verso cantado acende e a letra rola
-  sozinha, com os tempos de cada verso de um banco aberto de letras sincronizadas (LRCLIB); tocar num verso leva a
-  música até ele (como no Spotify). É automático: os tempos só são usados se forem da mesma gravação do vídeo
-  (mesma duração) e se a letra bater com a da página; refrão repetido volta para o refrão escrito; se não der, a letra não acompanha. O vídeo começa no topo
-  da música (onde dá para pular o anúncio) e depois fica atrás do título; em Referências dá para assisti-lo com os controles.
+- **Vídeo da música**: o vídeo começa no topo da música (onde dá para pular o anúncio) e depois fica atrás do
+  título; em Referências dá para assisti-lo com os controles.
 - **Player como no Spotify** (a barra do mini player tem a cor do fundo da letra da música que está tocando): na página da música o vídeo toca no topo, atrás do título; ao sair dela, continua no mini player
   sem parar nem repetir anúncio (é o mesmo vídeo, que só muda de lugar na tela) fixo acima do menu, com o vídeo do YouTube
   pequeno, nome, parte da missa, tempo e barra de progresso; a música continua tocando enquanto você navega.

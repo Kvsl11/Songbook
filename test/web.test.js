@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cifraTextoParaChordPro, ehCifraClub, simplificarCifra, parseLetras, resultadosLetras, lerLrc, mesmaDuracao, buscarLetraSincronizada, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
+  cifraTextoParaChordPro, ehCifraClub, simplificarCifra, parseLetras, resultadosLetras, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
 } from '../public/js/lib/web.js';
 import { semIntro, aplicarEstrutura, aplicarLetra, definirMeta, doEditor, letraDe, linhasDaLetra, paraEditor, parseChordPro } from '../public/js/chordpro.js';
 
@@ -140,11 +140,6 @@ test('Letras.mus.br: busca e página da letra', () => {
   assert.equal(l.letra, 'Deus está aqui\nneste momento\n\nE ainda se vier\nnoite traíçoeira');
 });
 
-test('letra sincronizada (LRC): tempos em segundos e em ordem', () => {
-  const l = lerLrc('[ar: X]\n[00:11.11] Tu és a minha porção\n[01:02.50][00:16.17] Tu és a minha herança\n[00:20.00]');
-  assert.deepEqual(l.map((x) => [Math.round(x.t * 100) / 100, x.texto]), [[11.11, 'Tu és a minha porção'], [16.17, 'Tu és a minha herança'], [20, ''], [62.5, 'Tu és a minha herança']]);
-});
-
 test('partes vindas da IA: só coloca as marcações, sem mudar a letra', () => {
   const pro = '[G]Deus está [D]aqui\nNeste momento\n\nE ainda se [C]vier\nnoite traiçoeira\n\nDeus está aqui\nde novo';
   assert.deepEqual(linhasDaLetra(pro), ['Deus está aqui', 'Neste momento', 'E ainda se vier', 'noite traiçoeira', 'Deus está aqui', 'de novo']);
@@ -152,17 +147,6 @@ test('partes vindas da IA: só coloca as marcações, sem mudar a letra', () => 
   assert.deepEqual(parseChordPro(r).sections.map((x) => `${x.type}:${x.label}`), ['verse:Estrofe 1', 'chorus:', 'verse:Estrofe 2']);
   assert.deepEqual(linhasDaLetra(r), linhasDaLetra(pro));
   assert.match(r, /\[G\]Deus está \[D\]aqui/);
-});
-
-test('letra sincronizada só da mesma gravação do vídeo (ao vivo ≠ estúdio)', async () => {
-  assert.ok(mesmaDuracao(194, 196) && mesmaDuracao(348, 0) && !mesmaDuracao(348, 196));
-  const lista = [
-    { id: 1, duration: 348, syncedLyrics: '[00:15.00] Não me sinto só' },
-    { id: 2, duration: 195, syncedLyrics: '[00:10.00] Não me sinto só' },
-  ];
-  const fetchImpl = async () => new Response(JSON.stringify(lista), { status: 200 });
-  assert.equal((await buscarLetraSincronizada({ titulo: 'Aba', artista: 'Kemuel', duracao: 194 }, fetchImpl)).fonte, 'https://lrclib.net/api/get/2');
-  assert.equal(await buscarLetraSincronizada({ titulo: 'Aba', artista: 'Kemuel', duracao: 250 }, fetchImpl), null);
 });
 
 test('tira a introdução da cifra: começa na letra', () => {

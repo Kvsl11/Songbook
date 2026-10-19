@@ -370,13 +370,13 @@ export function videosDoPiped(json) {
     });
 }
 
-export async function buscarYoutube(termo, { fetchImpl, instancias = PIPED } = {}) {
+export async function buscarYoutube(termo, { fetchImpl, instancias = PIPED, filtro = 'videos' } = {}) {
   const q = String(termo || '').trim();
   if (!q) return [];
   let erro = new Error('Busca de vídeos indisponível agora');
   for (const base of instancias) {
     try {
-      const res = await buscar(`${base}/search?filter=videos&q=${encodeURIComponent(q)}`, { fetchImpl, timeout: 9000 });
+      const res = await buscar(`${base}/search?filter=${filtro}&q=${encodeURIComponent(q)}`, { fetchImpl, timeout: 9000 });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return videosDoPiped(await res.json()).slice(0, 15);
     } catch (e) {
@@ -417,42 +417,3 @@ export function tituloDoVideo(t) {
     .replace(/\s*\|.*$/, '').replace(/\s+/g, ' ').trim();
 }
 
-// ------------------------------------------------------------------ letra sincronizada (LRCLIB)
-// Letra com o tempo de cada verso ("[01:23.45] verso"), para acompanhar a música como no Spotify.
-
-export function lerLrc(texto) {
-  const linhas = [];
-  for (const l of String(texto || '').split('\n')) {
-    const tempos = [...l.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];
-    if (!tempos.length) continue;
-    const verso = l.replace(/\[[^\]]*\]/g, '').trim();
-    for (const m of tempos) linhas.push({ t: Number(m[1]) * 60 + Number(m[2]), texto: verso });
-  }
-  return linhas.sort((a, b) => a.t - b.t);
-}
-
-// a versão com tempos mais parecida com a música (mesmo artista; duração mais próxima do vídeo)
-// duas durações (em segundos) que são da mesma gravação
-export const mesmaDuracao = (a, b) => !(a > 0 && b > 0) || Math.abs(a - b) <= Math.max(5, b * 0.03);
-
-export async function buscarLetraSincronizada({ titulo = '', artista = '', duracao = 0 } = {}, fetchImpl) {
-  const t = String(titulo).replace(/\s*[([].*?[)\]]\s*/g, ' ').trim();
-  if (!t) return null;
-  const consultar = async (params) => {
-    const res = await buscar(`https://lrclib.net/api/search?${new URLSearchParams(params)}`, { fetchImpl });
-    if (!res.ok) throw new Error(`LRCLIB respondeu ${res.status}`);
-    const lista = await res.json();
-    return Array.isArray(lista) ? lista.filter((r) => r.syncedLyrics && !r.instrumental) : [];
-  };
-  let lista = await consultar(artista ? { track_name: t, artist_name: artista } : { track_name: t });
-  if (!lista.length) lista = await consultar({ q: `${t} ${artista}`.trim() });
-  if (!lista.length) return null;
-  if (duracao > 0) {
-    // os tempos só servem se forem da mesma gravação do vídeo (ao vivo, acústico… têm outra duração)
-    lista = lista.filter((r) => mesmaDuracao(r.duration, duracao));
-    lista.sort((a, b) => Math.abs(a.duration - duracao) - Math.abs(b.duration - duracao));
-    if (!lista.length) return null;
-  }
-  const r = lista[0];
-  return { linhas: lerLrc(r.syncedLyrics), duracao: r.duration || 0, fonte: `https://lrclib.net/api/get/${r.id}` };
-}

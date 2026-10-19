@@ -1110,12 +1110,6 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 }
 .barra-sel[hidden] { display: none; }
 
-/* letra acompanhando a música (como no Spotify): o verso cantado acende, os já cantados ficam mais apagados */
-.song.karaoke .line { opacity: 0.5; transition: opacity 0.35s ease, transform 0.35s ease; transform-origin: center; }
-.song.karaoke .line.cantada { opacity: 0.32; }
-.song.karaoke .line.agora { opacity: 1; transform: scale(1.04); text-shadow: 0 2px 18px rgb(0 0 0 / 0.35); }
-.song.karaoke .line { cursor: pointer; }
-
 /* o clipe de verdade no topo da música (depois do anúncio): fica por trás do título e dos botões,
    sem receber toques (os controles do YouTube não aparecem); o degradê do topo continua por cima */
 #pl-tela.no-fundo { z-index: 0; border-radius: 0; box-shadow: none; pointer-events: none; container-type: size; }
@@ -1125,8 +1119,6 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 .song-topo.com-video .song-hero > .cover { opacity: 0; visibility: hidden; }
 .video-no-topo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-radius: var(--radius); background: var(--bg-elev); font-size: 14px; font-weight: 600; }
 .video-no-topo .ic { color: var(--accent-ink); }
-.song.karaoke-pronta .line { cursor: pointer; }
-.song.karaoke-pronta .line:not(.chords-only):active { opacity: 0.8; }
 /* vídeo no topo durante o anúncio: na frente, com os controles do YouTube (dá para pular o anúncio) */
 #pl-tela.na-frente { z-index: 14; border-radius: 0; background: #000; }
 

@@ -5,8 +5,8 @@ import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
-import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, mesmaDuracao, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
-import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, buscarLetraSincronizada, getCifraClub, getLetra, buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
+import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const view = $('#view');
@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-97';
+export const APP_VERSAO = '2026.10.19-98';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -424,7 +424,9 @@ const player = (() => {
   tela.hidden = true;
   $('.main-col').append(tela);
   const mini = $('.pl-video', el); // espaço reservado no mini player
-  const noPalco = () => Boolean(atual && palco?.isConnected && palcoDe === atual.youtube);
+  // a música tocando é esta?
+  const desta = (id) => Boolean(atual && id && atual.youtube === id);
+  const noPalco = () => Boolean(atual && palco?.isConnected && desta(palcoDe));
   const iframeAtual = () => tela.querySelector('iframe');
   // Na página da música o vídeo toca no topo (como o Canvas do Spotify): enquanto carrega e passa o
   // anúncio fica na frente (dá para pular o anúncio); quando o clipe começa, vai para trás do título.
@@ -521,7 +523,8 @@ const player = (() => {
     // segundos do vídeo agora (o YouTube avisa algumas vezes por segundo; entre um aviso e outro, estima)
     get tempoAgora() { return tempo + (estado === 'tocando' && marcaTempo ? (performance.now() - marcaTempo) / 1000 : 0); },
     get duracao() { return duracao; },
-    tocandoAgora: (youtube) => Boolean(atual && atual.youtube === youtube && estado === 'tocando'),
+    tocandoAgora: (youtube) => desta(youtube) && estado === 'tocando',
+    desta,
     ouvir(fn) { ouvintes.add(fn); return () => ouvintes.delete(fn); },
     tocar(item) {
       if (!item?.youtube) return;
@@ -2253,7 +2256,7 @@ function stopScroll() { cancelAnimationFrame(scrollTimer); scrollTimer = null; }
 let preview = null; // música temporária (vinda da busca/liturgia, ainda não salva)
 // a música temporária fica guardada na sessão, para voltar ao recarregar a página
 const CHAVE_PREVIA = 'songbook.previa';
-const guardarPrevia = () => { try { if (preview) sessionStorage.setItem(CHAVE_PREVIA, JSON.stringify({ ...preview, lrc: undefined })); } catch { /* sem espaço */ } };
+const guardarPrevia = () => { try { if (preview) sessionStorage.setItem(CHAVE_PREVIA, JSON.stringify(preview)); } catch { /* sem espaço */ } };
 try { preview = JSON.parse(sessionStorage.getItem(CHAVE_PREVIA) || 'null'); } catch { preview = null; }
 addEventListener('pagehide', guardarPrevia);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') guardarPrevia(); });
@@ -2278,7 +2281,7 @@ function viewSong(id, ctx = {}) {
   } else db.touchRecent(song.id);
   setTab(ctx.set ? 'biblioteca' : isPreview ? (song.back?.startsWith('#/buscar') ? 'buscar' : 'liturgia') : 'biblioteca');
   setTint(corDaMusica(song.title));
-  if (song.youtube && player.atual?.youtube === song.youtube) player.atualizar({ titulo: song.title, artista: song.artist || '', cor: corDaMusica(song.title) });
+  if (song.youtube && player.desta(song.youtube)) player.atualizar({ titulo: song.title, artista: song.artist || '', cor: corDaMusica(song.title) });
   const prefs = db.prefs();
   let { transpose = 0, capo = 0 } = song;
   const canvas = Boolean(song.youtube && prefs.videoFundo !== false);
@@ -2574,7 +2577,7 @@ function viewSong(id, ctx = {}) {
   aoSair(player.ouvir(iconePlay));
   $('#btn-play').onclick = () => {
     if (!song.youtube) { mudarVideo(); return; }
-    if (player.atual?.youtube === song.youtube) player.alternar(); else tocar();
+    if (player.desta(song.youtube)) player.alternar(); else tocar();
   };
   if (ctx.tocar && song.youtube) setTimeout(tocar, 60);
   // música vinda da busca sem vídeo: procura no YouTube sozinho e já vincula (se não achar, o aviso diz)
@@ -2589,126 +2592,6 @@ function viewSong(id, ctx = {}) {
   }
   avisoFalta();
 
-
-  // ---- letra acompanhando a música (como no Spotify), só no modo sem cifra
-  // Os tempos de cada verso vêm de um banco aberto de letras sincronizadas (LRCLIB); o tempo do vídeo
-  // vem do player. Tocar num verso leva a música até ele (como no Spotify). É tudo automático: se os tempos
-  // não forem da mesma gravação do vídeo ou a letra for muito diferente da da página, ela só não acompanha.
-  if (song.youtube && db.prefs().karaoke !== false) {
-    const dono = isPreview ? preview : db.song(song.id);
-    // a letra sincronizada guardada só vale para o vídeo com que foi buscada
-    let lrc = dono?.lrc !== undefined && (dono.lrc === null ? dono.lrcVideo === song.youtube : dono.lrc.video === song.youtube) ? dono.lrc : undefined;
-    let buscando = false;
-    let conferida = false; // a duração dos tempos já foi comparada com a do vídeo tocando
-    let mapa = [];
-    let mapaDe = null;
-    let atualEl = null;
-    let ultimoToque = 0;
-    const norm = (t) => normalizar(t).split(' ').filter(Boolean);
-    const parecido = (a, b) => { const A = norm(a); const B = new Set(norm(b)); return A.length ? A.filter((w) => B.has(w)).length / Math.max(A.length, B.size) : 0; };
-    // casa cada verso com tempo com uma linha da letra na tela. Segue em frente, mas volta quando o verso
-    // se repete (o refrão costuma estar escrito uma vez só e é cantado várias). Verso cantado que não está
-    // na página (ou trecho sem voz) fica sem linha: nada acende enquanto ele toca.
-    const mapear = () => {
-      const linhas = [...songEl.querySelectorAll('.line:not(.chords-only)')].filter((el) => el.textContent.trim());
-      const textos = linhas.map((el) => el.textContent);
-      mapa = [];
-      let j = 0;
-      for (const v of lrc.linhas) {
-        if (!v.texto) { mapa.push({ t: v.t, el: null }); continue; }
-        let achou = -1;
-        for (let k = j; k < Math.min(linhas.length, j + 6) && achou < 0; k++) if (parecido(v.texto, textos[k]) >= 0.6) achou = k;
-        if (achou < 0) {
-          let melhor = 0.6;
-          textos.forEach((t, k) => { const p = parecido(v.texto, t) - Math.abs(k - j) * 0.001; if (p >= melhor) { melhor = p; achou = k; } });
-        }
-        mapa.push({ t: v.t, el: achou >= 0 ? linhas[achou] : null, n: achou });
-        if (achou >= 0) j = achou + 1;
-      }
-      // letra muito diferente da que está na página: melhor não acompanhar do que acompanhar errado
-      const comTexto = mapa.filter((m, k) => lrc.linhas[k].texto);
-      if (!comTexto.length || comTexto.filter((m) => m.el).length / comTexto.length < 0.7) mapa = [];
-      mapaDe = songEl.firstElementChild;
-    };
-    const tocandoEsta = () => player.atual?.youtube === song.youtube && player.estado !== 'parado';
-    const limpar = () => {
-      songEl.classList.remove('karaoke', 'karaoke-pronta');
-      songEl.querySelectorAll('.agora, .cantada').forEach((x) => x.classList.remove('agora', 'cantada'));
-      atualEl = null;
-    };
-    const guardar = () => {
-      if (!dono) return;
-      dono.lrc = lrc;
-      dono.lrcVideo = song.youtube;
-      if (!isPreview) db.updateSong(song.id, { lrc, lrcVideo: song.youtube });
-    };
-    const carregar = (duracao = 0) => {
-      if (buscando) return;
-      buscando = true;
-      buscarLetraSincronizada({ titulo: song.title, artista: song.artist, duracao })
-        .then((r) => { lrc = r && r.linhas.length ? { ...r, video: song.youtube } : null; }).catch(() => { lrc = null; })
-        .finally(() => { buscando = false; mapaDe = null; guardar(); });
-    };
-    // os tempos precisam ser da mesma gravação do vídeo (a versão ao vivo, por exemplo, tem outro ritmo):
-    // se a duração não bate, procura outra; se não houver, a letra não acompanha este vídeo
-    const conferir = () => {
-      if (conferida || buscando || !tocandoEsta() || !(player.duracao > 0)) return;
-      conferida = true;
-      if (lrc && !mesmaDuracao(lrc.duracao, player.duracao)) { lrc = undefined; limpar(); carregar(player.duracao); }
-    };
-    const marcar = () => {
-      if (comCifra) { if (songEl.classList.contains('karaoke-pronta')) limpar(); return; }
-      if (lrc === undefined) carregar(tocandoEsta() ? player.duracao : 0);
-      conferir();
-      if (!lrc) { if (songEl.classList.contains('karaoke-pronta')) limpar(); return; }
-      if (mapaDe !== songEl.firstElementChild) mapear();
-      if (!mapa.length) return;
-      songEl.classList.add('karaoke-pronta');
-      const tocando = tocandoEsta();
-      if (!tocando) {
-        if (songEl.classList.contains('karaoke')) { songEl.classList.remove('karaoke'); songEl.querySelectorAll('.agora, .cantada').forEach((x) => x.classList.remove('agora', 'cantada')); atualEl = null; }
-        return;
-      }
-      songEl.classList.add('karaoke');
-      const agora = player.tempoAgora;
-      let i = -1;
-      for (let k = 0; k < mapa.length && mapa[k].t <= agora; k++) i = k;
-      const el = i >= 0 ? mapa[i].el : null;
-      if (el === atualEl) return;
-      // as linhas antes do verso atual ficam como já cantadas (pela posição na página)
-      const n = el ? mapa[i].n : -1;
-      const ate = n >= 0 ? n : -1;
-      [...new Set(mapa.map((m) => m.el).filter(Boolean))].forEach((x) => {
-        const k = mapa.find((m) => m.el === x).n;
-        x.classList.toggle('agora', x === el);
-        x.classList.toggle('cantada', x !== el && k < ate);
-      });
-      atualEl = el;
-      // rola sozinho até o verso atual (menos logo depois de o usuário rolar a página)
-      if (el && Date.now() - ultimoToque > 4000) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    };
-    const rolou = () => { ultimoToque = Date.now(); };
-    view.addEventListener('touchmove', rolou, { passive: true });
-    view.addEventListener('wheel', rolou, { passive: true });
-    // tocar num verso: a música vai até ele (e começa a tocar, se estava parada)
-    songEl.addEventListener('click', (e) => {
-      if (!songEl.classList.contains('karaoke-pronta')) return;
-      const linha = e.target.closest('.line');
-      // um verso repetido (refrão) vai para a vez mais próxima do ponto em que a música está
-      const vezes = mapa.filter((x) => x.el && x.el === linha);
-      if (!vezes.length) return;
-      const agoraSeg = tocandoEsta() ? player.tempoAgora : 0;
-      const m = tocandoEsta() ? vezes.reduce((a, b) => (Math.abs(b.t - agoraSeg) < Math.abs(a.t - agoraSeg) ? b : a)) : vezes[0];
-      if (e.target.closest('.chord') && db.prefs().diagramas) return; // o toque no acorde mostra o desenho
-      const alvoSeg = Math.max(0, m.t - 0.3);
-      if (!tocandoEsta()) player.tocar(itemDoPlayer(song, ctx.set ? db.set(ctx.set.id) : null, ctx.set ? ctx.index : -1));
-      player.irPara(alvoSeg);
-      atualEl = null;
-      ultimoToque = 0;
-    });
-    const relogio = setInterval(marcar, 250);
-    aoSair(() => { clearInterval(relogio); view.removeEventListener('touchmove', rolou); view.removeEventListener('wheel', rolou); });
-  }
 
   // topo com os quadros do clipe: a capa sai quando o 1º quadro carrega; o tipo de quadro fica salvo
   if (canvas) {
@@ -3564,7 +3447,6 @@ function viewSettings() {
 
     <div class="section-title">Página da música</div>
     <div class="settings-group">
-      <label class="setting"><span class="ico">${icon('music', 18)}</span><div class="grow"><div class="t">Letra acompanhando a música</div><div class="s">No modo só letra, enquanto o vídeo toca, o verso cantado fica em destaque e a letra rola sozinha (como no Spotify)</div></div><input type="checkbox" class="switch" id="karaoke" ${p.karaoke !== false ? 'checked' : ''}></label>
       <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo no topo da música</div><div class="s">Um trecho do clipe passa sem som atrás do título, como no Spotify. Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
     </div>
 
@@ -3641,7 +3523,6 @@ function viewSettings() {
     $('#destaque').querySelectorAll('[data-v]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   };
   $('#video-fundo').onchange = (e) => db.setPref('videoFundo', e.target.checked);
-  $('#karaoke').onchange = (e) => db.setPref('karaoke', e.target.checked);
   $('#exp').onclick = () => download(`songbook-backup-${hojeISO()}.json`, db.exportAll(), 'application/json');
   $('#imp').onclick = openImport;
   $('#clr').onclick = async () => {
