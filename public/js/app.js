@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-90';
+export const APP_VERSAO = '2026.10.19-91';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -3769,23 +3769,52 @@ function route() {
   }
 }
 
-// Fileiras horizontais (artistas, repertórios, músicas…): no computador ganham setas ‹ › nos lados, como no
-// Spotify (com mouse não dá para arrastar para o lado). Cada fileira nova que aparece na tela recebe as setas.
+// Fileiras horizontais (artistas, repertórios, músicas…): no computador dá para clicar e arrastar para o lado
+// (como no celular) e há setas ‹ › redondas ao lado do título da fileira, como no Spotify. Cada fileira nova
+// que aparece na tela ganha isso sozinha.
 function ligarFileira(shelf) {
-  if (shelf.parentElement?.classList.contains('shelf-wrap')) return;
-  const wrap = document.createElement('div');
-  wrap.className = 'shelf-wrap';
-  shelf.before(wrap);
-  wrap.innerHTML = `<button class="shelf-seta esq" aria-label="Voltar" tabindex="-1">${icon('back', 20)}</button><button class="shelf-seta dir" aria-label="Mais" tabindex="-1">${icon('next', 20)}</button>`;
-  wrap.prepend(shelf);
-  const [esq, dir] = wrap.querySelectorAll('.shelf-seta');
+  if (shelf.dataset.ligada) return;
+  shelf.dataset.ligada = '1';
+  // o título da fileira: logo antes dela, ou antes da caixa em que ela está (ex.: a seção Artistas da busca)
+  const antes = shelf.previousElementSibling || (shelf.parentElement?.firstElementChild === shelf ? shelf.parentElement.previousElementSibling : null);
+  const titulo = antes?.classList.contains('shelf-head') && !antes.querySelector('.shelf-setas') ? antes : null;
+  const setas = document.createElement('div');
+  setas.className = 'shelf-setas';
+  setas.innerHTML = `<button class="shelf-seta" data-lado="-1" aria-label="Voltar">${icon('back', 18)}</button><button class="shelf-seta" data-lado="1" aria-label="Mais">${icon('next', 18)}</button>`;
+  if (titulo) titulo.append(setas); else shelf.before(setas);
+  const [esq, dir] = setas.querySelectorAll('.shelf-seta');
   const atualizar = () => {
-    esq.hidden = shelf.scrollLeft < 30;
-    dir.hidden = shelf.scrollLeft + shelf.clientWidth >= shelf.scrollWidth - 30;
+    esq.disabled = shelf.scrollLeft < 4;
+    dir.disabled = shelf.scrollLeft + shelf.clientWidth >= shelf.scrollWidth - 4;
+    setas.hidden = shelf.scrollWidth <= shelf.clientWidth + 4; // cabe tudo: sem setas
   };
-  const passo = (lado) => shelf.scrollBy({ left: lado * Math.max(200, shelf.clientWidth * 0.8), behavior: 'smooth' });
-  esq.onclick = () => passo(-1);
-  dir.onclick = () => passo(1);
+  setas.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-lado]');
+    if (b) shelf.scrollBy({ left: Number(b.dataset.lado) * Math.max(200, shelf.clientWidth * 0.8), behavior: 'smooth' });
+  });
+  // clicar e arrastar com o mouse (o clique depois de arrastar não abre o item)
+  let ini = null;
+  let arrastou = false;
+  shelf.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    ini = { x: e.clientX, left: shelf.scrollLeft };
+    arrastou = false;
+  });
+  addEventListener('pointermove', (e) => {
+    if (!ini) return;
+    const dx = e.clientX - ini.x;
+    if (!arrastou && Math.abs(dx) < 6) return;
+    arrastou = true;
+    shelf.classList.add('arrastando');
+    shelf.scrollLeft = ini.left - dx;
+  });
+  addEventListener('pointerup', () => {
+    if (!ini) return;
+    ini = null;
+    shelf.classList.remove('arrastando');
+  });
+  shelf.addEventListener('click', (e) => { if (arrastou) { e.preventDefault(); e.stopPropagation(); arrastou = false; } }, true);
+  shelf.addEventListener('dragstart', (e) => e.preventDefault());
   shelf.addEventListener('scroll', atualizar, { passive: true });
   new ResizeObserver(atualizar).observe(shelf);
   new MutationObserver(atualizar).observe(shelf, { childList: true });
