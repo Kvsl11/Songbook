@@ -17,6 +17,11 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 - **Cifra automática**: uma letra que veio da internet sem acordes procura sozinha a cifra da mesma música no
   Cifra Club e troca (mantendo vídeo, parte da missa e quadros). Só depois de procurar, um aviso simples diz o que
   falta ("Esta música não tem cifra nem vídeo").
+- **Cifra sempre que existir**: ao trazer uma música, a cifra é procurada no Cifra Club pelo título com o artista e com
+  os participantes ("part.", "feat."); a fonte mostrada é a da cifra (Cifra Club) ou, só quando não há cifra, a da letra.
+  Se não achou, tenta de novo depois de uma semana.
+- **Eco entre parênteses**: uma linha cantada entre parênteses, como "(Você não está sozinho)", é letra, do tamanho
+  normal; só instruções como "(2x)", "(bis)", "(só as mulheres)" ou acordes ficam como observação.
 - **Sem introdução**: a parte de Intro das cifras não aparece (nem é trazida do Cifra Club) — a cifra começa na letra.
 - **Indicadores nas listas**: na biblioteca, na busca e nas faixas do repertório, ícones bem pequenos mostram se a
   música tem cifra e/ou vídeo.

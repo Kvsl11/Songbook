@@ -1,5 +1,5 @@
 // Renderização de ChordPro em HTML (acordes sobre a letra).
-import { ehInstrumental, parseChordPro, preferFlatsFor, semIntro, transposeChord, transposeKey } from './chordpro.js';
+import { ehInstrumental, ehObservacao, parseChordPro, preferFlatsFor, semIntro, transposeChord, transposeKey } from './chordpro.js';
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -20,7 +20,16 @@ export function renderSong(content, { transpose = 0, capo = 0, key = '' } = {}) 
     html.push(`<div class="section ${sec.type}${soInstr ? ' so-instr' : ''}">`);
     if (label) html.push(`<div class="section-label">${esc(label)}</div>`);
     for (const line of sec.lines) {
-      if (line.kind === 'comment') { html.push(`<div class="comment">${esc(line.text)}</div>`); continue; }
+      if (line.kind === 'comment') {
+        // cifras antigas guardaram o eco entre parênteses como observação: ele é letra, do tamanho normal
+        const t = line.text.trim().replace(/^\((.*)\)$/, '$1');
+        if (sec.type !== 'comment' && t.length <= 90 && !/[:]/.test(t) && !ehObservacao(t) && /\p{L}{3,}/u.test(t) && /\S\s+\S/.test(t)) {
+          html.push(`<div class="line lyrics-only eco"><span class="chunk"><span class="chord"></span><span class="lyric">(${esc(t)})</span></span></div>`);
+          continue;
+        }
+        html.push(`<div class="comment">${esc(line.text)}</div>`);
+        continue;
+      }
       if (line.kind === 'text') { html.push(`<div class="tab">${esc(line.text)}</div>`); continue; }
       const onlyChords = line.segments.every((s) => !s.text.trim());
       const noChords = line.segments.every((s) => s.chord === null);

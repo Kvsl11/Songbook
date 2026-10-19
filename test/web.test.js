@@ -154,3 +154,14 @@ test('tira a introdução da cifra: começa na letra', () => {
   // "Introdução" como letra (com palavras) fica
   assert.equal(semIntro('Introduzi a minha vida em Ti'), 'Introduzi a minha vida em Ti');
 });
+
+test('linha entre parênteses: observação fica observação, eco cantado é letra', async () => {
+  const pro = doEditor('[Estrofe]\nNão me sinto só\n(Você não está sozinho)\n(2x)\n(só as mulheres)');
+  assert.match(pro, /^\(Você não está sozinho\)$/m);
+  assert.match(pro, /\{comment: 2x\}/);
+  assert.match(pro, /\{comment: só as mulheres\}/);
+  const { renderSong } = await import('../public/js/render.js');
+  const html = renderSong('{start_of_verse}\nNão me sinto só\n{comment: Você não está sozinho}\n{comment: 2x}\n{end_of_verse}').html;
+  assert.match(html, /class="line lyrics-only eco"[^]*\(Você não está sozinho\)/);
+  assert.match(html, /<div class="comment">2x<\/div>/);
+});

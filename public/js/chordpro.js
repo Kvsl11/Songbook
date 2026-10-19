@@ -453,6 +453,11 @@ export function definirMeta(src, chave, valor) {
 // [Ponte], [Intro]… Tudo o que vem abaixo pertence a ela até a próxima. [Repetir refrão] repete o
 // refrão e uma linha só entre parênteses, como (2x), vira comentário. Ao salvar vira ChordPro.
 
+// Linha entre parênteses: é observação ("(2x)", "(bis)", "(só as mulheres)", "(solo)") ou é letra
+// cantada (o eco/segunda voz, "(Você não está sozinho)"), que continua a música e fica do tamanho normal
+const OBSERVACAO = /^\d+\s*x$|^x\s*\d+$|\b\d+\s*(x|vezes)\b|\bbis\b|repet|refr[ãa]o|\bcoro\b|solo|intro|instrumental|\bfinal\b|\bfim\b|todos|homens|mulheres|crian[çc]as|vozes|\bs[óo]\s|falad|declama|pausa|ad lib|capo|\btom\b|bateria|viol[ãa]o|teclado|guitarra|palmas|ministro|presidente|assembleia|solista|dueto|un[íi]ssono|acelera|devagar|lento|fade|ponte|estrofe|pr[ée]-?refr|riff|base|dedilhado|interl[úu]dio|^\W*$/i;
+export const ehObservacao = (texto) => OBSERVACAO.test(String(texto || '').trim()) || ehInstrumental(texto); // acordes entre parênteses também
+
 // "[Refrão]" ou "[Intro] G D" (nome que não é acorde). Devolve { nome, resto, tab } ou null
 export function ehCabecalho(linha) {
   const m = /^\s*\[([^\]]{2,40})\]\s*(.*)$/.exec(String(linha || ''));
@@ -528,7 +533,7 @@ export function doEditor(texto) {
     }
     espaco = false;
     const coment = /^\s*\(([^()]+)\)\s*$/.exec(linha);
-    if (coment && !isChordOnlyLine(linha)) { out.push(`{comment: ${coment[1].trim()}}`); continue; }
+    if (coment && !isChordOnlyLine(linha) && ehObservacao(coment[1])) { out.push(`{comment: ${coment[1].trim()}}`); continue; }
     out.push(linha);
   }
   fechar();
@@ -562,7 +567,7 @@ export function paraEditor(src) {
 // A IA recebe só as linhas da letra, numeradas, e devolve onde começa cada parte. O app só coloca
 // as marcações ([Refrão], [Estrofe 2]…): nenhuma palavra ou acorde é alterado.
 const NOMES_PARTE = { refrao: 'Refrão', estrofe: 'Estrofe', ponte: 'Ponte', 'pre-refrao': 'Pré-refrão', intro: 'Intro', final: 'Final' };
-const ehLinhaDeLetra = (l) => l.trim() && !ehDiretiva(l) && !soAcordes(l) && !/^\s*\([^()]*\)\s*$/.test(l);
+const ehLinhaDeLetra = (l) => { const p = /^\s*\(([^()]*)\)\s*$/.exec(l); return l.trim() && !ehDiretiva(l) && !soAcordes(l) && !(p && ehObservacao(p[1])); };
 
 export function linhasDaLetra(src) {
   return paraEditor(src).split('\n').filter(ehLinhaDeLetra).map((l) => semAcordes(l).replace(/\s+/g, ' ').trim());

@@ -42,7 +42,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-72';
+export const APP_VERSAO = '2026.10.19-73';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1374,11 +1374,32 @@ function ligarListaCindy(box, back) {
 
 const tituloLimpo = (t) => String(t || '').replace(/\s*[([].*?[)\]]\s*/g, ' ').replace(/\s*[–—-]\s*(cifra|letra|ao vivo|live|clipe|oficial).*$/i, '').trim();
 const mesmoNome = (a, b) => { const A = normalizar(a); const B = normalizar(b); return !!A && !!B && (A === B || ` ${A} `.includes(` ${B} `) || ` ${B} `.includes(` ${A} `)); };
-// entre os resultados de uma busca, a mesma música: mesmo título e (quando se sabe) mesmo artista
+// quem canta: o artista e os participantes do título ("Aba (part. Kemuel)", "feat. X", "e Y")
+const artistasDe = (titulo, artista) => {
+  const part = [...String(titulo || '').matchAll(/\((?:part\.?|feat\.?|ft\.?|participa[çc][ãa]o( de)?|com)\s+([^)]+)\)/gi)].map((m) => m[2]);
+  return [artista, ...part].flatMap((x) => String(x || '').split(/\s*(?:,|&| e | x |\/)\s*/i)).map((x) => x.trim()).filter(Boolean);
+};
+// entre os resultados de uma busca, a mesma música: mesmo título e (quando se sabe) mesmo artista,
+// contando os participantes. Sem o artista certo, aceita o mesmo título exato entre os primeiros resultados
 function mesmaMusica(lista, titulo, artista, artistaIncerto = false) {
   const t = tituloLimpo(titulo);
   const doTitulo = lista.filter((r) => mesmoNome(tituloLimpo(r.titulo), t));
-  return doTitulo.find((r) => !artista || mesmoNome(r.artista, artista)) || (artistaIncerto || !artista ? doTitulo[0] : null) || null;
+  const quem = artistasDe(titulo, artista);
+  const certo = doTitulo.find((r) => !quem.length || artistasDe(r.titulo, r.artista).some((a) => quem.some((b) => mesmoNome(a, b))));
+  if (certo) return certo;
+  if (artistaIncerto || !quem.length) return doTitulo[0] || null;
+  return lista.slice(0, 3).find((r) => normalizar(tituloLimpo(r.titulo)) === normalizar(t)) || null;
+}
+
+// procura a cifra da música no Cifra Club: pelo título com o artista, com cada participante e só pelo título
+async function acharNoCifraClub(titulo, artista = '', artistaIncerto = false) {
+  const t = tituloLimpo(titulo);
+  const consultas = [...new Set([`${t} ${artista}`.trim(), ...artistasDe(titulo, '').map((a) => `${t} ${a}`), t])];
+  for (const q of consultas) {
+    const achada = mesmaMusica(await buscarCifraClub(q).catch(() => []), titulo, artista, artistaIncerto);
+    if (achada) return achada;
+  }
+  return null;
 }
 
 // "Padre Marcelo Rossi - Deus Está Aqui (Noites Traiçoeiras) ft. Belo" -> artista e título
@@ -1393,8 +1414,11 @@ function nomesDoVideo(v) {
 async function trazerMusica({ titulo, artista = '', cifra = '', letra = null, video = null, artistaIncerto = false }) {
   const termo = `${tituloLimpo(titulo)} ${artista}`.trim();
   const pCifra = (async () => {
-    const url = cifra || mesmaMusica(await buscarCifraClub(termo), titulo, artista, artistaIncerto)?.url;
-    return url ? { ...(await getCifraClub(url)), url } : null;
+    const url = cifra || (await acharNoCifraClub(titulo, artista, artistaIncerto))?.url;
+    if (!url) return null;
+    // o site às vezes demora: tenta de novo antes de desistir da cifra
+    const c = await getCifraClub(url).catch(() => getCifraClub(url));
+    return { ...c, url };
   })().catch(() => null);
   // com o link da cifra na mão, o vídeo é procurado pelo nome que vem na cifra
   const pVideo = (video ? Promise.resolve([video])
@@ -1829,7 +1853,7 @@ function viewSong(id, ctx = {}) {
   // editar, fila e tela cheia ficam só na barra de ações abaixo da capa (sem repetir no topo)
   setHeader(song.title, { back, eyebrow: ctx.set ? `${ctx.index + 1} de ${ctx.set.items.length} · ${ctx.set.name}` : '' });
 
-  const kind = ctx.label || song.parte || (/^salmo/i.test(song.title) ? 'Salmo' : /aclama|aleluia/i.test(song.title) ? 'Aclamação' : 'Cifra');
+  const kind = ctx.label || song.parte || (/^salmo/i.test(song.title) ? 'Salmo' : /aclama|aleluia/i.test(song.title) ? 'Aclamação' : temCifra(song.content) ? 'Cifra' : 'Letra');
   const fonte = song.source && /^https?:/.test(song.source) ? host(song.source) : song.source?.startsWith('cnbb:') ? 'Liturgia Diária – CNBB' : '';
   view.innerHTML = `
     ${ctx.set ? `<div class="set-progress"><i style="width:${((ctx.index + 1) / ctx.set.items.length) * 100}%"></i></div>` : ''}
@@ -1950,7 +1974,7 @@ function viewSong(id, ctx = {}) {
   // letra que veio da internet sem acordes: procura a cifra da mesma música no Cifra Club e troca sozinho,
   // mantendo o vídeo, a parte da missa e os quadros (uma vez só; se não achar, fica como está)
   const procuraCifra = () => (isPreview ? !String(song.source || '').startsWith('cnbb:') : /letras\.mus\.br|lrclib/.test(song.source || ''))
-    && !renderSong(song.content).meta.x_sem_cifra && !!song.title;
+    && !(Date.now() - Number(renderSong(song.content).meta.x_sem_cifra || 0) < 7 * 864e5) && !!song.title;
   // só depois de o app já ter procurado: um aviso simples do que esta música não tem
   const avisoFalta = () => {
     const box = $('#aviso-video');
@@ -1967,9 +1991,9 @@ function viewSong(id, ctx = {}) {
     const hashAntes = location.hash;
     let novo = null;
     try {
-      const achada = mesmaMusica(await buscarCifraClub(`${tituloLimpo(song.title)} ${song.artist || ''}`), song.title, song.artist);
+      const achada = await acharNoCifraClub(song.title, song.artist);
       if (achada) {
-        const c = await getCifraClub(achada.url);
+        const c = await getCifraClub(achada.url).catch(() => getCifraClub(achada.url));
         if (temCifra(c.chordpro)) novo = { content: c.chordpro, source: achada.url };
       }
     } catch { return; } // sem conexão: tenta de novo na próxima vez
@@ -1981,7 +2005,7 @@ function viewSong(id, ctx = {}) {
       for (const k of ['youtube', 'x_canvas', 'x_parte', 'composer']) if (atual[k]) novo.content = definirMeta(novo.content, k, atual[k]);
     }
     if (!novo) {
-      const content = definirMeta(dono.content, 'x_sem_cifra', '1');
+      const content = definirMeta(dono.content, 'x_sem_cifra', String(Date.now())); // procura de novo daqui a uma semana
       if (isPreview) preview.content = content; else db.saveSong({ ...dono, content });
       song.content = content;
       avisoFalta();
@@ -2085,7 +2109,7 @@ function viewSong(id, ctx = {}) {
     ['Álbum', metaR.album],
     ['Ano', metaR.year],
     ['Tom original', tomBase],
-    ['Fonte', fonte && song.source ? `<a href="${esc(song.source)}" target="_blank" rel="noopener">${esc(fonte)}</a>` : esc(fonte), true],
+    [/letras\.mus\.br|lrclib/.test(song.source || '') ? 'Fonte da letra' : /cifraclub/.test(song.source || '') ? 'Fonte da cifra' : 'Fonte', fonte && song.source ? `<a href="${esc(song.source)}" target="_blank" rel="noopener">${esc(fonte)}</a>` : esc(fonte), true],
     ['Na biblioteca desde', !isPreview && song.createdAt ? new Date(song.createdAt).toLocaleDateString('pt-BR') : ''],
   ].filter(([, v]) => v);
   $('#creditos').innerHTML = creditos.length ? `<div class="creditos"><h3>Créditos</h3>${creditos.map(([k, v, html]) => `<div class="cred"><span>${esc(k)}</span><b>${html ? v : esc(v)}</b></div>`).join('')}
