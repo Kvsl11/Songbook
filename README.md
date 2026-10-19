@@ -14,8 +14,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   **Cifra Club** (cifras, com capas), em **letras** (LRCLIB), no **YouTube** (vídeos), nos cantos cifrados de
   cindyferrarezi.com e do Músicas para Missa e na sua biblioteca. Filtros: Tudo, Cifras, Letras, Vídeos,
   Cantos da missa, Biblioteca. Também traz atalhos para procurar a cifra em toda a internet, no Letras.mus.br e no YouTube.
-- **Importar da internet**: tocar numa cifra do Cifra Club abre a cifra já organizada (partes, refrão,
-  tablatura, tom e capotraste). Como o site não deixa outros apps lerem a página, o app a lê pelo Jina Reader
+- **Importar da internet**: tocar numa cifra do Cifra Club abre a cifra já organizada (partes, refrão, tom e
+  capotraste), na **versão simplificada**: sem tablaturas, riffs e solos. Como o site não deixa outros apps lerem a página, o app a lê pelo Jina Reader
   (serviço público); se ele não responder, abre o "Importar da internet": copie a cifra no site e cole
   (botão "Colar copiado"). Serve para cifra ou letra de **qualquer site**.
   Ao abrir uma música da busca (Cifra Club, letras, cantos), o app procura o vídeo no YouTube sozinho e já

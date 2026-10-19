@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-61';
+export const APP_VERSAO = '2026.10.19-63';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -564,8 +564,17 @@ window.addEventListener('message', (e) => {
       f.dataset.pronto = '1';
       cmd('mute');
       cmd('playVideo');
-      // volta ao começo do trecho a cada 30 s (enquanto a página estiver aberta)
-      const t = setInterval(() => { if (!f.isConnected) { clearInterval(t); return; } cmd('seekTo', [CANVAS_INICIO, true]); }, CANVAS_DURACAO * 1000);
+      // os controles do YouTube (pausa, pular) aparecem quando o vídeo começa e quando volta ao início
+      // do trecho: nesses momentos o vídeo fica escondido (aparece a imagem do clipe, desfocada)
+      const topo = f.closest('.song-topo');
+      const mostrar = () => { if (!f.isConnected) return; f.classList.remove('oculto'); topo?.classList.add('video-visivel'); };
+      setTimeout(mostrar, 4500);
+      const t = setInterval(() => {
+        if (!f.isConnected) { clearInterval(t); return; }
+        f.classList.add('oculto');
+        setTimeout(() => cmd('seekTo', [CANVAS_INICIO, true]), 700);
+        setTimeout(mostrar, 4200);
+      }, CANVAS_DURACAO * 1000);
     }
     if (msg?.event === 'onError') { f.closest('.song-topo')?.classList.remove('canvas-on'); f.closest('.canvas-fundo')?.remove(); }
   } catch { /* outro formato */ }
@@ -1674,7 +1683,7 @@ function viewSong(id, ctx = {}) {
   view.innerHTML = `
     ${ctx.set ? `<div class="set-progress"><i style="width:${((ctx.index + 1) / ctx.set.items.length) * 100}%"></i></div>` : ''}
     ${canvas ? '<div class="song-topo canvas-on">' : ''}
-    ${canvas ? `<div class="canvas-fundo" aria-hidden="true"><iframe src="${esc(ytFundo(song.youtube))}" tabindex="-1" title="" allow="autoplay; encrypted-media" onload="this.contentWindow.postMessage(JSON.stringify({event:'listening',id:2}),'*')"></iframe></div>` : ''}
+    ${canvas ? `<div class="canvas-fundo" aria-hidden="true"><img class="canvas-img" src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt=""><iframe class="oculto" src="${esc(ytFundo(song.youtube))}" tabindex="-1" title="" allow="autoplay; encrypted-media" onload="this.contentWindow.postMessage(JSON.stringify({event:'listening',id:2}),'*')"></iframe></div>` : ''}
     <section class="page-hero song-hero">${capa(song)}
       <div>${ctx.set ? `<button class="kind kind-btn" id="btn-parte" title="Trocar a parte da missa desta música no repertório">${esc(ctx.set.items[ctx.index]?.label || 'Definir a parte da missa')} ${icon('edit', 12)}</button>` : `<div class="kind">${esc(kind)}</div>`}<h2 id="song-title">${esc(song.title)}</h2>
         <div class="meta" id="song-meta"></div></div></section>
@@ -1723,6 +1732,11 @@ function viewSong(id, ctx = {}) {
     </div>`;
 
   const songEl = $('#song');
+  // a barra de ferramentas fica transparente (o degradê do topo passa por trás) até grudar no alto
+  const barraTools = $('#tools');
+  const grudou = () => barraTools.classList.toggle('colada', barraTools.getBoundingClientRect().top <= view.getBoundingClientRect().top + 2);
+  view.addEventListener('scroll', grudou, { passive: true });
+  aoSair(() => view.removeEventListener('scroll', grudou));
   const draw = () => {
     const r = renderSong(song.content, { transpose, capo, key: song.key });
     const meta = [];

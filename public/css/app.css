@@ -350,8 +350,10 @@ a.chip.sm { cursor: pointer; }
 
 /* modo "Letra" estilo Spotify */
 .song.lyrics-mode {
-  max-width: none; margin: 0 calc(-1 * var(--gutter)); padding: 28px var(--gutter) 40px;
-  background: color-mix(in srgb, var(--tint) 75%, #000); color: #fff;
+  --painel: color-mix(in srgb, var(--tint) 75%, #000);
+  max-width: none; margin: 0 calc(-1 * var(--gutter)); padding: 64px var(--gutter) 110px;
+  /* sem cortes secos: a cor do painel surge e some aos poucos */
+  background: linear-gradient(180deg, transparent 0, var(--painel) 56px, var(--painel) calc(100% - 100px), transparent 100%); color: #fff;
   font-size: calc(25px * var(--font-scale)); font-weight: 800; letter-spacing: -0.015em; line-height: 1.32;
 }
 .song.lyrics-mode .chord, .song.lyrics-mode .line.chords-only, .song.lyrics-mode .comment { display: none; }
@@ -379,7 +381,7 @@ a.chip.sm { cursor: pointer; }
 @media (max-width: 699px) { .song-toolbar .so-largo { display: none; } }
 .song.lyrics-mode .chunk { display: inline; white-space: pre-wrap; }
 .song.lyrics-mode .line { display: block; min-height: 0; }
-@media (min-width: 900px) { .song.lyrics-mode { border-radius: var(--radius); margin: 0; font-size: calc(32px * var(--font-scale)); padding: 36px 40px; } }
+@media (min-width: 900px) { .song.lyrics-mode { border-radius: var(--radius); margin: 0; font-size: calc(32px * var(--font-scale)); padding: 72px 40px 110px; } }
 
 .refs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin: 8px 0 24px; }
 .ref-card { display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: var(--radius); background: var(--bg-elev); text-decoration: none; transition: background 0.2s; min-width: 0; border: 0; text-align: left; cursor: pointer; color: var(--text); }
@@ -676,7 +678,7 @@ body.editando-cheio .nav, body.editando-cheio #player { display: none !important
 /* celular: controles da cifra quebram em linhas (sem rolagem lateral escondida) */
 @media (max-width: 700px) {
   /* celular: todos os controles numa linha só, compactos; se a tela for estreita demais, desliza para o lado */
-  .song-toolbar { position: static; flex-wrap: nowrap; justify-content: safe center; overflow-x: auto; gap: 6px; margin-left: 0; margin-right: 0; padding: 0 0 6px; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .song-toolbar { position: relative; top: auto; z-index: 2; flex-wrap: nowrap; justify-content: safe center; overflow-x: auto; gap: 6px; margin-left: 0; margin-right: 0; padding: 0 0 6px; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .song-toolbar .seg { height: 38px; padding: 2px; gap: 0; }
   .song-toolbar .seg button { height: 34px; min-width: 30px; padding: 0 6px; }
   .song-toolbar .seg .val { min-width: 34px; font-size: 13px; }
@@ -911,15 +913,22 @@ body.performance .convite-instalar { display: none; }
    vídeo aparece e a capa some, deixando o lugar dela livre para o vídeo. */
 .song-topo { position: relative; isolation: isolate; }
 .canvas-fundo {
-  position: absolute; z-index: -1; inset: -64px calc(-1 * var(--gutter)) -10px; overflow: hidden; pointer-events: none;
-  container-type: size; background: #000; opacity: 0.01; animation: aparecer-video 1s 5s forwards;
+  position: absolute; z-index: -1; inset: -64px calc(-1 * var(--gutter)) -90px; overflow: hidden; pointer-events: none;
+  container-type: size; background: #000;
 }
-.canvas-fundo iframe { position: absolute; top: 50%; left: 50%; border: 0; width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.2); }
-/* escurece para o título e os botões ficarem legíveis, e funde com a página embaixo */
-.canvas-fundo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(0 0 0 / 0.35) 0%, rgb(0 0 0 / 0.15) 35%, rgb(0 0 0 / 0.55) 75%, var(--bg) 100%); }
-@keyframes aparecer-video { to { opacity: 1; } }
-@keyframes sumir-capa { to { opacity: 0; visibility: hidden; } }
-.song-topo.canvas-on .song-hero > .cover { animation: sumir-capa 1s 5s forwards; }
+/* imagem do clipe, desfocada, por trás (aparece enquanto o vídeo está escondido) */
+.canvas-fundo .canvas-img { position: absolute; inset: -30px; width: calc(100% + 60px); height: calc(100% + 60px); object-fit: cover; filter: blur(22px) saturate(1.2); opacity: 0.85; }
+.canvas-fundo iframe { position: absolute; top: 50%; left: 50%; border: 0; width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.2); transition: opacity 0.7s ease; }
+/* escondido quase todo (o navegador não toca vídeo 100% oculto) enquanto os controles do YouTube aparecem */
+.canvas-fundo iframe.oculto { opacity: 0.01; }
+/* escurece para o título e os botões ficarem legíveis e funde suavemente com a página */
+.canvas-fundo::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgb(0 0 0 / 0.45) 0%, rgb(0 0 0 / 0.12) 26%, rgb(0 0 0 / 0.18) 50%, rgb(0 0 0 / 0.4) 68%,
+    color-mix(in srgb, var(--bg) 75%, transparent) 86%, var(--bg) 100%);
+}
+.song-topo.canvas-on .song-hero > .cover { transition: opacity 0.8s ease, visibility 0.8s; }
+.song-topo.video-visivel .song-hero > .cover { opacity: 0; visibility: hidden; }
 .song-topo.canvas-on .song-hero, .song-topo.canvas-on .actions-row { color: #fff; }
 .song-topo.canvas-on .page-hero .meta, .song-topo.canvas-on .page-hero .meta b { color: rgb(255 255 255 / 0.9); }
 .song-topo.canvas-on .actions-row .icon-btn { color: #fff; }
@@ -1026,3 +1035,11 @@ body.performance #player { bottom: calc(env(safe-area-inset-bottom) + 70px); }
 #pl-tela.no-palco { z-index: 14; border-radius: var(--radius); box-shadow: var(--shadow); } /* abaixo do topo e da barra da música */
 #pl-tela iframe { display: block; width: 100%; height: 100%; border: 0; }
 body.editando-cheio #pl-tela { visibility: hidden !important; }
+
+/* barra da música transparente até grudar no alto (o degradê do topo passa por trás dela) */
+.song-toolbar:not(.colada) { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.song-toolbar { transition: background 0.25s; }
+/* no modo "só a letra" (tela cheia) o painel fica inteiro */
+body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 120px; }
+/* tema claro: o painel some no branco da página; o texto (branco) fica dentro da parte colorida */
+:root[data-theme="light"] .song.lyrics-mode { padding-top: 72px; }

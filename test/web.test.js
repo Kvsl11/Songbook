@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cifraTextoParaChordPro, ehCifraClub, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
+  cifraTextoParaChordPro, ehCifraClub, simplificarCifra, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
 } from '../public/js/lib/web.js';
 import { aplicarLetra, definirMeta, doEditor, letraDe, paraEditor, parseChordPro } from '../public/js/chordpro.js';
 
@@ -43,7 +43,7 @@ B|-----3-----|
   assert.match(c.chordpro, /\{youtube: https:\/\/www\.youtube\.com\/watch\?v=abcdefghijk\}/);
   assert.match(c.chordpro, /\{start_of_verse: Primeira Parte\}/);
   assert.match(c.chordpro, /\{start_of_chorus\}\n\[Em\] {3}Eu me ale\[C\]grarei\n\{end_of_chorus\}/);
-  assert.match(c.chordpro, /\{start_of_tab\}\nE\|---3---2---\|/);
+  assert.ok(!/start_of_tab|E\|---3/.test(c.chordpro)); // versão simplificada: sem tablatura
   const { sections } = parseChordPro(c.chordpro);
   assert.ok(sections.some((s) => s.type === 'chorus'));
   assert.ok(!/\[Primeira Parte\]/.test(c.chordpro));
@@ -104,4 +104,9 @@ test('editor simples: [Refrão] vale até a próxima parte e volta igual', () =>
   assert.equal(ed, '[Refrão]\n[G]Ale[D]luia\n\n[Estrofe]\nVerso solto\n\n[Repetir refrão]');
   const tipos = (x) => parseChordPro(x).sections.map((y) => y.type).join(',');
   assert.equal(tipos(doEditor(ed)), tipos(original));
+});
+
+test('versão simplificada: tira tablaturas, "Parte 1 de 3" e solos vazios', () => {
+  const pro = '{comment: Intro}\n[E]   [A]\n\n{comment: Intro}\n\nParte 1 de 2\n  [E]    [A]\n{start_of_tab}\nE|---3---|\n{end_of_tab}\n\n{start_of_verse: Primeira Parte}\n[E]Deus está [A]aqui\n{end_of_verse}\n\n{comment: Solo}\n{start_of_tab}\nB|--5--|\n{end_of_tab}';
+  assert.equal(simplificarCifra(pro), '{comment: Intro}\n[E]   [A]\n\n{start_of_verse: Primeira Parte}\n[E]Deus está [A]aqui\n{end_of_verse}');
 });

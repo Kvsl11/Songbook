@@ -88,7 +88,33 @@ export function parseCifraClub(html, url = '') {
   if (yt) cab.push(`{youtube: https://www.youtube.com/watch?v=${yt}}`);
   if (capo && Number(capo) > 0) cab.push(`{comment: Capotraste na ${capo}ª casa${forma && real && real !== forma ? ` (tom real: ${real})` : ''}}`);
   if (url) cab.push(`{source: ${url}}`);
-  return { titulo, artista, tom: isChord(tom) ? tom : '', url, chordpro: cab.join('\n') + '\n\n' + cifraTextoParaChordPro(texto) };
+  return { titulo, artista, tom: isChord(tom) ? tom : '', url, chordpro: cab.join('\n') + '\n\n' + simplificarCifra(cifraTextoParaChordPro(texto)) };
+}
+
+// Versão simplificada: sem tablaturas, riffs e solos — só letra, acordes e a linha de acordes da introdução
+const soAcordesPro = (l) => /^\s*(\[[^\]]+\]\s*)+$/.test(l);
+const INSTRUMENTAL = /^\s*\{\s*(comment|c)\s*:\s*(tab\b|solo|riff|dedilhado|base|interl[úu]dio|intro|final)/i;
+export function simplificarCifra(pro) {
+  const linhas = String(pro || '').split('\n');
+  const out = [];
+  for (let i = 0; i < linhas.length; i++) {
+    const l = linhas[i];
+    if (/^\s*\{\s*(start_of_tab|sot)\s*\}/i.test(l)) {
+      // tira a tablatura e a linha de acordes / "Parte 1 de 3" que vinham logo antes dela
+      while (out.length && (soAcordesPro(out[out.length - 1]) || /^\s*Parte \d+ de \d+\s*$/i.test(out[out.length - 1]))) out.pop();
+      while (i < linhas.length && !/^\s*\{\s*(end_of_tab|eot)\s*\}/i.test(linhas[i])) i++;
+      continue;
+    }
+    if (/^\s*Parte \d+ de \d+\s*$/i.test(l)) continue;
+    out.push(l);
+  }
+  // títulos de partes instrumentais que ficaram vazios (ex.: "Solo" só com tablatura) saem também
+  const limpo = out.filter((l, i) => {
+    if (!INSTRUMENTAL.test(l)) return true;
+    const prox = out.slice(i + 1).find((x) => x.trim());
+    return prox !== undefined && !/^\s*\{/.test(prox);
+  });
+  return limpo.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 // serviços públicos que abrem a página por nós (o 1º que responder com a cifra vence).
