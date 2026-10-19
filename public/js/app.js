@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-79';
+export const APP_VERSAO = '2026.10.19-80';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1597,14 +1597,15 @@ const linhaMusicaWeb = (r, i, extra = '') => `
 // artistas católicos mais ouvidos, em ordem de popularidade (o índice da própria busca do Cifra Club)
 const ARTISTAS_CATOLICOS = ['Frei Gilson', 'Colo de Deus', 'Padre Fábio de Melo', 'Ministério Amor e Adoração', 'Comunidade Católica Shalom',
   'Eliana Ribeiro', 'Padre Marcelo Rossi', 'Davidson Silva', 'Walmir Alencar', 'Thiago Brado', 'Adoração e Vida', 'Celina Borges',
-  'Padre Reginaldo Manzotti', 'Canção Nova', 'Anjos de Resgate', 'Fraternidade São João Paulo II'];
+  'Padre Reginaldo Manzotti', 'Canção Nova', 'Anjos de Resgate', 'Fraternidade São João Paulo II', 'Rosa de Saron'];
 async function catolicasEmAlta() {
   const listas = await Promise.all(ARTISTAS_CATOLICOS.map((a) => buscarCifraClub(a)
     .then((r) => r.filter((x) => mesmoNome(x.artista, a) || mesmoNome(x.artista.replace(/^(comunidade cat[óo]lica|minist[ée]rio|padre|pe\.?)\s+/i, ''), a.replace(/^(comunidade cat[óo]lica|minist[ée]rio|padre)\s+/i, ''))).slice(0, 3))
     .catch(() => [])));
   // a mesma música por dois artistas (ex.: Noites Traiçoeiras) aparece uma vez só, na versão mais tocada
-  const vistas = new Set();
-  const unicas = listas.map((l) => l.filter((x) => { const k = normalizar(tituloLimpo(x.titulo)); return !vistas.has(k) && vistas.add(k); }));
+  const melhor = new Map();
+  for (const x of listas.flat()) { const k = normalizar(tituloLimpo(x.titulo)); if (!melhor.has(k) || melhor.get(k).popularidade < x.popularidade) melhor.set(k, x); }
+  const unicas = listas.map((l) => l.filter((x) => melhor.get(normalizar(tituloLimpo(x.titulo))) === x));
   // pelo menos a mais tocada de cada artista; o resto, as mais populares
   const escolhidas = new Set(unicas.map((l) => l[0]).filter(Boolean));
   for (const x of unicas.flat().sort((a, b) => b.popularidade - a.popularidade)) if (escolhidas.size < 30) escolhidas.add(x);
