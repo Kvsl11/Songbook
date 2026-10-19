@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-86';
+export const APP_VERSAO = '2026.10.19-88';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -233,6 +233,8 @@ function corDestaque() {
 
 // a cor padrão deixou de ser o verde: quem estava com o verde antigo passa para o azul-marinho (uma vez)
 // a cor padrão agora é o ciano da logo: quem estava no verde antigo ou no azul-marinho (padrão anterior) passa para ele (uma vez)
+// letra em colunas nas telas largas passou a vir ligada: liga uma vez para quem já usava o app
+if (!db.prefs().colunasV2) { db.setPref('columns', true); db.setPref('colunasV2', true); }
 if (!db.prefs().corV3) { if (['#1ed760', '#2747a3', undefined, ''].includes(db.prefs().accent)) db.setPref('accent', COR_PADRAO); db.setPref('corV3', true); }
 
 function applyTheme() {
@@ -2196,7 +2198,7 @@ function viewSong(id, ctx = {}) {
       <div class="seg"><button data-act="scroll" aria-pressed="false" aria-label="Rolagem automática" title="Rolagem automática (ajuste a velocidade na barra)" id="btn-scroll">${icon('gauge', 18)}</button></div>
       <div class="seg"><button data-act="f-" aria-label="Diminuir letra" title="Diminuir letra">A−</button><button data-act="f+" aria-label="Aumentar letra" title="Aumentar letra">A+</button></div>
       ${semCifra ? '' : `<div class="seg"><button data-act="chords" aria-pressed="${comCifra}" title="Cifra: ligado mostra os acordes; desligado, só a letra" aria-label="Mostrar cifra">${icon('chord', 17)}</button></div>`}
-      <div class="seg so-largo"><button data-act="cols" aria-pressed="${prefs.columns}" title="Letra em duas colunas (telas largas)" aria-label="Duas colunas">${icon('columns', 17)}</button></div>
+      <div class="seg so-largo"><button data-act="cols" aria-pressed="${prefs.columns !== false}" title="Letra em colunas (telas largas)" aria-label="Duas colunas">${icon('columns', 17)}</button></div>
     </div>
     <div class="acordes-musica" id="acordes-musica" hidden></div>
     <div class="song" id="song"></div>
@@ -2236,7 +2238,7 @@ function viewSong(id, ctx = {}) {
     $('#song-meta').innerHTML = meta.join(' ');
     songEl.innerHTML = r.html;
     songEl.classList.toggle('no-chords', !comCifra);
-    songEl.classList.toggle('columns', Boolean(db.prefs().columns));
+    songEl.classList.toggle('columns', db.prefs().columns !== false); // em colunas nas telas largas (vem ligado)
     // Cifra e Letra usam o mesmo painel estilo Spotify; na Cifra os acordes aparecem por cima
     songEl.classList.add('lyrics-mode');
     songEl.classList.toggle('with-chords', comCifra);
@@ -2679,7 +2681,7 @@ function viewSong(id, ctx = {}) {
         break;
       case 'cols': {
         // prefs() devolve o próprio objeto salvo: guarda o novo valor antes de gravar
-        const duas = !p.columns;
+        const duas = p.columns === false;
         db.setPref('columns', duas);
         b.setAttribute('aria-pressed', String(duas));
         toast(duas ? 'Letra em duas colunas' : 'Uma coluna');
@@ -3431,7 +3433,7 @@ function viewSettings() {
     <div class="settings-group">
       <label class="setting"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Mostrar acordes</div><div class="s">Desligue para usar só a letra (coral, telão)</div></div><input type="checkbox" class="switch" id="chords" ${p.modo !== 'letra' && p.showChords !== false ? 'checked' : ''}></label>
       <label class="setting"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Desenho dos acordes</div><div class="s">Mostra como montar cada acorde no violão (tabela no início da música e ao tocar num acorde)</div></div><input type="checkbox" class="switch" id="diagramas" ${p.diagramas ? 'checked' : ''}></label>
-      <label class="setting"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns ? 'checked' : ''}></label>
+      <label class="setting"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns !== false ? 'checked' : ''}></label>
       <div class="setting wrap"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div><div class="s">Tamanho, cor e fundo dos acordes sobre a letra</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
     </div>

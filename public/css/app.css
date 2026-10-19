@@ -124,8 +124,10 @@ body.performance .palco-ctrl:hover, body.performance .palco-ctrl:focus-within { 
 @media (min-width: 900px) {
   :root { --nav-h: 0px; }
   .shell { gap: 8px; padding: 8px; height: 100dvh; }
-  .main-col { border-radius: var(--radius); }
-  main { --gutter: max(24px, calc((100% - 1100px) / 2)); padding-bottom: 48px; }
+  /* a margem da página é medida pela largura da coluna principal (cqw), e não em %: assim vale igual em
+     qualquer elemento que a use (painel da letra, topo com vídeo, prateleiras) para ir de ponta a ponta */
+  .main-col { border-radius: var(--radius); container-type: inline-size; }
+  main { --gutter: max(24px, calc((100cqw - 1100px) / 2)); padding-bottom: 48px; }
   .side { display: flex; flex-direction: column; gap: 8px; width: 300px; flex: none; }
   .brand-row { display: flex; align-items: center; gap: 8px; padding: 14px 12px 6px 16px; background: var(--bg); border-radius: var(--radius) var(--radius) 0 0; margin-bottom: -8px; }
   .side .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; flex: 1; min-width: 0; }
@@ -377,7 +379,7 @@ a.chip.sm { cursor: pointer; }
 .song.lyrics-mode.with-chords .line { justify-content: center; }
 .song.lyrics-mode .section-label, .song.lyrics-mode .comment { text-align: center; }
 /* duas colunas: só em telas largas (tablet deitado/computador); no celular o botão some */
-@media (min-width: 700px) { .song.lyrics-mode.columns { column-count: 2; column-gap: 48px; } .song.lyrics-mode.columns .section { break-inside: avoid; } }
+/* (colunas da letra: a partir de 1200px, mais abaixo) */
 @media (max-width: 699px) { .song-toolbar .so-largo { display: none; } }
 .song.lyrics-mode .chunk { display: inline; white-space: pre-wrap; }
 .song.lyrics-mode .line { display: block; min-height: 0; }
@@ -1176,3 +1178,12 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
   /* o clipe tocando atrás do título some aos poucos embaixo, como o fundo */
   #pl-tela.no-fundo { -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 100%); mask-image: linear-gradient(180deg, #000 78%, transparent 100%); }
 }
+
+/* letra no computador: o painel colorido vai de ponta a ponta da tela (sem as faixas pretas dos lados) e,
+   nas telas largas, a letra se divide em colunas para aproveitar o espaço */
+@media (min-width: 900px) {
+  .song.lyrics-mode { margin: 0 calc(-1 * var(--gutter)); border-radius: 0; padding: 72px var(--gutter) 110px; }
+  .song.lyrics-mode.columns { padding-inline: clamp(32px, 4vw, 80px); column-gap: clamp(40px, 5vw, 96px); }
+}
+@media (min-width: 1200px) { .song.lyrics-mode.columns { column-count: 2; } .song.lyrics-mode.columns .section { break-inside: avoid; } }
+@media (min-width: 1700px) { .song.lyrics-mode.columns { column-count: 3; } }

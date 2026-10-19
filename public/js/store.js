@@ -2,7 +2,7 @@
 import { parseChordPro, guessKey } from './chordpro.js';
 
 const KEY = 'songbook.v1';
-const DEFAULT_PREFS = { theme: 'dark', fontScale: 1, showChords: true, columns: false, scrollSpeed: 3, destaqueCifra: 'forte', videoFundo: true };
+const DEFAULT_PREFS = { theme: 'dark', fontScale: 1, showChords: true, columns: true, scrollSpeed: 3, destaqueCifra: 'forte', videoFundo: true };
 
 function load() {
   try {
