@@ -1005,25 +1005,55 @@ body.performance .convite-instalar { display: none; }
 #player {
   position: absolute; z-index: 25; left: 8px; right: 8px; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 6px);
   border-radius: 10px; overflow: hidden; background: color-mix(in srgb, var(--cor-musica, var(--tint)) 75%, #000); color: #fff; transition: background 0.4s;
-  box-shadow: 0 10px 30px rgb(0 0 0 / 0.5); display: grid; grid-template-columns: auto 1fr; animation: surgir 0.3s both;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.5); animation: surgir 0.3s both;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center;
+  grid-template-areas: "video info play lado" "tempo tempo tempo tempo";
 }
-#player .pl-video { width: 96px; aspect-ratio: 16 / 9; background: #000; align-self: center; margin: 6px 0 8px 6px; border-radius: 6px; overflow: hidden; position: relative; }
+#player .pl-video { grid-area: video; width: 96px; aspect-ratio: 16 / 9; background: #000; align-self: center; margin: 6px 0 8px 6px; border-radius: 6px; overflow: hidden; position: relative; }
 #player .pl-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-#player .pl-barra { display: flex; align-items: center; gap: 2px; min-width: 0; padding: 0 4px 2px 0; }
-#player .pl-info { all: unset; cursor: pointer; flex: 1; min-width: 0; padding: 6px 10px; }
+#player .pl-info { grid-area: info; all: unset; cursor: pointer; min-width: 0; padding: 6px 10px; }
+#player .pl-info { grid-area: info; }
 #player .pl-txt b { display: block; font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #player .pl-txt small { display: block; font-size: 12px; color: rgb(255 255 255 / 0.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #player .icon-btn { color: #fff; width: 38px; height: 38px; flex: none; }
-#player .pl-play { width: 42px; height: 42px; }
-#player .pl-prog { grid-column: 1 / -1; height: 3px; background: rgb(255 255 255 / 0.2); margin: 0 8px 4px; border-radius: 2px; overflow: hidden; }
+#player .pl-play { grid-area: play; width: 42px; height: 42px; }
+#player .pl-lado { grid-area: lado; display: flex; align-items: center; padding-right: 4px; }
+#player .pl-lado [data-pl="ampliar"] { order: -1; }
+#player .pl-tempo { grid-area: tempo; display: flex; align-items: center; gap: 8px; margin: 0 8px 4px; }
+#player .pl-t0, #player .pl-t1 { display: none; font-size: 11px; color: rgb(255 255 255 / 0.7); font-variant-numeric: tabular-nums; min-width: 34px; }
+#player .pl-t0 { text-align: right; }
+#player .pl-prog { flex: 1; height: 3px; background: rgb(255 255 255 / 0.2); border-radius: 2px; overflow: hidden; }
 #player .pl-prog i { display: block; height: 100%; width: 0; background: #fff; transition: width 0.5s linear; }
 /* ampliado: o vídeo grande em cima da barra */
-#player.grande { grid-template-columns: 1fr; }
+#player.grande { grid-template-areas: "video video video video" "info info play lado" "tempo tempo tempo tempo"; }
 #player.grande .pl-video { width: auto; margin: 8px 8px 0; }
 body.com-player main { padding-bottom: calc(var(--nav-h) + 140px + env(safe-area-inset-bottom)); }
+/* computador e tablet deitado: uma barra no rodapé, de ponta a ponta, como no Spotify — a música à esquerda,
+   tocar/pausar e o tempo no centro, ampliar e fechar à direita */
 @media (min-width: 900px) {
-  #player { left: auto; right: 16px; width: 440px; bottom: 16px; }
-  #player .pl-video { width: 128px; }
+  #player {
+    left: 0; right: 0; bottom: 0; height: 84px; border-radius: 0 0 var(--radius) var(--radius); overflow: visible; box-shadow: 0 -8px 24px rgb(0 0 0 / 0.35);
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 1.4fr) minmax(0, 1fr); grid-template-rows: 1fr auto;
+    grid-template-areas: "esq play lado" "esq tempo lado"; padding: 8px 16px 10px; column-gap: 24px;
+  }
+  #player .pl-video { grid-area: esq; width: 112px; margin: 0; justify-self: start; }
+  #player .pl-info { grid-area: esq; margin-left: 124px; align-self: center; }
+  #player .pl-txt small { font-size: 12.5px; }
+  #player .pl-play { justify-self: center; align-self: end; width: 40px; height: 40px; background: #fff; color: #000; border-radius: 50%; }
+  #player .pl-play:hover { transform: scale(1.06); }
+  #player .pl-tempo { margin: 4px 0 0; }
+  #player .pl-t0, #player .pl-t1 { display: block; }
+  #player .pl-prog { height: 4px; cursor: pointer; transition: height 0.15s; overflow: visible; position: relative; }
+  #player .pl-prog i { border-radius: 2px; }
+  #player .pl-prog:hover { height: 6px; }
+  #player .pl-prog:hover i { background: var(--accent); }
+  #player .pl-lado { grid-area: lado; justify-self: end; gap: 4px; }
+  /* ampliado: o vídeo flutua grande acima da barra, no canto direito */
+  #player.grande { grid-template-areas: "esq play lado" "esq tempo lado"; }
+  #player.grande .pl-video { grid-area: auto / auto / auto / auto; position: absolute; right: 16px; left: auto; bottom: calc(100% + 12px); width: 420px; margin: 0; border-radius: 10px; box-shadow: var(--shadow-lg); }
+  #player .pl-tmini { display: none; }
+  #player.grande .pl-info { margin-left: 0; }
+  body.com-player main { padding-bottom: 120px; }
 }
 body.performance #player { bottom: calc(env(safe-area-inset-bottom) + 70px); }
 

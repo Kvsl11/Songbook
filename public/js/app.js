@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-93';
+export const APP_VERSAO = '2026.10.19-94';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -403,13 +403,13 @@ const player = (() => {
   el.hidden = true;
   el.innerHTML = `
     <div class="pl-video"></div>
-    <div class="pl-barra">
-      <button class="pl-info" data-pl="abrir" title="Abrir a música"><span class="pl-txt"><b></b><small></small></span></button>
+    <button class="pl-info" data-pl="abrir" title="Abrir a música"><span class="pl-txt"><b></b><small></small></span></button>
+    <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button>
+    <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
+    <div class="pl-lado">
       <button class="icon-btn" data-pl="ampliar" aria-label="Ampliar o vídeo" title="Ampliar o vídeo">${icon('expand', 18)}</button>
-      <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button>
       <button class="icon-btn" data-pl="fechar" aria-label="Fechar o player" title="Fechar">${icon('x', 18)}</button>
-    </div>
-    <div class="pl-prog"><i></i></div>`;
+    </div>`;
   $('.main-col').append(el);
   // O vídeo é UM só e nunca é recriado (recriar pausa e repete o anúncio): ele fica numa "tela"
   // solta e só muda de lugar, acompanhando a telinha da página da música ou o espaço do mini player.
@@ -475,9 +475,12 @@ const player = (() => {
     // a barra tem a cor do fundo da letra da música que está tocando (não a da tela em que se está)
     el.style.setProperty('--cor-musica', atual.cor || corDaMusica(atual.titulo || ''));
     $('.pl-txt b', el).textContent = atual.titulo || 'Vídeo';
-    $('.pl-txt small', el).textContent = [atual.parte, atual.artista, duracao ? `${fmt(tempo)} / ${fmt(duracao)}` : ''].filter(Boolean).join(' · ');
+    // o tempo vai junto do artista no celular; no computador ele fica na barra de tempo, no centro
+    $('.pl-txt small', el).innerHTML = esc([atual.parte, atual.artista].filter(Boolean).join(' · ')) + (duracao ? `<span class="pl-tmini">${atual.parte || atual.artista ? ' · ' : ''}${fmt(tempo)} / ${fmt(duracao)}</span>` : '');
     $('.pl-play', el).innerHTML = icon(estado === 'tocando' ? 'pause' : 'play', 20);
     $('.pl-prog i', el).style.width = duracao ? `${Math.min(100, (tempo / duracao) * 100)}%` : '0';
+    $('.pl-t0', el).textContent = duracao ? fmt(tempo) : '';
+    $('.pl-t1', el).textContent = duracao ? fmt(duracao) : '';
   };
   // cria o vídeo (só quando muda de vídeo)
   const montar = () => {
@@ -599,6 +602,8 @@ const player = (() => {
     } catch { /* mensagem de outro formato */ }
   });
   el.addEventListener('click', (e) => {
+    const prog = e.target.closest('.pl-prog');
+    if (prog && duracao) { const r = prog.getBoundingClientRect(); api.irPara(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * duracao); return; }
     const b = e.target.closest('[data-pl]');
     if (!b) return;
     if (b.dataset.pl === 'play') api.alternar();
