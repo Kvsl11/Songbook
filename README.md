@@ -15,9 +15,9 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   cindyferrarezi.com e do Músicas para Missa e na sua biblioteca. Filtros: Tudo, Cifras, Letras, Vídeos,
   Cantos da missa, Biblioteca. Também traz atalhos para procurar a cifra em toda a internet, no Letras.mus.br e no YouTube.
 - **Importar da internet**: tocar numa cifra do Cifra Club abre a cifra já organizada (partes, refrão,
-  tablatura). Como o site não deixa outros apps lerem a página, o app usa o servidor do projeto, um proxy
-  próprio (Ajustes) ou proxies públicos; se nenhum responder, abre o "Importar da internet": copie a cifra no
-  site e cole (botão "Colar copiado"). Serve para cifra ou letra de **qualquer site**.
+  tablatura, tom e capotraste). Como o site não deixa outros apps lerem a página, o app a lê pelo Jina Reader
+  (serviço público); se ele não responder, abre o "Importar da internet": copie a cifra no site e cole
+  (botão "Colar copiado"). Serve para cifra ou letra de **qualquer site**.
 
 - **Player como no Spotify**: na página da música o vídeo toca na telinha das Referências; ao sair dela, continua no mini player
   sem parar nem repetir anúncio (é o mesmo vídeo, que só muda de lugar na tela) fixo acima do menu, com o vídeo do YouTube
@@ -163,7 +163,6 @@ public/
   js/render.js    ChordPro -> HTML
   js/store.js     biblioteca/repertórios/preferências em localStorage
   js/app.js       interface (rotas por hash)
-scripts/proxy-cifras-worker.js  proxy opcional (Cloudflare Worker) para abrir cifras do Cifra Club
 test/             testes com node:test
 ```
 

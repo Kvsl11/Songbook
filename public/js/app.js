@@ -41,7 +41,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.19-59';
+export const APP_VERSAO = '2026.10.19-60';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2710,16 +2710,11 @@ function viewSettings() {
       <label class="setting"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns ? 'checked' : ''}></label>
       <div class="setting wrap"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div><div class="s">Tamanho, cor e fundo dos acordes sobre a letra</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
-      <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo de fundo na música</div><div class="s">Na música, o clipe aparece mudo no lugar da capa (como no Spotify). Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
     </div>
 
-    <div class="section-title">Busca na internet</div>
+    <div class="section-title">Página da música</div>
     <div class="settings-group">
-      <label class="setting"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Abrir cifras do Cifra Club no app</div><div class="s">Usa serviços públicos de passagem (proxy), porque o site não deixa outros apps lerem a cifra. Se falhar, o app pede para colar a cifra.</div></div><input type="checkbox" class="switch" id="proxies-publicos" ${p.proxiesPublicos !== false ? 'checked' : ''}></label>
-      <details class="setting-ajuda"><summary>Proxy próprio (opcional, mais confiável)</summary>
-        <p class="muted" style="font-size:13px">Endereço de um proxy seu (ex.: Cloudflare Worker de <code>scripts/proxy-cifras-worker.js</code>). Use <code>{url}</code> onde entra o endereço da cifra.</p>
-        <label class="campo-livre">Proxy<input class="input" id="proxy-cifra" value="${esc(p.proxyCifra || '')}" placeholder="https://meu-proxy.workers.dev/?url={url}" spellcheck="false"></label>
-      </details>
+      <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo no topo da música</div><div class="s">Um trecho do clipe passa sem som atrás do título, como no Spotify. Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
     </div>
 
     ${jaInstalado() ? '' : `<div class="section-title">App</div>
@@ -2743,7 +2738,7 @@ function viewSettings() {
     <div class="section-title">Sobre</div>
     <div class="settings-group">
       <div class="setting"><span class="ico" style="background:none">${logo(40)}</span><div class="grow"><div class="t">Songbook Litúrgico <span class="chip sm" style="margin-left:6px">versão ${APP_VERSAO}</span></div>
-        <div class="s">Cifras e letras com transposição, capotraste, rolagem automática, repertórios e referências no YouTube, integrado à Liturgia Diária da CNBB e aos cantos de cindyferrarezi.com.</div></div></div>
+        <div class="s">Cifras e letras com transposição, capotraste, rolagem automática, repertórios e vídeos do YouTube, integrado à Liturgia Diária da CNBB, aos cantos de cindyferrarezi.com e do Músicas para Missa e às cifras do Cifra Club.</div></div></div>
     </div>`;
   const nomeCor = () => {
     const a = db.prefs().accent || COR_PADRAO;
@@ -2795,8 +2790,6 @@ function viewSettings() {
     $('#destaque').querySelectorAll('[data-v]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   };
   $('#video-fundo').onchange = (e) => db.setPref('videoFundo', e.target.checked);
-  $('#proxies-publicos').onchange = (e) => db.setPref('proxiesPublicos', e.target.checked);
-  $('#proxy-cifra').onchange = (e) => db.setPref('proxyCifra', e.target.value.trim());
   $('#exp').onclick = () => download(`songbook-backup-${hojeISO()}.json`, db.exportAll(), 'application/json');
   $('#imp').onclick = openImport;
   $('#clr').onclick = async () => {

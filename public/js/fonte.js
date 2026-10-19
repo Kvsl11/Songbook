@@ -8,7 +8,6 @@ import { buscarCantos as buscarDireto, getCanto as getCantoDireto } from './lib/
 import { ehMpm, getMusicaMpm } from './lib/mpm.js';
 import { getLiturgia as getLiturgiaDireto } from './lib/cnbb.js';
 import { buscarCifraClub as buscarCifraClubDireto, buscarLetras as buscarLetrasDireto, getCifraClub as getCifraClubDireto, PROXIES_PUBLICOS } from './lib/web.js';
-import { db } from './store.js';
 
 const PREFIXO = 'songbook.cache.';
 const VALIDADE = 12 * 3600e3;
@@ -150,16 +149,10 @@ export function buscarLetras(termo) {
   return obter('letras:' + t.toLowerCase(), () => buscarLetrasDireto(t), 'api/letras?q=' + encodeURIComponent(t));
 }
 
-// proxies usados para abrir a página da cifra: o próprio (Ajustes) e, se permitido, os públicos
-export function proxiesCifra() {
-  const p = db.prefs();
-  return [(p.proxyCifra || '').trim(), ...(p.proxiesPublicos === false ? [] : PROXIES_PUBLICOS)].filter(Boolean);
-}
-
 // A página da cifra não libera CORS: tenta o servidor do projeto (se houver) e depois os proxies
 export function getCifraClub(url) {
   return obter('cc:' + url, async () => {
     try { return await viaServidor('api/cifraclub?url=' + encodeURIComponent(url)); } catch { /* sem servidor: segue */ }
-    return getCifraClubDireto(url, { proxies: proxiesCifra() });
+    return getCifraClubDireto(url, { proxies: PROXIES_PUBLICOS });
   }, 'api/cifraclub?url=' + encodeURIComponent(url));
 }
