@@ -50,7 +50,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-141';
+export const APP_VERSAO = '2026.10.20-142';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -573,10 +573,14 @@ const player = (() => {
   };
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
   const avisar = () => ouvintes.forEach((fn) => fn());
+  // a altura do player (muda ao ampliar o vídeo) vai para o CSS: as barras flutuantes da página ficam acima dele
+  const medirPlayer = () => document.body.style.setProperty('--player-h', `${el.offsetHeight}px`);
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(medirPlayer).observe(el);
   const mostrarBarra = () => {
     const ver = Boolean(atual) && !noPalco();
     el.hidden = !ver;
     document.body.classList.toggle('com-player', ver);
+    if (ver) medirPlayer();
   };
   const desenhar = () => {
     if (!atual) return;
