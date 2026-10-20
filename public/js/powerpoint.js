@@ -8,7 +8,7 @@ import { montarPptxSimples } from './lib/pptx-simples.js';
 
 const JSZIP_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
 let jszip = null;
-function carregarJSZip() {
+export function carregarJSZip() {
   if (window.JSZip) return Promise.resolve(window.JSZip);
   jszip ||= new Promise((ok, erro) => {
     const s = document.createElement('script');

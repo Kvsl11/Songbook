@@ -1151,6 +1151,11 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 /* o clipe de verdade no topo da música (depois do anúncio): fica por trás do título e dos botões,
    sem receber toques (os controles do YouTube não aparecem); o degradê do topo continua por cima */
 #pl-tela.no-fundo { z-index: 0; border-radius: 0; box-shadow: none; pointer-events: none; container-type: size; }
+/* numa rolagem rápida o vídeo (que segue o topo quadro a quadro) fica um pouco para trás e aparecia, com a borda
+   reta, abaixo do degradê: logo depois do fim do degradê, um fundo que rola junto com a página o encobre */
+.song-topo.com-video::after { content: ""; position: absolute; z-index: -2; left: calc(-1 * var(--gutter)); right: calc(-1 * var(--gutter)); top: calc(100% + 89px); height: 100vh; background: var(--bg); pointer-events: none; }
+@media (min-width: 641px) { .song-topo.com-video::after { top: calc(100% + 35px); } }
+.song-topo.com-video.menu-aberto::after { content: none; }
 #pl-tela.no-fundo iframe { position: absolute; top: 50%; left: 50%; width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.25); }
 .song-topo.com-video .canvas-fundo { background: transparent; }
 .song-topo.com-video .canvas-fundo img { opacity: 0 !important; transition: opacity 0.6s; }
@@ -1639,3 +1644,104 @@ label.check input[type="checkbox"]:focus-visible { outline: 2px solid var(--text
   .page-hero .cover { width: 120px; height: 120px; }
   .song.lyrics-mode { padding-top: 24px; }
 }
+
+/* ============================================================ lista de escolha do app (no lugar do <select>) */
+dialog.lista-dlg { max-width: 440px; padding: 0; }
+.lista-cab { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 10px 8px 20px; background: var(--surface); }
+.lista-cab h3 { margin: 0; font-size: 18px; font-weight: 800; }
+.lista-opcoes { display: grid; gap: 2px; padding: 0 8px 10px; }
+.lista-op { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; cursor: pointer; min-width: 0; }
+.lista-op:hover, .lista-op:focus-visible { background: var(--surface-2); }
+.lista-op[aria-selected="true"] { background: var(--accent-soft); }
+.lista-op .cover { width: 44px; height: 44px; flex: none; border-radius: 6px; }
+.lista-ic { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border-radius: 10px; background: var(--surface-2); color: var(--muted); }
+.lista-txt { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.lista-txt b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lista-txt small { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lista-ok { color: var(--accent-ink); flex: none; }
+@media (max-width: 699px) {
+  dialog.lista-dlg { margin: auto 8px calc(8px + env(safe-area-inset-bottom)); width: calc(100% - 16px); max-width: none; max-height: 75dvh; border-radius: 18px; }
+  dialog.lista-dlg[open] { animation: menu-subir 0.22s ease; }
+  .lista-op { padding: 12px; }
+}
+
+/* ============================================================ PowerPoint: um canto por momento da missa */
+.pptx-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: -6px; }
+.pptx-cab b { font-weight: 800; }
+.pptx-cab small { color: var(--muted); font-size: 12.5px; }
+.pptx-partes { display: grid; gap: 6px; }
+.pptx-parte { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 12px; padding: 8px 12px 8px 8px; border-radius: 12px; background: var(--surface-2); cursor: pointer; min-width: 0; }
+.pptx-parte:hover { background: var(--surface-3); }
+.pptx-parte:focus-visible { box-shadow: 0 0 0 2px var(--text); }
+.pptx-parte > .cover, .pptx-parte-vazio { width: 46px; height: 46px; flex: none; border-radius: 8px; }
+.pptx-parte-vazio { display: grid; place-items: center; border: 1.5px dashed var(--surface-3); color: var(--muted); }
+.pptx-parte-txt { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.pptx-parte-txt small { color: var(--accent-ink); font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.pptx-parte-txt b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pptx-parte-txt span { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pptx-parte.vazia .pptx-parte-txt b { color: var(--muted); font-weight: 600; }
+.pptx-parte > .ic:last-child { color: var(--muted); flex: none; }
+
+/* ============================================================ compor partitura */
+.compor-inicio .cp-tipos { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.compor-inicio .pptx-tipo b { display: inline-flex; align-items: center; gap: 8px; }
+.cp-ini-ajustes .chips { padding: 0; flex-wrap: wrap; justify-content: flex-end; }
+.cp-editar { margin-left: auto; }
+.compor { display: flex; flex-direction: column; min-height: 100%; }
+.compor-topo { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; min-width: 0; }
+.compor-topo .chips { flex: 1; min-width: 0; padding: 2px 0; }
+.compor-topo .cp-uma { font-weight: 800; color: var(--muted); font-size: 14px; }
+.cp-ajustes { flex: none; display: inline-flex; align-items: center; gap: 6px; }
+.compor-folha { position: relative; flex: 1; min-height: 240px; margin: 0 -6px 12px; cursor: pointer; }
+.compor-folha svg { user-select: none; }
+.cp-marca { position: absolute; z-index: 0; border-radius: 8px; background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); pointer-events: none; }
+.compor-folha > svg, .compor-folha > div:not(.cp-marca) { position: relative; z-index: 1; }
+.compor-palheta { position: sticky; bottom: 8px; z-index: 15; display: grid; gap: 8px; padding: 10px; border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: var(--shadow-lg); }
+.cp-cabeca { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.cp-abas { flex: none; }
+.cp-abas button { display: inline-flex; align-items: center; gap: 5px; padding: 0 10px; }
+.cp-abas button[aria-pressed="true"] { background: var(--surface-3); color: var(--accent-ink); }
+.cp-status { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+.cp-painel { display: grid; gap: 8px; }
+.cp-painel[hidden] { display: none; }
+.cp-linha { display: flex; gap: 6px; min-width: 0; }
+.cp-b { flex: 1 1 0; min-width: 0; height: 42px; display: grid; place-items: center; border: 0; border-radius: 10px; background: var(--surface-2); color: var(--text); cursor: pointer; font: inherit; font-weight: 800; font-size: 15px; padding: 0; }
+.cp-b:hover { background: var(--surface-3); }
+.cp-b[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.cp-b:focus-visible, .cp-tecla:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+.cp-b.cp-txt { font-size: 14px; }
+.cp-apagar { color: var(--danger); }
+.cp-tecla { flex: 1 1 0; min-width: 0; height: 52px; display: grid; place-content: center; gap: 1px; border: 0; border-radius: 10px; cursor: pointer; font: inherit;
+  background: var(--text); color: var(--bg); box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.18); }
+.cp-tecla:active { transform: translateY(1px); box-shadow: none; }
+.cp-tecla b { font-size: 15px; font-weight: 800; }
+.cp-tecla small { font-size: 10.5px; font-weight: 700; opacity: 0.6; }
+.cp-entrada .input { flex: 3 1 0; min-width: 0; height: 42px; font-size: 16px; }
+.cp-entrada .cp-b { flex: 0 0 48px; }
+.cp-painel .chips { padding: 0; }
+.cp-dica { margin: 0; font-size: 12.5px; color: var(--muted); }
+.cp-texto { min-height: 140px; resize: vertical; font: inherit; line-height: 1.5; }
+.cp-campo { display: grid; gap: 6px; }
+.cp-campo > small, .cp-lado small { color: var(--muted); font-weight: 700; font-size: 12.5px; }
+.cp-campo .chips { flex-wrap: wrap; padding: 0; }
+.cp-lado { display: flex; flex-wrap: wrap; gap: 16px; }
+.cp-lado > div { display: grid; gap: 6px; justify-items: start; }
+.cp-vozes { display: grid; gap: 6px; }
+.cp-voz { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cp-voz .input { flex: 1; min-width: 0; height: 38px; }
+.cp-voz .seg { flex: none; }
+.cp-voz .seg button { padding: 0 7px; font-size: 12px; }
+.cp-voz .seg button[aria-pressed="true"] { background: var(--surface-3); }
+@media (max-width: 600px) {
+  .cp-status { display: none; }
+  .cp-cabeca .cp-abas { flex: 1; display: flex; }
+  .cp-abas button { flex: 1; }
+  .cp-b { height: 40px; }
+  .cp-tecla { height: 48px; }
+  .cp-voz { flex-wrap: wrap; }
+}
+.compor .ensaio { display: grid; gap: 8px; }
+.compor-palheta[hidden] { display: none; }
+.cp-voltar { justify-self: center; }
+.compor .ensaio[hidden] { display: none; }

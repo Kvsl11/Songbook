@@ -37,6 +37,13 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   tipografia e as **cores do tema** (ou em **preto e branco**, como papel), zoom e **mudança de tom**. A página
   original (imagem leve, `partituras/<id>-<n>.png`) continua em **Original**, para conferir. Os dados (índice,
   letras, cifras e partituras) ficam salvos no repositório: continuam no app mesmo que a pasta do Drive seja fechada.
+- **Compor partitura** (menu ⋯ da música → *Criar partitura*, ou *Criar no app* / *Editar* na tela da partitura): editor
+  de partitura feito no app, para qualquer música (buscada, importada ou do acervo). Melodia, duas vozes, coral SATB ou
+  piano; notas pelo nome (Dó a Si, já com a armadura), durações com ponto, pausas, ligaduras, acordes, ♯/♭, oitavas,
+  letra em várias estrofes (sílaba por sílaba ou colando o texto com hífens) e cifras com atalhos do tom; compasso,
+  anacruse, tom, andamento e vozes nos ajustes; desfazer/refazer, teclado do computador (como no MuseScore), ouvir no
+  ensaio, imprimir/PDF e exportar/importar MusicXML. Dá para começar da partitura desenhada pelo app e corrigir. Fica
+  guardada na música (`lib/partitura.js` converte para MusicXML).
 - **Buscar (qualquer música)**: digite música, artista ou trecho e aparece uma lista só de **Músicas** (resultados do
   Cifra Club e do Letras juntos) e os **Vídeos** do YouTube. Tocar numa música já traz tudo junto: a **cifra** (Cifra
   Club, que já tem a letra; sem cifra, a letra do Letras), o **vídeo** do YouTube e o compositor. Um vídeo tocado
