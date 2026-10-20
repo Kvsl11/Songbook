@@ -411,3 +411,141 @@ export function distribuirLetra(pauta, texto, { inicio = 0, estrofe = 0 } = {}) 
   }
   return { ultimo, sobrou: silabas.length - k };
 }
+
+// ---- rascunho automático (IA): das notas ouvidas (Basic Pitch: { startTimeSeconds, durationSeconds, pitchMidi,
+// amplitude }) para a melodia na partitura. A IA ouve tudo (voz e instrumentos); aqui fica uma linha só: em cada
+// momento, a nota mais forte dentro da extensão de voz, já no compasso e no andamento.
+
+const SUST = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const BEM = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+export const alturaDoMidi = (midi, fifths = 0) => {
+  const m = Math.round(midi);
+  return (fifths < 0 ? BEM : SUST)[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
+};
+
+// tom pela cifra da música (G, Em, Bb, F#m…)
+export function tomDaCifra(key) {
+  const m = /^([A-G])([#b]?)(m(?!aj))?/.exec(String(key || '').trim());
+  if (!m) return null;
+  const modo = m[3] ? 'minor' : 'major';
+  const pc = (SEMI[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + 12) % 12;
+  // fifths do tom maior relativo (o menor usa a armadura do relativo maior: 3 semitons acima)
+  const maior = modo === 'minor' ? (pc + 3) % 12 : pc;
+  const porPc = { 0: 0, 7: 1, 2: 2, 9: 3, 4: 4, 11: 5, 6: 6, 1: -5, 8: -4, 3: -3, 10: -2, 5: -1 };
+  let fifths = porPc[maior];
+  if (m[2] === '#' && fifths < 0) fifths += 12; // Fá# maior / Ré# menor: 6 sustenidos
+  if (m[2] === 'b' && fifths > 5) fifths -= 12;
+  return { fifths, modo };
+}
+
+// tom pelas notas (Krumhansl-Schmuckler, com o peso da duração de cada nota)
+const PERFIL_MAIOR = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+const PERFIL_MENOR = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+export function estimarTom(notas) {
+  const h = new Array(12).fill(0);
+  for (const n of notas) h[((Math.round(n.pitchMidi) % 12) + 12) % 12] += n.durationSeconds * (n.amplitude ?? 1);
+  if (!h.some(Boolean)) return { fifths: 0, modo: 'major' };
+  const corr = (perfil, raiz) => {
+    const xs = h.map((_, i) => h[(i + raiz) % 12]);
+    const mx = xs.reduce((a, b) => a + b, 0) / 12;
+    const my = perfil.reduce((a, b) => a + b, 0) / 12;
+    let num = 0, dx = 0, dy = 0;
+    for (let i = 0; i < 12; i++) { num += (xs[i] - mx) * (perfil[i] - my); dx += (xs[i] - mx) ** 2; dy += (perfil[i] - my) ** 2; }
+    return num / Math.sqrt(dx * dy || 1);
+  };
+  let melhor = { r: -2 };
+  for (let raiz = 0; raiz < 12; raiz++) {
+    for (const [modo, perfil] of [['major', PERFIL_MAIOR], ['minor', PERFIL_MENOR]]) {
+      const r = corr(perfil, raiz);
+      if (r > melhor.r) melhor = { r, raiz, modo };
+    }
+  }
+  return tomDaCifra(SUST[melhor.raiz] + (melhor.modo === 'minor' ? 'm' : '')) || { fifths: 0, modo: 'major' };
+}
+
+// andamento pelos intervalos entre os começos das notas: o que melhor encaixa os intervalos em meios tempos
+export function estimarAndamento(notas, { min = 60, max = 140, faixa = [48, 84] } = {}) {
+  // só a melodia (sem os graves do acompanhamento nem os pedacinhos que a IA acha no ataque das notas)
+  const da = notas.filter((n) => n.pitchMidi >= faixa[0] && n.pitchMidi <= faixa[1] && n.durationSeconds >= 0.2);
+  const inicios = [];
+  for (const t of da.map((n) => n.startTimeSeconds).sort((a, b) => a - b)) if (!inicios.length || t - inicios[inicios.length - 1] > 0.2) inicios.push(t);
+  const ioi = [];
+  for (let i = 1; i < inicios.length; i++) { const d = inicios[i] - inicios[i - 1]; if (d > 0.08 && d < 2) ioi.push(d); }
+  if (ioi.length < 4) return 80;
+  // peso de cada figura (em colcheias): as comuns no canto (colcheia, semínima, mínima…) valem mais que as raras
+  const PESO = { 1: 0.8, 2: 1, 3: 0.45, 4: 1, 5: 0.15, 6: 0.75, 7: 0.15, 8: 0.9 };
+  let melhor = { s: -1, bpm: 80 };
+  for (let bpm = min; bpm <= max; bpm++) {
+    const meio = 30 / bpm; // meio tempo (colcheia), em segundos
+    let s = 0;
+    for (const d of ioi) { const x = d / meio; const r = Math.round(x); const erro = Math.abs(x - r); s += r >= 1 ? (1 - erro * 2) * (PESO[r] ?? 0.3) : 0; }
+    // um empurrão leve para os andamentos de canto de igreja (perto de 70–100)
+    s *= 1 - Math.abs(bpm - 85) / 400;
+    if (s > melhor.s) melhor = { s, bpm };
+  }
+  return melhor.bpm;
+}
+
+export function melodiaDasNotas(notas, { bpm = 80, fifths = 0, faixa = [48, 84], oitava = 0, minAmp = 0.25 } = {}) {
+  const passo = 60 / bpm / 4; // semicolcheia, em segundos
+  const validas = notas.filter((n) => n.pitchMidi >= faixa[0] && n.pitchMidi <= faixa[1] && (n.amplitude ?? 1) >= minAmp && n.durationSeconds > passo * 0.6);
+  if (!validas.length) return [];
+  const comeco = Math.min(...validas.map((n) => n.startTimeSeconds));
+  const fim = Math.max(...validas.map((n) => n.startTimeSeconds + n.durationSeconds));
+  const nPassos = Math.ceil((fim - comeco) / passo);
+  // em cada semicolcheia, a nota mais forte que soa (desempate: a mais aguda, que costuma ser a voz)
+  const grade = new Array(nPassos).fill(null);
+  for (let k = 0; k < nPassos; k++) {
+    const t = comeco + (k + 0.5) * passo;
+    let melhor = null;
+    for (const n of validas) {
+      if (n.startTimeSeconds > t || n.startTimeSeconds + n.durationSeconds < t) continue;
+      const forca = (n.amplitude ?? 1) + n.pitchMidi / 1000;
+      if (!melhor || forca > melhor.forca) melhor = { n, forca };
+    }
+    grade[k] = melhor?.n || null;
+  }
+  // blocos: a mesma nota seguida vira uma só; uma nota nova começa onde muda
+  const blocos = [];
+  for (const n of grade) {
+    const ult = blocos[blocos.length - 1];
+    if (ult && ult.n === n) ult.len++; else blocos.push({ n, len: 1 });
+  }
+  // limpa: notas de uma semicolcheia só e pausas curtas somem dentro da vizinha
+  for (let i = 0; i < blocos.length; i++) {
+    const b = blocos[i];
+    if (b.len === 1 && blocos.length > 1) {
+      // um pedacinho antes de uma nota costuma ser o ataque dela: vai para a seguinte (ou para a vizinha de mesma altura)
+      const ant = blocos[i - 1];
+      const prox = blocos[i + 1];
+      const mesma = (x) => x?.n && b.n && Math.round(x.n.pitchMidi) === Math.round(b.n.pitchMidi);
+      const viz = mesma(prox) ? prox : mesma(ant) ? ant : prox?.n ? prox : ant || prox;
+      if (viz === prox) prox.n = prox.n || b.n;
+      viz.len += 1;
+      blocos.splice(i, 1);
+      i = Math.max(-1, i - 2);
+    }
+  }
+  const juntos = [];
+  for (const b of blocos) {
+    const ult = juntos[juntos.length - 1];
+    // a mesma altura detectada duas vezes, uma por cima da outra, é uma nota só (notas repetidas de verdade não se sobrepõem)
+    // e um pedacinho curto logo antes da mesma nota (a IA às vezes parte o ataque) também
+    const mesma = ult?.n && b.n && Math.round(ult.n.pitchMidi) === Math.round(b.n.pitchMidi);
+    const sobreposta = mesma && (b.n.startTimeSeconds < ult.n.startTimeSeconds + ult.n.durationSeconds - passo * 0.5
+      || (ult.n.durationSeconds < passo * 1.5 && b.n.startTimeSeconds - (ult.n.startTimeSeconds + ult.n.durationSeconds) < passo * 0.5));
+    if (ult && (ult.n === b.n || sobreposta)) ult.len += b.len;
+    else juntos.push({ ...b });
+  }
+  // o começo de cada nota vai para a colcheia mais perto (o canto quase nunca usa semicolcheia solta)
+  let t = 0;
+  const marcas = juntos.map((b) => { const ini = Math.round(t / 2) * 2; t += b.len; return ini; });
+  marcas.push(Math.round(t / 2) * 2);
+  juntos.forEach((b, i) => { b.len = marcas[i + 1] - marcas[i]; });
+  for (let i = juntos.length - 1; i >= 0; i--) if (juntos[i].len <= 0) juntos.splice(i, 1);
+  // oitava: a melodia inteira vai para perto da extensão da voz escolhida (média ~ Sol4 para clave de sol)
+  const alturas = juntos.filter((b) => b.n).map((b) => b.n.pitchMidi);
+  const mediana = [...alturas].sort((a, b) => a - b)[Math.floor(alturas.length / 2)] ?? 67;
+  const desloc = Math.round((67 - mediana) / 12) * 12 + oitava * 12;
+  return juntos.map((b) => ({ a: b.n ? [alturaDoMidi(b.n.pitchMidi + desloc, fifths)] : [], d: b.len * 2, l: [], c: '' }));
+}

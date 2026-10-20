@@ -120,3 +120,30 @@ test('letra: distribui sílabas pelas notas, pulando pausas e continuação de l
   assert.equal(r.ultimo, 5);
   assert.equal(r.sobrou, 0);
 });
+
+test('IA: tom pela cifra e pelas notas, andamento e melodia no compasso', async () => {
+  const { tomDaCifra, estimarTom, estimarAndamento, melodiaDasNotas, alturaDoMidi } = await import('../public/js/lib/partitura.js');
+  assert.deepEqual(tomDaCifra('G'), { fifths: 1, modo: 'major' });
+  assert.deepEqual(tomDaCifra('Em'), { fifths: 1, modo: 'minor' });
+  assert.deepEqual(tomDaCifra('Bb'), { fifths: -2, modo: 'major' });
+  assert.deepEqual(tomDaCifra('F#m'), { fifths: 3, modo: 'minor' });
+  assert.equal(alturaDoMidi(61, 2), 'C#4');
+  assert.equal(alturaDoMidi(70, -1), 'Bb4');
+  // escala de Ré maior em semínimas a 90 bpm (0,667 s), com um acompanhamento grave e fraco
+  const q = 60 / 90;
+  const escala = [62, 64, 66, 67, 69, 71, 73, 74].map((p, i) => ({ startTimeSeconds: 1 + i * q, durationSeconds: q * 0.95, pitchMidi: p, amplitude: 0.8 }));
+  const baixo = [{ startTimeSeconds: 1, durationSeconds: 8 * q, pitchMidi: 38, amplitude: 0.9 }];
+  const notas = [...escala, ...baixo];
+  assert.deepEqual(estimarTom(escala), { fifths: 2, modo: 'major' });
+  const bpm = estimarAndamento(escala);
+  assert.ok(Math.abs(bpm - 90) <= 2, `andamento ${bpm}`);
+  const mel = melodiaDasNotas(notas, { bpm: 90, fifths: 2 });
+  assert.deepEqual(mel.map((e) => e.a[0]), ['D4', 'E4', 'F#4', 'G4', 'A4', 'B4', 'C#5', 'D5']);
+  assert.ok(mel.every((e) => e.d === 8));
+  // semínimas e mínimas misturadas (o que confundia o andamento com 3/2 dele)
+  const misto = [[62, 1], [64, 1], [66, 1], [67, 1], [69, 2], [69, 1], [71, 1], [69, 3], [67, 1], [66, 2], [62, 2]];
+  let t0 = 0.5;
+  const ns = misto.map(([p, b]) => { const n = { startTimeSeconds: t0, durationSeconds: b * q * 0.93, pitchMidi: p, amplitude: 0.8 }; t0 += b * q; return n; });
+  assert.ok(Math.abs(estimarAndamento(ns) - 90) <= 2, `andamento ${estimarAndamento(ns)}`);
+  assert.deepEqual(melodiaDasNotas(ns, { bpm: 90, fifths: 2 }).map((e) => e.d), misto.map(([, b]) => b * 8));
+});

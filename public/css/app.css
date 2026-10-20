@@ -94,7 +94,7 @@ main > * { position: relative; z-index: 1; }
 .nav {
   position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; height: calc(var(--nav-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  display: grid; grid-template-columns: repeat(4, 1fr); align-items: center;
+  display: grid; grid-template-columns: repeat(5, 1fr); align-items: center;
   /* como no Spotify: levemente transparente em cima (o conteúdo aparece de leve) e preto embaixo */
   background: linear-gradient(180deg, rgb(0 0 0 / 0.72) 0%, rgb(0 0 0 / 0.86) 40%, #000 72%);
 }
@@ -1745,3 +1745,43 @@ dialog.lista-dlg { max-width: 440px; padding: 0; }
 .compor-palheta[hidden] { display: none; }
 .cp-voltar { justify-self: center; }
 .compor .ensaio[hidden] { display: none; }
+
+/* ============================================================ Partituras (menu) e Gerar com IA */
+a.pptx-tipo { text-decoration: none; }
+.part-acoes { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin: 4px 0 8px; }
+.part-acao { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 14px; row-gap: 2px; align-items: center;
+  padding: 16px; border-radius: var(--radius); background: var(--surface-2); color: var(--text); }
+.part-acao:hover { background: var(--surface-3); }
+.part-acao:focus-visible { box-shadow: 0 0 0 2px var(--text); }
+.part-acao .part-acao-ic { grid-row: span 2; }
+.part-acao b { font-size: 17px; font-weight: 800; }
+.part-acao > span:last-child { color: var(--muted); font-size: 13px; line-height: 1.35; }
+.part-acao.ia { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 26%, var(--surface-2)), var(--surface-2) 70%); }
+.part-acao-ic { width: 46px; height: 46px; flex: none; display: grid; place-items: center; border-radius: 12px; background: var(--accent-soft); color: var(--accent-ink); }
+.part-vazio, .part-sub { margin: -2px 2px 10px; font-size: 14px; }
+.part-acervo { margin: 18px 0 8px; }
+.lista-busca { padding: 0 16px 8px; }
+.lista-busca .field { margin: 0; }
+.lista-rodape { margin: 0; padding: 4px 20px 16px; font-size: 13px; color: var(--muted); }
+.lista-rodape a { color: var(--accent-ink); font-weight: 800; }
+.ia-topo { display: flex; gap: 16px; align-items: center; margin: 4px 0 6px; }
+.ia-topo .cover { width: 96px; height: 96px; flex: none; border-radius: 10px; }
+.ia-topo h2 { margin: 2px 0 6px; font-size: clamp(22px, 5vw, 32px); font-weight: 900; letter-spacing: -0.02em; }
+.ia-topo p { margin: 0; font-size: 14px; }
+.ia-fontes { display: grid; gap: 10px; }
+.ia-fonte { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border-radius: var(--radius); background: var(--surface-2); }
+.ia-fonte-cab { display: flex; align-items: center; gap: 12px; flex: 1 1 260px; min-width: 0; }
+.ia-fonte-cab b { display: block; font-size: 15px; }
+.ia-fonte-cab small { color: var(--muted); font-size: 13px; line-height: 1.35; }
+.ia-fonte-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.ia-gravando, .ia-analisando { display: grid; justify-items: center; gap: 12px; text-align: center; padding: 28px 16px; margin-top: 12px; border-radius: var(--radius); background: var(--surface-2); }
+.ia-gravando b { font-size: 34px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.ia-gravando p, .ia-analisando p { margin: 0; max-width: 420px; font-size: 14px; }
+.ia-onda { width: min(320px, 80%); height: 10px; border-radius: 999px; background: var(--surface-3); overflow: hidden; display: flex; justify-content: center; }
+.ia-onda i { width: 100%; height: 100%; background: var(--accent); border-radius: 999px; transform: scaleX(0.02); transition: transform 0.08s linear; }
+.ia-barra { width: min(320px, 80%); height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.ia-barra i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+.ia-ajustes .chips { padding: 0; }
+.ia-previa { margin-top: 14px; min-height: 160px; }
+.ia-fim { justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin: 4px 0 16px; }
+@media (max-width: 600px) { .ia-topo .cover { width: 72px; height: 72px; } .ia-fim .btn { flex: 1; } }
