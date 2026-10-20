@@ -63,6 +63,10 @@ jobs:
         continue-on-error: true
         timeout-minutes: 25
         run: node scripts/liturgia-sync.mjs --dias 21
+      - name: Indexar o acervo litúrgico (pasta do Google Drive)
+        continue-on-error: true
+        timeout-minutes: 20
+        run: node scripts/acervo-sync.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

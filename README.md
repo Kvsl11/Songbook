@@ -10,6 +10,18 @@ ofertório, comunhão etc.).
 Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em degradê e player embutido:
 
 - **Início**: saudação, atalhos, a liturgia de hoje, seus repertórios, tocadas e adicionadas recentemente.
+- **Busca por setor** (sugestão do Junior Música Católica): na Busca, cartões levam a
+  **Missa litúrgica** (Hinário Litúrgico da CNBB domingo a domingo, hinários oficiais, Álbuns de Liturgia,
+  antífonas de entrada, cantos de comunhão, salmos responsoriais, Gradual Simples, cifras do Prof. Agnaldo Armindo),
+  **Partes fixas** (Senhor, Glória, Aclamação e Aclamação quaresmal, Creio, Santo, Oração eucarística/Amém, Pai Nosso,
+  Cordeiro, Antífonas marianas e Saudação à Mãe do Senhor, missas completas — cada parte com todas as opções),
+  **Tempos e solenidades** (Proclamação da Páscoa, Calenda, Sequências, Semana Santa, Advento, Natal, Quaresma,
+  Páscoa, Pentecostes, Corpus Christi, Nossa Senhora…), **Missa popular** (cantos de devoção da Cindy Ferrarezi) e
+  **Livros e documentos** (Missal, rituais, lecionários, documentos da Igreja). Tudo vem de um **acervo litúrgico
+  no Google Drive** (pasta pública), indexado todo dia pelo GitHub Actions (`scripts/acervo-sync.mjs` →
+  `data/acervo.json`); o app classifica cada arquivo pelo nome e pela pasta (`js/lib/acervo.js`), junta partitura,
+  cifra e áudio do mesmo canto e abre tudo no leitor do app. A busca por texto também procura no acervo
+  (filtro **Acervo litúrgico**).
 - **Buscar (qualquer música)**: digite música, artista ou trecho e aparece uma lista só de **Músicas** (resultados do
   Cifra Club e do Letras juntos) e os **Vídeos** do YouTube. Tocar numa música já traz tudo junto: a **cifra** (Cifra
   Club, que já tem a letra; sem cifra, a letra do Letras), o **vídeo** do YouTube e o compositor. Um vídeo tocado
@@ -197,6 +209,7 @@ public/
   js/lib/cnbb.js  cliente/parser da Liturgia Diária da CNBB          (navegador e Node)
   js/lib/cindy.js cliente do WordPress da Cindy: busca, repertório, cifras -> ChordPro (navegador e Node)
   js/lib/missa.js junta CNBB + Cindy na estrutura de partes da missa
+  js/lib/acervo.js acervo litúrgico do Google Drive: leitura das pastas, setores, partes fixas e tempos
   js/lib/web.js   Cifra Club (busca e página -> ChordPro), Letras.mus.br (letras), vídeos do YouTube (Piped)
   js/acordes.js   desenho dos acordes no violão
   js/fonte.js     busca direta + cache local, com o servidor como reserva

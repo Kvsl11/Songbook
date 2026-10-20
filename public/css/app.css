@@ -1279,3 +1279,24 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 /* letra: entra e sai em degradês longos (do vídeo para a letra e da letra para as Referências) */
 .song.lyrics-mode { padding-top: 96px; padding-bottom: 170px; }
 @media (min-width: 900px) { .song.lyrics-mode { padding-top: 110px; padding-bottom: 190px; } }
+
+/* setores da missa (Busca): cartões coloridos como os de "Navegar" do Spotify */
+.setores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 8px; }
+@media (min-width: 700px) { .setores { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1200px) { .setores { grid-template-columns: repeat(5, 1fr); } }
+.setor { position: relative; display: flex; flex-direction: column; gap: 4px; min-height: 104px; padding: 14px 64px 14px 14px; overflow: hidden; border-radius: 10px;
+  text-decoration: none; color: #fff; background: linear-gradient(135deg, hsl(var(--h) 55% 40%), hsl(calc(var(--h) + 30) 50% 26%)); transition: transform 0.15s, filter 0.15s; }
+.setor:hover { filter: brightness(1.08); }
+.setor:active { transform: scale(0.98); }
+.setor b { font-size: 17px; line-height: 1.15; }
+.setor small { font-size: 12px; line-height: 1.3; opacity: 0.85; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.setor-ic { position: absolute; right: -6px; bottom: -6px; transform: rotate(18deg); opacity: 0.9; }
+.grade-partes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.parte-card { display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; min-height: 84px; padding: 12px; border-radius: 10px; text-decoration: none; color: #fff;
+  background: linear-gradient(135deg, hsl(var(--h) 50% 38%), hsl(calc(var(--h) + 25) 45% 24%)); transition: filter 0.15s, transform 0.15s; }
+.parte-card:hover { filter: brightness(1.1); }
+.parte-card:active { transform: scale(0.98); }
+.parte-card b { font-size: 15px; line-height: 1.2; }
+.parte-card small { font-size: 12px; opacity: 0.8; }
+.canto-ic { width: 48px; height: 48px; border-radius: 6px; display: grid; place-items: center; }
+.track.canto .acts { gap: 2px; }

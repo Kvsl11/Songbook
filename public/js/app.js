@@ -5,8 +5,9 @@ import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
+import { agruparCantos, buscarNoAcervo, COLECOES_LITURGICAS, COLECOES_LIVROS, ehLivro, parteFixa, PARTES_FIXAS, tempoDe, TEMPOS, urlArquivo, urlPasta } from './lib/acervo.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
-import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, buscarCindy, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
+import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, buscarCindy, carregarAcervo, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const view = $('#view');
@@ -41,7 +42,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-101';
+export const APP_VERSAO = '2026.10.20-102';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1844,7 +1845,7 @@ function viewSearch() {
   setTint('#2d2d2d');
   setHeader('Buscar', { actions: [{ icon: 'download', label: 'Importar cifra ou letra da internet', onClick: () => importarDaInternet() }] });
   const q = sessionStorage.getItem('busca') || '';
-  const FILTROS = [['tudo', 'Tudo'], ['musicas', 'Músicas'], ['artistas', 'Artistas'], ['videos', 'Vídeos'], ['biblioteca', 'Biblioteca']];
+  const FILTROS = [['tudo', 'Tudo'], ['musicas', 'Músicas'], ['acervo', 'Acervo litúrgico'], ['artistas', 'Artistas'], ['videos', 'Vídeos'], ['biblioteca', 'Biblioteca']];
   let filtro = sessionStorage.getItem('buscaFiltro') || 'tudo';
   if (!FILTROS.some(([k]) => k === filtro)) filtro = 'tudo';
   view.innerHTML = `
@@ -1880,7 +1881,8 @@ function viewSearch() {
       res.innerHTML = `
         <div class="busca-dica">${icon('sparkles', 18)}<span>Busque qualquer música: ao abrir, ela já vem com a cifra (<b>Cifra Club</b>), a letra (<b>Letras</b>) e o vídeo (<b>YouTube</b>). Achou a cifra em outro site? <button class="link-btn" id="btn-importar">Cole aqui</button>.</span></div>`;
       $('#btn-importar').onclick = () => importarDaInternet();
-      res.insertAdjacentHTML('beforeend', `<div class="shelf-head"><h2>Artistas católicos</h2></div><div class="shelf" id="art-cat"></div>
+      res.insertAdjacentHTML('beforeend', `<div class="shelf-head"><h2>Navegar por setor</h2></div><div class="setores">${SETORES.map(cartaoSetor).join('')}</div>
+        <div class="shelf-head"><h2>Artistas católicos</h2></div><div class="shelf" id="art-cat"></div>
         <div class="shelf-head"><h2>Católicas em alta</h2></div><div id="em-alta"><div class="loading-note"><span class="spin"></span>Carregando as mais tocadas…</div></div>`);
       const meu = ++seq;
       Promise.all(ARTISTAS_CATOLICOS.map((a) => buscarArtistasCifraClub(a).then((l) => artistaCerto(l, a)).catch(() => null))).then((lista) => {
@@ -1900,6 +1902,7 @@ function viewSearch() {
     const blocos = [];
     if (mostra('biblioteca') && (locais.length || filtro === 'biblioteca')) blocos.push(`<div class="shelf-head"><h2>Na sua biblioteca</h2></div>${locais.length ? `<ul class="tracks">${locais.map((s) => linhaMusica(s, s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '')).join('')}</ul>` : '<p class="muted">Nada na biblioteca.</p>'}`);
     if (mostra('artistas')) blocos.push(caixa('ar-res', 'Artistas'));
+    if (mostra('acervo')) blocos.push(caixa('ac-res', 'No acervo litúrgico', filtro === 'acervo' ? '' : `<a href="#/setor/busca/${encodeURIComponent(term)}">Ver tudo</a>`));
     if (mostra('musicas')) blocos.push(caixa('mu-res', 'Músicas'));
     if (mostra('videos')) blocos.push(caixa('yt-res', 'Vídeos', `<a href="${esc(ytBusca(term))}" target="_blank" rel="noopener">youtube.com</a>`));
     res.innerHTML = blocos.join('');
@@ -1915,6 +1918,24 @@ function viewSearch() {
           // na aba Tudo, sem artista, a seção some
           if (!artistas.length && filtro === 'tudo') { $('#ar-res').previousElementSibling?.remove(); $('#ar-res').remove(); }
         }).catch((e) => vivo('ar-res') && erro('ar-res', 'Não consegui buscar artistas: ' + e.message));
+      }
+      if (mostra('acervo')) {
+        acervoClassificado().then((ac) => {
+          if (!vivo('ac-res')) return;
+          const box = $('#ac-res');
+          const achou = buscarNoAcervo(ac.itens, term);
+          if (!achou.length && filtro === 'tudo') { box.previousElementSibling?.remove(); box.remove(); return; }
+          if (!ac.itens.length) { box.innerHTML = avisoAcervo(); return; }
+          if (filtro === 'acervo') desenharCantos(box, ac.itens, { filtro: term, vazio: 'Nada no acervo com esse nome.' });
+          else {
+            // o mesmo canto de anos diferentes aparece uma vez só no resumo
+            const vistos = new Set();
+            const cantos = agruparCantos(achou).filter((c) => { const k = normalizar(c.titulo); if (vistos.has(k)) return false; vistos.add(k); return true; }).slice(0, 6);
+            cantosNaTela = cantos;
+            box.innerHTML = `<ul class="tracks">${cantos.map((c, i) => linhaCanto(c, i)).join('')}</ul>`;
+          }
+          if (!box.dataset.ligado) { box.dataset.ligado = '1'; ligarCantos(box); }
+        });
       }
       if (mostra('musicas')) {
         buscarMusicas(term).then((lista) => {
@@ -2134,6 +2155,209 @@ async function viewCategoria(id, nome) {
   } catch (e) {
     if ($('#lista')) $('#lista').innerHTML = `<div class="alert">${icon('info', 18)}<span>${esc(e.message)}</span></div>`;
   }
+}
+
+// ------------------------------------------------------------- setores da missa (acervo litúrgico)
+// A busca organizada por setor: Missa litúrgica (hinários da CNBB, antífonas, salmos), Partes fixas
+// (cada parte com todas as opções), Tempos e solenidades, Missa popular (cantos de devoção, Cindy
+// Ferrarezi) e Livros e documentos. Os arquivos vêm do acervo do Google Drive (data/acervo.json).
+const SETORES = [
+  ['liturgica', 'Missa litúrgica', 'Hinários da CNBB, antífonas, salmos e cantos do próprio do dia', 'book', 210],
+  ['fixas', 'Partes fixas', 'Senhor, Glória, Santo, Cordeiro… todas as opções de cada parte', 'sparkles', 28],
+  ['tempos', 'Tempos e solenidades', 'Proclamação da Páscoa, Calenda, Sequências, Semana Santa…', 'calendar', 330],
+  ['popular', 'Missa popular', 'Cantos de devoção popular (Cindy Ferrarezi)', 'music', 150],
+  ['livros', 'Livros e documentos', 'Missal, rituais, lecionários e documentos da Igreja', 'library', 260],
+];
+const cartaoSetor = ([k, nome, desc, ic, h]) => `<a class="setor" href="#/setor/${k}" style="--h:${h}"><b>${esc(nome)}</b><small>${esc(desc)}</small><span class="setor-ic">${icon(ic, 40)}</span></a>`;
+
+let indiceAcervo = null;
+async function acervoClassificado() {
+  if (!indiceAcervo) {
+    const itens = await carregarAcervo();
+    const fixas = new Map();
+    const tempos = new Map();
+    for (const it of itens) {
+      const pf = parteFixa(it);
+      if (pf) (fixas.get(pf) || fixas.set(pf, []).get(pf)).push(it);
+      const tp = tempoDe(it);
+      if (tp) (tempos.get(tp) || tempos.set(tp, []).get(tp)).push(it);
+    }
+    indiceAcervo = { itens, fixas, tempos };
+    if (!itens.length) indiceAcervo = null; // não carregou: tenta de novo na próxima vez
+    return { itens, fixas, tempos };
+  }
+  return indiceAcervo;
+}
+
+// rótulo da coleção de onde o arquivo vem (para agrupar a lista)
+// (na ordem de prioridade das listas: as partes fixas do acervo primeiro, depois os hinários da CNBB…)
+const ORDEM_COLECOES = [['OUTROS SUBSÍDIOS DE MÚSICA LITÚRGICA/Partes fixas', 'Partes fixas — acervo litúrgico', ''], ...COLECOES_LITURGICAS, ...COLECOES_LIVROS];
+const COLECOES = [...ORDEM_COLECOES].sort((a, b) => b[0].length - a[0].length);
+const prioridade = (nome) => { const i = ORDEM_COLECOES.findIndex((c) => c[1] === nome); return i < 0 ? 999 : i; };
+const colecaoDe = (caminho) => { const c = caminho.join('/'); return (COLECOES.find(([p]) => c === p.trim() || c.startsWith(p.trim() + '/')) || [])[1] || bonito(caminho[0] || 'Acervo'); };
+const ARQ = { pdf: ['Partitura', 'file'], texto: ['Cifra/letra', 'text'], audio: ['Ouvir', 'play'], video: ['Vídeo', 'video'], pasta: ['Pasta', 'library'] };
+const urlDoArquivo = (a) => (a.tipo === 'pasta' ? urlPasta(a.id) : urlArquivo(a.id));
+const ORDEM_ARQ = ['pdf', 'texto', 'audio', 'video', 'pasta'];
+let cantosNaTela = [];
+function linhaCanto(c, i, { caminho = true } = {}) {
+  const arqs = [...c.arquivos].sort((a, b) => ORDEM_ARQ.indexOf(a.tipo) - ORDEM_ARQ.indexOf(b.tipo));
+  const principal = arqs[0];
+  const tipos = [...new Set(arqs.map((a) => a.tipo))];
+  const onde = caminho ? c.caminho.slice(-2).map((x) => bonito(x).replace(/\s*_\s*/g, ' · ')).join(' › ') : '';
+  return `<li class="track clickable canto" data-canto="${i}" style="grid-template-columns:auto 1fr auto">
+    <div class="cover gen canto-ic" style="--h:${principal.tipo === 'audio' ? 150 : principal.tipo === 'texto' ? 28 : 210}">${icon(ARQ[principal.tipo][1], 22)}</div>
+    <div class="info"><div class="t">${esc(c.titulo)}</div><div class="s">${tipos.map((t) => ARQ[t][0]).join(' · ')}${onde ? ` · ${esc(onde)}` : ''}</div></div>
+    <span class="acts">${tipos.length > 1 ? tipos.map((t) => `<button class="icon-btn" data-arq="${t}" aria-label="${ARQ[t][0]}" title="${ARQ[t][0]}">${icon(ARQ[t][1], 16)}</button>`).join('') : `<button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button>`}</span></li>`;
+}
+function abrirCanto(c, tipo) {
+  const a = c.arquivos.find((x) => x.tipo === tipo) || [...c.arquivos].sort((x, y) => ORDEM_ARQ.indexOf(x.tipo) - ORDEM_ARQ.indexOf(y.tipo))[0];
+  if (!a) return;
+  const titulo = c.arquivos.length > 1 && a.tipo !== 'pdf' ? `${c.titulo} (${ARQ[a.tipo][0].toLowerCase()})` : c.titulo;
+  location.hash = `#/arquivo/${encodeURIComponent(urlDoArquivo(a))}/${encodeURIComponent(titulo)}/${encodeURIComponent(location.hash)}`;
+}
+// lista de cantos agrupada pela coleção de origem, com busca dentro dela
+function desenharCantos(box, itens, { filtro = '', vazio = 'Nada encontrado.', agrupar = true, caminho = true } = {}) {
+  const lista = filtro ? buscarNoAcervo(itens, filtro) : itens;
+  const cantos = agruparCantos(lista);
+  cantosNaTela = cantos;
+  if (!cantos.length) { box.innerHTML = `<p class="muted">${vazio}</p>`; return; }
+  if (!agrupar) { box.innerHTML = `<ul class="tracks">${cantos.map((c, i) => linhaCanto(c, i, { caminho })).join('')}</ul>`; return; }
+  const grupos = new Map();
+  cantos.forEach((c, i) => { const g = colecaoDe(c.caminho); if (!grupos.has(g)) grupos.set(g, []); grupos.get(g).push([c, i]); });
+  box.innerHTML = [...grupos].sort((a, b) => prioridade(a[0]) - prioridade(b[0])).map(([g, cs]) => `<div class="shelf-head"><h2>${esc(g)}</h2><span class="muted">${cs.length}</span></div>
+    <ul class="tracks">${cs.map(([c, i]) => linhaCanto(c, i)).join('')}</ul>`).join('');
+}
+function ligarCantos(box) {
+  box.addEventListener('click', (e) => {
+    const li = e.target.closest('li[data-canto]');
+    const c = li && cantosNaTela[Number(li.dataset.canto)];
+    if (c) abrirCanto(c, e.target.closest('[data-arq]')?.dataset.arq);
+  });
+}
+const avisoAcervo = () => `<div class="alert">${icon('info', 18)}<span>O acervo litúrgico ainda não está disponível neste aparelho. Ele é atualizado todo dia; confira a conexão e tente de novo.</span></div>`;
+
+async function viewSetor(k, parte) {
+  const setor = SETORES.find((x) => x[0] === k);
+  if (k === 'busca') return viewBuscaAcervo(parte || '');
+  if (!setor) return viewNotFound();
+  if (parte) return viewParteDoSetor(setor, parte);
+  setTab('buscar');
+  setTint(`hsl(${setor[4]} 45% 32%)`);
+  setHeader(setor[1], { back: '#/buscar', eyebrow: 'Setor' });
+  const topo = `<section class="page-hero"><div class="cover gen" style="--h:${setor[4]}">${icon(setor[3], 64)}</div>
+    <div><div class="kind">Setor</div><h2>${esc(setor[1])}</h2><div class="meta">${esc(setor[2])}</div></div></section>`;
+  if (k === 'popular') {
+    view.innerHTML = `${topo}
+      <p class="muted" style="margin:-6px 0 14px">Cantos de devoção popular, cifrados, de <b>cindyferrarezi.com</b>, por parte da missa e tempo.</p>
+      <div class="grade-partes">${CATEGORIAS.map(([nome, id, ic], i) => `<a class="parte-card" href="#/buscar/categoria/${id}/${encodeURIComponent(nome)}" style="--h:${(i * 47 + 200) % 360}">${icon(ic, 20)}<b>${esc(nome)}</b></a>`).join('')}</div>`;
+    return;
+  }
+  view.innerHTML = `${topo}<div id="setor-corpo"><div class="loading-note"><span class="spin"></span>Abrindo o acervo…</div></div>`;
+  const ac = await acervoClassificado();
+  const corpo = $('#setor-corpo');
+  if (!corpo) return;
+  if (!ac.itens.length) { corpo.innerHTML = avisoAcervo(); return; }
+  const cartaoParte = ([pk, nome], n, i) => `<a class="parte-card" href="#/setor/${k}/${pk}" style="--h:${(i * 37 + setor[4]) % 360}"><b>${esc(nome)}</b><small>${n ? `${n} ${n === 1 ? 'arquivo' : 'arquivos'}` : 'ainda sem arquivos'}</small></a>`;
+  const colecao = ([cam, nome, desc]) => {
+    const n = ac.itens.filter((it) => { const c = it.caminho.join('/'); return c === cam.trim() || c.startsWith(cam.trim() + '/'); }).length;
+    return n ? `<li class="track clickable" data-pasta="${esc(cam.trim())}" style="grid-template-columns:auto 1fr auto"><div class="cover gen canto-ic" style="--h:${setor[4]}">${icon('library', 22)}</div>
+      <div class="info"><div class="t">${esc(nome)}</div><div class="s">${desc ? esc(desc) + ' · ' : ''}${n} arquivos</div></div><span class="acts"><button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>` : '';
+  };
+  if (k === 'fixas') corpo.innerHTML = `<div class="grade-partes">${PARTES_FIXAS.map((p, i) => cartaoParte(p, ac.fixas.get(p[0])?.length || 0, i)).join('')}</div>`;
+  else if (k === 'tempos') corpo.innerHTML = `<div class="grade-partes">${TEMPOS.map((p, i) => cartaoParte(p, ac.tempos.get(p[0])?.length || 0, i)).join('')}</div>`;
+  else {
+    const cols = k === 'livros' ? COLECOES_LIVROS : COLECOES_LITURGICAS;
+    corpo.innerHTML = `${k === 'liturgica' ? `<div class="chips" style="margin-bottom:14px"><a class="chip" href="#/setor/fixas">${icon('sparkles', 14)} Partes fixas</a><a class="chip" href="#/setor/tempos">${icon('calendar', 14)} Tempos e solenidades</a></div>` : ''}
+      <ul class="tracks">${cols.map(colecao).join('')}</ul>`;
+    corpo.addEventListener('click', (e) => { const li = e.target.closest('li[data-pasta]'); if (li) location.hash = '#/acervo/' + encodeURIComponent(li.dataset.pasta); });
+  }
+  corpo.insertAdjacentHTML('beforeend', `<p class="fonte" style="margin-top:18px">Arquivos do acervo litúrgico no Google Drive (hinários e subsídios da CNBB). Partituras, cifras e áudios abrem aqui no app.</p>`);
+}
+
+async function viewParteDoSetor(setor, pk) {
+  const lista = setor[0] === 'fixas' ? PARTES_FIXAS : TEMPOS;
+  const parte = lista.find((p) => p[0] === pk);
+  if (!parte) return viewNotFound();
+  setTab('buscar');
+  setTint(`hsl(${setor[4]} 45% 32%)`);
+  setHeader(parte[1], { back: '#/setor/' + setor[0], eyebrow: setor[1] });
+  view.innerHTML = `<h2 class="greet">${esc(parte[1])}</h2>
+    <label class="field">${icon('search', 20)}<input class="search" type="search" placeholder="Procurar em ${esc(parte[1])}"></label>
+    <div id="cantos" style="margin-top:12px"><div class="loading-note"><span class="spin"></span>Abrindo o acervo…</div></div>`;
+  const ac = await acervoClassificado();
+  const box = $('#cantos');
+  if (!box) return;
+  if (!ac.itens.length) { box.innerHTML = avisoAcervo(); return; }
+  const itens = (setor[0] === 'fixas' ? ac.fixas : ac.tempos).get(pk) || [];
+  const vazio = `Ainda não há arquivos de ${esc(parte[1])} no acervo. <a href="#/buscar" id="na-internet">Procurar na internet</a>`;
+  ligarCantos(box);
+  desenharCantos(box, itens, { vazio });
+  $('#na-internet')?.addEventListener('click', () => { sessionStorage.setItem('busca', parte[1].replace(/\s*\(.*$/, '')); sessionStorage.setItem('buscaFiltro', 'tudo'); });
+  $('.search').oninput = (e) => desenharCantos(box, itens, { filtro: e.target.value, vazio: 'Nada com esse nome.' });
+}
+
+// navegar pelas pastas do acervo (subpastas e cantos)
+async function viewAcervo(caminho = '') {
+  const partes = caminho ? caminho.split('/') : [];
+  setTab('buscar');
+  setTint('#24425c');
+  const pai = partes.length > 1 ? '#/acervo/' + encodeURIComponent(partes.slice(0, -1).join('/')) : (ehLivro({ caminho: partes }) ? '#/setor/livros' : '#/setor/liturgica');
+  const nome = (COLECOES.find(([p]) => p.trim() === caminho) || [])[1] || bonito(partes[partes.length - 1] || 'Acervo litúrgico').replace(/\s*_\s*/g, ' · ');
+  setHeader(nome, { back: pai, eyebrow: 'Acervo litúrgico' });
+  view.innerHTML = `<h2 class="greet">${esc(nome)}</h2>
+    <label class="field">${icon('search', 20)}<input class="search" type="search" placeholder="Procurar nesta pasta"></label>
+    <div id="pastas" style="margin-top:12px"></div><div id="cantos"><div class="loading-note"><span class="spin"></span>Abrindo o acervo…</div></div>`;
+  const ac = await acervoClassificado();
+  const box = $('#cantos');
+  if (!box) return;
+  if (!ac.itens.length) { box.innerHTML = avisoAcervo(); return; }
+  const dentro = ac.itens.filter((it) => partes.every((p, i) => it.caminho[i] === p));
+  const aqui = dentro.filter((it) => it.caminho.length === partes.length);
+  const sub = new Map();
+  for (const it of dentro) if (it.caminho.length > partes.length) { const n = it.caminho[partes.length]; sub.set(n, (sub.get(n) || 0) + 1); }
+  const pastas = [...sub].sort((a, b) => a[0].localeCompare(b[0], 'pt', { numeric: true }));
+  // pasta só com uma subpasta e nada mais: entra direto nela
+  if (!aqui.length && pastas.length === 1) {
+    const dest = [...partes, pastas[0][0]].join('/');
+    history.replaceState(null, '', '#/acervo/' + encodeURIComponent(dest));
+    return viewAcervo(dest);
+  }
+  // voltar: a pasta de cima que não seja só passagem (uma subpasta e nada mais), ou o setor
+  let acima = partes.slice(0, -1);
+  const soPassagem = (cam) => {
+    const de = ac.itens.filter((it) => cam.every((p, i) => it.caminho[i] === p));
+    return !de.some((it) => it.caminho.length === cam.length) && new Set(de.map((it) => it.caminho[cam.length])).size === 1;
+  };
+  while (acima.length && soPassagem(acima)) acima = acima.slice(0, -1);
+  // acima da coleção (Hinário, Antífonas…) volta para o setor
+  const raiz = COLECOES.find(([p]) => caminho === p.trim() || caminho.startsWith(p.trim() + '/'));
+  if (raiz && acima.length < raiz[0].trim().split('/').length) acima = [];
+  setHeader(nome, { back: acima.length ? '#/acervo/' + encodeURIComponent(acima.join('/')) : (ehLivro({ caminho: partes }) ? '#/setor/livros' : '#/setor/liturgica'), eyebrow: 'Acervo litúrgico' });
+  const desenhar = (filtro = '') => {
+    $('#pastas').innerHTML = !filtro && pastas.length ? `<ul class="tracks">${pastas.map(([n, q]) => `<li class="track clickable" data-sub="${esc(n)}" style="grid-template-columns:auto 1fr auto"><div class="cover gen canto-ic" style="--h:210">${icon('library', 22)}</div>
+      <div class="info"><div class="t">${esc(bonito(n).replace(/\s*_\s*/g, ' · '))}</div><div class="s">${q} arquivos</div></div><span class="acts"><button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`).join('')}</ul>` : '';
+    if (filtro) desenharCantos(box, dentro, { filtro, vazio: 'Nada com esse nome nesta pasta.' });
+    else if (aqui.length) desenharCantos(box, aqui, { agrupar: false, caminho: false });
+    else box.innerHTML = '';
+  };
+  ligarCantos(box);
+  $('#pastas').addEventListener('click', (e) => { const li = e.target.closest('li[data-sub]'); if (li) location.hash = '#/acervo/' + encodeURIComponent([...partes, li.dataset.sub].join('/')); });
+  desenhar();
+  $('.search').oninput = (e) => desenhar(e.target.value.trim());
+}
+
+// todos os arquivos do acervo com o termo (da busca)
+async function viewBuscaAcervo(termo) {
+  setTab('buscar');
+  setTint('#24425c');
+  setHeader('Acervo litúrgico', { back: '#/buscar', eyebrow: 'Busca' });
+  view.innerHTML = `<h2 class="greet">“${esc(termo)}” no acervo</h2><div id="cantos"><div class="loading-note"><span class="spin"></span>Procurando…</div></div>`;
+  const ac = await acervoClassificado();
+  const box = $('#cantos');
+  if (!box) return;
+  if (!ac.itens.length) { box.innerHTML = avisoAcervo(); return; }
+  ligarCantos(box);
+  desenharCantos(box, ac.itens, { filtro: termo, vazio: 'Nada no acervo com esse nome.' });
 }
 
 // ------------------------------------------------------------- biblioteca
@@ -3730,10 +3954,11 @@ async function viewFontes() {
 }
 
 // leitor de arquivos (partituras, hinários, preces do Google Drive, PDFs) dentro do app
-function viewArquivo(url, titulo) {
-  setTab('oracoes');
+function viewArquivo(url, titulo, voltar = '') {
+  const doAcervo = /^#\/(setor|acervo|buscar)/.test(voltar);
+  setTab(doAcervo ? 'buscar' : 'oracoes');
   setTint('#24425c');
-  setHeader(titulo || 'Arquivo', { back: '#/fontes', eyebrow: host(url) });
+  setHeader(titulo || 'Arquivo', { back: voltar || '#/fontes', eyebrow: host(url) });
   const leitor = leitorDoArquivo(url || '');
   if (!leitor) { location.hash = '#/fontes'; return; }
   view.innerHTML = `<div class="leitor">
@@ -3787,7 +4012,9 @@ function route() {
     case 'oracoes': return viewOracoes();
     case 'oracao': return viewOracao(b);
     case 'fontes': return viewFontes();
-    case 'arquivo': return viewArquivo(b, c);
+    case 'arquivo': return viewArquivo(b, c, d);
+    case 'setor': return viewSetor(b, c);
+    case 'acervo': return viewAcervo(b || '');
     default: return viewNotFound();
   }
 }
