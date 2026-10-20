@@ -169,3 +169,64 @@ test('IA: voz grave na clave de tenor e música que começa no contratempo', asy
   const mel = melodiaDasNotas([...nc, ...baixo], { bpm: 96 });
   assert.deepEqual(mel[0], { a: [], d: 4, l: [], c: '' });
 });
+
+test('IA: coral a 4 vozes separa as notas em Soprano, Contralto, Tenor e Baixo sem cruzar', async () => {
+  const { vozesDasNotas } = await import('../public/js/lib/partitura.js');
+  const tempo = 60 / 90;
+  // 4 acordes de semínima (Sol maior → Ré maior…), cada voz na sua altura, mais um tempo só com a melodia
+  const acordes = [[71, 67, 62, 55], [69, 66, 62, 50], [71, 67, 59, 55], [72, 64, 60, 48]];
+  const notas = acordes.flatMap((ac, i) => ac.map((p) => ({ startTimeSeconds: i * tempo, durationSeconds: tempo * 0.95, pitchMidi: p, amplitude: 0.8 })));
+  notas.push({ startTimeSeconds: 4 * tempo, durationSeconds: tempo * 0.95, pitchMidi: 74, amplitude: 0.8 });
+  const pautas = vozesDasNotas(notas, { bpm: 90, fifths: 1 });
+  assert.deepEqual(pautas.map((p) => p.nome), ['Soprano', 'Contralto', 'Tenor', 'Baixo']);
+  assert.deepEqual(pautas.map((p) => p.clave), ['G', 'G', 'G8', 'F']);
+  const alturas = (p) => p.ev.filter((e) => e.a.length).map((e) => e.a[0]);
+  assert.deepEqual(alturas(pautas[0]), ['B4', 'A4', 'B4', 'C5', 'D5']);
+  assert.deepEqual(alturas(pautas[1]), ['G4', 'F#4', 'G4', 'E4']);
+  assert.deepEqual(alturas(pautas[2]), ['D4', 'D4', 'B3', 'C4']);
+  assert.deepEqual(alturas(pautas[3]), ['G3', 'D3', 'G3', 'C3']);
+  // todas as vozes do mesmo tamanho (o último tempo só o soprano canta; as outras ficam em pausa)
+  const tam = pautas.map((p) => p.ev.reduce((a, e) => a + e.d, 0));
+  assert.ok(tam.every((x) => x === tam[0]));
+});
+
+test('letra automática: sílabas do português e a letra em todas as vozes', async () => {
+  const { separarSilabas, letraEmSilabas, colocarLetra, temLetra } = await import('../public/js/lib/partitura.js');
+  const casos = {
+    Maria: 'Ma-ri-a', filho: 'fi-lho', palavra: 'pa-la-vra', carro: 'car-ro', nascer: 'nas-cer', inspirar: 'ins-pi-rar',
+    pai: 'pai', 'mãe': 'mãe', 'coração': 'co-ra-ção', 'saúde': 'sa-ú-de', quando: 'quan-do', guerra: 'guer-ra',
+    'água': 'á-gua', 'Senhor,': 'Se-nhor,', muito: 'mui-to', sair: 'sa-ir', rainha: 'ra-i-nha', 'obstáculo': 'obs-tá-cu-lo',
+  };
+  for (const [w, esperado] of Object.entries(casos)) assert.equal(separarSilabas(w).join('-'), esperado, w);
+  assert.equal(letraEmSilabas('Santo, santo\nSenhor'), 'San-to, san-to Se-nhor');
+  const m = novaPartitura({ tipo: 'duas' });
+  m.pautas[0].ev = [n('C4', 8), n(null, 8), n('D4', 8, { lig: true }), n('D4', 8), n('E4', 8)];
+  m.pautas[1].ev = [n('A3', 16), n('B3', 16)];
+  assert.equal(temLetra(m), false);
+  const sobrou = colocarLetra(m, letraEmSilabas('San-to Deus'));
+  assert.deepEqual(m.pautas[0].ev.map((e) => e.l[0] || ''), ['San-', '', 'to', '', 'Deus']);
+  assert.deepEqual(m.pautas[1].ev.map((e) => e.l[0] || ''), ['San-', 'to']);
+  assert.equal(sobrou, 1);
+  assert.equal(temLetra(m), true);
+});
+
+test('cifra automática: cada acorde na sílaba onde cai e na nota dela (só na primeira voz)', async () => {
+  const { silabasDaLetra, colocarLetra, temCifra } = await import('../public/js/lib/partitura.js');
+  const { linhasDaLetraComCifra } = await import('../public/js/chordpro.js');
+  const linhas = linhasDaLetraComCifra('{title: T}\n{soc}\n[G]Santo, san[D]to é o [Em]Senhor\n[C]Deus [D]\n{eoc}\n[A] [B]\nO céu');
+  const sil = silabasDaLetra(linhas);
+  assert.equal(sil.map((x) => (x.c ? `[${x.c}]` : '') + x.s).join(' '), '[G]San- to, san- [D]to é o [Em]Se- nhor [C]Deus [D]O céu');
+  const m = novaPartitura({ tipo: 'duas' });
+  m.pautas[0].ev = Array.from({ length: 6 }, () => n('C4', 8, { c: 'X' }));
+  m.pautas[1].ev = Array.from({ length: 6 }, () => n('A3', 8));
+  colocarLetra(m, sil, { cifras: true });
+  assert.deepEqual(m.pautas[0].ev.map((e) => e.c), ['G', '', '', 'D', '', '']);
+  assert.deepEqual(m.pautas[0].ev.map((e) => e.l[0]), ['San-', 'to,', 'san-', 'to', 'é', 'o']);
+  assert.ok(m.pautas[1].ev.every((e) => !e.c));
+  // só a cifra: a letra que havia fica
+  m.pautas[0].ev[0].l = ['Ho-'];
+  colocarLetra(m, sil.map((x) => ({ ...x, c: x.c === 'G' ? 'Am' : x.c })), { comLetra: false, cifras: true });
+  assert.equal(m.pautas[0].ev[0].c, 'Am');
+  assert.equal(m.pautas[0].ev[0].l[0], 'Ho-');
+  assert.equal(temCifra(m), true);
+});

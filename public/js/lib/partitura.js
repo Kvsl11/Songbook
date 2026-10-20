@@ -399,6 +399,10 @@ export function deMusicXML(doc) {
 export function distribuirLetra(pauta, texto, { inicio = 0, estrofe = 0 } = {}) {
   const silabas = String(texto).trim().split(/\s+/).filter(Boolean)
     .flatMap((palavra) => { const ps = palavra.split('-').filter(Boolean); return ps.map((s, i) => s + (i < ps.length - 1 ? '-' : '')); });
+  return distribuirSilabas(pauta, silabas.map((s) => ({ s, c: '' })), { inicio, estrofe });
+}
+// as sílabas ({ s, c }) nas notas; com "cifras", a cifra de cada sílaba vai para a nota dela
+function distribuirSilabas(pauta, silabas, { inicio = 0, estrofe = 0, cifras = false } = {}) {
   let k = 0;
   let ultimo = -1;
   for (let i = inicio; i < pauta.ev.length && k < silabas.length; i++) {
@@ -406,15 +410,136 @@ export function distribuirLetra(pauta, texto, { inicio = 0, estrofe = 0 } = {}) 
     const continuaLigadura = i > 0 && pauta.ev[i - 1].lig && pauta.ev[i - 1].a?.length;
     if (!ev.a?.length || continuaLigadura) continue;
     ev.l = [...(ev.l || [])];
-    ev.l[estrofe] = silabas[k++];
+    ev.l[estrofe] = silabas[k].s;
+    if (cifras && silabas[k].c) ev.c = silabas[k].c;
+    k++;
     ultimo = i;
   }
   return { ultimo, sobrou: silabas.length - k };
 }
 
+// ---- sílabas: a letra da música (sem hífens) separada em sílabas, para cair nota por nota. Regras do português:
+// a consoante entre vogais vai com a seguinte (ca-sa); ch, lh, nh e os encontros com l/r (pr, bl, tr…) não se
+// separam (fi-lho, pa-la-vra); as outras consoantes juntas se separam (car-ro, nas-cer, ad-vo-ga-do; a última fica
+// com a vogal seguinte: ins-pi-rar); a vogal + i/u sem acento é ditongo (pai, céu, mãe, pão), as outras vogais
+// juntas se separam (Ma-ri-a, sa-ú-de); o u de qu/gu antes de vogal faz parte da consoante (que, guer-ra, quan-do).
+const VOGAIS = 'aeiouáéíóúâêôãõàüy';
+const ehVogal = (c) => VOGAIS.includes(c);
+const ENCONTROS = new Set(['bl', 'br', 'cl', 'cr', 'dr', 'fl', 'fr', 'gl', 'gr', 'pl', 'pr', 'tr', 'vr', 'tl', 'ch', 'lh', 'nh', 'gn', 'ps', 'pn']);
+const ditongo = (a, b) => ('aeoáéóâêô'.includes(a) && 'iu'.includes(b)) || ('ãõ'.includes(a) && 'eoi'.includes(b))
+  || (a === 'u' && b === 'i') || (a === 'i' && b === 'u');
+export function separarSilabas(palavra) {
+  const m = /^([^\p{L}]*)([\p{L}]+(?:[-'’][\p{L}]+)*)([^\p{L}]*)$/u.exec(palavra);
+  if (!m) return [palavra];
+  const [, antes, miolo, depois] = m;
+  // palavras com hífen (dá-me, guarda-chuva): cada pedaço separado
+  if (/[-]/.test(miolo)) {
+    const partes = miolo.split('-').map((x) => separarSilabas(x));
+    const out = partes.flat();
+    out[0] = antes + out[0];
+    out[out.length - 1] += depois;
+    return out;
+  }
+  const w = miolo.toLowerCase();
+  // o que é vogal (núcleo) em cada letra
+  const vog = [...w].map((c, i) => ehVogal(c) && !(c === 'u' && i > 0 && 'qg'.includes(w[i - 1]) && ehVogal(w[i + 1] || '')) && !(c === 'y' && ehVogal(w[i + 1] || '')));
+  // núcleos: [início, fim] de cada sílaba (vogal sozinha ou ditongo)
+  const nucleos = [];
+  for (let i = 0; i < w.length; i++) {
+    if (!vog[i]) continue;
+    const ult = nucleos[nucleos.length - 1];
+    if (ult && ult[1] === i - 1 && ult[1] === ult[0] && ditongo(w[i - 1], w[i])
+      // "ai", "ui"… seguidos de nh, ou de consoante que fecha a palavra (sa-ir, ra-iz), não são ditongo
+      && !('iu'.includes(w[i]) && (w.slice(i + 1, i + 3) === 'nh' || (i + 2 === w.length && 'rlz'.includes(w[i + 1]))))) ult[1] = i;
+    else nucleos.push([i, i]);
+  }
+  if (nucleos.length < 2) return [palavra];
+  // corte entre um núcleo e o seguinte: as consoantes do meio se dividem
+  const cortes = [];
+  for (let k = 1; k < nucleos.length; k++) {
+    const ini = nucleos[k - 1][1] + 1;
+    const fim = nucleos[k][0]; // primeira letra do próximo núcleo
+    const cons = w.slice(ini, fim);
+    // quantas consoantes vão com a vogal seguinte: uma, ou duas (qu/gu, ch/lh/nh e os encontros com l/r)
+    let vai = cons.length ? 1 : 0;
+    if (cons.length >= 2 && (/^[qg]u$/.test(cons.slice(-2)) || ENCONTROS.has(cons.slice(-2)))) vai = 2;
+    cortes.push(fim - vai);
+  }
+  const out = [];
+  let de = 0;
+  for (const c of cortes) { out.push(miolo.slice(de, c)); de = c; }
+  out.push(miolo.slice(de));
+  out[0] = antes + out[0];
+  out[out.length - 1] += depois;
+  return out;
+}
+// sílabas da letra com a cifra de cada uma: as linhas vêm com os acordes no lugar ("[G]San[D]to, santo"); o acorde
+// fica na sílaba onde ele cai (o que cai num espaço ou no fim da linha vai para a próxima sílaba).
+// Devolve [{ s: sílaba (com "-" se a palavra continua), c: cifra ou '' }]
+export function silabasDaLetra(linhas) {
+  const out = [];
+  let pendente = '';
+  for (const linha of [].concat(linhas)) {
+    // o texto sem os acordes e onde cada acorde cai nele
+    const acordes = [];
+    let texto = '';
+    const re = /\[([^\]]*)\]/g;
+    let ult = 0;
+    let m;
+    while ((m = re.exec(linha))) { texto += linha.slice(ult, m.index); acordes.push({ at: texto.length, c: m[1].trim() }); ult = re.lastIndex; }
+    texto += linha.slice(ult);
+    const silabas = [];
+    for (const w of texto.matchAll(/\S+/g)) {
+      let at = w.index;
+      const partes = separarSilabas(w[0]);
+      partes.forEach((sil, i) => { silabas.push({ ini: at, fim: at + sil.length, s: sil + (i < partes.length - 1 ? '-' : ''), c: '' }); at += sil.length; });
+    }
+    if (pendente && silabas.length) { silabas[0].c = pendente; pendente = ''; }
+    for (const a of acordes) {
+      if (!a.c) continue;
+      const alvo = silabas.find((x) => a.at < x.fim);
+      if (alvo) alvo.c = a.c; else pendente = a.c;
+    }
+    for (const x of silabas) out.push({ s: x.s, c: x.c });
+  }
+  return out;
+}
+
+// texto inteiro com as sílabas separadas por hífen (o formato que distribuirLetra lê)
+export const letraEmSilabas = (texto) => String(texto || '').split(/\s+/).filter(Boolean).map((p) => separarSilabas(p).join('-')).join(' ');
+
+// a letra em todas as vozes (cada uma canta o texto inteiro, do começo), numa estrofe; tira a letra que havia nela.
+// "letra": o texto com hífens ou as sílabas de silabasDaLetra. Com "cifras" (e as sílabas trazendo a cifra), os
+// acordes da música vão para as notas da primeira voz com notas (as cifras que ela tinha saem); com letra: false,
+// só a cifra entra. Devolve quantas sílabas sobraram (na voz que mais faltou nota)
+export function colocarLetra(modelo, letra, { estrofe = 0, cifras = false, comLetra = true } = {}) {
+  const silabas = typeof letra === 'string'
+    ? letra.trim().split(/\s+/).filter(Boolean).flatMap((w) => { const ps = w.split('-').filter(Boolean); return ps.map((s, i) => ({ s: s + (i < ps.length - 1 ? '-' : ''), c: '' })); })
+    : letra;
+  let sobrou = 0;
+  let primeira = true;
+  for (const p of modelo.pautas) {
+    if (!p.ev.some((e) => e.a?.length)) continue;
+    const comCifra = cifras && primeira;
+    primeira = false;
+    if (!comLetra && !comCifra) continue;
+    const antes = p.ev.map((e) => e.l);
+    if (comCifra) for (const e of p.ev) e.c = '';
+    for (const e of p.ev) if (e.l?.[estrofe]) { e.l = [...e.l]; e.l[estrofe] = ''; while (e.l.length && !e.l[e.l.length - 1]) e.l.pop(); }
+    sobrou = Math.max(sobrou, distribuirSilabas(p, silabas, { estrofe, cifras: comCifra }).sobrou);
+    if (!comLetra) p.ev.forEach((e, i) => { e.l = antes[i] || []; }); // só a cifra: a letra que havia fica
+  }
+  return sobrou;
+}
+const temCifra = (modelo) => modelo.pautas.some((p) => p.ev.some((e) => e.c));
+export { temCifra };
+const temLetra = (modelo) => modelo.pautas.some((p) => p.ev.some((e) => e.l?.some(Boolean)));
+export { temLetra };
+
 // ---- rascunho automático (IA): das notas ouvidas (Basic Pitch: { startTimeSeconds, durationSeconds, pitchMidi,
-// amplitude }) para a melodia na partitura. A IA ouve tudo (voz e instrumentos); aqui fica uma linha só: em cada
-// momento, a nota mais forte dentro da extensão de voz, já no compasso e no andamento.
+// amplitude }) para a partitura. A IA ouve tudo (voz e instrumentos); a melodia é uma linha só (em cada momento, a
+// nota mais forte dentro da extensão de voz) e o coral separa as notas em Soprano, Contralto, Tenor e Baixo, já no
+// compasso e no andamento.
 
 const SUST = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const BEM = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -496,10 +621,9 @@ export function claveDaVoz(notas, modo = 'mistura') {
   const mediana = alt[Math.floor(alt.length / 2)] ?? 67;
   return modo === 'voz' && mediana < 60 ? { clave: 'G8', centro: 55 } : { clave: 'G', centro: 67 };
 }
-export function melodiaDasNotas(notas, { bpm = 80, fifths = 0, modo = 'mistura', faixa = faixaDoModo(modo), oitava = 0, minAmp = 0.2, centro = 67, meioTempo = false } = {}) {
+// a grade de semicolcheias onde as notas ouvidas se encaixam: onde começa (num tempo) e quantos passos tem
+function gradeDasNotas(notas, validas, { bpm, minAmp, meioTempo }) {
   const passo = 60 / bpm / 4; // semicolcheia, em segundos
-  const validas = notas.filter((n) => n.pitchMidi >= faixa[0] && n.pitchMidi <= faixa[1] && (n.amplitude ?? 1) >= minAmp && n.durationSeconds > passo * 0.6);
-  if (!validas.length) return [];
   // onde caem os tempos: a média circular dos começos de TODAS as notas ouvidas — o baixo e os acordes da banda mudam
   // no tempo — com as mais fortes e longas pesando mais. A grade começa num tempo, e não na primeira nota: música que
   // começa no contratempo não fica toda deslocada meio tempo
@@ -517,19 +641,12 @@ export function melodiaDasNotas(notas, { bpm = 80, fifths = 0, modo = 'mistura',
   const primeira = Math.min(...validas.map((n) => n.startTimeSeconds));
   const comeco = fase + Math.floor((primeira - fase + passo / 2) / tempo) * tempo;
   const fim = Math.max(...validas.map((n) => n.startTimeSeconds + n.durationSeconds));
-  const nPassos = Math.ceil((fim - comeco) / passo);
-  // em cada semicolcheia, a nota mais forte que soa (desempate: a mais aguda, que costuma ser a voz)
-  const grade = new Array(nPassos).fill(null);
-  for (let k = 0; k < nPassos; k++) {
-    const t = comeco + (k + 0.5) * passo;
-    let melhor = null;
-    for (const n of validas) {
-      if (n.startTimeSeconds > t || n.startTimeSeconds + n.durationSeconds < t) continue;
-      const forca = (n.amplitude ?? 1) + n.pitchMidi / 1000;
-      if (!melhor || forca > melhor.forca) melhor = { n, forca };
-    }
-    grade[k] = melhor?.n || null;
-  }
+  return { passo, comeco, nPassos: Math.ceil((fim - comeco) / passo) };
+}
+const soaEm = (n, t) => n.startTimeSeconds <= t && n.startTimeSeconds + n.durationSeconds >= t;
+
+// de uma linha da grade (a nota de cada semicolcheia, ou null) para os eventos da partitura
+function eventosDaGrade(grade, passo) {
   // blocos: a mesma nota seguida vira uma só; uma nota nova começa onde muda
   const blocos = [];
   for (const n of grade) {
@@ -568,11 +685,115 @@ export function melodiaDasNotas(notas, { bpm = 80, fifths = 0, modo = 'mistura',
   marcas.push(Math.round(t / 2) * 2);
   juntos.forEach((b, i) => { b.len = marcas[i + 1] - marcas[i]; });
   for (let i = juntos.length - 1; i >= 0; i--) if (juntos[i].len <= 0) juntos.splice(i, 1);
+  return juntos;
+}
+const paraEventos = (juntos, desloc, fifths) => juntos.map((b) => ({ a: b.n ? [alturaDoMidi(b.n.pitchMidi + desloc, fifths)] : [], d: b.len * 2, l: [], c: '' }));
+
+export function melodiaDasNotas(notas, { bpm = 80, fifths = 0, modo = 'mistura', faixa = faixaDoModo(modo), oitava = 0, minAmp = 0.2, centro = 67, meioTempo = false } = {}) {
+  const passoS = 60 / bpm / 4;
+  const validas = notas.filter((n) => n.pitchMidi >= faixa[0] && n.pitchMidi <= faixa[1] && (n.amplitude ?? 1) >= minAmp && n.durationSeconds > passoS * 0.6);
+  if (!validas.length) return [];
+  const { passo, comeco, nPassos } = gradeDasNotas(notas, validas, { bpm, minAmp, meioTempo });
+  // em cada semicolcheia, a nota mais forte que soa (desempate: a mais aguda, que costuma ser a voz)
+  const grade = new Array(nPassos).fill(null);
+  for (let k = 0; k < nPassos; k++) {
+    const t = comeco + (k + 0.5) * passo;
+    let melhor = null;
+    for (const n of validas) {
+      if (!soaEm(n, t)) continue;
+      const forca = (n.amplitude ?? 1) + n.pitchMidi / 1000;
+      if (!melhor || forca > melhor.forca) melhor = { n, forca };
+    }
+    grade[k] = melhor?.n || null;
+  }
+  const juntos = eventosDaGrade(grade, passo);
   // oitava: a melodia inteira vai para perto da extensão da clave (centro: Sol4 na clave de sol, Sol3 na de tenor)
   const alturas = juntos.filter((b) => b.n).map((b) => b.n.pitchMidi);
   const mediana = [...alturas].sort((a, b) => a - b)[Math.floor(alturas.length / 2)] ?? 67;
   const desloc = Math.round((centro - mediana) / 12) * 12 + oitava * 12;
-  return juntos.map((b) => ({ a: b.n ? [alturaDoMidi(b.n.pitchMidi + desloc, fifths)] : [], d: b.len * 2, l: [], c: '' }));
+  return paraEventos(juntos, desloc, fifths);
+}
+
+// coral a 4 vozes: em cada semicolcheia, as notas que soam (da mais aguda para a mais grave) vão para Soprano,
+// Contralto, Tenor e Baixo sem cruzar as vozes; com menos de 4 notas, cada uma vai para a voz que estava mais perto
+// (ou, no começo, para o meio da extensão dela) e as outras ficam em pausa. Com mais de 4 (acordes da banda), ficam
+// as 4 que melhor continuam as vozes. Devolve as pautas (já com nome e clave), na altura real.
+export const VOZES_CORAL = [
+  { id: 's', nome: 'Soprano', clave: 'G', centro: 67, faixa: [58, 84] },
+  { id: 'c', nome: 'Contralto', clave: 'G', centro: 62, faixa: [52, 77] },
+  { id: 't', nome: 'Tenor', clave: 'G8', centro: 55, faixa: [46, 70] },
+  { id: 'b', nome: 'Baixo', clave: 'F', centro: 48, faixa: [38, 64] },
+];
+// todas as formas de escolher k de n índices, em ordem
+function combinacoes(n, k) {
+  const out = [];
+  const rec = (ini, acc) => {
+    if (acc.length === k) { out.push(acc.slice()); return; }
+    for (let i = ini; i <= n - (k - acc.length); i++) { acc.push(i); rec(i + 1, acc); acc.pop(); }
+  };
+  rec(0, []);
+  return out;
+}
+export function vozesDasNotas(notas, { bpm = 80, fifths = 0, oitava = 0, minAmp = 0.2, meioTempo = false, faixa = [38, 84] } = {}) {
+  const vozes = VOZES_CORAL;
+  const vazias = () => vozes.map((v) => ({ id: v.id, nome: v.nome, clave: v.clave, ev: [] }));
+  const passoS = 60 / bpm / 4;
+  const validas = notas.filter((n) => n.pitchMidi >= faixa[0] && n.pitchMidi <= faixa[1] && (n.amplitude ?? 1) >= minAmp && n.durationSeconds > passoS * 0.6);
+  if (!validas.length) return vazias();
+  const { passo, comeco, nPassos } = gradeDasNotas(notas, validas, { bpm, minAmp, meioTempo });
+  const grades = vozes.map(() => new Array(nPassos).fill(null));
+  const ultima = vozes.map((v) => v.centro); // altura recente de cada voz (para seguir a linha dela)
+  const anterior = vozes.map(() => null); // a nota que cada voz cantava no passo anterior
+  for (let k = 0; k < nPassos; k++) {
+    const t = comeco + (k + 0.5) * passo;
+    // as notas que soam, uma por altura (a mais forte), da mais aguda para a mais grave; no máximo 8 (as mais fortes)
+    const porAltura = new Map();
+    for (const n of validas) {
+      if (!soaEm(n, t)) continue;
+      const a = Math.round(n.pitchMidi);
+      const ja = porAltura.get(a);
+      if (!ja || (n.amplitude ?? 1) > (ja.amplitude ?? 1)) porAltura.set(a, n);
+    }
+    let soando = [...porAltura.values()];
+    if (soando.length > 8) soando = soando.sort((a, b) => (b.amplitude ?? 1) - (a.amplitude ?? 1)).slice(0, 8);
+    soando.sort((a, b) => b.pitchMidi - a.pitchMidi);
+    if (!soando.length) { for (let v = 0; v < vozes.length; v++) anterior[v] = null; continue; }
+    // custo de uma voz cantar uma nota: a distância da linha dela, mais um castigo fora da extensão; continuar a mesma
+    // nota que já cantava é de graça (não troca de voz no meio de uma nota)
+    const custo = (v, n) => {
+      if (anterior[v] === n) return -3;
+      const [lo, hi] = vozes[v].faixa;
+      const fora = n.pitchMidi < lo ? lo - n.pitchMidi : n.pitchMidi > hi ? n.pitchMidi - hi : 0;
+      return Math.abs(n.pitchMidi - ultima[v]) * 0.5 + fora * 3;
+    };
+    const kNotas = Math.min(soando.length, vozes.length);
+    let melhor = null;
+    // escolhe quais notas entram (se há mais de 4) e para quais vozes vão, sem cruzar: a mais aguda na voz mais aguda
+    for (const quais of combinacoes(soando.length, kNotas)) {
+      for (const onde of combinacoes(vozes.length, kNotas)) {
+        let c = 0;
+        for (let j = 0; j < kNotas; j++) c += custo(onde[j], soando[quais[j]]);
+        if (!melhor || c < melhor.c) melhor = { c, quais, onde };
+      }
+    }
+    for (let v = 0; v < vozes.length; v++) {
+      const j = melhor.onde.indexOf(v);
+      const n = j >= 0 ? soando[melhor.quais[j]] : null;
+      grades[v][k] = n;
+      anterior[v] = n;
+      if (n) ultima[v] = ultima[v] * 0.3 + n.pitchMidi * 0.7;
+    }
+  }
+  const pautas = vazias();
+  const linhas = grades.map((g) => eventosDaGrade(g, passo));
+  // todas as vozes do mesmo tamanho (as que acabam antes ganham a pausa do fim)
+  const total = Math.max(...linhas.map((l) => l.reduce((a, b) => a + b.len, 0)));
+  linhas.forEach((l, v) => {
+    const falta = total - l.reduce((a, b) => a + b.len, 0);
+    if (falta > 0) l.push({ n: null, len: falta });
+    pautas[v].ev = paraEventos(l, oitava * 12, fifths);
+  });
+  return pautas;
 }
 
 // leitura ao vivo: as notas de um pedaço analisado (com contexto antes do corte, a partir de "de") entram na lista;

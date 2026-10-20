@@ -44,12 +44,21 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   anacruse, tom, andamento e vozes nos ajustes; desfazer/refazer, teclado do computador (como no MuseScore), ouvir no
   ensaio, imprimir/PDF e exportar/importar MusicXML. Dá para começar da partitura desenhada pelo app e corrigir. Fica
   guardada na música (`lib/partitura.js` converte para MusicXML).
+  **Letra automática**: a letra da música entra sozinha nas notas de todas as vozes, sílaba por sílaba (separação de
+  sílabas do português: `separarSilabas`, `colocarLetra`), no rascunho da IA, ao abrir o editor ou a partitura sem
+  letra, e em ⋯ → *Colocar a letra da música*; corrige-se na aba **Letra**. A **cifra** vem junto: cada acorde da
+  cifra da música vai para a nota da sílaba onde ele cai (`silabasDaLetra`), na primeira voz (rascunho da IA, partitura
+  sem cifra e ⋯ → *Colocar a cifra da música*); corrige-se na aba **Cifra**. No editor, o ▶ do topo vira ⏸ enquanto
+  toca; na partitura e no editor (ouvindo), tocar numa nota leva a música para ali e toca a partir dela.
 - **Partituras** (menu do app): as partituras feitas no app e as prontas (acervo/Hinário) das músicas da biblioteca, com
   **Nova partitura** (escolhendo a música) e **Gerar com IA**: o app ouve a música pelo microfone (com o vídeo
   tocando), pelo som de uma aba (computador) ou de um arquivo de áudio, e o modelo **Basic Pitch** (Spotify, código
   aberto, roda no próprio aparelho) transforma o som em notas; o app escolhe a melodia, acha tom (pela cifra ou pelo
-  que ouviu) e andamento, põe no compasso e mostra a prévia para ajustar antes de abrir no editor. É um rascunho:
-  funciona melhor com voz e violão do que com banda completa.
+  que ouviu) e andamento, põe no compasso e mostra a prévia para ajustar antes de abrir no editor. Em **Vozes**, *Coral
+  a 4 vozes* separa as notas que soam juntas em **Soprano, Contralto, Tenor e Baixo** (cada uma na sua pauta e clave,
+  sem cruzar as vozes e seguindo a linha de cada uma: `vozesDasNotas`). É um rascunho: funciona melhor com voz e
+  violão (ou o coral sozinho) do que com banda completa. Com mais de uma voz, a partitura mostra o nome de cada pauta
+  e o ensaio usa esses nomes para tocar uma voz só.
 - **Buscar (qualquer música)**: digite música, artista ou trecho e aparece uma lista só de **Músicas** (resultados do
   Cifra Club e do Letras juntos) e os **Vídeos** do YouTube. Tocar numa música já traz tudo junto: a **cifra** (Cifra
   Club, que já tem a letra; sem cifra, a letra do Letras), o **vídeo** do YouTube e o compositor. Um vídeo tocado

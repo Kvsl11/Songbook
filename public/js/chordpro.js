@@ -603,6 +603,10 @@ const ehLinhaDeLetra = (l) => { const p = /^\s*\(([^()]*)\)\s*$/.exec(l); return
 export function linhasDaLetra(src) {
   return paraEditor(src).split('\n').filter(ehLinhaDeLetra).map((l) => semAcordes(l).replace(/\s+/g, ' ').trim());
 }
+// as mesmas linhas, com os acordes no lugar ([G]Santo, [D]santo…): para a letra e a cifra entrarem juntas na partitura
+export function linhasDaLetraComCifra(src) {
+  return paraEditor(src).split('\n').filter(ehLinhaDeLetra).map((l) => l.replace(/\s+/g, ' ').trim());
+}
 
 // partes: [{ inicio: nº da linha (1 = primeira), tipo: 'refrao' | 'estrofe' | 'ponte' | 'pre-refrao' | 'intro' | 'final' }]
 export function aplicarEstrutura(src, partes) {
