@@ -12,7 +12,7 @@ import { duracaoTotal, nomearVozes, passoNoTempo, segundosPorSemibreve, volumeDa
 import {
   acordesDoTom as acordesDaArmadura, alterar, alturaPeloNome, CLAVES, COMPASSOS, deMusicXML, distribuirLetra, DURACOES, emCompassos, frequenciaDa, midiDa, moverGrau,
   mudarOitava, NOMES_NOTA, nomeDaAltura, nomeDoTom, nomeDuracao, novaPartitura, paraMusicXML, tiquesDoCompasso,
-  estimarAndamento, estimarTom, melodiaDasNotas, tomDaCifra,
+  claveDaVoz, estimarAndamento, estimarTom, faixaDoModo, juntarPedaco, melodiaDasNotas, tomDaCifra,
 } from './lib/partitura.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
@@ -50,7 +50,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-144';
+export const APP_VERSAO = '2026.10.20-145';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -3978,24 +3978,13 @@ function criarLeitor(aoAtualizar) {
       const fim = Math.min(total, ini + PEDACO);
       const de = Math.max(0, ini - ANTES);
       try {
-        const achadas = await notasDoAudio(audio.slice(de, fim));
-        const t0 = ini / SR_IA;
-        const t1 = fim / SR_IA;
-        const novos = [];
-        for (const n of achadas) {
-          const s = n.startTimeSeconds + de / SR_IA;
-          const e = s + n.durationSeconds;
-          if (s < t0 - 0.05) {
-            // nota que já soava antes do corte: alonga a do pedaço anterior
-            const p = pendentes.find((x) => x.pitchMidi === n.pitchMidi);
-            if (p && e > p.startTimeSeconds + p.durationSeconds) p.durationSeconds = e - p.startTimeSeconds;
-            continue;
-          }
-          const nova = { startTimeSeconds: s, durationSeconds: n.durationSeconds, pitchMidi: n.pitchMidi, amplitude: n.amplitude };
-          notas.push(nova);
-          novos.push(nova);
-        }
-        pendentes = [...pendentes, ...novos].filter((x) => x.startTimeSeconds + x.durationSeconds >= t1 - 0.1);
+        // volume: microfone longe ou baixo chega fraco e a IA quase não ouve; o pedaço é aumentado até perto do máximo
+        const trecho = audio.slice(de, fim);
+        let pico = 0;
+        for (let i = 0; i < trecho.length; i++) pico = Math.max(pico, Math.abs(trecho[i]));
+        if (pico > 0.002 && pico < 0.6) { const g = Math.min(0.9 / pico, 40); for (let i = 0; i < trecho.length; i++) trecho[i] *= g; }
+        const achadas = await notasDoAudio(trecho);
+        pendentes = juntarPedaco(notas, pendentes, achadas, { de: de / SR_IA, t0: ini / SR_IA, t1: fim / SR_IA });
       } catch (e) { erro = e; break; }
       analisado = fim;
       aoAtualizar();
@@ -4057,6 +4046,7 @@ async function gerarComIA(song, titulo) {
   const podeAba = !celular && !!navigator.mediaDevices?.getDisplayMedia;
   const podeMic = !!navigator.mediaDevices?.getUserMedia;
   let sessao = null; // captura em andamento
+  let modoIA = 'mistura'; // 'voz' (cantando no microfone) ou 'mistura' (música com banda: vídeo, aba, arquivo)
   aoSair(() => pararCaptura());
   view.innerHTML = `<div class="ia">
     <section class="ia-topo">${capa(song)}<div><div class="kind">Gerar com IA</div><h2>${esc(titulo)}</h2>
@@ -4112,11 +4102,14 @@ async function gerarComIA(song, titulo) {
     nVivo = notas.length;
     const tomC = tomDaCifra(renderSong(song.content).key || song.key);
     const { fifths, modo } = tomC || estimarTom(notas);
-    const bpm = estimarAndamento(notas);
+    const bpm = estimarAndamento(notas, { faixa: faixaDoModo(modoIA) });
+    const { clave, centro } = claveDaVoz(notas, modoIA);
     $('#ia-tom-vivo') && ($('#ia-tom-vivo').textContent = nomeDoTom(fifths, modo));
     $('#ia-bpm-vivo') && ($('#ia-bpm-vivo').textContent = `♩ ${bpm}`);
     const m = novaPartitura({ titulo, fifths, modo, bpm });
-    m.pautas[0].ev = melodiaDasNotas(notas, { bpm, fifths });
+    m.pautas[0].clave = clave;
+    m.pautas[0].nome = modoIA === 'voz' ? 'Voz' : 'Melodia';
+    m.pautas[0].ev = melodiaDasNotas(notas, { bpm, fifths, modo: modoIA, centro });
     if (!m.pautas[0].ev.length) return;
     // só os últimos ~8 compassos (a tela não fica enorme e o desenho é rápido)
     const cheio = tiquesDoCompasso(m.compasso);
@@ -4177,22 +4170,34 @@ async function gerarComIA(song, titulo) {
   const fecharAbertos = () => { for (const st of abertos) st.getTracks().forEach((t) => t.stop()); abertos.clear(); };
   aoSair(fecharAbertos);
   let pedindo = false;
+  // microfone: cantando, com o ajuste automático de volume e o filtro de ruído do aparelho (a voz chega forte e limpa);
+  // com o vídeo tocando no próprio celular, sem filtro de ruído (ele apagaria a música) e sem cancelar o eco
   const pedirAudio = (tipo) => (tipo === 'aba'
     ? navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
-    : navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }));
+    : navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: tipo === 'mic', autoGainControl: true } }));
+  let somSessao = null; // um áudio só para a sessão inteira (pausar e continuar usam o mesmo)
   async function capturar(tipo) {
     if (pedindo || sessao) return; // dois toques em Gravar não abrem dois microfones
     pedindo = true;
+    modoIA = tipo === 'mic' ? 'voz' : 'mistura';
+    // o áudio é criado já no toque: no celular, criado depois da janela de permissão ele fica parado ("suspenso")
+    // e nada era gravado
+    somSessao?.close?.();
+    somSessao = new (window.AudioContext || window.webkitAudioContext)();
+    somSessao.resume?.();
     let stream;
     try {
       stream = await pedirAudio(tipo);
     } catch {
       toast(tipo === 'aba' ? 'Captura da aba cancelada' : 'Sem acesso ao microfone: permita nas configurações do navegador');
+      somSessao.close?.();
+      somSessao = null;
       return;
     } finally { pedindo = false; }
     // saiu da tela enquanto o navegador pedia a permissão: fecha na hora
-    if (!view.contains(passo)) { stream.getTracks().forEach((t) => t.stop()); return; }
+    if (!view.contains(passo)) { stream.getTracks().forEach((t) => t.stop()); somSessao?.close?.(); somSessao = null; return; }
     if (tipo === 'aba' && !stream.getAudioTracks().length) { stream.getTracks().forEach((t) => t.stop()); toast('Marque “Compartilhar áudio da aba” ao escolher a aba'); return; }
+    if (somSessao.state === 'suspended') await somSessao.resume().catch(() => {});
     telaLeitura(tipo);
     const leitor = ligarLeitor();
     // vídeo: os blocos esperam ~1 s numa fila e só entram se o vídeo da música andou nesse meio-tempo
@@ -4211,7 +4216,7 @@ async function gerarComIA(song, titulo) {
     let entrada = null;
     const ligar = (st) => {
       abertos.add(st);
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = somSessao;
       const fonte = ctx.createMediaStreamSource(new MediaStream(st.getAudioTracks()));
       const proc = ctx.createScriptProcessor(4096, 1, 1);
       const mudo = ctx.createGain();
@@ -4224,6 +4229,7 @@ async function gerarComIA(song, titulo) {
         let pico = 0;
         for (let i = 0; i < bloco.length; i += 16) pico = Math.max(pico, Math.abs(bloco[i]));
         estado.nivel = Math.min(1, pico * 3);
+        estado.media = (estado.media ?? 0.1) * 0.97 + estado.nivel * 0.03;
         const agora = performance.now();
         if (tipo !== 'video') { if (!pausado) leitor.alimentar(reamostrar(bloco)); return; }
         fila.push({ t: agora, bloco });
@@ -4232,25 +4238,26 @@ async function gerarComIA(song, titulo) {
           if (tocouEntre(b.t - 300, b.t + 900)) leitor.alimentar(reamostrar(b.bloco));
         }
       };
-      entrada = { stream: st, ctx, proc };
+      entrada = { stream: st, fonte, proc };
     };
     const desligar = () => {
       if (!entrada) return;
-      const { stream: st, ctx, proc } = entrada;
+      const { stream: st, fonte, proc } = entrada;
       entrada = null;
       fila = [];
       estado.nivel = 0;
       proc.onaudioprocess = null;
+      fonte.disconnect();
+      proc.disconnect();
       st.getTracks().forEach((t) => t.stop());
       abertos.delete(st);
-      ctx.close?.();
     };
     // continuar depois de pausar: abre o microfone de novo (a permissão já foi dada; a aba não fecha ao pausar)
     const religar = async () => {
       if (entrada || reabrindo || !sessao) return;
       reabrindo = true;
       try {
-        const st = await pedirAudio('mic');
+        const st = await pedirAudio(tipo);
         if (!sessao || pausado) st.getTracks().forEach((t) => t.stop()); else ligar(st);
       } catch { toast('Não consegui abrir o microfone de novo'); }
       reabrindo = false;
@@ -4277,7 +4284,9 @@ async function gerarComIA(song, titulo) {
       } else {
         estado.ouvindo = !pausado && !!entrada;
         estado.texto = pausado ? `Pausado${tipo === 'mic' ? ' (microfone fechado)' : ''}: a partitura continua de onde parou ao tocar em Continuar`
-          : tipo === 'aba' ? 'Ouvindo o som da aba' : entrada ? 'Ouvindo pelo microfone' : 'Abrindo o microfone…';
+          : tipo === 'aba' ? 'Ouvindo o som da aba' : !entrada ? 'Abrindo o microfone…'
+            : leitor.segundos > 3 && estado.media < 0.02 ? 'O som está chegando muito baixo: cante mais perto do celular'
+              : 'Ouvindo pelo microfone';
       }
       // o botão mostra o que dá para fazer agora (no vídeo, segue também o pausar/tocar do player)
       const bp = $('#ia-pausa');
@@ -4311,6 +4320,8 @@ async function gerarComIA(song, titulo) {
     sessao = null;
     s?.parar();
     fecharAbertos();
+    somSessao?.close?.();
+    somSessao = null;
   }
   async function lerArquivo(arquivo) {
     telaLeitura('arquivo');
@@ -4366,13 +4377,17 @@ async function gerarComIA(song, titulo) {
   function resultado() {
     const tomCifra = tomDaCifra(renderSong(song.content).key || song.key);
     let [fifths, modo] = tomCifra ? [tomCifra.fifths, tomCifra.modo] : (({ fifths: f, modo: m }) => [f, m])(estimarTom(notas));
-    let bpm = estimarAndamento(notas);
+    let bpm = estimarAndamento(notas, { faixa: faixaDoModo(modoIA) });
+    const { clave, centro } = claveDaVoz(notas, modoIA);
     let compasso = [4, 4];
     let oitava = 0;
+    let meioTempo = false;
     let osmd = null;
     const montar = () => {
       const m = novaPartitura({ titulo, compasso, fifths, modo, bpm });
-      m.pautas[0].ev = melodiaDasNotas(notas, { bpm, fifths, oitava });
+      m.pautas[0].clave = clave;
+      m.pautas[0].nome = modoIA === 'voz' ? 'Voz' : 'Melodia';
+      m.pautas[0].ev = melodiaDasNotas(notas, { bpm, fifths, oitava, modo: modoIA, centro, meioTempo });
       return m;
     };
     passo.innerHTML = `<div class="section-title">Rascunho pronto</div>
@@ -4382,6 +4397,7 @@ async function gerarComIA(song, titulo) {
         <div class="setting"><span class="ico">${icon('music', 18)}</span><div class="grow"><div class="t">Tom</div><div class="s">${tomCifra ? 'Pela cifra da música' : 'Pelo que a IA ouviu'}</div></div><button class="btn small" id="ia-tom">${nomeDoTom(fifths, modo)}</button></div>
         <div class="setting wrap"><span class="ico">${icon('clock', 18)}</span><div class="grow"><div class="t">Compasso</div></div>
           <div class="chips" id="ia-compasso">${[[2, 4], [3, 4], [4, 4], [6, 8]].map(([a, b]) => `<button class="chip" data-c="${a}/${b}" aria-pressed="${a === 4 && b === 4}">${a}/${b}</button>`).join('')}</div></div>
+        <label class="setting"><span class="ico">${icon('clock', 18)}</span><div class="grow"><div class="t">Começa no contratempo</div><div class="s">Se as notas ficaram deslocadas meio tempo (comum com a voz sozinha), ligue</div></div><input type="checkbox" class="switch" id="ia-meio"></label>
         <div class="setting"><span class="ico">${icon('up', 18)}</span><div class="grow"><div class="t">Oitava</div></div>
           <div class="seg"><button data-oit="-1">8ª↓</button><span class="val" id="ia-oit">0</span><button data-oit="1">8ª↑</button></div></div>
       </div>
@@ -4410,7 +4426,7 @@ async function gerarComIA(song, titulo) {
       if (b.dataset.oit) { oitava = Math.max(-2, Math.min(2, oitava + Number(b.dataset.oit))); previa(); }
       if (b.dataset.c) { compasso = b.dataset.c.split('/').map(Number); $('#ia-compasso').querySelectorAll('[data-c]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); previa(); }
       if (b.id === 'ia-tom') { const v = await escolherTomPartitura(fifths, modo); if (v) { [fifths, modo] = v; previa(); } }
-      if (b.id === 'ia-denovo') telaFontes();
+      if (b.id === 'ia-denovo') { passo.onchange = null; telaFontes(); }
       if (b.id === 'ia-abrir') {
         const atual = db.song(id);
         if (atual?.partitura?.pautas?.some((p) => p.ev.length) && !(await ask({ title: 'Trocar a partitura?', text: 'Esta música já tem uma partitura feita no app. O rascunho da IA fica no lugar dela.', ok: 'Trocar', danger: true }))) return;
@@ -4419,6 +4435,7 @@ async function gerarComIA(song, titulo) {
         location.hash = `#/musica/${id}/compor`;
       }
     };
+    passo.onchange = (e) => { if (e.target.id === 'ia-meio') { meioTempo = e.target.checked; previa(); } };
     previa();
   }
   telaFontes();

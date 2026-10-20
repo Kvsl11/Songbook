@@ -486,11 +486,36 @@ export function estimarAndamento(notas, { min = 60, max = 140, faixa = [48, 84] 
   return melhor.bpm;
 }
 
-export function melodiaDasNotas(notas, { bpm = 80, fifths = 0, faixa = [48, 84], oitava = 0, minAmp = 0.25 } = {}) {
+// faixa de alturas que entra na melodia: a voz cantando sozinha pode ser bem grave (homem: até Mi2); numa música
+// com banda, abaixo de Dó3 é quase sempre o baixo
+export const faixaDoModo = (modo) => (modo === 'voz' ? [40, 84] : [48, 84]);
+// voz grave (homem): clave de sol com 8 embaixo (tenor), escrita na altura real; senão, clave de sol
+export function claveDaVoz(notas, modo = 'mistura') {
+  const [lo, hi] = faixaDoModo(modo);
+  const alt = notas.filter((n) => n.pitchMidi >= lo && n.pitchMidi <= hi).map((n) => n.pitchMidi).sort((a, b) => a - b);
+  const mediana = alt[Math.floor(alt.length / 2)] ?? 67;
+  return modo === 'voz' && mediana < 60 ? { clave: 'G8', centro: 55 } : { clave: 'G', centro: 67 };
+}
+export function melodiaDasNotas(notas, { bpm = 80, fifths = 0, modo = 'mistura', faixa = faixaDoModo(modo), oitava = 0, minAmp = 0.2, centro = 67, meioTempo = false } = {}) {
   const passo = 60 / bpm / 4; // semicolcheia, em segundos
   const validas = notas.filter((n) => n.pitchMidi >= faixa[0] && n.pitchMidi <= faixa[1] && (n.amplitude ?? 1) >= minAmp && n.durationSeconds > passo * 0.6);
   if (!validas.length) return [];
-  const comeco = Math.min(...validas.map((n) => n.startTimeSeconds));
+  // onde caem os tempos: a média circular dos começos de TODAS as notas ouvidas — o baixo e os acordes da banda mudam
+  // no tempo — com as mais fortes e longas pesando mais. A grade começa num tempo, e não na primeira nota: música que
+  // começa no contratempo não fica toda deslocada meio tempo
+  const tempo = 60 / bpm;
+  let sx = 0;
+  let sy = 0;
+  for (const n of notas.filter((x) => (x.amplitude ?? 1) >= minAmp && x.durationSeconds > passo * 0.6)) {
+    const ang = (2 * Math.PI * n.startTimeSeconds) / tempo;
+    const w = (n.amplitude ?? 1) * Math.min(1, n.durationSeconds / tempo);
+    sx += w * Math.cos(ang);
+    sy += w * Math.sin(ang);
+  }
+  // meioTempo: a pessoa diz que os tempos caem no meio (a voz sozinha não deixa saber)
+  const fase = ((Math.atan2(sy, sx) / (2 * Math.PI)) * tempo + (meioTempo ? tempo / 2 : 0) + tempo) % tempo;
+  const primeira = Math.min(...validas.map((n) => n.startTimeSeconds));
+  const comeco = fase + Math.floor((primeira - fase + passo / 2) / tempo) * tempo;
   const fim = Math.max(...validas.map((n) => n.startTimeSeconds + n.durationSeconds));
   const nPassos = Math.ceil((fim - comeco) / passo);
   // em cada semicolcheia, a nota mais forte que soa (desempate: a mais aguda, que costuma ser a voz)
@@ -543,9 +568,29 @@ export function melodiaDasNotas(notas, { bpm = 80, fifths = 0, faixa = [48, 84],
   marcas.push(Math.round(t / 2) * 2);
   juntos.forEach((b, i) => { b.len = marcas[i + 1] - marcas[i]; });
   for (let i = juntos.length - 1; i >= 0; i--) if (juntos[i].len <= 0) juntos.splice(i, 1);
-  // oitava: a melodia inteira vai para perto da extensão da voz escolhida (média ~ Sol4 para clave de sol)
+  // oitava: a melodia inteira vai para perto da extensão da clave (centro: Sol4 na clave de sol, Sol3 na de tenor)
   const alturas = juntos.filter((b) => b.n).map((b) => b.n.pitchMidi);
   const mediana = [...alturas].sort((a, b) => a - b)[Math.floor(alturas.length / 2)] ?? 67;
-  const desloc = Math.round((67 - mediana) / 12) * 12 + oitava * 12;
+  const desloc = Math.round((centro - mediana) / 12) * 12 + oitava * 12;
   return juntos.map((b) => ({ a: b.n ? [alturaDoMidi(b.n.pitchMidi + desloc, fifths)] : [], d: b.len * 2, l: [], c: '' }));
+}
+
+// leitura ao vivo: as notas de um pedaço analisado (com contexto antes do corte, a partir de "de") entram na lista;
+// a nota que já soava antes do corte (t0) alonga a do pedaço anterior em vez de virar outra. Devolve as notas que
+// chegam até o fim do pedaço (t1), que podem continuar no próximo.
+export function juntarPedaco(notas, pendentes, achadas, { de, t0, t1 }) {
+  const novos = [];
+  for (const n of achadas) {
+    const s = n.startTimeSeconds + de;
+    const e = s + n.durationSeconds;
+    if (s < t0 - 0.05) {
+      const p = pendentes.find((x) => x.pitchMidi === n.pitchMidi);
+      if (p && e > p.startTimeSeconds + p.durationSeconds) p.durationSeconds = e - p.startTimeSeconds;
+      continue;
+    }
+    const nova = { startTimeSeconds: s, durationSeconds: n.durationSeconds, pitchMidi: n.pitchMidi, amplitude: n.amplitude };
+    notas.push(nova);
+    novos.push(nova);
+  }
+  return [...pendentes, ...novos].filter((x) => x.startTimeSeconds + x.durationSeconds >= t1 - 0.1);
 }
