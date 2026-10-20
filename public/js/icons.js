@@ -78,6 +78,10 @@ const MENU = {
     off: '<path d="M3.5 3v18M8.5 3v18" stroke-width="2"/><rect x="13.2" y="3.2" width="4.6" height="17.8" rx="1" transform="rotate(-14 15.5 12.1)" stroke-width="1.9"/>',
     on: '<rect x="2.4" y="2.5" width="2.6" height="19" rx="1" fill="currentColor" stroke="none"/><rect x="7.2" y="2.5" width="2.6" height="19" rx="1" fill="currentColor" stroke="none"/><rect x="13" y="3" width="5" height="18.2" rx="1" transform="rotate(-14 15.5 12.1)" fill="currentColor" stroke="none"/>',
   },
+  partitura: {
+    off: '<ellipse cx="8" cy="17.5" rx="4.2" ry="3.2" transform="rotate(-20 8 17.5)" stroke-width="1.9"/><path d="M12 16.5V3.2c2.6 1.4 6.5 2.7 6.5 7.3" stroke-width="1.9"/>',
+    on: '<ellipse cx="8" cy="17.5" rx="4.2" ry="3.2" transform="rotate(-20 8 17.5)" fill="currentColor" stroke-width="1.6"/><path d="M12 16.5V3.2c2.6 1.4 6.5 2.7 6.5 7.3" stroke-width="2.8"/>',
+  },
   cross: { off: `<path d="${CRUZ}" stroke-width="1.8"/>`, on: `<path d="${CRUZ}" fill="currentColor" stroke-width="1"/>` },
   book: { off: `<path d="${LIVRO}" stroke-width="1.9"/><path d="M12 6.2v15.6" stroke-width="1.9"/>`, on: `<path d="${LIVRO}" fill="currentColor" stroke-width="1.2"/><path d="M12 7v14" stroke="var(--bg, #121212)" stroke-width="1.4"/>` },
 };

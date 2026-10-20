@@ -44,6 +44,12 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   anacruse, tom, andamento e vozes nos ajustes; desfazer/refazer, teclado do computador (como no MuseScore), ouvir no
   ensaio, imprimir/PDF e exportar/importar MusicXML. Dá para começar da partitura desenhada pelo app e corrigir. Fica
   guardada na música (`lib/partitura.js` converte para MusicXML).
+- **Partituras** (menu do app): as partituras feitas no app e as prontas (acervo/Hinário) das músicas da biblioteca, com
+  **Nova partitura** (escolhendo a música) e **Gerar com IA**: o app ouve a música pelo microfone (com o vídeo
+  tocando), pelo som de uma aba (computador) ou de um arquivo de áudio, e o modelo **Basic Pitch** (Spotify, código
+  aberto, roda no próprio aparelho) transforma o som em notas; o app escolhe a melodia, acha tom (pela cifra ou pelo
+  que ouviu) e andamento, põe no compasso e mostra a prévia para ajustar antes de abrir no editor. É um rascunho:
+  funciona melhor com voz e violão do que com banda completa.
 - **Buscar (qualquer música)**: digite música, artista ou trecho e aparece uma lista só de **Músicas** (resultados do
   Cifra Club e do Letras juntos) e os **Vídeos** do YouTube. Tocar numa música já traz tudo junto: a **cifra** (Cifra
   Club, que já tem a letra; sem cifra, a letra do Letras), o **vídeo** do YouTube e o compositor. Um vídeo tocado
