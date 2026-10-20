@@ -1220,6 +1220,10 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
   .song-topo.canvas-on + #aviso-cifra .aviso, .song-topo.canvas-on ~ #aviso-video .aviso { margin-top: 0; }
 }
 @media (min-width: 900px) { .song-topo.canvas-on .canvas-fundo { border-radius: var(--radius) var(--radius) 0 0; } }
+/* música aberta no repertório: a barrinha de progresso (4 px + 16 px de margem) fica acima do topo; o vídeo sobe
+   também esse tanto e cobre até o alto da tela (antes sobrava uma faixa do fundo colorido em cima) */
+.set-progress + .song-topo.canvas-on .canvas-fundo { top: -84px; }
+.set-progress { position: relative; z-index: 2; } /* por cima do vídeo do topo */
 @media (min-width: 641px) {
   /* o clipe tocando atrás do título some aos poucos embaixo, como o fundo */
   #pl-tela.no-fundo { -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 100%); mask-image: linear-gradient(180deg, #000 78%, transparent 100%); }
@@ -1570,3 +1574,21 @@ a.source { text-decoration: none; color: inherit; }
   .acoes-musica { gap: 8px; }
 }
 @media (max-width: 700px) { .song-toolbar.sem-cifra .ferramentas { justify-content: center; gap: 10px; } }
+
+/* ============================================================ celular deitado (tela larga e baixa)
+   o menu de baixo e o topo ficam finos e as barras fixas, enxutas: sobra altura para a letra e a partitura */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 899px) {
+  :root { --nav-h: 46px; }
+  .nav a { flex-direction: row; justify-content: center; gap: 0; padding-top: 0; }
+  .nav a em { display: none; }
+  .topbar { min-height: 46px; padding-top: calc(4px + env(safe-area-inset-top)); padding-bottom: 4px; }
+  .topbar .icon-btn.round, #btn-back { width: 34px; height: 34px; }
+  #title { font-size: 16px; }
+  .ensaio { padding: 6px 10px; gap: 4px; }
+  .ensaio .play-big { width: 38px; height: 38px; }
+  .ensaio-linha.vozes { flex-wrap: nowrap; }
+  .ensaio .vozes .chips { flex: 1 1 auto; }
+  .cta-bar { padding: 6px 10px; }
+  .page-hero .cover { width: 120px; height: 120px; }
+  .song.lyrics-mode { padding-top: 24px; }
+}
