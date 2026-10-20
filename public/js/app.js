@@ -5,9 +5,9 @@ import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
-import { agruparCantos, buscarNoAcervo, COLECOES_LITURGICAS, COLECOES_LIVROS, ehLivro, parteFixa, PARTES_FIXAS, tempoDe, TEMPOS, urlArquivo, urlPasta } from './lib/acervo.js';
+import { COLECOES_LITURGICAS, parteFixa, PARTES_FIXAS, tempoDe, TEMPOS } from './lib/acervo.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
-import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, buscarCindy, carregarAcervo, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
+import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const view = $('#view');
@@ -1902,7 +1902,6 @@ function viewSearch() {
     const blocos = [];
     if (mostra('biblioteca') && (locais.length || filtro === 'biblioteca')) blocos.push(`<div class="shelf-head"><h2>Na sua biblioteca</h2></div>${locais.length ? `<ul class="tracks">${locais.map((s) => linhaMusica(s, s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '')).join('')}</ul>` : '<p class="muted">Nada na biblioteca.</p>'}`);
     if (mostra('artistas')) blocos.push(caixa('ar-res', 'Artistas'));
-    if (mostra('acervo')) blocos.push(caixa('hi-res', 'Hinário Litúrgico da CNBB (com letra)'));
     if (mostra('acervo')) blocos.push(caixa('ac-res', 'No acervo litúrgico', filtro === 'acervo' ? '' : `<a href="#/setor/busca/${encodeURIComponent(term)}">Ver tudo</a>`));
     if (mostra('musicas')) blocos.push(caixa('mu-res', 'Músicas'));
     if (mostra('videos')) blocos.push(caixa('yt-res', 'Vídeos', `<a href="${esc(ytBusca(term))}" target="_blank" rel="noopener">youtube.com</a>`));
@@ -1921,50 +1920,22 @@ function viewSearch() {
         }).catch((e) => vivo('ar-res') && erro('ar-res', 'Não consegui buscar artistas: ' + e.message));
       }
       if (mostra('acervo')) {
-        // cantos do Hinário da CNBB pelo título ou pela letra (o mesmo canto de vários anos aparece uma vez)
-        carregarHinario().then((cadernos) => {
-          if (!vivo('hi-res')) return;
-          const box = $('#hi-res');
-          const vistos = new Set();
-          const achou = [];
-          for (const cad of [...cadernos].reverse()) {
-            cad.cantos.forEach((c, i) => {
-              const k = normalizar(c.titulo);
-              if (vistos.has(k) || !normalizar(c.titulo + ' ' + c.chordpro).includes(t)) return;
-              vistos.add(k);
-              achou.push({ cad, c, i });
-            });
-          }
-          if (!achou.length) { box.previousElementSibling?.remove(); box.remove(); return; }
-          const lista = achou.sort((a, b) => Number(normalizar(b.c.titulo).includes(t)) - Number(normalizar(a.c.titulo).includes(t))).slice(0, filtro === 'acervo' ? 30 : 6);
-          box.innerHTML = `<ul class="tracks">${lista.map(({ c }, n) => `<li class="track clickable" data-hi="${n}" style="grid-template-columns:auto 1fr auto">
-            <div class="cover gen canto-ic" style="--h:${(n * 41 + 200) % 360}">${icon('text', 20)}</div>
-            <div class="info"><div class="t">${esc(c.titulo)}</div><div class="s">${esc(c.parte)}${c.autor ? ` · ${esc(c.autor)}` : ''}</div></div>
-            <span class="acts"><button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`).join('')}</ul>`;
-          box.onclick = (e) => {
-            const li = e.target.closest('li[data-hi]');
-            const x = li && lista[Number(li.dataset.hi)];
-            if (!x) return;
-            const salva = db.songBySource(sourceHinario(x.cad, x.i));
-            if (salva) location.hash = '#/musica/' + salva.id;
-            else abrirPrevia(conteudoHinario(x.cad, x.c), sourceHinario(x.cad, x.i), '#/buscar');
-          };
-        });
+        // músicas do acervo litúrgico (Hinário da CNBB, partes fixas, antífonas, cifras…) pelo título ou pela letra
         acervoClassificado().then((ac) => {
           if (!vivo('ac-res')) return;
           const box = $('#ac-res');
-          const achou = buscarNoAcervo(ac.itens, term);
-          if (!achou.length && filtro === 'tudo') { box.previousElementSibling?.remove(); box.remove(); return; }
-          if (!ac.itens.length) { box.innerHTML = avisoAcervo(); return; }
-          if (filtro === 'acervo') desenharCantos(box, ac.itens, { filtro: term, vazio: 'Nada no acervo com esse nome.' });
+          if (!ac.musicas.length) { if (filtro === 'tudo') { box.previousElementSibling?.remove(); box.remove(); } else box.innerHTML = avisoAcervo(); return; }
+          // o mesmo canto (de vários anos do Hinário) aparece uma vez
+          const vistos = new Set();
+          const unicas = ac.musicas.filter((m) => { const k = normalizar(m.titulo + ' ' + (m.autor || '')); if (vistos.has(k)) return false; vistos.add(k); return true; });
+          if (filtro === 'acervo') { desenharMusicas(box, unicas, { filtro: term, vazio: 'Nada no acervo com esse nome.' }); }
           else {
-            // o mesmo canto de anos diferentes aparece uma vez só no resumo
-            const vistos = new Set();
-            const cantos = agruparCantos(achou).filter((c) => { const k = normalizar(c.titulo); if (vistos.has(k)) return false; vistos.add(k); return true; }).slice(0, 6);
-            cantosNaTela = cantos;
-            box.innerHTML = `<ul class="tracks">${cantos.map((c, i) => linhaCanto(c, i)).join('')}</ul>`;
+            desenharMusicas(box, unicas, { filtro: term, agrupar: false });
+            if (!musicasNaTela.length) { box.previousElementSibling?.remove(); box.remove(); return; }
+            musicasNaTela = musicasNaTela.slice(0, 6);
+            box.innerHTML = `<ul class="tracks">${musicasNaTela.map((m, i) => linhaMusicaAcervo(m, i)).join('')}</ul>`;
           }
-          if (!box.dataset.ligado) { box.dataset.ligado = '1'; ligarCantos(box); }
+          if (!box.dataset.ligado) { box.dataset.ligado = '1'; ligarMusicas(box); }
         });
       }
       if (mostra('musicas')) {
@@ -2187,84 +2158,94 @@ async function viewCategoria(id, nome) {
   }
 }
 
-// ------------------------------------------------------------- setores da missa (acervo litúrgico)
-// A busca organizada por setor: Missa litúrgica (hinários da CNBB, antífonas, salmos), Partes fixas
-// (cada parte com todas as opções), Tempos e solenidades, Missa popular (cantos de devoção, Cindy
-// Ferrarezi) e Livros e documentos. Os arquivos vêm do acervo do Google Drive (data/acervo.json).
+// ------------------------------------------------------------- setores da missa (músicas do acervo litúrgico)
+// A busca organizada por setor: Missa litúrgica (Hinário da CNBB, antífonas, salmos, cifras), Partes fixas
+// (cada parte com todas as opções), Tempos e solenidades e Missa popular (cantos de devoção, Cindy Ferrarezi).
+// As músicas foram tiradas dos arquivos do acervo litúrgico (data/cantos.json e data/hinario.json) e abrem
+// como música do app: letra (e cifra, quando o arquivo trazia), vídeo do YouTube, salvar, repertório.
 const SETORES = [
-  ['liturgica', 'Missa litúrgica', 'Hinários da CNBB, antífonas, salmos e cantos do próprio do dia', 'book', 210],
+  ['liturgica', 'Missa litúrgica', 'Hinário da CNBB, antífonas, salmos e cifras do próprio do dia', 'book', 210],
   ['fixas', 'Partes fixas', 'Senhor, Glória, Santo, Cordeiro… todas as opções de cada parte', 'sparkles', 28],
   ['tempos', 'Tempos e solenidades', 'Proclamação da Páscoa, Calenda, Sequências, Semana Santa…', 'calendar', 330],
   ['popular', 'Missa popular', 'Cantos de devoção popular (Cindy Ferrarezi)', 'music', 150],
-  ['livros', 'Livros e documentos', 'Missal, rituais, lecionários e documentos da Igreja', 'library', 260],
 ];
 const cartaoSetor = ([k, nome, desc, ic, h]) => `<a class="setor" href="#/setor/${k}" style="--h:${h}"><b>${esc(nome)}</b><small>${esc(desc)}</small><span class="setor-ic">${icon(ic, 40)}</span></a>`;
+const HINARIO = 'Hinário Litúrgico da CNBB';
 
+// todas as músicas do acervo: { fonte (source no app), titulo, autor, parte, caminho, tipo: 'cifra'|'letra', chordpro, nome }
 let indiceAcervo = null;
 async function acervoClassificado() {
-  if (!indiceAcervo) {
-    const itens = await carregarAcervo();
-    const fixas = new Map();
-    const tempos = new Map();
-    for (const it of itens) {
-      const pf = parteFixa(it);
-      if (pf) (fixas.get(pf) || fixas.set(pf, []).get(pf)).push(it);
-      const tp = tempoDe(it);
-      if (tp) (tempos.get(tp) || tempos.set(tp, []).get(tp)).push(it);
-    }
-    indiceAcervo = { itens, fixas, tempos };
-    if (!itens.length) indiceAcervo = null; // não carregou: tenta de novo na próxima vez
-    return { itens, fixas, tempos };
+  if (indiceAcervo) return indiceAcervo;
+  const [cantos, cadernos] = await Promise.all([carregarCantos(), carregarHinario()]);
+  const musicas = cantos.map((c) => ({ ...c, fonte: `acervo:${c.id}:${c.i}`, nome: `${c.titulo} ${c.parte || ''}` }));
+  // Hinário: por celebração (o mesmo canto de anos diferentes fica uma vez em cada lista de parte)
+  for (const cad of cadernos) {
+    const pasta = [HINARIO, `${cad.celebracao || cad.nome}${cad.data ? ` (${fmtData(cad.data)})` : ''}`];
+    cad.cantos.forEach((c, i) => musicas.push({ fonte: sourceHinario(cad, i), titulo: c.titulo, autor: c.autor, parte: c.parte, caminho: pasta, tipo: 'letra', chordpro: c.chordpro, nome: `${c.titulo} ${c.parte}`, data: cad.data }));
   }
-  return indiceAcervo;
+  const fixas = new Map();
+  const tempos = new Map();
+  const vistos = new Set();
+  for (const m of musicas) {
+    const k = normalizar(m.titulo + ' ' + (m.autor || ''));
+    const repetido = vistos.has(k);
+    vistos.add(k);
+    if (repetido) continue; // nas listas por parte e por tempo, cada canto uma vez
+    const pf = parteFixa(m);
+    if (pf) (fixas.get(pf) || fixas.set(pf, []).get(pf)).push(m);
+    const tp = tempoDe(m);
+    if (tp) (tempos.get(tp) || tempos.set(tp, []).get(tp)).push(m);
+  }
+  const r = { musicas, fixas, tempos };
+  if (musicas.length) indiceAcervo = r; // não carregou: tenta de novo na próxima vez
+  return r;
 }
 
-// rótulo da coleção de onde o arquivo vem (para agrupar a lista)
-// (na ordem de prioridade das listas: as partes fixas do acervo primeiro, depois os hinários da CNBB…)
-const ORDEM_COLECOES = [['OUTROS SUBSÍDIOS DE MÚSICA LITÚRGICA/Partes fixas', 'Partes fixas — acervo litúrgico', ''], ...COLECOES_LITURGICAS, ...COLECOES_LIVROS];
+// rótulo da coleção de onde a música vem (para agrupar a lista), na ordem de prioridade
+const ORDEM_COLECOES = [['OUTROS SUBSÍDIOS DE MÚSICA LITÚRGICA/Partes fixas', 'Partes fixas', ''], [HINARIO, HINARIO, 'Igreja em Oração — domingo a domingo'], ...COLECOES_LITURGICAS];
 const COLECOES = [...ORDEM_COLECOES].sort((a, b) => b[0].length - a[0].length);
 const prioridade = (nome) => { const i = ORDEM_COLECOES.findIndex((c) => c[1] === nome); return i < 0 ? 999 : i; };
-const colecaoDe = (caminho) => { const c = caminho.join('/'); return (COLECOES.find(([p]) => c === p.trim() || c.startsWith(p.trim() + '/')) || [])[1] || bonito(caminho[0] || 'Acervo'); };
-const ARQ = { pdf: ['Partitura', 'file'], texto: ['Cifra/letra', 'text'], audio: ['Ouvir', 'play'], video: ['Vídeo', 'video'], pasta: ['Pasta', 'library'] };
-const urlDoArquivo = (a) => (a.tipo === 'pasta' ? urlPasta(a.id) : urlArquivo(a.id));
-const ORDEM_ARQ = ['pdf', 'texto', 'audio', 'video', 'pasta'];
-let cantosNaTela = [];
-function linhaCanto(c, i, { caminho = true } = {}) {
-  const arqs = [...c.arquivos].sort((a, b) => ORDEM_ARQ.indexOf(a.tipo) - ORDEM_ARQ.indexOf(b.tipo));
-  const principal = arqs[0];
-  const tipos = [...new Set(arqs.map((a) => a.tipo))];
-  const onde = caminho ? c.caminho.slice(-2).map((x) => bonito(x).replace(/\s*_\s*/g, ' · ')).join(' › ') : '';
-  return `<li class="track clickable canto" data-canto="${i}" style="grid-template-columns:auto 1fr auto">
-    <div class="cover gen canto-ic" style="--h:${principal.tipo === 'audio' ? 150 : principal.tipo === 'texto' ? 28 : 210}">${icon(ARQ[principal.tipo][1], 22)}</div>
-    <div class="info"><div class="t">${esc(c.titulo)}</div><div class="s">${tipos.map((t) => ARQ[t][0]).join(' · ')}${onde ? ` · ${esc(onde)}` : ''}</div></div>
-    <span class="acts">${tipos.length > 1 ? tipos.map((t) => `<button class="icon-btn" data-arq="${t}" aria-label="${ARQ[t][0]}" title="${ARQ[t][0]}">${icon(ARQ[t][1], 16)}</button>`).join('') : `<button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button>`}</span></li>`;
+const naPasta = (caminho, p) => { const c = caminho.join('/'); return c === p.trim() || c.startsWith(p.trim() + '/'); };
+const colecaoDe = (caminho) => (COLECOES.find(([p]) => naPasta(caminho, p)) || [])[1] || bonito(caminho[0] || 'Acervo');
+const semSublinhado = (t) => bonito(t).replace(/\s*_\s*/g, ' · ');
+
+let musicasNaTela = [];
+function linhaMusicaAcervo(m, i, { pasta = true } = {}) {
+  const onde = pasta ? m.caminho.slice(-1).map(semSublinhado).join('') : '';
+  const salva = db.songBySource(m.fonte);
+  return `<li class="track clickable" data-ma="${i}" style="grid-template-columns:auto 1fr auto">
+    <div class="cover gen canto-ic" style="--h:${m.tipo === 'cifra' ? 28 : m.tipo === 'partitura' ? 280 : 210}">${icon(m.tipo === 'cifra' ? 'chord' : m.tipo === 'partitura' ? 'score' : 'text', 20)}</div>
+    <div class="info"><div class="t">${esc(m.titulo)}</div><div class="s">${m.tipo === 'cifra' ? 'Cifra' : m.tipo === 'partitura' ? 'Partitura' : 'Letra'}${m.tipo !== 'partitura' && /x_partitura/.test(m.chordpro) ? ' · <span class="tag-partitura">Partitura</span>' : ''}${m.parte ? ` · ${esc(m.parte)}` : ''}${m.autor ? ` · ${esc(m.autor)}` : ''}${onde ? ` · ${esc(onde)}` : ''}</div></div>
+    <span class="acts">${salva ? `<span class="chip sm" title="Na sua biblioteca">${icon('check', 14)}</span>` : ''}<button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 }
-function abrirCanto(c, tipo) {
-  const a = c.arquivos.find((x) => x.tipo === tipo) || [...c.arquivos].sort((x, y) => ORDEM_ARQ.indexOf(x.tipo) - ORDEM_ARQ.indexOf(y.tipo))[0];
-  if (!a) return;
-  const titulo = c.arquivos.length > 1 && a.tipo !== 'pdf' ? `${c.titulo} (${ARQ[a.tipo][0].toLowerCase()})` : c.titulo;
-  location.hash = `#/arquivo/${encodeURIComponent(urlDoArquivo(a))}/${encodeURIComponent(titulo)}/${encodeURIComponent(location.hash)}`;
+// abre a música do acervo como música do app (a salva, se já estiver na biblioteca)
+function abrirMusicaAcervo(m, voltar = location.hash) {
+  const salva = db.songBySource(m.fonte);
+  if (salva) { location.hash = '#/musica/' + salva.id; return; }
+  abrirPrevia(m.chordpro, m.fonte, voltar);
 }
-// lista de cantos agrupada pela coleção de origem, com busca dentro dela
-function desenharCantos(box, itens, { filtro = '', vazio = 'Nada encontrado.', agrupar = true, caminho = true } = {}) {
-  const lista = filtro ? buscarNoAcervo(itens, filtro) : itens;
-  const cantos = agruparCantos(lista);
-  cantosNaTela = cantos;
-  if (!cantos.length) { box.innerHTML = `<p class="muted">${vazio}</p>`; return; }
-  if (!agrupar) { box.innerHTML = `<ul class="tracks">${cantos.map((c, i) => linhaCanto(c, i, { caminho })).join('')}</ul>`; return; }
+// lista de músicas agrupada pela coleção de origem, com busca dentro dela
+function desenharMusicas(box, lista, { filtro = '', vazio = 'Nada encontrado.', agrupar = true, pasta = true } = {}) {
+  const t = normalizar(filtro);
+  const ms = t ? lista.filter((m) => normalizar(`${m.titulo} ${m.autor || ''} ${m.parte || ''} ${m.chordpro}`).includes(t))
+    .sort((a, b) => Number(normalizar(b.titulo).includes(t)) - Number(normalizar(a.titulo).includes(t))) : lista;
+  musicasNaTela = ms;
+  if (!ms.length) { box.innerHTML = `<p class="muted">${vazio}</p>`; return; }
+  if (!agrupar) { box.innerHTML = `<ul class="tracks">${ms.map((m, i) => linhaMusicaAcervo(m, i, { pasta })).join('')}</ul>`; return; }
   const grupos = new Map();
-  cantos.forEach((c, i) => { const g = colecaoDe(c.caminho); if (!grupos.has(g)) grupos.set(g, []); grupos.get(g).push([c, i]); });
-  box.innerHTML = [...grupos].sort((a, b) => prioridade(a[0]) - prioridade(b[0])).map(([g, cs]) => `<div class="shelf-head"><h2>${esc(g)}</h2><span class="muted">${cs.length}</span></div>
-    <ul class="tracks">${cs.map(([c, i]) => linhaCanto(c, i)).join('')}</ul>`).join('');
+  ms.forEach((m, i) => { const g = colecaoDe(m.caminho); if (!grupos.has(g)) grupos.set(g, []); grupos.get(g).push([m, i]); });
+  box.innerHTML = [...grupos].sort((a, b) => prioridade(a[0]) - prioridade(b[0])).map(([g, xs]) => `<div class="shelf-head"><h2>${esc(g)}</h2><span class="muted">${xs.length}</span></div>
+    <ul class="tracks">${xs.map(([m, i]) => linhaMusicaAcervo(m, i, { pasta })).join('')}</ul>`).join('');
 }
-function ligarCantos(box) {
+function ligarMusicas(box) {
   box.addEventListener('click', (e) => {
-    const li = e.target.closest('li[data-canto]');
-    const c = li && cantosNaTela[Number(li.dataset.canto)];
-    if (c) abrirCanto(c, e.target.closest('[data-arq]')?.dataset.arq);
+    const li = e.target.closest('li[data-ma]');
+    const m = li && musicasNaTela[Number(li.dataset.ma)];
+    if (m) abrirMusicaAcervo(m);
   });
 }
-const avisoAcervo = () => `<div class="alert">${icon('info', 18)}<span>O acervo litúrgico ainda não está disponível neste aparelho. Ele é atualizado todo dia; confira a conexão e tente de novo.</span></div>`;
+const avisoAcervo = () => `<div class="alert">${icon('info', 18)}<span>As músicas do acervo litúrgico ainda não estão disponíveis neste aparelho. Confira a conexão e tente de novo.</span></div>`;
+const contagem = (n) => (n ? `${n} ${n === 1 ? 'música' : 'músicas'}` : 'ainda sem músicas');
 
 async function viewSetor(k, parte) {
   const setor = SETORES.find((x) => x[0] === k);
@@ -2278,30 +2259,30 @@ async function viewSetor(k, parte) {
     <div><div class="kind">Setor</div><h2>${esc(setor[1])}</h2><div class="meta">${esc(setor[2])}</div></div></section>`;
   if (k === 'popular') {
     view.innerHTML = `${topo}
-      <p class="muted" style="margin:-6px 0 14px">Cantos de devoção popular, cifrados, de <b>cindyferrarezi.com</b>, por parte da missa e tempo.</p>
+      <p class="muted" style="margin:-6px 0 14px">Cantos de devoção popular, cifrados, de <b>cindyferrarezi.com</b>, por parte da missa e tempo. Na Liturgia, a <b>Missa popular</b> traz também as sugestões do Músicas para Missa.</p>
       <div class="grade-partes">${CATEGORIAS.map(([nome, id, ic], i) => `<a class="parte-card" href="#/buscar/categoria/${id}/${encodeURIComponent(nome)}" style="--h:${(i * 47 + 200) % 360}">${icon(ic, 20)}<b>${esc(nome)}</b></a>`).join('')}</div>`;
     return;
   }
-  view.innerHTML = `${topo}<div id="setor-corpo"><div class="loading-note"><span class="spin"></span>Abrindo o acervo…</div></div>`;
+  view.innerHTML = `${topo}<div id="setor-corpo"><div class="loading-note"><span class="spin"></span>Carregando as músicas…</div></div>`;
   const ac = await acervoClassificado();
   const corpo = $('#setor-corpo');
   if (!corpo) return;
-  if (!ac.itens.length) { corpo.innerHTML = avisoAcervo(); return; }
-  const cartaoParte = ([pk, nome], n, i) => `<a class="parte-card" href="#/setor/${k}/${pk}" style="--h:${(i * 37 + setor[4]) % 360}"><b>${esc(nome)}</b><small>${n ? `${n} ${n === 1 ? 'arquivo' : 'arquivos'}` : 'ainda sem arquivos'}</small></a>`;
-  const colecao = ([cam, nome, desc]) => {
-    const n = ac.itens.filter((it) => { const c = it.caminho.join('/'); return c === cam.trim() || c.startsWith(cam.trim() + '/'); }).length;
-    return n ? `<li class="track clickable" data-pasta="${esc(cam.trim())}" style="grid-template-columns:auto 1fr auto"><div class="cover gen canto-ic" style="--h:${setor[4]}">${icon('library', 22)}</div>
-      <div class="info"><div class="t">${esc(nome)}</div><div class="s">${desc ? esc(desc) + ' · ' : ''}${n} arquivos</div></div><span class="acts"><button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>` : '';
-  };
+  if (!ac.musicas.length) { corpo.innerHTML = avisoAcervo(); return; }
+  const cartaoParte = ([pk, nome], n, i) => `<a class="parte-card" href="#/setor/${k}/${pk}" style="--h:${(i * 37 + setor[4]) % 360}"><b>${esc(nome)}</b><small>${contagem(n)}</small></a>`;
   if (k === 'fixas') corpo.innerHTML = `<div class="grade-partes">${PARTES_FIXAS.map((p, i) => cartaoParte(p, ac.fixas.get(p[0])?.length || 0, i)).join('')}</div>`;
   else if (k === 'tempos') corpo.innerHTML = `<div class="grade-partes">${TEMPOS.map((p, i) => cartaoParte(p, ac.tempos.get(p[0])?.length || 0, i)).join('')}</div>`;
   else {
-    const cols = k === 'livros' ? COLECOES_LIVROS : COLECOES_LITURGICAS;
-    corpo.innerHTML = `${k === 'liturgica' ? `<a class="source" href="#/liturgia" style="margin-bottom:14px"><span class="ico">${icon('cross', 18)}</span><span><b>Missa do dia com o Hinário da CNBB</b><br><small>Os cantos da celebração, com a letra, o áudio e o caderno. Na Liturgia, escolha “Missa litúrgica”.</small></span></a><div class="chips" style="margin-bottom:14px"><a class="chip" href="#/setor/fixas">${icon('sparkles', 14)} Partes fixas</a><a class="chip" href="#/setor/tempos">${icon('calendar', 14)} Tempos e solenidades</a></div>` : ''}
-      <ul class="tracks">${cols.map(colecao).join('')}</ul>`;
+    const colecao = ([cam, nome, desc]) => {
+      const n = ac.musicas.filter((m) => naPasta(m.caminho, cam)).length;
+      return n ? `<li class="track clickable" data-pasta="${esc(cam.trim())}" style="grid-template-columns:auto 1fr auto"><div class="cover gen canto-ic" style="--h:${setor[4]}">${icon('library', 22)}</div>
+        <div class="info"><div class="t">${esc(nome)}</div><div class="s">${desc ? esc(desc) + ' · ' : ''}${contagem(n)}</div></div><span class="acts"><button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>` : '';
+    };
+    corpo.innerHTML = `<a class="source" href="#/liturgia" style="margin-bottom:14px"><span class="ico">${icon('cross', 18)}</span><span><b>Missa do dia com o Hinário da CNBB</b><br><small>Os cantos da celebração, com a letra. Na Liturgia, escolha “Missa litúrgica”.</small></span></a>
+      <div class="chips" style="margin-bottom:14px"><a class="chip" href="#/setor/fixas">${icon('sparkles', 14)} Partes fixas</a><a class="chip" href="#/setor/tempos">${icon('calendar', 14)} Tempos e solenidades</a></div>
+      <ul class="tracks">${ORDEM_COLECOES.map(colecao).join('')}</ul>`;
     corpo.addEventListener('click', (e) => { const li = e.target.closest('li[data-pasta]'); if (li) location.hash = '#/acervo/' + encodeURIComponent(li.dataset.pasta); });
   }
-  corpo.insertAdjacentHTML('beforeend', `<p class="fonte" style="margin-top:18px">Arquivos do acervo litúrgico no Google Drive (hinários e subsídios da CNBB). Partituras, cifras e áudios abrem aqui no app.</p>`);
+  corpo.insertAdjacentHTML('beforeend', `<p class="fonte" style="margin-top:18px">Músicas tiradas do acervo litúrgico (hinários e subsídios da CNBB): a letra fiel e, quando o arquivo trazia, a cifra.</p>`);
 }
 
 async function viewParteDoSetor(setor, pk) {
@@ -2313,81 +2294,84 @@ async function viewParteDoSetor(setor, pk) {
   setHeader(parte[1], { back: '#/setor/' + setor[0], eyebrow: setor[1] });
   view.innerHTML = `<h2 class="greet">${esc(parte[1])}</h2>
     <label class="field">${icon('search', 20)}<input class="search" type="search" placeholder="Procurar em ${esc(parte[1])}"></label>
-    <div id="cantos" style="margin-top:12px"><div class="loading-note"><span class="spin"></span>Abrindo o acervo…</div></div>`;
+    <div id="cantos" style="margin-top:12px"><div class="loading-note"><span class="spin"></span>Carregando as músicas…</div></div>`;
   const ac = await acervoClassificado();
   const box = $('#cantos');
   if (!box) return;
-  if (!ac.itens.length) { box.innerHTML = avisoAcervo(); return; }
+  if (!ac.musicas.length) { box.innerHTML = avisoAcervo(); return; }
   const itens = (setor[0] === 'fixas' ? ac.fixas : ac.tempos).get(pk) || [];
-  const vazio = `Ainda não há arquivos de ${esc(parte[1])} no acervo. <a href="#/buscar" id="na-internet">Procurar na internet</a>`;
-  ligarCantos(box);
-  desenharCantos(box, itens, { vazio });
+  const vazio = `Ainda não há músicas de ${esc(parte[1])} no acervo. <a href="#/buscar" id="na-internet">Procurar na internet</a>`;
+  ligarMusicas(box);
+  desenharMusicas(box, itens, { vazio });
   $('#na-internet')?.addEventListener('click', () => { sessionStorage.setItem('busca', parte[1].replace(/\s*\(.*$/, '')); sessionStorage.setItem('buscaFiltro', 'tudo'); });
-  $('.search').oninput = (e) => desenharCantos(box, itens, { filtro: e.target.value, vazio: 'Nada com esse nome.' });
+  $('.search').oninput = (e) => desenharMusicas(box, itens, { filtro: e.target.value, vazio: 'Nada com esse nome.' });
 }
 
-// navegar pelas pastas do acervo (subpastas e cantos)
+// navegar pelas pastas do acervo (subpastas e músicas)
 async function viewAcervo(caminho = '') {
   const partes = caminho ? caminho.split('/') : [];
   setTab('buscar');
   setTint('#24425c');
-  const pai = partes.length > 1 ? '#/acervo/' + encodeURIComponent(partes.slice(0, -1).join('/')) : (ehLivro({ caminho: partes }) ? '#/setor/livros' : '#/setor/liturgica');
-  const nome = (COLECOES.find(([p]) => p.trim() === caminho) || [])[1] || bonito(partes[partes.length - 1] || 'Acervo litúrgico').replace(/\s*_\s*/g, ' · ');
-  setHeader(nome, { back: pai, eyebrow: 'Acervo litúrgico' });
+  const nome = (COLECOES.find(([p]) => p.trim() === caminho) || [])[1] || semSublinhado(partes[partes.length - 1] || 'Acervo litúrgico');
+  setHeader(nome, { back: '#/setor/liturgica', eyebrow: 'Missa litúrgica' });
   view.innerHTML = `<h2 class="greet">${esc(nome)}</h2>
     <label class="field">${icon('search', 20)}<input class="search" type="search" placeholder="Procurar nesta pasta"></label>
-    <div id="pastas" style="margin-top:12px"></div><div id="cantos"><div class="loading-note"><span class="spin"></span>Abrindo o acervo…</div></div>`;
+    <div id="pastas" style="margin-top:12px"></div><div id="cantos"><div class="loading-note"><span class="spin"></span>Carregando as músicas…</div></div>`;
   const ac = await acervoClassificado();
   const box = $('#cantos');
   if (!box) return;
-  if (!ac.itens.length) { box.innerHTML = avisoAcervo(); return; }
-  const dentro = ac.itens.filter((it) => partes.every((p, i) => it.caminho[i] === p));
-  const aqui = dentro.filter((it) => it.caminho.length === partes.length);
+  if (!ac.musicas.length) { box.innerHTML = avisoAcervo(); return; }
+  const dentro = ac.musicas.filter((m) => partes.every((p, i) => m.caminho[i] === p));
+  const aqui = dentro.filter((m) => m.caminho.length === partes.length);
   const sub = new Map();
-  for (const it of dentro) if (it.caminho.length > partes.length) { const n = it.caminho[partes.length]; sub.set(n, (sub.get(n) || 0) + 1); }
-  const pastas = [...sub].sort((a, b) => a[0].localeCompare(b[0], 'pt', { numeric: true }));
+  for (const m of dentro) if (m.caminho.length > partes.length) { const n = m.caminho[partes.length]; sub.set(n, (sub.get(n) || 0) + 1); }
+  // no Hinário, as celebrações mais novas primeiro
+  const pastas = [...sub].sort((a, b) => (partes[0] === HINARIO ? -1 : 1) * a[0].localeCompare(b[0], 'pt', { numeric: true }));
+  if (partes[0] === HINARIO && partes.length === 1) {
+    const data = (n) => { const m = /\((\d{2})\/(\d{2})\/(\d{4})\)$/.exec(n); return m ? m[3] + m[2] + m[1] : ''; };
+    pastas.sort((a, b) => data(b[0]).localeCompare(data(a[0])));
+  }
   // pasta só com uma subpasta e nada mais: entra direto nela
   if (!aqui.length && pastas.length === 1) {
     const dest = [...partes, pastas[0][0]].join('/');
     history.replaceState(null, '', '#/acervo/' + encodeURIComponent(dest));
     return viewAcervo(dest);
   }
-  // voltar: a pasta de cima que não seja só passagem (uma subpasta e nada mais), ou o setor
+  // voltar: a pasta de cima que não seja só passagem, ou o setor (acima da coleção)
   let acima = partes.slice(0, -1);
   const soPassagem = (cam) => {
-    const de = ac.itens.filter((it) => cam.every((p, i) => it.caminho[i] === p));
-    return !de.some((it) => it.caminho.length === cam.length) && new Set(de.map((it) => it.caminho[cam.length])).size === 1;
+    const de = ac.musicas.filter((m) => cam.every((p, i) => m.caminho[i] === p));
+    return !de.some((m) => m.caminho.length === cam.length) && new Set(de.map((m) => m.caminho[cam.length])).size === 1;
   };
   while (acima.length && soPassagem(acima)) acima = acima.slice(0, -1);
-  // acima da coleção (Hinário, Antífonas…) volta para o setor
-  const raiz = COLECOES.find(([p]) => caminho === p.trim() || caminho.startsWith(p.trim() + '/'));
+  const raiz = COLECOES.find(([p]) => naPasta(partes, p));
   if (raiz && acima.length < raiz[0].trim().split('/').length) acima = [];
-  setHeader(nome, { back: acima.length ? '#/acervo/' + encodeURIComponent(acima.join('/')) : (ehLivro({ caminho: partes }) ? '#/setor/livros' : '#/setor/liturgica'), eyebrow: 'Acervo litúrgico' });
+  setHeader(nome, { back: acima.length ? '#/acervo/' + encodeURIComponent(acima.join('/')) : '#/setor/liturgica', eyebrow: 'Missa litúrgica' });
   const desenhar = (filtro = '') => {
     $('#pastas').innerHTML = !filtro && pastas.length ? `<ul class="tracks">${pastas.map(([n, q]) => `<li class="track clickable" data-sub="${esc(n)}" style="grid-template-columns:auto 1fr auto"><div class="cover gen canto-ic" style="--h:210">${icon('library', 22)}</div>
-      <div class="info"><div class="t">${esc(bonito(n).replace(/\s*_\s*/g, ' · '))}</div><div class="s">${q} arquivos</div></div><span class="acts"><button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`).join('')}</ul>` : '';
-    if (filtro) desenharCantos(box, dentro, { filtro, vazio: 'Nada com esse nome nesta pasta.' });
-    else if (aqui.length) desenharCantos(box, aqui, { agrupar: false, caminho: false });
+      <div class="info"><div class="t">${esc(semSublinhado(n))}</div><div class="s">${contagem(q)}</div></div><span class="acts"><button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`).join('')}</ul>` : '';
+    if (filtro) desenharMusicas(box, dentro, { filtro, vazio: 'Nada com esse nome nesta pasta.' });
+    else if (aqui.length) desenharMusicas(box, aqui, { agrupar: false, pasta: false });
     else box.innerHTML = '';
   };
-  ligarCantos(box);
+  ligarMusicas(box);
   $('#pastas').addEventListener('click', (e) => { const li = e.target.closest('li[data-sub]'); if (li) location.hash = '#/acervo/' + encodeURIComponent([...partes, li.dataset.sub].join('/')); });
   desenhar();
   $('.search').oninput = (e) => desenhar(e.target.value.trim());
 }
 
-// todos os arquivos do acervo com o termo (da busca)
+// todas as músicas do acervo com o termo (da busca)
 async function viewBuscaAcervo(termo) {
   setTab('buscar');
   setTint('#24425c');
   setHeader('Acervo litúrgico', { back: '#/buscar', eyebrow: 'Busca' });
-  view.innerHTML = `<h2 class="greet">“${esc(termo)}” no acervo</h2><div id="cantos"><div class="loading-note"><span class="spin"></span>Procurando…</div></div>`;
+  view.innerHTML = `<h2 class="greet">“${esc(termo)}” no acervo litúrgico</h2><div id="cantos"><div class="loading-note"><span class="spin"></span>Procurando…</div></div>`;
   const ac = await acervoClassificado();
   const box = $('#cantos');
   if (!box) return;
-  if (!ac.itens.length) { box.innerHTML = avisoAcervo(); return; }
-  ligarCantos(box);
-  desenharCantos(box, ac.itens, { filtro: termo, vazio: 'Nada no acervo com esse nome.' });
+  if (!ac.musicas.length) { box.innerHTML = avisoAcervo(); return; }
+  ligarMusicas(box);
+  desenharMusicas(box, ac.musicas, { filtro: termo, vazio: 'Nada no acervo com esse nome.' });
 }
 
 // ------------------------------------------------------------- biblioteca
@@ -2519,6 +2503,32 @@ addEventListener('pagehide', guardarPrevia);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') guardarPrevia(); });
 let keyHandler = null;
 
+// ---- partitura da música (páginas guardadas no app: partituras/<id>-<n>.png), numa tela própria com zoom.
+// {x_partitura: <id>:<n>} = páginas 1 a n; {x_partitura: <id>:<a>-<b>} = páginas a a b (caderno do Hinário)
+function paginasDaPartitura(content) {
+  const m = /^([\w-]+):(\d+)(?:-(\d+))?$/.exec(String(renderSong(content || '').meta.x_partitura || '').trim());
+  if (!m) return [];
+  const [de, ate] = m[3] ? [Number(m[2]), Number(m[3])] : [1, Number(m[2])];
+  return Array.from({ length: Math.max(0, ate - de + 1) }, (_, i) => `partituras/${m[1]}-${de + i}.png`);
+}
+function viewPartitura(id) {
+  const song = id === 'previa' ? preview : db.song(id);
+  if (!song) return viewNotFound();
+  const titulo = renderSong(song.content).meta.title || 'Partitura';
+  const paginas = paginasDaPartitura(song.content);
+  setTab(id === 'previa' && preview?.back?.startsWith('#/liturgia') ? 'liturgia' : 'buscar');
+  setTint('#3a3a3a');
+  setHeader(titulo, { back: '#/musica/' + id, eyebrow: 'Partitura' });
+  let zoom = Number(sessionStorage.getItem('zoomPartitura')) || 1;
+  view.innerHTML = `<div class="partitura">
+    <div class="partitura-barra"><b>${icon('score', 18)} ${esc(titulo)}</b><span class="spacer"></span>
+      <div class="seg"><button data-z="-1" aria-label="Diminuir">${icon('minus', 16)}</button><button data-z="1" aria-label="Aumentar">${icon('plus', 16)}</button></div></div>
+    <div class="partitura-paginas">${paginas.length ? paginas.map((src, i) => `<img src="${esc(src)}" alt="Página ${i + 1} da partitura" loading="${i ? 'lazy' : 'eager'}">`).join('') : '<p class="muted">Esta música não tem partitura.</p>'}</div></div>`;
+  const aplicar = () => { $('.partitura-paginas').style.setProperty('--zoom', zoom); sessionStorage.setItem('zoomPartitura', zoom); };
+  aplicar();
+  view.querySelectorAll('[data-z]').forEach((b) => (b.onclick = () => { zoom = Math.min(3, Math.max(0.6, +(zoom + Number(b.dataset.z) * 0.2).toFixed(1))); aplicar(); }));
+}
+
 function viewSong(id, ctx = {}) {
   stopScroll();
   const isPreview = id === 'previa';
@@ -2569,7 +2579,7 @@ function viewSong(id, ctx = {}) {
   setHeader(song.title, { back, eyebrow: ctx.set ? `${ctx.index + 1} de ${ctx.set.items.length} · ${ctx.set.name}` : '' });
 
   const kind = ctx.label || song.parte || (/^salmo/i.test(song.title) ? 'Salmo' : /aclama|aleluia/i.test(song.title) ? 'Aclamação' : temCifra(song.content) ? 'Cifra' : 'Letra');
-  const fonte = song.source && /^https?:/.test(song.source) ? host(song.source) : song.source?.startsWith('cnbb:') ? 'Liturgia Diária – CNBB' : song.source?.startsWith('hinario:') ? 'Hinário Litúrgico da CNBB (Igreja em Oração)' : '';
+  const fonte = song.source && /^https?:/.test(song.source) ? host(song.source) : song.source?.startsWith('cnbb:') ? 'Liturgia Diária – CNBB' : song.source?.startsWith('hinario:') ? 'Hinário Litúrgico da CNBB (Igreja em Oração)' : song.source?.startsWith('acervo:') ? 'Acervo litúrgico (hinários e subsídios da CNBB)' : '';
   view.innerHTML = `
     ${ctx.set ? `<div class="set-progress"><i style="width:${((ctx.index + 1) / ctx.set.items.length) * 100}%"></i></div>` : ''}
     ${canvas ? '<div class="song-topo canvas-on">' : ''}
@@ -2581,6 +2591,7 @@ function viewSong(id, ctx = {}) {
       <button class="play-big ${song.youtube ? '' : 'off'}" id="btn-play" aria-label="${song.youtube ? 'Tocar' : 'Escolher vídeo'}" title="${song.youtube ? 'Tocar (continua tocando no player enquanto você navega)' : 'Sem vídeo: escolher um no YouTube'}">${icon(song.youtube ? (player.tocandoAgora(song.youtube) ? 'pause' : 'play') : 'youtube', 24)}</button>
       <button class="salvar-btn${isPreview ? '' : ' salva'}" id="btn-biblio" data-salvar aria-pressed="${!isPreview}" aria-label="${isPreview ? 'Salvar na biblioteca' : 'Na biblioteca (tocar para tirar)'}" title="${isPreview ? 'Salvar na biblioteca' : 'Na sua biblioteca — tocar para tirar'}">${icon(isPreview ? 'plus' : 'check', 18)}</button>
       <button class="icon-btn" id="btn-add" aria-label="Adicionar a repertório" title="Adicionar a um repertório">${icon('list', 22)}</button>
+      ${paginasDaPartitura(song.content).length ? `<a class="partitura-btn" id="btn-partitura" href="#/musica/${isPreview ? 'previa' : song.id}/partitura" title="Ver a partitura">${icon('score', 18)} Partitura</a>` : ''}
       ${isPreview ? `<button class="icon-btn" id="btn-edit-prev" aria-label="Editar cifra" title="Salvar e editar a cifra">${icon('edit', 22)}</button>`
         : `<a class="icon-btn" href="#/editar/${song.id}" aria-label="Editar" title="Editar cifra">${icon('edit', 22)}</a>`}
       <button class="icon-btn" id="btn-palco" aria-label="Só a letra (tela cheia)" title="Só a letra, tela cheia">${icon('expand', 22)}</button>
@@ -2685,8 +2696,8 @@ function viewSong(id, ctx = {}) {
 
   // letra que veio da internet sem acordes: procura a cifra da mesma música no Cifra Club e troca sozinho,
   // mantendo o vídeo, a parte da missa e os quadros (uma vez só; se não achar, fica como está)
-  // (a letra do Hinário da CNBB e o texto oficial da CNBB ficam como estão: letra fiel)
-  const procuraCifra = () => (isPreview ? !/^(cnbb|hinario):/.test(song.source || '') : /letras\.mus\.br|lrclib/.test(song.source || ''))
+  // (a letra do Hinário e do acervo litúrgico e o texto oficial da CNBB ficam como estão: letra fiel)
+  const procuraCifra = () => (isPreview ? !/^(cnbb|hinario|acervo):/.test(song.source || '') : /letras\.mus\.br|lrclib/.test(song.source || ''))
     && !(Date.now() - Number(renderSong(song.content).meta.x_sem_cifra || 0) < 7 * 864e5) && !!song.title;
   // só depois de o app já ter procurado: um aviso simples do que esta música não tem
   const avisoFalta = () => {
@@ -3647,7 +3658,7 @@ async function viewLiturgia(data) {
 }
 
 // ---- Missa litúrgica: os cantos do Hinário Litúrgico da CNBB ("Igreja em Oração") para a celebração, com a
-// letra tirada do caderno da CNBB, o áudio de referência e o caderno em PDF (scripts/hinario-sync.mjs)
+// letra tirada do caderno da CNBB (scripts/hinario-sync.mjs); o vídeo de referência vem do YouTube
 const tipoMissa = () => (db.prefs().tipoMissa === 'popular' ? 'popular' : 'liturgica');
 const nomeCelebracao = (t) => normalizar(String(t || '').replace(/\b(\d+)\s*[°ºª]/g, '$1').replace(/\bdo\b|\bda\b|\bde\b/g, ' ')).replace(/\s+/g, ' ').trim();
 // o caderno da data; sem ele, o da mesma celebração e do mesmo ano litúrgico (A, B ou C) de outro ano
@@ -3664,7 +3675,7 @@ function cadernoDoDia(cadernos, lit, data) {
   return caderno ? { caderno, outroAno: true } : null;
 }
 const sourceHinario = (cad, i) => `hinario:${cad.id}:${i}`;
-const conteudoHinario = (cad, c) => definirMeta(c.chordpro, 'pdf', `https://drive.google.com/file/d/${cad.id}/view`); // a partitura: o caderno
+const conteudoHinario = (cad, c) => c.chordpro;
 async function desenharMissaLiturgica(lit, data) {
   const box = $('#missa-liturgica');
   if (!box) return;
@@ -3681,16 +3692,15 @@ async function desenharMissaLiturgica(lit, data) {
   }
   const { caderno: cad, outroAno } = achado;
   const marcados = new Set(cad.cantos.map((_, i) => i));
-  const pdf = `https://drive.google.com/file/d/${cad.id}/view`;
   box.innerHTML = `
     <div class="source"><span class="ico">${icon('book', 18)}</span><div>Cantos do <b>Hinário Litúrgico da CNBB</b> (Igreja em Oração) para <b>${esc(cad.celebracao || lit.celebracao)}</b>${outroAno ? ` <small>(caderno de ${esc(fmtData(cad.data) || 'outro ano')}, mesma celebração)</small>` : ''}.
-      <br><a href="#/arquivo/${encodeURIComponent(pdf)}/${encodeURIComponent(cad.nome.replace(/_/g, ' '))}/${encodeURIComponent('#/liturgia/' + data)}">Abrir o caderno com as partituras</a> · <a href="#/setor/fixas">Partes fixas</a></div></div>
+      <br>Toque num canto para ver a letra (o vídeo de referência é procurado no YouTube). <a href="#/setor/fixas">Partes fixas</a></div></div>
     <ul class="tracks hinario-lista">${cad.cantos.map((c, i) => `
       <li class="track clickable" data-h="${i}" style="grid-template-columns:auto auto 1fr auto">
         <label class="h-marca" title="Incluir no repertório"><input type="checkbox" data-incluir="${i}" checked></label>
-        <div class="cover gen canto-ic" style="--h:${(i * 41 + 200) % 360}">${icon(c.audio ? 'music' : 'text', 20)}</div>
-        <div class="info"><div class="t">${esc(c.titulo)}</div><div class="s">${esc(c.parte)}${c.autor ? ` · ${esc(c.autor)}` : ''}${c.soPartitura ? ' · letra no caderno' : ''}</div></div>
-        <span class="acts">${c.audio ? `<button class="icon-btn" data-ouvir="${i}" aria-label="Ouvir" title="Ouvir a gravação">${icon('play', 16)}</button>` : ''}<button class="icon-btn" aria-label="Abrir a letra">${icon('next', 18)}</button></span></li>`).join('')}
+        <div class="cover gen canto-ic" style="--h:${(i * 41 + 200) % 360}">${icon('text', 20)}</div>
+        <div class="info"><div class="t">${esc(c.titulo)}</div><div class="s">${esc(c.parte)}${c.autor ? ` · ${esc(c.autor)}` : ''}${c.soPartitura ? ' · só o refrão' : ''}${/x_partitura/.test(c.chordpro) ? ' · <span class="tag-partitura">Partitura</span>' : ''}</div></div>
+        <span class="acts"><button class="icon-btn" aria-label="Abrir a letra">${icon('next', 18)}</button></span></li>`).join('')}
     </ul>
     <div class="cta-bar">
       <div class="info"><b id="h-count">${marcados.size} cantos escolhidos</b><span>Com a letra do Hinário, reunidos num repertório</span></div>
@@ -3704,12 +3714,6 @@ async function desenharMissaLiturgica(lit, data) {
   });
   box.addEventListener('click', (e) => {
     if (e.target.closest('.h-marca')) return;
-    const ouvir = e.target.closest('[data-ouvir]');
-    if (ouvir) {
-      const c = cad.cantos[Number(ouvir.dataset.ouvir)];
-      location.hash = `#/arquivo/${encodeURIComponent(`https://drive.google.com/file/d/${c.audio}/view`)}/${encodeURIComponent(c.titulo + ' (ouvir)')}/${encodeURIComponent('#/liturgia/' + data)}`;
-      return;
-    }
     const li = e.target.closest('li[data-h]');
     if (!li) return;
     const i = Number(li.dataset.h);
@@ -4133,7 +4137,7 @@ function route() {
     case 'artista': return d === 'album' ? viewAlbum(b, c, e) : viewArtista(b, c);
     case 'biblioteca': return viewLibrary(b);
     case 'repertorios': return viewLibrary('repertorios');
-    case 'musica': return viewSong(b, { tocar: c === 'tocar' });
+    case 'musica': return c === 'partitura' ? viewPartitura(b) : viewSong(b, { tocar: c === 'tocar' });
     case 'editar': return viewEditor(b, c);
     case 'repertorio': return c !== undefined ? viewSetSong(b, Number(c)) : viewSet(b);
     case 'liturgia': return viewLiturgia(b);

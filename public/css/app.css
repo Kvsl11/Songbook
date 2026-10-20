@@ -1311,3 +1311,14 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 .h-marca { display: grid; place-items: center; width: 28px; height: 48px; cursor: pointer; }
 .h-marca input { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; }
 a.source { text-decoration: none; color: inherit; }
+
+/* partitura: botão em destaque na música e tela com as páginas (fundo branco, como papel) */
+.partitura-btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 999px; text-decoration: none; font-weight: 800; font-size: 13px;
+  color: var(--accent-ink); border: 1.5px solid var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); flex: none; }
+.partitura-btn:hover { background: color-mix(in srgb, var(--accent) 24%, transparent); }
+.tag-partitura { color: var(--accent-ink); font-weight: 700; }
+.partitura-barra { display: flex; align-items: center; gap: 10px; margin: 4px 0 12px; }
+.partitura-barra b { display: inline-flex; align-items: center; gap: 8px; }
+.partitura-paginas { --zoom: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; overflow-x: auto; padding-bottom: 90px; }
+.partitura-paginas img { width: calc(min(100%, 900px) * var(--zoom)); max-width: none; height: auto; background: #fff; border-radius: 6px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.35); }
+@media (max-width: 640px) { .partitura-paginas { margin: 0 calc(-1 * var(--gutter, 16px)); } .partitura-paginas img { border-radius: 0; width: calc(100% * var(--zoom)); } }

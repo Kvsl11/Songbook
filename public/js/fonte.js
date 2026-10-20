@@ -6,7 +6,6 @@
 import { getMissa as getMissaDireto } from './lib/missa.js';
 import { buscarCantos as buscarDireto, getCanto as getCantoDireto } from './lib/cindy.js';
 import { ehMpm, getMusicaMpm } from './lib/mpm.js';
-import { expandir as expandirAcervo } from './lib/acervo.js';
 import { getLiturgia as getLiturgiaDireto } from './lib/cnbb.js';
 import { buscarCifraClub as buscarCifraClubDireto, buscarLetras as buscarLetrasDireto, getCifraClub as getCifraClubDireto, buscarArtistasCifraClub as buscarArtistasDireto, getArtistaCifraClub as getArtistaDireto, getDiscografiaCifraClub as getDiscografiaDireto, getTodasMusicasCifraClub as getTodasMusicasDireto, getLetra as getLetraDireto, PROXIES_PUBLICOS } from './lib/web.js';
 
@@ -139,6 +138,16 @@ export const indiceOracoes = () => dadosLocais('pt-oracoes', 'data/pt/oracoes.js
 export const getOracao = (slug) => dadosLocais('pt-oracao:' + slug, `data/pt/oracoes/${encodeURIComponent(slug)}.json`);
 export const diretorioJunior = () => dadosLocais('junior', 'data/junior.json');
 
+// músicas tiradas dos arquivos do acervo litúrgico (scripts/cantos-sync.mjs)
+let cantosCarregados = null;
+export function carregarCantos() {
+  if (!cantosCarregados) {
+    cantosCarregados = fetch(new URL('data/cantos.json', document.baseURI)).then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.cantos || []).catch(() => { cantosCarregados = null; return []; });
+  }
+  return cantosCarregados;
+}
+
 // letras do Hinário Litúrgico da CNBB por celebração (scripts/hinario-sync.mjs)
 let hinarioCarregado = null;
 export function carregarHinario() {
@@ -147,17 +156,6 @@ export function carregarHinario() {
       .then((d) => d?.cadernos || []).catch(() => { hinarioCarregado = null; return []; });
   }
   return hinarioCarregado;
-}
-
-// acervo litúrgico (pasta do Google Drive indexada pelo GitHub Actions: scripts/acervo-sync.mjs).
-// É grande para o armazenamento do aparelho: fica na memória enquanto o app está aberto (o service worker guarda o arquivo)
-let acervoCarregado = null;
-export function carregarAcervo() {
-  if (!acervoCarregado) {
-    acervoCarregado = fetch(new URL('data/acervo.json', document.baseURI)).then((r) => (r.ok ? r.json() : null))
-      .then((d) => expandirAcervo(d)).catch(() => { acervoCarregado = null; return []; });
-  }
-  return acervoCarregado;
 }
 
 // ------------------------------------------------------------------ busca na internet (Cifra Club, letras)

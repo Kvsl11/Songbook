@@ -79,6 +79,18 @@ jobs:
         run: |
           command -v pdftotext || (sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils)
           node scripts/hinario-sync.mjs
+      - name: Cache das músicas do acervo
+        uses: actions/cache@v4
+        with:
+          path: .acervo-cache
+          key: acervo-${{ github.run_id }}
+          restore-keys: acervo-
+      - name: Músicas e partituras dos arquivos do acervo
+        continue-on-error: true
+        timeout-minutes: 60
+        run: |
+          command -v pdftoppm || (sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils)
+          node scripts/cantos-sync.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

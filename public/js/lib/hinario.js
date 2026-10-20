@@ -136,13 +136,22 @@ export function parseCaderno(texto) {
     }
     cabecalhos.push({ i: j, titulo: titulo.replace(/\s+/g, ' '), parte: m[1].replace(/\s+/g, ' ').trim(), autor });
   }
+  // página de cada linha (o pdftotext marca a troca de página com \f): a partitura de cada canto vai da
+  // página do título até antes da página do canto seguinte
+  const paginaDa = [];
+  let pg = 1;
+  for (const l of linhas) { pg += (l.match(/\f/g) || []).length; paginaDa.push(pg); }
+  const ultimaPagina = pg;
   const cantos = cabecalhos.map((c, n) => {
     const fim = n + 1 < cabecalhos.length ? cabecalhos[n + 1].i : linhas.length;
+    const de = paginaDa[c.i];
+    const proxima = n + 1 < cabecalhos.length ? paginaDa[cabecalhos[n + 1].i] : Math.min(ultimaPagina, de + 2) + 1;
+    const ate = Math.max(de, proxima - 1);
     const letra = trechosDeLetra(linhas.slice(c.i + 2, fim));
     let chave = parteDoCanto(c.parte);
     if (chave === 'outro' && /aleluia/i.test(c.titulo)) chave = 'aclamacao';
     // sem a letra escrita depois da partitura: fica o título (a letra completa está no caderno em PDF)
-    return { titulo: c.titulo, parte: c.parte, autor: c.autor, chave, chordpro: letraParaPro(c, letra.length ? letra : [c.titulo]), soPartitura: !letra.length };
+    return { titulo: c.titulo, parte: c.parte, autor: c.autor, chave, chordpro: letraParaPro(c, letra.length ? letra : [c.titulo]), soPartitura: !letra.length, paginas: [de, ate] };
   });
   return { celebracao, data, cantos };
 }

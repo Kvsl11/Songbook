@@ -1,18 +1,21 @@
 // Copia para public/data/hinario.json as letras do Hinário Litúrgico da CNBB ("Igreja em Oração"): baixa os
 // cadernos em PDF do acervo (data/acervo.json), tira o texto com o pdftotext (poppler-utils) e guarda, por
-// celebração, cada canto com a parte da missa, a autoria, a letra (ChordPro) e o áudio do mesmo canto.
+// celebração, cada canto com a parte da missa, a autoria e a letra (ChordPro). As páginas do caderno viram
+// imagens (public/partituras/<id>-<n>.png) e cada canto aponta as suas no botão "Partitura" do app.
 // Os textos já lidos ficam em .hinario-cache/ (um caderno não muda). O resultado fica salvo no repositório:
 // se o acervo deixar de responder, o hinario.json salvo continua valendo.
 //
 // Uso: node scripts/hinario-sync.mjs
 
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { expandir } from '../public/js/lib/acervo.js';
 import { parseCaderno } from '../public/js/lib/hinario.js';
+import { definirMeta } from '../public/js/chordpro.js';
+import { imagensDaPartitura } from './cantos-sync.mjs';
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ACERVO = path.join(RAIZ, 'public', 'data', 'acervo.json');
@@ -24,7 +27,8 @@ const simples = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').
 
 async function textoDoCaderno(id) {
   const txt = path.join(CACHE, id + '.txt');
-  try { return await readFile(txt, 'utf8'); } catch { /* ainda não lido */ }
+  const temImagens = await access(path.join(RAIZ, 'public', 'partituras', `${id}-1.png`)).then(() => true, () => false);
+  try { if (temImagens) return await readFile(txt, 'utf8'); } catch { /* ainda não lido */ }
   const pdf = path.join(CACHE, id + '.pdf');
   for (let t = 1; ; t++) {
     try {
@@ -38,6 +42,7 @@ async function textoDoCaderno(id) {
     }
   }
   await exec('pdftotext', ['-enc', 'UTF-8', pdf, txt]);
+  await imagensDaPartitura(pdf, id);
   await rm(pdf, { force: true });
   return readFile(txt, 'utf8');
 }
@@ -51,15 +56,9 @@ for (const cad of cadernos) {
   let r;
   try { r = parseCaderno(await textoDoCaderno(cad.id)); } catch (e) { falhas++; console.warn(`${cad.nome}: ${e.message}`); continue; }
   if (!r.cantos.length) continue;
-  // os áudios do mesmo domingo: pasta "Áudios_<nome do caderno>" na mesma pasta do caderno
-  const base = simples(cad.nome.replace(/^caderno_?/i, '').replace(/\.pdf$/i, ''));
-  const pastaAudios = itens.filter((it) => it.tipo === 'audio' && it.caminho.length === cad.caminho.length + 1
-    && cad.caminho.every((c, i) => it.caminho[i] === c) && simples(it.caminho[it.caminho.length - 1]).replace(/^audios /, '') === base);
-  const audioDe = (titulo) => pastaAudios.find((a) => simples(a.nome.replace(/^\d+\.\s*/, '').split('_')[0]) === simples(titulo))
-    || pastaAudios.find((a) => { const n = simples(a.nome.replace(/^\d+\.\s*/, '').split('_')[0]); const t = simples(titulo); return n && t && (n.startsWith(t) || t.startsWith(n)); });
   saida.push({
     id: cad.id, nome: cad.nome.replace(/\.pdf$/i, ''), celebracao: r.celebracao, data: r.data,
-    cantos: r.cantos.map((c) => ({ ...c, audio: audioDe(c.titulo)?.id || undefined })),
+    cantos: r.cantos.map(({ paginas, ...c }) => ({ ...c, chordpro: definirMeta(c.chordpro, 'x_partitura', `${cad.id}:${paginas[0]}-${paginas[1]}`) })),
   });
 }
 saida.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
