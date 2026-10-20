@@ -141,12 +141,12 @@ export function parseCaderno(texto) {
   const paginaDa = [];
   let pg = 1;
   for (const l of linhas) { pg += (l.match(/\f/g) || []).length; paginaDa.push(pg); }
-  const ultimaPagina = pg;
+  const ultimaPagina = /\f\s*$/.test(texto) ? pg - 1 : pg; // o pdftotext termina com uma troca de página
   const cantos = cabecalhos.map((c, n) => {
     const fim = n + 1 < cabecalhos.length ? cabecalhos[n + 1].i : linhas.length;
     const de = paginaDa[c.i];
     const proxima = n + 1 < cabecalhos.length ? paginaDa[cabecalhos[n + 1].i] : Math.min(ultimaPagina, de + 2) + 1;
-    const ate = Math.max(de, proxima - 1);
+    const ate = Math.min(ultimaPagina, Math.max(de, proxima - 1));
     const letra = trechosDeLetra(linhas.slice(c.i + 2, fim));
     let chave = parteDoCanto(c.parte);
     if (chave === 'outro' && /aleluia/i.test(c.titulo)) chave = 'aclamacao';

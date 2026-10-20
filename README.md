@@ -10,14 +10,14 @@ ofertório, comunhão etc.).
 Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em degradê e player embutido:
 
 - **Início**: saudação, atalhos, a liturgia de hoje, seus repertórios, tocadas e adicionadas recentemente.
-- **Missa litúrgica ou Missa popular** (na Liturgia): a **Missa litúrgica** traz os cantos do **Hinário Litúrgico
-  da CNBB** ("Igreja em Oração") para a celebração do dia — refrão orante, abertura, salmo, aclamação, oferendas,
-  comunhão, saudação à Mãe do Senhor —, cada um com a **letra fiel** tirada do caderno da CNBB e a sua partitura
-  (botão Partitura); dá para escolher os cantos e montar o repertório. A **Missa popular** são as
-  sugestões da Cindy Ferrarezi e do Músicas para Missa (cifradas). Sem caderno para o dia (dias de semana), aparece a
-  popular. As letras vêm de `scripts/hinario-sync.mjs` (baixa os cadernos do acervo, tira o texto com o `pdftotext`
-  e separa título, parte, autoria e letra com `js/lib/hinario.js`) e ficam salvas em `data/hinario.json` no
-  repositório; os cantos do Hinário também aparecem na Busca (filtro Acervo litúrgico).
+- **Missa litúrgica ou Missa popular** (na Liturgia): a estrutura da missa do dia vem da CNBB e do Pocket Terço
+  (leituras, salmo, aclamação, evangelho) nas duas. Na **Missa litúrgica**, cada parte sugere os cantos dos
+  **arquivos do acervo litúrgico** (`js/lib/sugestoes-liturgicas.js`): primeiro os do caderno do **Hinário Litúrgico
+  da CNBB** da data (refrão orante, abertura, salmo, aclamação, oferendas, comunhão, saudação à Mãe do Senhor), depois
+  os arquivos do mesmo domingo, tempo e ano ("30. A - Eu vos amo, ó Senhor", "29° Dom. T. Comum") e os que trazem o
+  refrão do salmo ou o versículo da aclamação do dia; nas partes fixas (Senhor, Glória, Santo, Cordeiro), as opções do
+  tempo e as gerais. Tudo com a letra fiel (e a cifra ou a partitura, quando o arquivo tem) e o botão Montar
+  repertório. A **Missa popular** continua com as sugestões da Cindy Ferrarezi e do Músicas para Missa.
 - **Busca por setor** (sugestão do Junior Música Católica): na Busca, cartões levam a **Missa litúrgica** (Hinário
   Litúrgico da CNBB por celebração, antífonas de entrada, cantos de comunhão, salmos responsoriais, cifras do Prof.
   Agnaldo Armindo…), **Partes fixas** (Senhor, Glória, Aclamação e Aclamação quaresmal, Creio, Santo, Oração
@@ -29,6 +29,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   pasta (`data/acervo.json`), `scripts/cantos-sync.mjs` lê cada arquivo (`js/lib/cantos-acervo.js`: cifras em .docx/PDF
   viram cifras, partituras viram letra juntando as sílabas) e grava `data/cantos.json`. A busca por texto também
   procura nelas (filtro **Acervo litúrgico**).
+- **Cifra completada sozinha**: quando a cifra só tem acordes em parte das estrofes, ao abrir a música o app repete
+  a sequência da estrofe cifrada nas outras, guarda e avisa (sem precisar tocar em nada).
 - **Partitura**: as músicas que vêm de partitura (acervo e cadernos do Hinário) trazem as páginas como imagens leves
   (`partituras/<id>-<n>.png`, preto e branco); na música, o botão **Partitura** abre as páginas numa tela própria, com
   zoom. Os dados (índice, letras, cifras e partituras) ficam salvos no repositório: continuam no app mesmo que a

@@ -6,6 +6,7 @@ import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
 import { COLECOES_LITURGICAS, parteFixa, PARTES_FIXAS, tempoDe, TEMPOS } from './lib/acervo.js';
+import { sugerirParaODia } from './lib/sugestoes-liturgicas.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -42,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-103';
+export const APP_VERSAO = '2026.10.20-104';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2181,7 +2182,7 @@ async function acervoClassificado() {
   // Hinário: por celebração (o mesmo canto de anos diferentes fica uma vez em cada lista de parte)
   for (const cad of cadernos) {
     const pasta = [HINARIO, `${cad.celebracao || cad.nome}${cad.data ? ` (${fmtData(cad.data)})` : ''}`];
-    cad.cantos.forEach((c, i) => musicas.push({ fonte: sourceHinario(cad, i), titulo: c.titulo, autor: c.autor, parte: c.parte, caminho: pasta, tipo: 'letra', chordpro: c.chordpro, nome: `${c.titulo} ${c.parte}`, data: cad.data }));
+    cad.cantos.forEach((c, i) => musicas.push({ fonte: sourceHinario(cad, i), titulo: c.titulo, autor: c.autor, parte: c.parte, caminho: pasta, arquivo: cad.nome, caderno: cad.id, tipo: 'letra', chordpro: c.chordpro, nome: `${c.titulo} ${c.parte}`, data: cad.data }));
   }
   const fixas = new Map();
   const tempos = new Map();
@@ -2523,7 +2524,7 @@ function viewPartitura(id) {
   view.innerHTML = `<div class="partitura">
     <div class="partitura-barra"><b>${icon('score', 18)} ${esc(titulo)}</b><span class="spacer"></span>
       <div class="seg"><button data-z="-1" aria-label="Diminuir">${icon('minus', 16)}</button><button data-z="1" aria-label="Aumentar">${icon('plus', 16)}</button></div></div>
-    <div class="partitura-paginas">${paginas.length ? paginas.map((src, i) => `<img src="${esc(src)}" alt="Página ${i + 1} da partitura" loading="${i ? 'lazy' : 'eager'}">`).join('') : '<p class="muted">Esta música não tem partitura.</p>'}</div></div>`;
+    <div class="partitura-paginas">${paginas.length ? paginas.map((src, i) => `<img src="${esc(src)}" alt="Página ${i + 1} da partitura" loading="${i ? 'lazy' : 'eager'}" onerror="this.remove()">`).join('') : '<p class="muted">Esta música não tem partitura.</p>'}</div></div>`;
   const aplicar = () => { $('.partitura-paginas').style.setProperty('--zoom', zoom); sessionStorage.setItem('zoomPartitura', zoom); };
   aplicar();
   view.querySelectorAll('[data-z]').forEach((b) => (b.onclick = () => { zoom = Math.min(3, Math.max(0.6, +(zoom + Number(b.dataset.z) * 0.2).toFixed(1))); aplicar(); }));
@@ -2742,7 +2743,8 @@ function viewSong(id, ctx = {}) {
     if (location.hash === hashAntes) route();
   };
 
-  // aviso de cifra completada automaticamente / estrofes sem acordes
+  // estrofes sem acordes: o app repete sozinho a sequência da estrofe cifrada nelas (sem precisar tocar em nada),
+  // guarda e avisa
   const avisoCifra = () => {
     const box = $('#aviso-cifra');
     if (!box) return;
@@ -2754,15 +2756,12 @@ function viewSong(id, ctx = {}) {
     } else if (meta.x_cifra_completada) {
       box.innerHTML = `<div class="aviso">${icon('sparkles', 18)}<span>A cifra original só tinha acordes em parte da música. Repeti a mesma sequência nas outras estrofes${song.youtube ? ' — confira ouvindo o vídeo' : ''}.</span></div>`;
     } else if (faltam) {
-      box.innerHTML = `<div class="aviso">${icon('info', 18)}<span>${faltam} estrofe(s) sem acordes.</span><button class="btn small" id="btn-completar" title="Repete a sequência de acordes da estrofe cifrada nas estrofes sem acordes">${icon('sparkles', 15)} Completar cifra</button></div>`;
-      $('#btn-completar').onclick = () => {
-        const r = completarCifra(song.content);
-        song.content = r.texto.replace(/(\n\n)/, `\n{x_cifra_completada: ${r.completadas}}$1`);
-        if (isPreview) preview.content = song.content; else db.saveSong({ ...db.song(song.id), content: song.content });
-        toast(`Cifra completada em ${r.completadas} estrofe(s)`);
-        draw();
-        avisoCifra();
-      };
+      const r = completarCifra(song.content);
+      song.content = r.texto.replace(/(\n\n)/, `\n{x_cifra_completada: ${r.completadas}}$1`);
+      if (isPreview) { preview.content = song.content; guardarPrevia(); } else db.saveSong({ ...db.song(song.id), content: song.content });
+      toast(`Cifra completada sozinha em ${r.completadas} estrofe(s)`);
+      draw();
+      avisoCifra();
     } else box.innerHTML = '';
   };
   avisoCifra();
@@ -3515,8 +3514,16 @@ async function viewLiturgia(data) {
 
   const lit = missa.liturgia;
   lembrarCorLiturgica(data, lit.cor);
-  if (!escolhas.has(data)) escolhas.set(data, Object.fromEntries(missa.partes.map((p) => [p.chave, escolhaPadrao(p)])));
-  const sel = escolhas.get(data);
+  // Missa litúrgica: as mesmas partes (leituras, salmo e aclamação da CNBB), com os cantos sugeridos dos arquivos
+  // do acervo litúrgico e do Hinário da CNBB; Missa popular: Cindy Ferrarezi e Músicas para Missa
+  const liturgica = tipoMissa() === 'liturgica';
+  if (liturgica) {
+    missa = await missaLiturgica(missa, data);
+    if ($('#dt')?.value !== data) return;
+  }
+  const chaveEscolhas = (liturgica ? 'lit:' : '') + data;
+  if (!escolhas.has(chaveEscolhas)) escolhas.set(chaveEscolhas, Object.fromEntries(missa.partes.map((p) => [p.chave, escolhaPadrao(p)])));
+  const sel = escolhas.get(chaveEscolhas);
   const cantoEscolhido = (p) => p.cantos.find((c) => c.url === sel[p.chave]);
   const nomeEscolha = (p) => {
     const v = sel[p.chave];
@@ -3525,14 +3532,22 @@ async function viewLiturgia(data) {
     return cantoEscolhido(p)?.titulo || '';
   };
   const contagem = (p) => {
+    if (liturgica) {
+      const h = p.cantos.filter((c) => c.fonte === 'hinario').length;
+      const a = p.cantos.length - h;
+      return [h ? `${h} Hinário CNBB` : '', a ? `${a} do acervo` : ''].filter(Boolean).join(' · ');
+    }
     const m = p.cantos.filter((c) => c.fonte === 'mpm').length;
     const c = p.cantos.length - m;
     return [c ? `${c} Cindy` : '', m ? `${m} MpM` : ''].filter(Boolean).join(' · ');
   };
+  const tagFonte = (c) => (c?.fonte === 'mpm' ? ' <span class="tag mpm" title="Sugestão do site Músicas para Missa">MpM</span>'
+    : c?.fonte === 'hinario' ? ' <span class="tag cnbb" title="Hinário Litúrgico da CNBB">Hinário</span>'
+      : c?.fonte === 'acervo' ? ' <span class="tag" title="Arquivo do acervo litúrgico">Acervo</span>' : '');
   const resumo = (p) => {
     const n = nomeEscolha(p);
     const cont = p.cantos.length > 1 ? `<small class="cont">${contagem(p)}</small>` : '';
-    if (n) return `<span class="sel">${esc(n)}${cantoEscolhido(p)?.fonte === 'mpm' ? ' <span class="tag mpm">MpM</span>' : ''}</span>${cont}`;
+    if (n) return `<span class="sel">${esc(n)}${tagFonte(cantoEscolhido(p))}</span>${cont}`;
     if (p.liturgia) return `<span>${esc(p.liturgia.referenciaCompleta || p.liturgia.referencia || '')}</span>`;
     return `<span>${p.cantos.length ? contagem(p) : 'Sem sugestões'}</span>`;
   };
@@ -3561,22 +3576,22 @@ async function viewLiturgia(data) {
       <div class="refs">${lit.leituras.map((l) => `<span>${esc(l)}</span>`).join('')}</div>
     </section>
     <div class="seg-tabs tipo-missa" role="tablist">
-      <button class="chip" data-tipo="liturgica" aria-pressed="${tipoMissa() === 'liturgica'}">${icon('book', 15)} Missa litúrgica</button>
-      <button class="chip" data-tipo="popular" aria-pressed="${tipoMissa() === 'popular'}">${icon('music', 15)} Missa popular</button>
+      <button class="chip" data-tipo="liturgica" aria-pressed="${liturgica}">${icon('book', 15)} Missa litúrgica</button>
+      <button class="chip" data-tipo="popular" aria-pressed="${!liturgica}">${icon('music', 15)} Missa popular</button>
     </div>
-    <div class="so-liturgica" id="missa-liturgica"><div class="loading-note"><span class="spin"></span>Procurando os cantos do Hinário Litúrgico da CNBB…</div></div>
-    <div class="source so-popular"><span class="ico">${icon('sparkles', 18)}</span><div>${missa.repertorio
+    ${liturgica ? `<div class="source"><span class="ico">${icon('book', 18)}</span><div>Cantos sugeridos dos <b>arquivos do acervo litúrgico</b> (hinários e subsídios da CNBB)${missa.caderno ? ` e do <b>Hinário Litúrgico da CNBB</b> para ${esc(missa.caderno.caderno.celebracao || lit.celebracao)}${missa.caderno.outroAno ? ` <small>(caderno de ${esc(fmtData(missa.caderno.caderno.data) || 'outro ano')})</small>` : ''}` : ''}, pela celebração, pelo tempo e pelo texto do salmo e da aclamação do dia.</div></div>`
+    : `<div class="source"><span class="ico">${icon('sparkles', 18)}</span><div>${missa.repertorio
       ? `Sugestões de cantos de <a href="${esc(missa.repertorio.url)}" target="_blank" rel="noopener">${esc(missa.repertorio.titulo)}</a> · Cindy Ferrarezi`
       : 'A Cindy Ferrarezi ainda não publicou o repertório desta data. Salmo e aclamação foram buscados pelo texto do dia.'}
       ${missa.mpm ? `<br>Mais sugestões de <a href="${esc(missa.mpm.url)}" target="_blank" rel="noopener">${esc(missa.mpm.titulo)}</a> · Músicas para Missa <span class="tag mpm">MpM</span>` : ''}
-      ${lit.missas.length > 1 ? `<br>Hoje há ${lit.missas.length} formulários de missa; a estrutura usa o primeiro.` : ''}</div></div>
-    ${missa.mpm ? `<div class="fonte-pref so-popular"><span>Sugestão principal em cada parte:</span>
+      ${lit.missas.length > 1 ? `<br>Hoje há ${lit.missas.length} formulários de missa; a estrutura usa o primeiro.` : ''}</div></div>`}
+    ${!liturgica && missa.mpm ? `<div class="fonte-pref"><span>Sugestão principal em cada parte:</span>
       <button class="chip" data-fonte="cindy" aria-pressed="${fontePreferida() === 'cindy'}" title="Escolher primeiro as sugestões da Cindy Ferrarezi">Cindy Ferrarezi</button>
       <button class="chip" data-fonte="mpm" aria-pressed="${fontePreferida() === 'mpm'}" title="Escolher primeiro as sugestões do Músicas para Missa">Músicas para Missa</button>
       <small>Abra cada parte para ver todas as opções das duas fontes.</small></div>` : ''}
     ${missa.avisos.map((a) => `<div class="alert">${icon('info', 18)}<span>${esc(a)}</span></div>`).join('')}
     <div id="partes">${missa.partes.map((p) => `
-      <details class="parte${LEITURAS.includes(p.chave) ? ' parte-leitura' : ''}" data-chave="${p.chave}" ${['salmo', 'aclamacao'].includes(p.chave) ? 'open' : ''}>
+      <details class="parte" data-chave="${p.chave}" ${['salmo', 'aclamacao'].includes(p.chave) ? 'open' : ''}>
         <summary>
           ${passoHTML(p, numeros[p.chave])}
           <span class="n"><b>${esc(p.nome)}</b>${resumo(p)}</span>
@@ -3588,17 +3603,17 @@ async function viewLiturgia(data) {
           ${(p.chordpro || p.cantos.length) ? `<div class="opcoes-titulo">Escolha o canto</div><div class="opcoes">
             <label class="opcao"><input type="radio" name="op-${p.chave}" value="" ${!sel[p.chave] ? 'checked' : ''}><span class="lbl">Nenhum</span></label>
             ${p.chordpro ? `<label class="opcao"><input type="radio" name="op-${p.chave}" value="cnbb" ${sel[p.chave] === 'cnbb' ? 'checked' : ''}><div class="cover gen" style="--h:130">${icon('cross', 18)}</div><span class="lbl">Texto oficial (sem cifra)</span><span class="tag cnbb">CNBB</span><button class="icon-btn" data-ver="cnbb" aria-label="Ver">${icon('next', 18)}</button></label>` : ''}
-            ${ordenarCantos(p.cantos).map((c) => `<label class="opcao"><input type="radio" name="op-${p.chave}" value="${esc(c.url)}" ${sel[p.chave] === c.url ? 'checked' : ''}>${capa({ titulo: c.titulo, capa: c.capa })}<span class="lbl">${esc(c.titulo)}</span>${c.sugestao ? '<span class="tag">busca</span>' : ''}${c.fonte === 'mpm' ? '<span class="tag mpm" title="Sugestão do site Músicas para Missa">MpM</span>' : ''}<button class="icon-btn" data-ver="${esc(c.url)}" aria-label="Ver">${icon('next', 18)}</button></label>`).join('')}
+            ${ordenarCantos(p.cantos).map((c) => `<label class="opcao"><input type="radio" name="op-${p.chave}" value="${esc(c.url)}" ${sel[p.chave] === c.url ? 'checked' : ''}>${capa({ titulo: c.titulo, capa: c.capa })}<span class="lbl">${esc(c.titulo)}</span>${c.sugestao ? '<span class="tag">busca</span>' : ''}${tagFonte(c)}${c.partitura ? `<span class="tag-partitura" title="Tem partitura">${icon('score', 14)}</span>` : ''}<button class="icon-btn" data-ver="${esc(c.url)}" aria-label="Ver">${icon('next', 18)}</button></label>`).join('')}
           </div>` : ''}
         </div>
       </details>`).join('')}
     </div>
     <div id="missal-dia"></div>
-    <div class="cta-bar so-popular">
-      <div class="info"><b id="cta-count"></b><span>Serão baixados com cifra e reunidos num repertório</span></div>
+    <div class="cta-bar">
+      <div class="info"><b id="cta-count"></b><span>${liturgica ? 'Reunidos num repertório, com a letra (e a cifra ou a partitura, quando houver)' : 'Serão baixados com cifra e reunidos num repertório'}</span></div>
       <button class="btn primary" id="montar">${icon('sparkles', 18)} Montar repertório</button>
     </div>
-    <p class="fonte">Textos litúrgicos: <a href="${esc(lit.fonte.url)}" target="_blank" rel="noopener">${esc(lit.fonte.nome)}</a>. Cantos, cifras e capas: <a href="https://cindyferrarezi.com/" target="_blank" rel="noopener">cindyferrarezi.com</a>. Conteúdo obtido sob demanda para uso pessoal e pastoral; os direitos pertencem aos respectivos autores.</p>`;
+    <p class="fonte">Textos litúrgicos: <a href="${esc(lit.fonte.url)}" target="_blank" rel="noopener">${esc(lit.fonte.nome)}</a>. ${liturgica ? 'Cantos: acervo litúrgico (hinários e subsídios da CNBB).' : 'Cantos, cifras e capas: <a href="https://cindyferrarezi.com/" target="_blank" rel="noopener">cindyferrarezi.com</a>.'} Conteúdo obtido sob demanda para uso pessoal e pastoral; os direitos pertencem aos respectivos autores.</p>`;
 
   const atualizaCta = () => { $('#cta-count').textContent = `${contaEscolhas()} cantos escolhidos`; };
   atualizaCta();
@@ -3641,17 +3656,14 @@ async function viewLiturgia(data) {
   });
   $('#montar').onclick = () => montarRepertorio(missa, sel, data);
   desenharMissalDoDia(data);
-  // Missa litúrgica (Hinário Litúrgico da CNBB, com a letra) ou Missa popular (Cindy Ferrarezi e Músicas para Missa)
-  const mostrarTipo = (t) => {
-    $('#lit').classList.toggle('modo-liturgica', t === 'liturgica');
-    $('#lit').querySelectorAll('[data-tipo]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tipo === t)));
-  };
-  $('#lit').querySelectorAll('[data-tipo]').forEach((b) => (b.onclick = () => { db.setPref('tipoMissa', b.dataset.tipo); mostrarTipo(b.dataset.tipo); }));
-  mostrarTipo(tipoMissa());
-  desenharMissaLiturgica(lit, data);
+  $('#lit').querySelectorAll('[data-tipo]').forEach((b) => (b.onclick = () => {
+    if (b.dataset.tipo === tipoMissa()) return;
+    db.setPref('tipoMissa', b.dataset.tipo);
+    viewLiturgia(data);
+  }));
   $('#lit').querySelectorAll('[data-fonte]').forEach((b) => (b.onclick = () => {
     db.setPref('fonteSugestoes', b.dataset.fonte);
-    escolhas.set(data, Object.fromEntries(missa.partes.map((p) => [p.chave, escolhaPadrao(p)])));
+    escolhas.set(chaveEscolhas, Object.fromEntries(missa.partes.map((p) => [p.chave, escolhaPadrao(p)])));
     viewLiturgia(data);
     toast(b.dataset.fonte === 'mpm' ? 'Usando primeiro as sugestões do Músicas para Missa' : 'Usando primeiro as sugestões da Cindy Ferrarezi');
   }));
@@ -3675,67 +3687,32 @@ function cadernoDoDia(cadernos, lit, data) {
   return caderno ? { caderno, outroAno: true } : null;
 }
 const sourceHinario = (cad, i) => `hinario:${cad.id}:${i}`;
-const conteudoHinario = (cad, c) => c.chordpro;
-async function desenharMissaLiturgica(lit, data) {
-  const box = $('#missa-liturgica');
-  if (!box) return;
-  const cadernos = await carregarHinario();
-  if (!$('#missa-liturgica')) return;
-  const achado = cadernoDoDia(cadernos, lit, data);
-  if (!achado) {
-    // sem caderno (dias de semana, por exemplo): o aviso fica e a Missa popular aparece embaixo
-    box.innerHTML = `<div class="alert">${icon('info', 18)}<span>O Hinário Litúrgico da CNBB não tem caderno para esta celebração (ele traz os domingos e as solenidades). Veja as <a href="#/setor/fixas">partes fixas</a> e os <a href="#/setor/tempos">cantos do tempo</a> no acervo litúrgico; abaixo, as sugestões da Missa popular.</span></div>`;
-    box.classList.remove('so-liturgica');
-    $('#lit').classList.remove('modo-liturgica');
-    $('#lit').querySelectorAll('[data-tipo]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tipo === 'popular')));
-    return;
+// as partes da missa do dia (com as leituras da CNBB) e, em cada uma, os cantos dos arquivos que combinam com ela
+async function missaLiturgica(missa, data) {
+  const lit = missa.liturgia;
+  const [ac, cadernos] = await Promise.all([acervoClassificado(), carregarHinario()]);
+  const caderno = cadernoDoDia(cadernos, lit, data);
+  const m0 = lit.missas[0] || {};
+  const sug = sugerirParaODia(ac.musicas, lit, { caderno: caderno?.caderno.id, textos: { salmo: m0.salmo?.refrao, aclamacao: m0.aclamacao?.versiculo } });
+  const cantosDe = (chave) => (sug[chave] || []).map(({ musica: m }) => ({
+    titulo: m.titulo, url: m.fonte, fonte: m.fonte.startsWith('hinario:') ? 'hinario' : 'acervo', partitura: /x_partitura/.test(m.chordpro),
+  }));
+  const partes = missa.partes.map((p) => ({ ...p, cantos: cantosDe(p.chave), texto: [] })).filter((p) => !['sinal', 'oracao'].includes(p.chave) || p.cantos.length);
+  // o refrão orante do Hinário (antes da entrada) e o Glória, quando o caderno do dia traz
+  if (sug.refrao?.length) partes.unshift({ chave: 'refrao', nome: 'Refrão orante', cantos: cantosDe('refrao'), texto: [] });
+  if (!partes.some((p) => p.chave === 'gloria') && sug.gloria?.some((x) => x.pontos >= 20)) {
+    partes.splice(partes.findIndex((p) => p.chave === 'ato') + 1 || 1, 0, { chave: 'gloria', nome: 'Glória', cantos: cantosDe('gloria'), texto: [] });
   }
-  const { caderno: cad, outroAno } = achado;
-  const marcados = new Set(cad.cantos.map((_, i) => i));
-  box.innerHTML = `
-    <div class="source"><span class="ico">${icon('book', 18)}</span><div>Cantos do <b>Hinário Litúrgico da CNBB</b> (Igreja em Oração) para <b>${esc(cad.celebracao || lit.celebracao)}</b>${outroAno ? ` <small>(caderno de ${esc(fmtData(cad.data) || 'outro ano')}, mesma celebração)</small>` : ''}.
-      <br>Toque num canto para ver a letra (o vídeo de referência é procurado no YouTube). <a href="#/setor/fixas">Partes fixas</a></div></div>
-    <ul class="tracks hinario-lista">${cad.cantos.map((c, i) => `
-      <li class="track clickable" data-h="${i}" style="grid-template-columns:auto auto 1fr auto">
-        <label class="h-marca" title="Incluir no repertório"><input type="checkbox" data-incluir="${i}" checked></label>
-        <div class="cover gen canto-ic" style="--h:${(i * 41 + 200) % 360}">${icon('text', 20)}</div>
-        <div class="info"><div class="t">${esc(c.titulo)}</div><div class="s">${esc(c.parte)}${c.autor ? ` · ${esc(c.autor)}` : ''}${c.soPartitura ? ' · só o refrão' : ''}${/x_partitura/.test(c.chordpro) ? ' · <span class="tag-partitura">Partitura</span>' : ''}</div></div>
-        <span class="acts"><button class="icon-btn" aria-label="Abrir a letra">${icon('next', 18)}</button></span></li>`).join('')}
-    </ul>
-    <div class="cta-bar">
-      <div class="info"><b id="h-count">${marcados.size} cantos escolhidos</b><span>Com a letra do Hinário, reunidos num repertório</span></div>
-      <button class="btn primary" id="h-montar">${icon('sparkles', 18)} Montar repertório</button>
-    </div>`;
-  box.addEventListener('change', (e) => {
-    const cb = e.target.closest('[data-incluir]');
-    if (!cb) return;
-    if (cb.checked) marcados.add(Number(cb.dataset.incluir)); else marcados.delete(Number(cb.dataset.incluir));
-    $('#h-count').textContent = `${marcados.size} cantos escolhidos`;
-  });
-  box.addEventListener('click', (e) => {
-    if (e.target.closest('.h-marca')) return;
-    const li = e.target.closest('li[data-h]');
-    if (!li) return;
-    const i = Number(li.dataset.h);
-    const salva = db.songBySource(sourceHinario(cad, i));
-    if (salva) { location.hash = '#/musica/' + salva.id; return; }
-    abrirPrevia(conteudoHinario(cad, cad.cantos[i]), sourceHinario(cad, i), '#/liturgia/' + data);
-  });
-  $('#h-montar').onclick = () => {
-    const items = [...marcados].sort((a, b) => a - b).map((i) => {
-      const c = cad.cantos[i];
-      const song = db.songBySource(sourceHinario(cad, i)) || db.saveSong({ content: conteudoHinario(cad, c), source: sourceHinario(cad, i) });
-      return { songId: song.id, label: c.parte };
-    });
-    if (!items.length) { toast('Escolha pelo menos um canto'); return; }
-    const set = db.saveSet({ name: `Missa ${fmtData(data)} – ${lit.celebracao}`, date: data, items });
-    desenharLateral();
-    toast('Repertório da missa criado com os cantos do Hinário!', 4000);
-    location.hash = '#/repertorio/' + set.id;
-  };
+  return { ...missa, partes, repertorio: null, mpm: null, caderno };
 }
 
 async function songFromChoice(parte, valor, lit) {
+  // canto do acervo litúrgico ou do Hinário da CNBB (Missa litúrgica): já está no app
+  if (/^(acervo|hinario):/.test(valor)) {
+    const m = (await acervoClassificado()).musicas.find((x) => x.fonte === valor);
+    if (!m) throw new Error('canto não encontrado no acervo');
+    return { id: 'previa', content: m.chordpro, source: valor, transpose: 0, capo: 0 };
+  }
   if (valor === 'cnbb') return { id: 'previa', content: parte.chordpro, source: `cnbb:${lit.data}:${parte.chave}`, transpose: 0, capo: 0 };
   const c = await getCanto(valor);
   return { id: 'previa', content: c.chordpro, source: c.url, transpose: 0, capo: 0 };

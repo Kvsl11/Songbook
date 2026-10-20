@@ -96,7 +96,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
         const c = cantoDePartitura(r.texto, it.nome);
         achados = c && (!c.semLetra || r.paginas) ? [{ ...c, tipo: c.semLetra ? 'partitura' : 'letra' }] : [];
       }
-      achados.forEach((c, i) => cantos.push({ id: it.id, i, caminho: it.caminho, ...c, partitura: r.paginas || 0 }));
+      achados.forEach((c, i) => cantos.push({ id: it.id, i, caminho: it.caminho, arquivo: it.nome.trim(), ...c, partitura: r.paginas || 0 }));
     }
   };
   await Promise.all(Array.from({ length: 4 }, trabalhador));
@@ -114,8 +114,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     if (outro && !fica.partitura && outro.partitura) Object.assign(fica, { partitura: outro.partitura, partituraId: outro.id });
     melhor.set(k, fica);
   }
-  const saida = [...melhor.values()].map(({ id, i, caminho, titulo, autor, parte, tipo, chordpro, partitura, partituraId }) => ({
-    id, i, caminho, titulo, autor: autor || undefined, parte: parte || undefined, tipo,
+  // arquivo: o nome original (traz o número do domingo e o ano, "30. A - Eu vos amo"), para sugerir na missa do dia
+  const saida = [...melhor.values()].map(({ id, i, caminho, arquivo, titulo, autor, parte, tipo, chordpro, partitura, partituraId }) => ({
+    id, i, caminho, arquivo, titulo, autor: autor || undefined, parte: parte || undefined, tipo,
     chordpro: partitura ? definirMeta(chordpro, 'x_partitura', `${partituraId || id}:${partitura}`) : chordpro,
   })).sort((a, b) => a.caminho.join('/').localeCompare(b.caminho.join('/'), 'pt', { numeric: true }) || a.titulo.localeCompare(b.titulo, 'pt'));
   const anterior = await readFile(SAIDA, 'utf8').then((t) => JSON.parse(t)).catch(() => null);
