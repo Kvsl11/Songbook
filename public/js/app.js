@@ -45,7 +45,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-135';
+export const APP_VERSAO = '2026.10.20-136';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -173,20 +173,83 @@ const somaDias = (iso, n) => {
 const DIAS_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const dataPorExtenso = (iso) => (iso ? `${DIAS_SEMANA[new Date(iso + 'T12:00:00').getDay()]}, ${fmtData(iso)}` : 'Escolher data');
 
-// Campo de data sempre exibido como dd/mm/aaaa: o <input type="date"> nativo mostra o
-// formato do idioma do aparelho (ex.: mm/dd/aaaa), então ele fica invisível por cima
-// do texto formatado e só serve para abrir o calendário.
+// Campo de data: botão com a data por extenso que abre o calendário do próprio app (o do aparelho é genérico
+// e mostra o formato do idioma do sistema). O valor fica num campo escondido com o id pedido.
 function campoData(id, valor, rotulo = 'Data') {
-  return `<label class="date-field">${icon('calendar', 18)}<span class="date-text" id="${id}-texto">${esc(dataPorExtenso(valor))}</span>
-    <input class="date-native" type="date" id="${id}" value="${esc(valor || '')}" aria-label="${esc(rotulo)}"></label>`;
+  return `<button type="button" class="date-field" id="${id}-campo" aria-haspopup="dialog" aria-label="${esc(rotulo)}">${icon('calendar', 18)}<span class="date-text" id="${id}-texto">${esc(dataPorExtenso(valor))}</span></button>
+    <input type="hidden" id="${id}" value="${esc(valor || '')}">`;
 }
 function ligarCampoData(id, onChange) {
   const input = $('#' + id);
-  input.addEventListener('click', () => { try { input.showPicker(); } catch { /* navegador sem showPicker */ } });
-  input.addEventListener('change', () => {
-    $('#' + id + '-texto').textContent = dataPorExtenso(input.value);
-    onChange(input.value);
+  const campo = $('#' + id + '-campo');
+  campo.onclick = () => abrirCalendario(campo, input.value, (v) => {
+    input.value = v;
+    $('#' + id + '-texto').textContent = dataPorExtenso(v);
+    onChange(v);
   });
+}
+
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+// calendário do app: no celular sobe do rodapé; no tablet e no PC abre logo abaixo do campo
+function abrirCalendario(ancora, valor, aoEscolher) {
+  document.querySelectorAll('.cal, .cal-fundo').forEach((el) => el.remove());
+  const hoje = hojeISO();
+  let [ano, mes] = (valor || hoje).split('-').map(Number);
+  mes--;
+  const iso = (a, m, d) => `${a}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const fundo = document.createElement('div');
+  fundo.className = 'cal-fundo';
+  const cal = document.createElement('div');
+  cal.className = 'cal';
+  cal.setAttribute('role', 'dialog');
+  cal.setAttribute('aria-label', ancora.getAttribute('aria-label') || 'Escolher data');
+  const desenhar = () => {
+    const vazios = new Date(ano, mes, 1).getDay();
+    const dias = new Date(ano, mes + 1, 0).getDate();
+    let cels = '<span></span>'.repeat(vazios);
+    for (let d = 1; d <= dias; d++) {
+      const v = iso(ano, mes, d);
+      cels += `<button type="button" data-dia="${v}" class="${v === hoje ? 'hoje' : ''}" aria-pressed="${v === valor}" aria-label="${esc(dataPorExtenso(v))}">${d}</button>`;
+    }
+    cal.innerHTML = `<div class="cal-topo"><button type="button" class="icon-btn" data-mes="-1" aria-label="Mês anterior">${icon('back', 20)}</button>
+        <b>${MESES[mes][0].toUpperCase() + MESES[mes].slice(1)} de ${ano}</b><button type="button" class="icon-btn" data-mes="1" aria-label="Próximo mês">${icon('next', 20)}</button></div>
+      <div class="cal-semana" aria-hidden="true">${['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((x) => `<span>${x}</span>`).join('')}</div>
+      <div class="cal-dias">${cels}</div>
+      <div class="cal-rodape"><button type="button" class="btn ghost small" data-fechar>Cancelar</button><button type="button" class="btn small" data-dia="${hoje}">Hoje</button></div>`;
+  };
+  const tecla = (e) => { if (e.key === 'Escape') fechar(); };
+  function fechar() {
+    cal.remove();
+    fundo.remove();
+    document.removeEventListener('keydown', tecla);
+    window.removeEventListener('hashchange', fechar);
+  }
+  cal.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.mes) {
+      mes += Number(b.dataset.mes);
+      if (mes < 0) { mes = 11; ano--; } else if (mes > 11) { mes = 0; ano++; }
+      desenhar();
+    } else if (b.dataset.dia) {
+      fechar();
+      ancora.focus?.();
+      if (b.dataset.dia !== valor) aoEscolher(b.dataset.dia);
+    } else if (b.dataset.fechar !== undefined) { fechar(); ancora.focus?.(); }
+  });
+  fundo.onclick = fechar;
+  document.addEventListener('keydown', tecla);
+  window.addEventListener('hashchange', fechar);
+  desenhar();
+  document.body.append(fundo, cal);
+  if (!matchMedia('(max-width: 699px)').matches) {
+    const r = ancora.getBoundingClientRect();
+    const larg = cal.offsetWidth;
+    const alt = cal.offsetHeight;
+    cal.style.left = Math.max(8, Math.min(r.left, innerWidth - larg - 8)) + 'px';
+    cal.style.top = (r.bottom + 8 + alt > innerHeight - 8 ? Math.max(8, r.top - alt - 8) : r.bottom + 8) + 'px';
+  }
+  (cal.querySelector('[aria-pressed="true"]') || cal.querySelector('.hoje') || cal.querySelector('[data-dia]'))?.focus({ preventScroll: true });
 }
 
 const hue = (s) => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
@@ -2793,7 +2856,7 @@ function criarEnsaio(osmd, barra, tomAtual) {
       <div class="seg"><button data-e="lento" aria-label="Mais devagar">${icon('minus', 15)}</button><span class="val" id="ens-bpm"><small>♩ =</small>${bpm}</span><button data-e="rapido" aria-label="Mais rápido">${icon('plus', 15)}</button></div>
     </div>
     ${vozes2 ? `<div class="ensaio-linha vozes"><div class="chips" id="ens-vozes"><button class="chip" data-voz="">Todas</button>${vozes.map((v) => `<button class="chip" data-voz="${esc(v.voz)}">${esc(v.nome)}</button>`).join('')}</div>
-      <label class="ens-so" title="Ligado: a voz escolhida em destaque e as outras bem baixinho, de fundo"><input type="checkbox" id="ens-so"> Outras vozes de fundo</label></div>` : ''}`;
+      <label class="ens-so" title="Ligado: a voz escolhida em destaque e as outras bem baixinho, de fundo"><input type="checkbox" class="switch" id="ens-so"><span>Outras vozes de fundo</span></label></div>` : ''}`;
   const desenharBarra = () => {
     barra.querySelector('[data-e="play"]').innerHTML = icon(tocando ? 'pause' : 'play', 22);
     barra.querySelector('[data-e="play"]').setAttribute('aria-label', tocando ? 'Pausar' : 'Tocar');
@@ -2801,28 +2864,74 @@ function criarEnsaio(osmd, barra, tomAtual) {
     barra.querySelectorAll('[data-voz]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.voz === escolhida)));
   };
   const tAgora = () => (tocando ? inicioT + (audio.currentTime - inicioAudio) / segundosPorSemibreve(bpm) : inicioT);
-  // som: um timbre suave (triângulo com um pouco da oitava), com ataque e soltura curtos
+  // som: timbre de voz/órgão suave (harmônicos que caem rápido, sem o "apito" do triângulo), filtro que tira o
+  // chiado do agudo, vibrato leve depois do ataque, um pouco de sala (reverberação) e um limitador na saída
+  let timbre = null;
+  let saida = null; // entrada da cadeia final (filtro → limitador, com a sala em paralelo)
+  const montarAudio = () => {
+    audio = new (window.AudioContext || window.webkitAudioContext)();
+    const harm = [0, 1, 0.42, 0.2, 0.11, 0.06, 0.035, 0.02];
+    timbre = audio.createPeriodicWave(new Float32Array(harm.length), new Float32Array(harm));
+    const limitador = audio.createDynamicsCompressor();
+    limitador.threshold.value = -14;
+    limitador.knee.value = 10;
+    limitador.ratio.value = 6;
+    limitador.attack.value = 0.005;
+    limitador.release.value = 0.2;
+    limitador.connect(audio.destination);
+    saida = audio.createBiquadFilter();
+    saida.type = 'lowpass';
+    saida.frequency.value = 3200;
+    saida.Q.value = 0.5;
+    saida.connect(limitador);
+    // sala: ruído que se apaga em ~1,4 s, misturado baixinho
+    const dur = 1.4;
+    const ir = audio.createBuffer(2, Math.round(audio.sampleRate * dur), audio.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = ir.getChannelData(c);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 3;
+    }
+    const sala = audio.createConvolver();
+    sala.buffer = ir;
+    const nivelSala = audio.createGain();
+    nivelSala.gain.value = 0.16;
+    saida.connect(sala).connect(nivelSala).connect(limitador);
+  };
+  const novoMestre = () => {
+    mestre = audio.createGain();
+    mestre.gain.value = 0.9;
+    mestre.connect(saida);
+  };
   const nota = (freq, quando, dur, vol) => {
     if (vol <= 0) return;
     const f = freq * 2 ** (tomAtual() / 12);
+    // as graves soam mais fracas ao ouvido (e no alto-falante do celular): ganham um pouco de volume
+    const pico = 0.2 * vol * Math.min(1.6, Math.max(1, (330 / f) ** 0.35));
     const g = audio.createGain();
     g.connect(mestre);
-    const pico = 0.22 * vol;
+    const solta = quando + Math.max(0.1, dur - 0.02);
     g.gain.setValueAtTime(0, quando);
-    g.gain.linearRampToValueAtTime(pico, quando + 0.015);
-    g.gain.setTargetAtTime(pico * 0.55, quando + 0.04, 0.25);
-    const solta = quando + Math.max(0.08, dur - 0.03);
-    g.gain.setTargetAtTime(0, solta, 0.04);
-    for (const [tipo, mult, nivel] of [['triangle', 1, 1], ['sine', 2, 0.25]]) {
-      const o = audio.createOscillator();
-      const og = audio.createGain();
-      o.type = tipo;
-      o.frequency.value = f * mult;
-      og.gain.value = nivel;
-      o.connect(og).connect(g);
-      o.start(quando);
-      o.stop(solta + 0.3);
+    g.gain.linearRampToValueAtTime(pico, quando + 0.035);
+    g.gain.setTargetAtTime(pico * 0.75, quando + 0.06, 0.3);
+    g.gain.setTargetAtTime(0, solta, 0.07);
+    const o = audio.createOscillator();
+    o.setPeriodicWave(timbre);
+    o.frequency.value = f;
+    // vibrato: entra devagar depois de 0,25 s, só nas notas mais longas
+    if (dur > 0.4) {
+      const lfo = audio.createOscillator();
+      const prof = audio.createGain();
+      lfo.frequency.value = 5.2;
+      prof.gain.setValueAtTime(0, quando);
+      prof.gain.setValueAtTime(0, quando + 0.25);
+      prof.gain.linearRampToValueAtTime(f * 0.004, quando + 0.6);
+      lfo.connect(prof).connect(o.frequency);
+      lfo.start(quando);
+      lfo.stop(solta + 0.4);
     }
+    o.connect(g);
+    o.start(quando);
+    o.stop(solta + 0.4);
   };
   const agendar = () => {
     const spw = segundosPorSemibreve(bpm);
@@ -2854,12 +2963,7 @@ function criarEnsaio(osmd, barra, tomAtual) {
     quadro = requestAnimationFrame(acompanhar);
   };
   const tocar = async () => {
-    if (!audio) {
-      audio = new (window.AudioContext || window.webkitAudioContext)();
-      mestre = audio.createGain();
-      mestre.gain.value = 0.9;
-      mestre.connect(audio.destination);
-    }
+    if (!audio) { montarAudio(); novoMestre(); }
     if (audio.state === 'suspended') await audio.resume();
     mostrarCursor();
     tocando = true;
@@ -2879,9 +2983,7 @@ function criarEnsaio(osmd, barra, tomAtual) {
     cancelAnimationFrame(quadro);
     // corta o que já estava agendado
     mestre.disconnect();
-    mestre = audio.createGain();
-    mestre.gain.value = 0.9;
-    mestre.connect(audio.destination);
+    novoMestre();
     desenharBarra();
     $('#ens-pos', barra).textContent = `Pausado · compasso ${(osmd.cursor.Iterator.CurrentMeasureIndex ?? 0) + 1}`;
   }
