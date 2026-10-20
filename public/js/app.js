@@ -43,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-108';
+export const APP_VERSAO = '2026.10.20-109';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -3487,19 +3487,21 @@ function escolhaPadrao(parte) {
   return cantos[0].url;
 }
 
+// textos da liturgia com tratamento de missal: refrão do salmo em destaque (℟) e estrofes numeradas, o Aleluia
+// grande com o versículo (℣), e letra capitular no começo das leituras
 function leituraHTML(l) {
   const ref = l.referenciaCompleta || l.referencia || '';
   const longa = LEITURAS.includes(l.tipo);
-  let html = `<div class="leitura${longa ? ' recolhida' : ''}"><div class="ref">${esc(ref)}</div>`;
+  let html = `<div class="leitura leitura-${esc(l.tipo || 'texto')}${longa ? ' recolhida' : ''}"><div class="ref">${esc(ref)}</div>`;
   if (l.antifona) html += `<p class="ant">${esc(l.antifona)}</p>`;
-  if (l.introducao) html += `<p><b>${esc(l.introducao)}</b></p>`;
+  if (l.introducao) html += `<p class="intro">${esc(l.introducao)}</p>`;
   if (l.tipo === 'salmo') {
-    html += `<p class="refrao">R. ${esc(l.refrao)}${l.refraoAlternativo ? `<br><i>Ou: ${esc(l.refraoAlternativo)}</i>` : ''}</p>`;
-    html += l.estrofes.map((e) => `<p>${esc(e.join('\n'))}</p>`).join('');
+    html += `<div class="salmo-refrao"><span class="vr">℟.</span><p>${esc(l.refrao)}</p>${l.refraoAlternativo ? `<small>Ou: ${esc(l.refraoAlternativo)}</small>` : ''}</div>`;
+    html += `<ol class="estrofes">${l.estrofes.map((e) => `<li><p>${esc(e.join('\n'))}</p><span class="vr-fim">℟.</span></li>`).join('')}</ol>`;
   } else if (l.tipo === 'aclamacao') {
-    html += (l.opcoes || [l]).map((o, i) => `${i ? `<div class="ref">${esc(o.referencia)}</div>` : ''}<p class="refrao">R. ${esc(o.refrao)}</p><p>V. ${esc(o.versiculo)}</p>`).join('');
+    html += (l.opcoes || [l]).map((o, i) => `${i ? `<div class="ref">${esc(o.referencia)}</div>` : ''}<div class="aleluia">${esc(o.refrao)}</div><p class="versiculo"><span class="vr">℣.</span> ${esc(o.versiculo)}</p>`).join('');
   } else {
-    html += l.texto.map((p) => `<p>${esc(p)}</p>`).join('');
+    html += l.texto.map((p, i) => `<p${i ? '' : ' class="abre"'}>${esc(p)}</p>`).join('');
   }
   html += '</div>';
   if (longa) html += `<button class="btn small ghost" data-expand>${icon('book', 15)} Ler texto completo</button>`;
@@ -4017,6 +4019,16 @@ async function viewOracoes() {
   $('#busca-oracao').addEventListener('input', (e) => desenhar(e.target.value));
 }
 
+// texto do Missal (Pocket Terço) com mais respiro e destaque: parágrafos no lugar das linhas em branco,
+// ℣/℟ e as siglas de quem diz (CP, CC, C1…) marcados, para o CSS dar o tratamento de missal
+function realcarMissal(html) {
+  return String(html || '')
+    .replace(/(<br>\s*){2,}/g, '</p><p>')
+    .replace(/<span class="rub">\s*([℣℟]\.?)\s*<\/span>/g, '<span class="vr">$1</span>')
+    .replace(/<span class="rub">\s*(C[PC]|C\d|P|S|D|T|L|A)\s*<\/span>/g, '<span class="sigla">$1</span>')
+    .replace(/<p>\s*<\/p>/g, '');
+}
+
 async function viewOracao(slug) {
   setTab('oracoes');
   setTint('#3b2f5c');
@@ -4024,14 +4036,15 @@ async function viewOracao(slug) {
   view.innerHTML = '<div class="loading-note"><span class="spin"></span>Carregando…</div>';
   let o;
   try { o = await getOracao(slug); } catch { return viewNotFound(); }
-  setHeader(o.titulo, { back: '#/oracoes', eyebrow: o.categoria || 'Oração' });
+  const titulo = String(o.titulo || '').replace(/\s*\((?:\d+|[A-Z]\d)\)\s*/, ' ').trim(); // "Oração Eucarística (02) II" -> "Oração Eucarística II"
+  setHeader(titulo, { back: '#/oracoes', eyebrow: o.categoria || 'Oração' });
   view.innerHTML = `
-    <section class="page-hero"><div class="cover gen" style="--h:270">${icon('book', 40)}</div>
-      <div><div class="kind">${esc(o.categoria || 'Oração')}</div><h2>${esc(o.titulo)}</h2>
+    <section class="page-hero hero-liturgico"><div class="cover gen" style="--h:270"><span class="cruz">✠</span></div>
+      <div><div class="kind">${esc(o.categoria || 'Oração')}</div><h2>${esc(titulo)}</h2>
       <div class="meta"><span>Fonte: <a href="${esc(o.url)}" target="_blank" rel="noopener">Pocket Terço</a> · Missal Romano</span></div></div></section>
     <div class="seg" style="margin-bottom:14px;width:max-content"><button data-f="-" aria-label="Diminuir letra">A−</button><button data-f="+" aria-label="Aumentar letra">A+</button></div>
-    <article class="texto-liturgico">${o.html}</article>
-    <p class="legenda-rub"><span class="rub">Em marrom</span>: indicações para quem preside. <b>Em negrito</b>: respostas do povo.</p>`;
+    <article class="texto-liturgico missal"><p>${realcarMissal(o.html)}</p></article>
+    <p class="legenda-rub"><span class="rub">Em vermelho</span>: indicações (rubricas). <b>Em dourado</b>: respostas do povo. <span class="sigla">CP</span> quem preside, <span class="sigla">CC</span> os concelebrantes.</p>`;
   view.querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => {
     const p = db.prefs();
     db.setPref('fontScale', Math.max(0.6, Math.min(2.5, +(p.fontScale + (b.dataset.f === '+' ? 0.1 : -0.1)).toFixed(2))));
@@ -4168,7 +4181,7 @@ async function desenharMissalDoDia(data) {
   if (!m?.blocos?.length) { box.innerHTML = ''; return; }
   const oracoes = m.blocos.filter((b) => b.tipo === 'oracao');
   const outros = m.blocos.filter((b) => b.tipo !== 'oracao');
-  const bloco = (b) => `<details class="cat-oracoes"><summary><b>${esc(b.titulo)}</b>${icon('down', 18)}</summary><div class="texto-liturgico">${b.html}</div></details>`;
+  const bloco = (b) => `<details class="cat-oracoes"><summary><b>${esc(b.titulo)}</b>${icon('down', 18)}</summary><div class="texto-liturgico missal"><p>${realcarMissal(b.html)}</p></div></details>`;
   box.innerHTML = `
     <div class="shelf-head"><h2>Orações e antífonas do dia</h2><a href="#/oracoes">Orações eucarísticas</a></div>
     ${oracoes.map(bloco).join('')}

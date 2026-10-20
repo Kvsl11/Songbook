@@ -32,6 +32,7 @@
   --nav-h: 64px;
   --sans: "Figtree", "Circular", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --serif: "Source Serif 4", Georgia, serif;
+  --display: "Cormorant Garamond", "Source Serif 4", Georgia, serif; /* títulos, refrões e respostas litúrgicas */
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   color-scheme: dark;
 }
@@ -1351,3 +1352,42 @@ a.source { text-decoration: none; color: inherit; }
 .lista-oracoes a { padding: 12px 12px; background: var(--surface); margin-bottom: 6px; border-radius: 10px; }
 .lista-oracoes a > span:nth-child(2) { flex: 1; }
 .lista-oracoes .ic { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 8px; color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* ---- tipografia litúrgica (missal): rubricas em vermelho, ℣/℟, respostas do povo em destaque, refrões e Aleluia */
+:root { --rubrica: #e48a6c; --resposta: #ecc983; }
+:root[data-theme="light"] { --rubrica: #a5321a; --resposta: #7a520c; }
+.texto-liturgico { font-size: calc(18px * var(--font-scale)); line-height: 1.72; letter-spacing: 0.003em; }
+.texto-liturgico.missal p { margin: 0 0 1.05em; }
+.texto-liturgico .rub { color: var(--rubrica); font-family: var(--serif); font-style: italic; font-size: 0.84em; letter-spacing: 0.01em; }
+.texto-liturgico .vr, .leitura .vr { display: inline-block; min-width: 1.4em; font-family: var(--display); font-weight: 700; font-style: normal; font-size: 1.2em; line-height: 1; color: var(--rubrica); }
+.texto-liturgico b, .texto-liturgico strong { font-family: var(--display); font-weight: 700; font-size: 1.14em; letter-spacing: 0.005em; color: var(--resposta); }
+.sigla { display: inline-block; margin-right: 6px; padding: 1px 5px; border-radius: 4px; font-family: var(--sans); font-size: 10px; font-weight: 800; font-style: normal; letter-spacing: 0.08em;
+  color: var(--rubrica); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rubrica) 60%, transparent); vertical-align: 0.25em; }
+.texto-liturgico .postura { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 9px; }
+.legenda-rub .rub { color: var(--rubrica); font-style: italic; }
+.legenda-rub b { font-family: var(--display); color: var(--resposta); font-size: 1.1em; }
+.hero-liturgico h2 { font-family: var(--display); font-weight: 700; letter-spacing: 0; line-height: 1.02; }
+.hero-liturgico .cover .cruz { font-size: 72px; line-height: 1; color: rgb(255 255 255 / 0.9); font-family: var(--display); }
+
+/* leituras, salmo e aclamação na Liturgia */
+.leitura { font-size: 18px; line-height: 1.7; }
+.leitura .intro { font-family: var(--display); font-style: italic; font-weight: 600; font-size: 1.12em; color: var(--lit-ink); }
+.leitura p.abre::first-letter { float: left; font-family: var(--display); font-weight: 700; font-size: 3.4em; line-height: 0.82; padding: 0.06em 0.1em 0 0; color: var(--lit-ink); }
+.leitura .refrao { display: none; }
+.salmo-refrao { position: relative; margin: 6px 0 16px; padding: 16px 18px 16px 52px; border-radius: 14px; white-space: normal;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--lit-cor, #4a7) 22%, transparent), color-mix(in srgb, var(--lit-cor, #4a7) 6%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lit-cor, #4a7) 35%, transparent); }
+.salmo-refrao .vr { position: absolute; left: 16px; top: 15px; font-size: 1.7em; }
+.salmo-refrao p { margin: 0; font-family: var(--display); font-style: italic; font-weight: 600; font-size: 1.32em; line-height: 1.3; }
+.salmo-refrao small { display: block; margin-top: 6px; font-family: var(--serif); font-style: italic; color: var(--muted); }
+.estrofes { list-style: none; counter-reset: estrofe; margin: 0; padding: 0; }
+.estrofes li { counter-increment: estrofe; position: relative; padding: 0 0 0 34px; margin-bottom: 14px; }
+.estrofes li::before { content: counter(estrofe); position: absolute; left: 0; top: 0.15em; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  font-family: var(--sans); font-size: 11px; font-weight: 800; color: var(--lit-ink); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--lit-ink) 55%, transparent); }
+.estrofes li p { margin: 0; }
+.estrofes .vr-fim { font-family: var(--display); font-weight: 700; color: var(--rubrica); }
+.aleluia { margin: 4px 0 12px; font-family: var(--display); font-weight: 700; font-size: 2em; line-height: 1.1; text-align: center; letter-spacing: 0.01em;
+  background: linear-gradient(90deg, var(--lit-ink), var(--resposta)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.aleluia::before, .aleluia::after { content: '❧'; font-size: 0.5em; vertical-align: 0.35em; margin: 0 10px; color: var(--lit-ink); -webkit-text-fill-color: var(--lit-ink); }
+.aleluia::before { display: inline-block; transform: scaleX(-1); }
+.versiculo { font-style: italic; font-size: 1.06em; text-align: center; max-width: 34em; margin: 0 auto 0.6em; }
