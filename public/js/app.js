@@ -45,7 +45,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-127';
+export const APP_VERSAO = '2026.10.20-128';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -3994,12 +3994,27 @@ async function revisarSet(set) {
     sug = sugerirParaODia(ac.musicas, lit, { caderno: cadernoDoDia(cadernos, lit, set.date)?.caderno.id, textos: { salmo: m0.salmo?.refrao, aclamacao: m0.aclamacao?.versiculo } });
     if (!box.isConnected) return;
   }
+  // música que não veio do acervo/Hinário (Cindy, Músicas para Missa, Cifra Club, feita à mão): também as
+  // sugestões da Missa popular daquele dia (Cindy Ferrarezi e Músicas para Missa)
+  const doAcervo = (src) => /^(acervo|hinario|cnbb):/.test(src || '');
+  let popular = null;
+  if (avisos.some((a) => a.acao === 'trocar' && a.parte && !doAcervo(itens[a.i]?.source))) {
+    popular = await getMissa(set.date).catch(() => null);
+    if (!box.isConnected) return;
+  }
   const quaresma = /quaresma|cinzas|ramos|paixao|semana santa/.test(normalizar(`${lit.tempo || ''} ${lit.celebracao || ''}`));
   const usadas = new Set(itens.map((x) => x.source).filter(Boolean));
   const opcoes = (a) => {
+    const comPopular = popular && !doAcervo(itens[a.i]?.source);
     const lista = (sug[a.parte] || []).map(({ musica }) => musica)
       .filter((m) => !usadas.has(m.fonte) && !(quaresma && /\baleluia\b/i.test(m.chordpro || '')))
-      .slice(0, 3).map((m) => ({ titulo: m.titulo, fonte: m.fonte, de: m.fonte.startsWith('hinario:') ? 'Hinário CNBB' : 'Acervo' }));
+      .slice(0, comPopular ? 2 : 3).map((m) => ({ titulo: m.titulo, fonte: m.fonte, de: m.fonte.startsWith('hinario:') ? 'Hinário CNBB' : 'Acervo' }));
+    if (comPopular) {
+      const p = popular.partes.find((x) => x.chave === a.parte);
+      for (const c of (p?.cantos || []).filter((c) => !usadas.has(c.url) && !(quaresma && /aleluia/i.test(c.titulo))).slice(0, 2)) {
+        lista.push({ titulo: c.titulo, fonte: c.url, de: c.fonte === 'mpm' ? 'Músicas para Missa' : 'Cindy Ferrarezi', popular: p });
+      }
+    }
     // salmo: o do dia, com o texto oficial da CNBB, sempre em primeiro
     if (a.parte === 'salmo' && lit.missas?.[0]?.salmo) lista.unshift({ titulo: `Salmo do dia — ${lit.missas[0].salmo.refrao}`, fonte: 'cnbb', de: 'Texto oficial da CNBB' });
     return lista;
@@ -4014,12 +4029,12 @@ async function revisarSet(set) {
     if (!ops.length) return `<div class="sugestoes"><small class="muted">Sem sugestão no acervo para esta parte: troque por outra música da sua biblioteca ou da busca.</small></div>`;
     a.opcoes = ops;
     return `<div class="sugestoes"><small class="muted">Sugestões para o dia:</small>${ops.map((o, j) => `<div class="sug"><span><b>${esc(o.titulo)}</b><small>${esc(o.de)}</small></span>
-      ${o.fonte !== 'cnbb' ? `<button class="icon-btn" data-ver-sug="${k}:${j}" aria-label="Ver" title="Ver a música">${icon('next', 16)}</button>` : ''}<button class="btn small" data-trocar="${k}:${j}">Trocar</button></div>`).join('')}</div>`;
+      ${o.fonte !== 'cnbb' && !o.popular ? `<button class="icon-btn" data-ver-sug="${k}:${j}" aria-label="Ver" title="Ver a música">${icon('next', 16)}</button>` : ''}<button class="btn small" data-trocar="${k}:${j}">Trocar</button></div>`).join('')}</div>`;
   };
   const n = (nv) => avisos.filter((a) => a.nivel === nv).length;
   const resumo = avisos.length ? [n('erro') && `${n('erro')} ${n('erro') > 1 ? 'erros' : 'erro'}`, n('atencao') && `${n('atencao')} ${n('atencao') > 1 ? 'atenções' : 'atenção'}`, n('info') && `${n('info')} ${n('info') > 1 ? 'observações' : 'observação'}`].filter(Boolean).join(' · ') : 'Tudo certo';
   const ic = { erro: 'x', atencao: 'info', info: 'check' };
-  box.innerHTML = `<details class="revisao ${n('erro') ? 'com-erro' : n('atencao') ? 'com-atencao' : 'ok'}" ${n('erro') ? 'open' : ''}>
+  box.innerHTML = `<details class="revisao ${n('erro') ? 'com-erro' : n('atencao') ? 'com-atencao' : 'ok'}" ${n('erro') || n('atencao') ? 'open' : ''}>
     <summary>${icon(avisos.length ? 'cross' : 'check', 18)}<span><b>Revisão litúrgica</b><small>${esc(lit.celebracao || '')}</small><em class="rev-resumo">${resumo}</em></span><span class="chip sm">${resumo}</span>${avisos.length ? icon('down', 18) : ''}</summary>
     ${avisos.length ? `<ul>${avisos.map((a, k) => `<li class="${a.nivel}"><div class="rev-aviso" ${a.i !== undefined ? `data-ir="${a.i}"` : ''}>${icon(ic[a.nivel], 15)}<span>${esc(a.texto)}</span></div>${sugestoesHTML(a, k)}</li>`).join('')}</ul>`
     : ''}</details>`;
@@ -4039,6 +4054,11 @@ async function revisarSet(set) {
         const p = (await getMissa(set.date)).partes.find((x) => x.chave === 'salmo');
         if (!p?.chordpro) throw new Error('salmo do dia indisponível');
         [content, source] = [p.chordpro, `cnbb:${set.date}:salmo`];
+      } else if (o.popular) {
+        // Cindy Ferrarezi ou Músicas para Missa: baixa a cifra (como em "Montar repertório" na Missa popular)
+        b.innerHTML = '<span class="spin"></span>';
+        const c = await songFromChoice(o.popular, o.fonte, lit);
+        [content, source] = [c.content, c.source];
       } else {
         const m = ac.musicas.find((x) => x.fonte === o.fonte);
         if (b.dataset.verSug) { abrirMusicaAcervo(m); return; }
@@ -4052,7 +4072,7 @@ async function revisarSet(set) {
       desenharLateral();
       toast(`${anterior ? `“${anterior}” trocado por` : 'Agora:'} “${nova.title}”`, 3500);
       viewSet(set.id);
-    } catch (err) { toast('Erro: ' + err.message); } finally { b.disabled = false; }
+    } catch (err) { toast('Erro: ' + err.message); } finally { b.disabled = false; if (b.dataset.trocar) b.textContent = 'Trocar'; }
   }));
   box.querySelectorAll('[data-remover]').forEach((b) => b.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -4473,6 +4493,12 @@ async function songFromChoice(parte, valor, lit) {
 async function montarRepertorio(missa, sel, data, { btn = $('#montar'), tipo = '' } = {}) {
   const pl = tipo === 'playlist';
   const original = btn.innerHTML;
+  // enquanto mostra o progresso ("3/9 Salmo"), o botão fica do tamanho que tinha: não empurra o outro nem a contagem
+  const [largura, flex] = [btn.style.width, btn.style.flex];
+  const w = btn.getBoundingClientRect().width;
+  btn.style.width = w + 'px';
+  btn.style.flex = `0 0 ${w}px`;
+  btn.classList.add('progresso');
   btn.disabled = true;
   const lit = missa.liturgia;
   const items = [];
@@ -4481,7 +4507,7 @@ async function montarRepertorio(missa, sel, data, { btn = $('#montar'), tipo = '
   try {
     for (const [i, p] of escolhidas.entries()) {
       const v = sel[p.chave];
-      btn.innerHTML = `<span class="spin"></span> ${i + 1}/${escolhidas.length} ${esc(p.nome)}`;
+      btn.innerHTML = `<span class="spin"></span><span class="txt">${i + 1}/${escolhidas.length} ${esc(p.nome)}</span>`;
       const source = v === 'cnbb' ? `cnbb:${lit.data}:${p.chave}` : v;
       let song = db.songBySource(source);
       if (!song) {
@@ -4508,6 +4534,9 @@ async function montarRepertorio(missa, sel, data, { btn = $('#montar'), tipo = '
   } finally {
     btn.disabled = false;
     btn.innerHTML = original;
+    btn.style.width = largura;
+    btn.style.flex = flex;
+    btn.classList.remove('progresso');
   }
 }
 

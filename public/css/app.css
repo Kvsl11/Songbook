@@ -1535,3 +1535,6 @@ a.source { text-decoration: none; color: inherit; }
 .revisao summary b { white-space: nowrap; }
 .revisao .rev-resumo { display: none; font-style: normal; font-size: 12.5px; font-weight: 700; color: var(--text); }
 @media (max-width: 600px) { .revisao summary > .chip { display: none; } .revisao .rev-resumo { display: block; } }
+/* botão mostrando o progresso ("3/9 Salmo"): mesmo tamanho, texto cortado com reticências */
+.btn.progresso { overflow: hidden; justify-content: flex-start; }
+.btn.progresso .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
