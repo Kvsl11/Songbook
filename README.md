@@ -111,8 +111,11 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   nas demais (com aviso para conferir ouvindo o vídeo); botão "Completar cifra" na música e no editor.
   Músicas sem nenhum acorde mostram só a opção Letra.
 - **Dicas**: passar o mouse ou segurar o dedo num botão mostra o nome da função.
-- **Orações**: aba com orações eucarísticas, prefácios, ordinário da missa e outras orações (com rubricas e posturas);
-  na Liturgia, as orações e antífonas do dia (entrada, coleta, oferendas, comunhão, depois da comunhão).
+- **Orações**: um menu só, com três abas no topo — **Liturgia** (a liturgia do dia, com a missa litúrgica ou popular),
+  **Orações** (orações eucarísticas em cartões — principais, para missas com crianças, para diversas circunstâncias,
+  sobre a reconciliação —, o ordinário da missa em passos, prefácios, orações diversas, do dia a dia e em latim, com
+  rubricas e posturas) e **Hinários e formação** (fontes do Junior Música Católica). Na Liturgia, as orações e
+  antífonas do dia (entrada, coleta, oferendas, comunhão, depois da comunhão).
 - **Funciona sem internet**: repertórios e músicas ficam no aparelho; a Início mostra a liturgia de hoje sozinha e
   o app já deixa guardadas a liturgia e as sugestões de hoje, do próximo domingo e das datas dos repertórios futuros.
   Capas, fontes e bibliotecas também ficam guardadas; com sinal fraco, o app abre com a cópia guardada em poucos segundos.

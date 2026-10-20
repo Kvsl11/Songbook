@@ -93,7 +93,7 @@ main > * { position: relative; z-index: 1; }
 .nav {
   position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; height: calc(var(--nav-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  display: grid; grid-template-columns: repeat(5, 1fr); align-items: center;
+  display: grid; grid-template-columns: repeat(4, 1fr); align-items: center;
   /* como no Spotify: levemente transparente em cima (o conteúdo aparece de leve) e preto embaixo */
   background: linear-gradient(180deg, rgb(0 0 0 / 0.72) 0%, rgb(0 0 0 / 0.86) 40%, #000 72%);
 }
@@ -1316,3 +1316,38 @@ a.source { text-decoration: none; color: inherit; }
 .partitura-paginas { --zoom: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; overflow-x: auto; padding-bottom: 90px; }
 .partitura-paginas img { width: calc(min(100%, 900px) * var(--zoom)); max-width: none; height: auto; background: #fff; border-radius: 6px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.35); }
 @media (max-width: 640px) { .partitura-paginas { margin: 0 calc(-1 * var(--gutter, 16px)); } .partitura-paginas img { border-radius: 0; width: calc(100% * var(--zoom)); } }
+
+/* Orações: abas no topo (Liturgia · Orações · Hinários e formação) */
+.abas-oracoes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin: 4px 0 18px; border-radius: 14px; background: var(--surface-2); }
+.abas-oracoes a { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; padding: 6px 8px; border-radius: 10px; text-decoration: none;
+  color: var(--muted); font-weight: 700; font-size: 13.5px; text-align: center; line-height: 1.15; transition: background 0.2s, color 0.2s; }
+.abas-oracoes a:hover { color: var(--text); }
+.abas-oracoes a.ativa { background: var(--bg-elev); color: var(--text); box-shadow: 0 2px 10px rgb(0 0 0 / 0.25); }
+.abas-oracoes a.ativa svg { color: var(--accent-ink); }
+@media (max-width: 420px) { .abas-oracoes a { flex-direction: column; gap: 3px; font-size: 12px; } }
+
+/* categorias e lista das orações */
+.cat-oracao { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
+.cat-oracao .chip { flex: none; display: inline-flex; align-items: center; gap: 6px; }
+.cat-oracao .chip small { font-size: 11px; opacity: 0.7; font-weight: 700; }
+.grupo-oe { font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin: 20px 0 10px; }
+.grade-oe { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.cartao-oe { position: relative; display: flex; flex-direction: column; gap: 2px; min-height: 118px; padding: 14px; border-radius: 14px; overflow: hidden; text-decoration: none; color: #fff;
+  background: radial-gradient(120% 90% at 100% 0%, hsl(calc(var(--h) + 30) 70% 55% / 0.55), transparent 60%), linear-gradient(150deg, hsl(var(--h) 45% 34%), hsl(calc(var(--h) + 20) 50% 18%));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08); transition: transform 0.15s, filter 0.15s; }
+.cartao-oe:hover { filter: brightness(1.1); transform: translateY(-2px); }
+.cartao-oe small { padding-right: 20px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75; font-weight: 700; }
+.cartao-oe b { font-family: Georgia, 'Times New Roman', serif; font-size: 40px; line-height: 1.05; margin-top: auto; letter-spacing: 0.02em; }
+.cartao-oe span { font-size: 13px; font-weight: 600; opacity: 0.9; }
+.cartao-oe::after { content: '✠'; position: absolute; right: 12px; top: 10px; font-size: 18px; opacity: 0.35; }
+.passos-ordinario { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 8px; }
+.passos-ordinario a { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 12px; background: var(--surface); text-decoration: none; color: var(--text); transition: background 0.2s; }
+.passos-ordinario a:hover { background: var(--surface-2); }
+.passos-ordinario .num { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 50%; font-weight: 800; color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent); }
+.passos-ordinario a > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; }
+.passos-ordinario small { color: var(--muted); font-size: 12px; }
+.lista-oracoes { padding: 0; }
+.lista-oracoes a { padding: 12px 12px; background: var(--surface); margin-bottom: 6px; border-radius: 10px; }
+.lista-oracoes a > span:nth-child(2) { flex: 1; }
+.lista-oracoes .ic { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 8px; color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 12%, transparent); }
