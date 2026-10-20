@@ -20,7 +20,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   **Livros e documentos** (Missal, rituais, lecionários, documentos da Igreja). Tudo vem de um **acervo litúrgico
   no Google Drive** (pasta pública), indexado todo dia pelo GitHub Actions (`scripts/acervo-sync.mjs` →
   `data/acervo.json`); o app classifica cada arquivo pelo nome e pela pasta (`js/lib/acervo.js`), junta partitura,
-  cifra e áudio do mesmo canto e abre tudo no leitor do app. A busca por texto também procura no acervo
+  cifra e áudio do mesmo canto e abre tudo no leitor do app. O índice (só nomes e pastas) fica salvo no repositório:
+  se a pasta for fechada, ele continua no app; os arquivos em si abrem do Drive. A busca por texto também procura no acervo
   (filtro **Acervo litúrgico**).
 - **Buscar (qualquer música)**: digite música, artista ou trecho e aparece uma lista só de **Músicas** (resultados do
   Cifra Club e do Letras juntos) e os **Vídeos** do YouTube. Tocar numa música já traz tudo junto: a **cifra** (Cifra

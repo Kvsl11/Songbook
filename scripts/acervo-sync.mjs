@@ -3,9 +3,12 @@
 // (embeddedfolderview: sem login e sem chave). Só os nomes e os ids entram no índice; os arquivos abrem
 // no leitor do app, direto do Drive.
 //
+// O índice fica salvo no repositório (public/data/acervo.json): se a pasta for fechada ou vier bem menor
+// (fora do ar, sem permissão), o índice salvo continua valendo e não é trocado.
+//
 // Uso: node scripts/acervo-sync.mjs [--pasta <id>] [--profundidade 8]
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ACERVO_RAIZ, arquivoIgnorado, compactar, parsePastaDrive, pastaIgnorada, tipoDoArquivo } from '../public/js/lib/acervo.js';
@@ -53,6 +56,12 @@ async function trabalhador() {
 // a fila cresce enquanto as pastas são lidas: os trabalhadores voltam a olhar até ela esvaziar
 while (fila.length) await Promise.all(Array.from({ length: 6 }, trabalhador));
 
+const anterior = await readFile(SAIDA, 'utf8').then((t) => JSON.parse(t)).catch(() => null);
+const antes = anterior?.itens?.length || 0;
+if (entradas.length < antes * 0.5) {
+  console.log(`acervo: a pasta respondeu com ${entradas.length} arquivos (o índice salvo tem ${antes}); mantendo o índice salvo`);
+  process.exit(0);
+}
 entradas.sort((a, b) => a.caminho.join('/').localeCompare(b.caminho.join('/'), 'pt', { numeric: true }) || a.nome.localeCompare(b.nome, 'pt', { numeric: true }));
 await mkdir(path.dirname(SAIDA), { recursive: true });
 await writeFile(SAIDA, JSON.stringify({ geradoEm: new Date().toISOString(), raiz: PASTA, ...compactar(entradas) }));
