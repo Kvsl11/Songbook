@@ -43,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-119';
+export const APP_VERSAO = '2026.10.20-120';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2352,13 +2352,14 @@ async function viewParteDoSetor(setor, pk) {
   setHeader(parte[1], { back: '#/setor/' + setor[0], eyebrow: setor[1] });
   const completas = pk === 'missas-completas';
   view.innerHTML = `<h2 class="greet">${esc(parte[1])}</h2>
+    <label class="field">${icon('search', 20)}<input class="search" type="search" placeholder="Procurar em ${esc(parte[1])}"></label>
+    <div style="height:14px"></div>
     ${completas ? `<div id="missa-sugerida"><div class="loading-note"><span class="spin"></span>Montando a missa de hoje…</div></div>
       <div class="shelf-head"><h2>Missas completas do acervo</h2></div>` : ''}
     ${pk === 'creio' ? `<div class="shelf-head"><h2>Rezar o Creio</h2></div><div class="grade-oe">${CREIO_TEXTOS.map(([slug, nome, sub], k) => `<a class="cartao-oe texto" href="#/oracao/${slug}" style="--h:${265 + k * 12}">
       <small>Profissão de fé</small><b>${esc(nome)}</b><span>${esc(sub)}</span></a>`).join('')}</div>
       <div class="shelf-head" style="margin-top:18px"><h2>Creio cantado</h2></div>` : ''}
-    <label class="field">${icon('search', 20)}<input class="search" type="search" placeholder="Procurar em ${esc(parte[1])}"></label>
-    <div id="cantos" style="margin-top:12px"><div class="loading-note"><span class="spin"></span>Carregando as músicas…</div></div>`;
+    <div id="cantos"><div class="loading-note"><span class="spin"></span>Carregando as músicas…</div></div>`;
   if (completas) missaCompletaSugerida($('#missa-sugerida'));
   const ac = await acervoClassificado();
   const box = $('#cantos');
