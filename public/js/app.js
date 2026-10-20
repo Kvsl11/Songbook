@@ -43,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-120';
+export const APP_VERSAO = '2026.10.20-121';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2358,7 +2358,7 @@ async function viewParteDoSetor(setor, pk) {
       <div class="shelf-head"><h2>Missas completas do acervo</h2></div>` : ''}
     ${pk === 'creio' ? `<div class="shelf-head"><h2>Rezar o Creio</h2></div><div class="grade-oe">${CREIO_TEXTOS.map(([slug, nome, sub], k) => `<a class="cartao-oe texto" href="#/oracao/${slug}" style="--h:${265 + k * 12}">
       <small>Profissão de fé</small><b>${esc(nome)}</b><span>${esc(sub)}</span></a>`).join('')}</div>
-      <div class="shelf-head" style="margin-top:18px"><h2>Creio cantado</h2></div>` : ''}
+      <div class="shelf-head" id="creio-cantado" style="margin-top:18px" hidden><h2>Creio cantado</h2></div>` : ''}
     <div id="cantos"><div class="loading-note"><span class="spin"></span>Carregando as músicas…</div></div>`;
   if (completas) missaCompletaSugerida($('#missa-sugerida'));
   const ac = await acervoClassificado();
@@ -2367,8 +2367,11 @@ async function viewParteDoSetor(setor, pk) {
   if (!ac.musicas.length) { box.innerHTML = avisoAcervo(); return; }
   const itens = (setor[0] === 'fixas' ? ac.fixas : ac.tempos).get(pk) || [];
   const vazio = completas ? 'Ainda não há missas completas (todas as partes num arquivo só) no acervo. Use a sugestão de hoje, acima.'
-    : `Ainda não há músicas de ${esc(parte[1])} no acervo. <a href="#/buscar" id="na-internet">Procurar na internet</a>`;
+    : `Nenhum canto desta parte no acervo ainda. <a href="#/buscar" id="na-internet">Buscar “${esc(parte[1].replace(/\s*\(.*$/, ''))}” na internet</a> (cifras e vídeos).`;
   ligarMusicas(box);
+  // Creio: sem Creio cantado no acervo, ficam só os textos para rezar (sem a seção vazia)
+  if (pk === 'creio' && !itens.length) { box.innerHTML = ''; $('.field', view)?.nextElementSibling?.remove(); $('.field', view)?.remove(); return; }
+  if ($('#creio-cantado')) $('#creio-cantado').hidden = false;
   desenharMusicas(box, itens, { vazio });
   $('#na-internet')?.addEventListener('click', () => { sessionStorage.setItem('busca', parte[1].replace(/\s*\(.*$/, '')); sessionStorage.setItem('buscaFiltro', 'tudo'); });
   $('.search').oninput = (e) => desenharMusicas(box, itens, { filtro: e.target.value, vazio: 'Nada com esse nome.' });
