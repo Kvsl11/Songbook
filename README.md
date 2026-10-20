@@ -31,10 +31,12 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   procura nelas (filtro **Acervo litúrgico**).
 - **Cifra completada sozinha**: quando a cifra só tem acordes em parte das estrofes, ao abrir a música o app repete
   a sequência da estrofe cifrada nas outras, guarda e avisa (sem precisar tocar em nada).
-- **Partitura**: as músicas que vêm de partitura (acervo e cadernos do Hinário) trazem as páginas como imagens leves
-  (`partituras/<id>-<n>.png`, preto e branco); na música, o botão **Partitura** abre as páginas numa tela própria, com
-  zoom. Os dados (índice, letras, cifras e partituras) ficam salvos no repositório: continuam no app mesmo que a
-  pasta do Drive seja fechada.
+- **Partitura**: as músicas que vêm de partitura (acervo e cadernos do Hinário) têm o botão **Partitura**. A
+  partitura é **desenhada pelo app** (OpenSheetMusicDisplay) a partir do MusicXML lido do PDF original pelo Audiveris
+  (`scripts/partituras-omr.mjs`, leitura óptica de partitura; fica só a letra da melodia, sem créditos), com a
+  tipografia e as **cores do tema** (ou em **preto e branco**, como papel), zoom e **mudança de tom**. A página
+  original (imagem leve, `partituras/<id>-<n>.png`) continua em **Original**, para conferir. Os dados (índice,
+  letras, cifras e partituras) ficam salvos no repositório: continuam no app mesmo que a pasta do Drive seja fechada.
 - **Buscar (qualquer música)**: digite música, artista ou trecho e aparece uma lista só de **Músicas** (resultados do
   Cifra Club e do Letras juntos) e os **Vídeos** do YouTube. Tocar numa música já traz tudo junto: a **cifra** (Cifra
   Club, que já tem a letra; sem cifra, a letra do Letras), o **vídeo** do YouTube e o compositor. Um vídeo tocado

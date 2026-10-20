@@ -1391,3 +1391,9 @@ a.source { text-decoration: none; color: inherit; }
 .aleluia::before, .aleluia::after { content: '❧'; font-size: 0.5em; vertical-align: 0.35em; margin: 0 10px; color: var(--lit-ink); -webkit-text-fill-color: var(--lit-ink); }
 .aleluia::before { display: inline-block; transform: scaleX(-1); }
 .versiculo { font-style: italic; font-size: 1.06em; text-align: center; max-width: 34em; margin: 0 auto 0.6em; }
+.partitura-barra { flex-wrap: wrap; }
+.partitura-barra .seg button { display: inline-flex; align-items: center; gap: 5px; }
+.partitura-barra .seg button[aria-pressed="true"] { background: var(--surface-3); color: var(--accent-ink); }
+.osmd-box { margin: 0 -6px 18px; padding: 6px 0 24px; border-radius: 12px; overflow-x: auto; }
+.osmd-box.pb { background: #fff; padding: 14px 6px 28px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.35); }
+.osmd-box svg { max-width: none; }

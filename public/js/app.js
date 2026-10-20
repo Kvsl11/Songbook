@@ -43,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-109';
+export const APP_VERSAO = '2026.10.20-110';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2532,22 +2532,109 @@ function paginasDaPartitura(content) {
   const [de, ate] = m[3] ? [Number(m[2]), Number(m[3])] : [1, Number(m[2])];
   return Array.from({ length: Math.max(0, ate - de + 1) }, (_, i) => `partituras/${m[1]}-${de + i}.png`);
 }
-function viewPartitura(id) {
+// MusicXML da partitura desenhada pelo app (scripts/partituras-omr.mjs): acervo <id>.mxl, Hinário <caderno>-<de>-<até>.mxl
+function mxlDaPartitura(content) {
+  const m = /^([\w-]+):(\d+)(?:-(\d+))?$/.exec(String(renderSong(content || '').meta.x_partitura || '').trim());
+  if (!m) return '';
+  return m[3] ? `partituras/${m[1]}-${m[2]}-${m[3]}.mxl` : `partituras/${m[1]}.mxl`;
+}
+const scriptsCarregados = new Map();
+const carregarScript = (src) => {
+  if (!scriptsCarregados.has(src)) {
+    scriptsCarregados.set(src, new Promise((ok, falha) => {
+      const el = document.createElement('script');
+      el.src = src;
+      el.onload = ok;
+      el.onerror = () => { scriptsCarregados.delete(src); falha(new Error('sem conexão')); };
+      document.head.appendChild(el);
+    }));
+  }
+  return scriptsCarregados.get(src);
+};
+const OSMD_JS = 'https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.2/build/opensheetmusicdisplay.min.js';
+const CIFRA_NO_TEXTO = /^[A-G][#b♯♭]?(m|maj|min|dim|aug|sus|add|°|º|ø|M)?[\d()+#b♯♭]*(\/[A-G][#b♯♭]?)?$/;
+
+async function viewPartitura(id) {
   const song = id === 'previa' ? preview : db.song(id);
   if (!song) return viewNotFound();
   const titulo = renderSong(song.content).meta.title || 'Partitura';
   const paginas = paginasDaPartitura(song.content);
+  const mxl = mxlDaPartitura(song.content);
   setTab(id === 'previa' && preview?.back?.startsWith('#/liturgia') ? 'liturgia' : 'buscar');
   setTint('#3a3a3a');
   setHeader(titulo, { back: '#/musica/' + id, eyebrow: 'Partitura' });
+  view.innerHTML = `<div class="partitura"><div class="loading-note"><span class="spin"></span>Preparando a partitura…</div></div>`;
+  const temDesenho = mxl ? await fetch(mxl, { method: 'HEAD' }).then((r) => r.ok).catch(() => false) : false;
+  if (!view.querySelector('.partitura')) return;
+  const prefs = db.prefs();
+  let modo = temDesenho && prefs.partituraModo !== 'original' ? 'desenhada' : 'original';
+  let cores = prefs.partituraCores === 'pb' ? 'pb' : 'app';
+  let tom = 0;
   let zoom = Number(sessionStorage.getItem('zoomPartitura')) || 1;
   view.innerHTML = `<div class="partitura">
-    <div class="partitura-barra"><b>${icon('score', 18)} ${esc(titulo)}</b><span class="spacer"></span>
-      <div class="seg"><button data-z="-1" aria-label="Diminuir">${icon('minus', 16)}</button><button data-z="1" aria-label="Aumentar">${icon('plus', 16)}</button></div></div>
-    <div class="partitura-paginas">${paginas.length ? paginas.map((src, i) => `<img src="${esc(src)}" alt="Página ${i + 1} da partitura" loading="${i ? 'lazy' : 'eager'}" onerror="this.remove()">`).join('') : '<p class="muted">Esta música não tem partitura.</p>'}</div></div>`;
-  const aplicar = () => { $('.partitura-paginas').style.setProperty('--zoom', zoom); sessionStorage.setItem('zoomPartitura', zoom); };
+    <div class="partitura-barra">
+      ${temDesenho ? `<div class="seg"><button data-modo="desenhada">${icon('score', 15)} Desenhada</button><button data-modo="original">${icon('file', 15)} Original</button></div>` : ''}
+      <div class="seg so-desenhada"><button data-cor="app">Cores do app</button><button data-cor="pb">Preto e branco</button></div>
+      <div class="seg so-desenhada"><button data-tom="-1" aria-label="Meio tom abaixo">${icon('minus', 15)}</button><span class="val" id="tom-part"><small>Tom</small>0</span><button data-tom="1" aria-label="Meio tom acima">${icon('plus', 15)}</button></div>
+      <span class="spacer"></span>
+      <div class="seg"><button data-z="-1" aria-label="Diminuir">A−</button><button data-z="1" aria-label="Aumentar">A+</button></div>
+    </div>
+    <div id="part-desenhada" class="osmd-box"></div>
+    <div class="partitura-paginas" id="part-original">${paginas.length ? paginas.map((src, i) => `<img src="${esc(src)}" alt="Página ${i + 1} da partitura" loading="${i ? 'lazy' : 'eager'}" onerror="this.remove()">`).join('') : '<p class="muted">Esta música não tem partitura.</p>'}</div>
+    <p class="fonte" id="part-aviso"></p></div>`;
+  let osmd = null;
+  const caixa = $('#part-desenhada');
+  // cores: as do tema escolhido no app (notas e letra no tom do texto, cifras na cor de destaque) ou preto e branco
+  const coresDoTema = () => {
+    const css = getComputedStyle(document.documentElement);
+    const v = (n, d) => css.getPropertyValue(n).trim() || d;
+    return cores === 'pb' ? { musica: '#000000', texto: '#000000', cifra: '#000000' } : { musica: v('--text', '#f2f2f2'), texto: v('--text', '#f2f2f2'), cifra: v('--accent-ink', '#4fd1e8') };
+  };
+  const desenhar = async () => {
+    if (modo !== 'desenhada') return;
+    const c = coresDoTema();
+    caixa.classList.toggle('pb', cores === 'pb');
+    try {
+      if (!osmd) {
+        caixa.innerHTML = '<div class="loading-note"><span class="spin"></span>Desenhando a partitura…</div>';
+        await carregarScript(OSMD_JS);
+        caixa.innerHTML = '';
+        osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(caixa, {
+          autoResize: true, backend: 'svg', drawTitle: false, drawSubtitle: false, drawComposer: false, drawLyricist: false,
+          drawCredits: false, drawPartNames: false, defaultFontFamily: 'Figtree, sans-serif',
+        });
+        await osmd.load(mxl);
+        osmd.TransposeCalculator = new opensheetmusicdisplay.TransposeCalculator();
+      }
+      osmd.setOptions({ defaultColorMusic: c.musica, defaultColorNotehead: c.musica, defaultColorStem: c.musica, defaultColorRest: c.musica, defaultColorLabel: c.texto, defaultColorTitle: c.texto });
+      osmd.Sheet.Transpose = tom;
+      osmd.zoom = zoom * (innerWidth < 640 ? 0.75 : 1);
+      osmd.updateGraphic();
+      osmd.render();
+      // cifras na cor de destaque (o desenho não tem cor própria para elas)
+      caixa.querySelectorAll('svg text').forEach((t) => { if (CIFRA_NO_TEXTO.test(t.textContent.trim())) { t.setAttribute('fill', c.cifra); t.style.fontWeight = '700'; } });
+      $('#part-aviso').textContent = 'Partitura desenhada a partir do arquivo original por leitura automática: confira em “Original” se algo parecer estranho.';
+    } catch (e) {
+      caixa.innerHTML = `<div class="alert">${icon('info', 18)}<span>Não consegui desenhar a partitura agora (${esc(e.message)}). Veja a original.</span></div>`;
+    }
+  };
+  const aplicar = () => {
+    view.querySelectorAll('[data-modo]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.modo === modo)));
+    view.querySelectorAll('[data-cor]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cor === cores)));
+    view.querySelectorAll('.so-desenhada').forEach((x) => (x.hidden = modo !== 'desenhada'));
+    caixa.hidden = modo !== 'desenhada';
+    $('#part-original').hidden = modo !== 'original';
+    $('#part-aviso').hidden = modo !== 'desenhada';
+    $('#part-original').style.setProperty('--zoom', zoom);
+    $('#tom-part').innerHTML = `<small>Tom</small>${tom > 0 ? '+' : ''}${tom}`;
+    sessionStorage.setItem('zoomPartitura', zoom);
+    desenhar();
+  };
+  view.querySelectorAll('[data-modo]').forEach((b) => (b.onclick = () => { modo = b.dataset.modo; db.setPref('partituraModo', modo); aplicar(); }));
+  view.querySelectorAll('[data-cor]').forEach((b) => (b.onclick = () => { cores = b.dataset.cor; db.setPref('partituraCores', cores); aplicar(); }));
+  view.querySelectorAll('[data-tom]').forEach((b) => (b.onclick = () => { tom = Math.max(-11, Math.min(11, tom + Number(b.dataset.tom))); aplicar(); }));
+  view.querySelectorAll('[data-z]').forEach((b) => (b.onclick = () => { zoom = Math.min(3, Math.max(0.6, +(zoom + Number(b.dataset.z) * 0.15).toFixed(2))); aplicar(); }));
   aplicar();
-  view.querySelectorAll('[data-z]').forEach((b) => (b.onclick = () => { zoom = Math.min(3, Math.max(0.6, +(zoom + Number(b.dataset.z) * 0.2).toFixed(1))); aplicar(); }));
 }
 
 function viewSong(id, ctx = {}) {
