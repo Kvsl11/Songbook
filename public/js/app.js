@@ -14,6 +14,7 @@ import {
   mudarOitava, NOMES_NOTA, nomeDaAltura, nomeDoTom, nomeDuracao, novaPartitura, paraMusicXML, tiquesDoCompasso,
   claveDaVoz, estimarAndamento, estimarTom, faixaDoModo, juntarPedaco, melodiaDasNotas, tomDaCifra, vozesDasNotas, colocarLetra, letraEmSilabas, temLetra, silabasDaLetra, temCifra as temCifraNaPartitura,
 } from './lib/partitura.js';
+import { corCss, corDominante } from './lib/cores.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -259,7 +260,58 @@ function abrirCalendario(ancora, valor, aoEscolher) {
 
 const hue = (s) => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
 const host = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } };
-const corDaMusica = (titulo) => `hsl(${hue(titulo)} 45% 32%)`;
+// sem capa: uma cor pelo título (matiz, saturação e brilho variam de música para música)
+const corDaMusica = (titulo) => `hsl(${hue(titulo)} ${36 + (hue(titulo + 's') % 28)}% ${27 + (hue(titulo + 'l') % 10)}%)`;
+// cor da capa: a cor dominante da capa da música (ou da miniatura do vídeo) vira o fundo da letra e do player. É
+// calculada uma vez por imagem e guardada; sem capa, capa cinza ou sem internet, fica a cor pelo título
+const CORES_CAPA = 'songbook.coresCapa';
+let coresCapa = {};
+try { coresCapa = JSON.parse(localStorage.getItem(CORES_CAPA) || '{}') || {}; } catch { /* sem armazenamento */ }
+const capaDaMusica = (song) => song.cover || song.capa || (song.youtube ? `https://i.ytimg.com/vi/${song.youtube}/mqdefault.jpg` : '');
+const corDe = (song) => coresCapa[capaDaMusica(song)] || corDaMusica(song.title || song.titulo || '');
+const calculando = new Map();
+function corDaCapa(song) {
+  const src = capaDaMusica(song);
+  if (!src) return Promise.resolve(null);
+  if (src in coresCapa) return Promise.resolve(coresCapa[src] || null);
+  if (calculando.has(src)) return calculando.get(src);
+  const p = (async () => {
+    // a imagem direto (o YouTube deixa ler os pixels) ou, se o site não deixa, por um redimensionador público
+    for (const url of [src, `https://wsrv.nl/?url=${encodeURIComponent(src)}&w=48&h=48&fit=cover&output=png`]) {
+      try {
+        const r = await fetch(url, { mode: 'cors' });
+        if (!r.ok) continue;
+        const bmp = await createImageBitmap(await r.blob());
+        const c = document.createElement('canvas');
+        c.width = c.height = 32;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(bmp, 0, 0, 32, 32);
+        const d = corDominante(ctx.getImageData(0, 0, 32, 32).data);
+        coresCapa[src] = d ? corCss(d) : ''; // '' = capa sem cor: fica a do título
+        const chaves = Object.keys(coresCapa);
+        if (chaves.length > 400) for (const k of chaves.slice(0, chaves.length - 400)) delete coresCapa[k];
+        try { localStorage.setItem(CORES_CAPA, JSON.stringify(coresCapa)); } catch { /* cota cheia */ }
+        return coresCapa[src] || null;
+      } catch { /* tenta o próximo */ }
+    }
+    return null; // sem internet: tenta de novo outra vez
+  })();
+  calculando.set(src, p);
+  p.finally(() => calculando.delete(src));
+  return p;
+}
+// a cor da música na tela e no player: a conhecida já, e a da capa quando ficar pronta (se ainda estiver na mesma tela)
+function corDaMusicaNaTela(song) {
+  const cor = corDe(song);
+  setTint(cor);
+  const tela = location.hash;
+  if (song.youtube && player.desta(song.youtube)) player.atualizar({ cor });
+  corDaCapa(song).then((c) => {
+    if (!c) return;
+    if (location.hash === tela) setTint(c);
+    if (song.youtube && player.desta(song.youtube)) player.atualizar({ cor: c });
+  });
+}
 const saudacao = () => { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; };
 const ytBusca = (t) => `https://www.youtube.com/results?search_query=${encodeURIComponent(t)}`;
 
@@ -374,8 +426,10 @@ function tocarReferencia(song) {
 }
 // o que o player precisa saber de uma música (e de onde ela veio: repertório e parte da missa)
 function itemDoPlayer(song, set = null, index = -1) {
+  // a cor da capa ainda não calculada chega ao player quando ficar pronta
+  corDaCapa(song).then((c) => { if (c && song.youtube && player.desta(song.youtube)) player.atualizar({ cor: c }); });
   return {
-    youtube: song.youtube, titulo: song.title, artista: song.artist || '', capa: song.cover || '', songId: song.id, cor: corDaMusica(song.title),
+    youtube: song.youtube, titulo: song.title, artista: song.artist || '', capa: song.cover || '', songId: song.id, cor: corDe(song),
     href: set ? `#/repertorio/${set.id}/${index}` : song.id && song.id !== 'previa' ? `#/musica/${song.id}` : location.hash,
     parte: set ? set.items[index]?.label || '' : '', setId: set?.id || '', index,
   };
@@ -4773,8 +4827,8 @@ function viewSong(id, ctx = {}) {
     song = { ...song, title: r.meta.title || 'Canto', artist: r.meta.artist || r.meta.subtitle || '', youtube: youtubeId(r.meta.youtube) || '', cover: r.meta.cover || '', pdf: r.meta.pdf || '', key: r.key, composer: r.meta.composer || r.meta.lyricist || '' };
   } else db.touchRecent(song.id);
   setTab(ctx.set ? 'biblioteca' : isPreview ? (song.back?.startsWith('#/buscar') ? 'buscar' : 'liturgia') : 'biblioteca');
-  setTint(corDaMusica(song.title));
-  if (song.youtube && player.desta(song.youtube)) player.atualizar({ titulo: song.title, artista: song.artist || '', cor: corDaMusica(song.title) });
+  if (song.youtube && player.desta(song.youtube)) player.atualizar({ titulo: song.title, artista: song.artist || '' });
+  corDaMusicaNaTela(song);
   const prefs = db.prefs();
   let { transpose = 0, capo = 0 } = song;
   const canvas = Boolean(song.youtube && prefs.videoFundo !== false);
@@ -5383,7 +5437,7 @@ function viewEditor(id, setId) {
   const setDestino = isNew && setId ? db.set(setId) : null; // música nova já vai para este repertório
   const song = isNew ? { content: `{title: }\n\n${TEMPLATE_CORPO}` } : db.song(id);
   if (!song) return viewNotFound();
-  setTint(corDaMusica(song.title || 'nova'));
+  setTint(corDe({ ...song, title: song.title || 'nova' }));
   const { meta, corpo } = separarMeta(song.content);
   // formato do texto: acordes na linha de cima, entre [colchetes] ou só a letra (acordes preservados)
   let formato = ['colchetes', 'letra'].includes(db.prefs().formatoEditor) ? db.prefs().formatoEditor : 'acima';

@@ -109,6 +109,10 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 
 - **Vídeo da música**: o vídeo começa no topo da música (onde dá para pular o anúncio) e depois fica atrás do
   título; em Referências dá para assisti-lo com os controles.
+- **Cor da capa**: o fundo da letra de cada música tem a cor dominante da capa (ou da miniatura do vídeo), escura o
+  bastante para o texto; capas diferentes dão matizes, saturações e brilhos diferentes (`lib/cores.js`). A cor é
+  calculada uma vez por capa e guardada, e vai junto para o mini player, que continua com ela ao sair da tela. Sem
+  capa (ou capa cinza), a cor vem do título, também variando de música para música.
 - **Player como no Spotify** (a barra do mini player tem a cor do fundo da letra da música que está tocando): na página da música o vídeo toca no topo, atrás do título; ao sair dela, continua no mini player
   sem parar nem repetir anúncio (é o mesmo vídeo, que só muda de lugar na tela) fixo acima do menu, com o vídeo do YouTube
   pequeno, nome, parte da missa, tempo e barra de progresso; a música continua tocando enquanto você navega.
