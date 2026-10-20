@@ -12,7 +12,7 @@ import { duracaoTotal, nomearVozes, passoNoTempo, segundosPorSemibreve, volumeDa
 import {
   acordesDoTom as acordesDaArmadura, alterar, alturaPeloNome, CLAVES, COMPASSOS, deMusicXML, distribuirLetra, DURACOES, emCompassos, frequenciaDa, midiDa, moverGrau,
   mudarOitava, NOMES_NOTA, nomeDaAltura, nomeDoTom, nomeDuracao, novaPartitura, paraMusicXML, tiquesDoCompasso,
-  claveDaVoz, estimarAndamento, estimarTom, faixaDoModo, juntarPedaco, melodiaDasNotas, tomDaCifra,
+  claveDaVoz, estimarAndamento, estimarTom, faixaDoModo, juntarPedaco, melodiaDasNotas, tomDaCifra, vozesDasNotas,
 } from './lib/partitura.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
@@ -2900,6 +2900,7 @@ function criarEnsaio(osmd, barra, tomAtual) {
   if (!barra) return null;
   // as notas de cada momento da partitura (o cursor do desenho percorre tudo, já com as repetições)
   const passos = [];
+  const nomesDasPautas = new Map(); // voz → nome da pauta (instrumento) de onde ela vem
   const cur = osmd.cursor;
   cur.reset();
   for (let guarda = 0; !cur.Iterator.EndReached && guarda < 20000; guarda++) {
@@ -2907,6 +2908,7 @@ function criarEnsaio(osmd, barra, tomAtual) {
     const notas = [];
     for (const ve of cur.Iterator.CurrentVoiceEntries || []) {
       const voz = `${ve.ParentVoice.Parent.Id}:${ve.ParentVoice.VoiceId}`;
+      if (!nomesDasPautas.has(voz)) nomesDasPautas.set(voz, String(ve.ParentVoice.Parent.Name || '').trim());
       for (const n of ve.Notes) {
         if (!n.Pitch || n.isRest()) continue;
         if (n.NoteTie && n.NoteTie.StartNote !== n) continue; // nota ligada: soa uma vez, com a duração somada
@@ -2928,7 +2930,9 @@ function criarEnsaio(osmd, barra, tomAtual) {
     try { c.CursorOptions = { ...c.CursorOptions, color: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#06b6d4', alpha: 0.45, follow: false }; } catch { /* versão sem a opção */ }
     c.show();
   };
-  const vozes = nomearVozes(passos);
+  // nomes das pautas só quando cada uma tem o seu (a leitura automática chama todas de "Voice", "Piano"…)
+  const genericos = /^(voice|voz|part|parte|piano|instrument|staff|p\d+|music|melodia)\b/i;
+  const vozes = nomearVozes(passos, { nomes: new Map([...nomesDasPautas].filter(([, n]) => n && !genericos.test(n))) });
   const grupoDe = new Map(vozes.flatMap((g) => g.membros.map((m) => [m, g.voz])));
   const fim = duracaoTotal(passos);
   let bpm = Math.round(osmd.Sheet.SourceMeasures[0]?.TempoInBPM || osmd.Sheet.DefaultStartTempoInBpm || 90);
@@ -3710,7 +3714,8 @@ function editorPartitura(song, titulo) {
       <div class="acts"><button class="btn ghost" data-no>Cancelar</button><button class="btn primary" data-ok>Aplicar</button></div>`,
     (dlg, done) => {
       const lerNomes = () => dlg.querySelectorAll('.cp-voz').forEach((row) => { pautas[Number(row.dataset.i)].nome = $('[data-nome]', row).value.trim() || pautas[Number(row.dataset.i)].nome; });
-      const redesenharVozes = () => { lerNomes(); $('.cp-vozes', dlg).innerHTML = pautas.map(linhaPauta).join(''); };
+      // quem chama já leu os nomes digitados (depois de tirar uma voz, as linhas na tela não batem mais com a lista)
+      const redesenharVozes = () => { $('.cp-vozes', dlg).innerHTML = pautas.map(linhaPauta).join(''); };
       dlg.addEventListener('click', async (e) => {
         const b = e.target.closest('button');
         if (!b) return;
@@ -4127,7 +4132,7 @@ async function gerarComIA(song, titulo) {
   aoSair(() => pararCaptura());
   view.innerHTML = `<div class="ia">
     <section class="ia-topo">${capa(song)}<div><div class="kind">Gerar com IA</div><h2>${esc(titulo)}</h2>
-      <p class="muted">O app ouve a música e escreve a <b>melodia</b> na partitura, já no tom e no andamento. É um rascunho: confira e corrija no editor (fica melhor com voz e violão do que com banda completa).</p></div></section>
+      <p class="muted">O app ouve a música e escreve a <b>melodia</b> na partitura — ou <b>todas as vozes do coral</b> (soprano, contralto, tenor e baixo), cada uma na sua pauta —, já no tom e no andamento. É um rascunho: confira e corrija no editor (fica melhor com voz e violão do que com banda completa).</p></div></section>
     <div id="ia-passo"></div></div>`;
   const passo = $('#ia-passo');
 
@@ -4459,8 +4464,14 @@ async function gerarComIA(song, titulo) {
     let compasso = [4, 4];
     let oitava = 0;
     let meioTempo = false;
+    let coral = false; // separar em Soprano, Contralto, Tenor e Baixo
     let osmd = null;
     const montar = () => {
+      if (coral) {
+        const m = novaPartitura({ titulo, compasso, fifths, modo, bpm, tipo: 'satb' });
+        m.pautas = vozesDasNotas(notas, { bpm, fifths, oitava, meioTempo });
+        return m;
+      }
       const m = novaPartitura({ titulo, compasso, fifths, modo, bpm });
       m.pautas[0].clave = clave;
       m.pautas[0].nome = modoIA === 'voz' ? 'Voz' : 'Melodia';
@@ -4469,6 +4480,8 @@ async function gerarComIA(song, titulo) {
     };
     passo.innerHTML = `<div class="section-title">Rascunho pronto</div>
       <div class="settings-group ia-ajustes">
+        <div class="setting wrap"><span class="ico">${icon('score', 18)}</span><div class="grow"><div class="t">Vozes</div><div class="s">Coral: a IA separa as notas que soam juntas em soprano, contralto, tenor e baixo, cada voz na sua pauta</div></div>
+          <div class="chips" id="ia-vozes"><button class="chip" data-vozes="1" aria-pressed="true">Só a melodia</button><button class="chip" data-vozes="4" aria-pressed="false">Coral a 4 vozes</button></div></div>
         <div class="setting"><span class="ico">${icon('gauge', 18)}</span><div class="grow"><div class="t">Andamento</div><div class="s">Se as notas ficaram picadas ou longas demais, ajuste aqui</div></div>
           <div class="seg"><button data-bpm="-4" aria-label="Mais devagar">${icon('minus', 15)}</button><span class="val" id="ia-bpm">${bpm}</span><button data-bpm="4" aria-label="Mais rápido">${icon('plus', 15)}</button></div></div>
         <div class="setting"><span class="ico">${icon('music', 18)}</span><div class="grow"><div class="t">Tom</div><div class="s">${tomCifra ? 'Pela cifra da música' : 'Pelo que a IA ouviu'}</div></div><button class="btn small" id="ia-tom">${nomeDoTom(fifths, modo)}</button></div>
@@ -4490,7 +4503,7 @@ async function gerarComIA(song, titulo) {
         if (!caixa) return;
         if (!osmd) { caixa.innerHTML = ''; osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(caixa, { autoResize: false, backend: 'svg', drawTitle: false, drawPartNames: false, defaultFontFamily: 'Figtree, sans-serif' }); }
         const cor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#f2f2f2';
-        osmd.setOptions({ defaultColorMusic: cor, defaultColorNotehead: cor, defaultColorStem: cor, defaultColorRest: cor, defaultColorLabel: cor });
+        osmd.setOptions({ drawPartNames: coral, defaultColorMusic: cor, defaultColorNotehead: cor, defaultColorStem: cor, defaultColorRest: cor, defaultColorLabel: cor });
         await osmd.load(paraMusicXML(montar()));
         osmd.zoom = innerWidth < 640 ? 0.7 : 0.9;
         osmd.render();
@@ -4500,6 +4513,7 @@ async function gerarComIA(song, titulo) {
       const b = e.target.closest('button');
       if (!b) return;
       if (b.dataset.bpm) { bpm = Math.max(40, Math.min(200, bpm + Number(b.dataset.bpm))); previa(); }
+      if (b.dataset.vozes) { coral = b.dataset.vozes === '4'; $('#ia-vozes').querySelectorAll('[data-vozes]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); previa(); }
       if (b.dataset.oit) { oitava = Math.max(-2, Math.min(2, oitava + Number(b.dataset.oit))); previa(); }
       if (b.dataset.c) { compasso = b.dataset.c.split('/').map(Number); $('#ia-compasso').querySelectorAll('[data-c]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); previa(); }
       if (b.id === 'ia-tom') { const v = await escolherTomPartitura(fifths, modo); if (v) { [fifths, modo] = v; previa(); } }
@@ -4508,7 +4522,7 @@ async function gerarComIA(song, titulo) {
         const atual = db.song(id);
         if (atual?.partitura?.pautas?.some((p) => p.ev.length) && !(await ask({ title: 'Trocar a partitura?', text: 'Esta música já tem uma partitura feita no app. O rascunho da IA fica no lugar dela.', ok: 'Trocar', danger: true }))) return;
         db.updateSong(id, { partitura: montar() });
-        toast('Rascunho aberto no editor: confira as notas e coloque a letra');
+        toast(coral ? 'Rascunho do coral aberto no editor: confira cada voz e coloque a letra' : 'Rascunho aberto no editor: confira as notas e coloque a letra');
         location.hash = `#/musica/${id}/compor`;
       }
     };
@@ -4574,6 +4588,8 @@ async function viewPartitura(id) {
           drawCredits: false, drawPartNames: false, defaultFontFamily: 'Figtree, sans-serif',
         });
         await osmd.load(propria ? paraMusicXML(song.partitura) : mxl);
+        // várias vozes: o nome de cada uma (Soprano, Contralto…) no começo da pauta, para saber quem canta o quê
+        osmd.setOptions({ drawPartNames: (osmd.Sheet.Instruments?.length || 0) > 1 });
         osmd.TransposeCalculator = new opensheetmusicdisplay.TransposeCalculator();
       }
       osmd.setOptions({ defaultColorMusic: c.musica, defaultColorNotehead: c.musica, defaultColorStem: c.musica, defaultColorRest: c.musica, defaultColorLabel: c.texto, defaultColorTitle: c.texto });

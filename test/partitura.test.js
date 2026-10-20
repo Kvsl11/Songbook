@@ -169,3 +169,23 @@ test('IA: voz grave na clave de tenor e música que começa no contratempo', asy
   const mel = melodiaDasNotas([...nc, ...baixo], { bpm: 96 });
   assert.deepEqual(mel[0], { a: [], d: 4, l: [], c: '' });
 });
+
+test('IA: coral a 4 vozes separa as notas em Soprano, Contralto, Tenor e Baixo sem cruzar', async () => {
+  const { vozesDasNotas } = await import('../public/js/lib/partitura.js');
+  const tempo = 60 / 90;
+  // 4 acordes de semínima (Sol maior → Ré maior…), cada voz na sua altura, mais um tempo só com a melodia
+  const acordes = [[71, 67, 62, 55], [69, 66, 62, 50], [71, 67, 59, 55], [72, 64, 60, 48]];
+  const notas = acordes.flatMap((ac, i) => ac.map((p) => ({ startTimeSeconds: i * tempo, durationSeconds: tempo * 0.95, pitchMidi: p, amplitude: 0.8 })));
+  notas.push({ startTimeSeconds: 4 * tempo, durationSeconds: tempo * 0.95, pitchMidi: 74, amplitude: 0.8 });
+  const pautas = vozesDasNotas(notas, { bpm: 90, fifths: 1 });
+  assert.deepEqual(pautas.map((p) => p.nome), ['Soprano', 'Contralto', 'Tenor', 'Baixo']);
+  assert.deepEqual(pautas.map((p) => p.clave), ['G', 'G', 'G8', 'F']);
+  const alturas = (p) => p.ev.filter((e) => e.a.length).map((e) => e.a[0]);
+  assert.deepEqual(alturas(pautas[0]), ['B4', 'A4', 'B4', 'C5', 'D5']);
+  assert.deepEqual(alturas(pautas[1]), ['G4', 'F#4', 'G4', 'E4']);
+  assert.deepEqual(alturas(pautas[2]), ['D4', 'D4', 'B3', 'C4']);
+  assert.deepEqual(alturas(pautas[3]), ['G3', 'D3', 'G3', 'C3']);
+  // todas as vozes do mesmo tamanho (o último tempo só o soprano canta; as outras ficam em pausa)
+  const tam = pautas.map((p) => p.ev.reduce((a, e) => a + e.d, 0));
+  assert.ok(tam.every((x) => x === tam[0]));
+});

@@ -35,3 +35,10 @@ test('tempo: segundos por semibreve, passo que está soando e duração', () => 
   assert.equal(passoNoTempo(ps, 9), 2);
   assert.equal(duracaoTotal(ps), 1);
 });
+
+test('nomearVozes: usa o nome de cada pauta quando todas têm o seu', async () => {
+  const { nomearVozes } = await import('../public/js/lib/ensaio.js');
+  const passos = [{ t: 0, notas: [{ freq: 440, dur: 0.25, voz: 'a:1' }, { freq: 220, dur: 0.25, voz: 'b:1' }] }];
+  assert.deepEqual(nomearVozes(passos, { nomes: new Map([['a:1', 'Solista'], ['b:1', 'Coro']]) }).map((v) => v.nome), ['Solista', 'Coro']);
+  assert.deepEqual(nomearVozes(passos, { nomes: new Map([['a:1', 'Solista']]) }).map((v) => v.nome), ['Voz aguda', 'Voz grave']);
+});

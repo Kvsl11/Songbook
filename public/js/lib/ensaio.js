@@ -4,8 +4,9 @@
 // vozes do ensaio: a leitura automática às vezes numera a mesma voz de jeitos diferentes; as "vozes" com poucas
 // notas entram na voz principal de altura mais próxima. Cada grupo ganha um nome pela altura média
 // (a leitura chama todas de "Voice"): 4 = coral (Soprano, Contralto, Tenor, Baixo); 2 ou 3 = aguda, média, grave; 1 = melodia.
-// Devolve [{ voz (id do grupo), nome, membros: [vozes da partitura] }]
-export function nomearVozes(passos, { minimo = 0.4 } = {}) {
+// Se cada grupo vem de uma pauta com nome próprio e diferente (a partitura feita no app: Soprano, Contralto, "Solista"…),
+// vale o nome da pauta. Devolve [{ voz (id do grupo), nome, membros: [vozes da partitura] }]
+export function nomearVozes(passos, { minimo = 0.4, nomes: nomesDasPautas = new Map() } = {}) {
   const soma = new Map();
   for (const p of passos) for (const n of p.notas) {
     const s = soma.get(n.voz) || { total: 0, n: 0 };
@@ -26,7 +27,9 @@ export function nomearVozes(passos, { minimo = 0.4 } = {}) {
     : principais.length === 3 ? ['Voz aguda', 'Voz média', 'Voz grave']
       : principais.length === 2 ? ['Voz aguda', 'Voz grave']
         : principais.map((_, i) => (principais.length === 1 ? 'Melodia' : `Voz ${i + 1}`));
-  return principais.map((v, i) => ({ voz: v.voz, nome: nomes[i], membros: v.membros }));
+  const proprios = principais.map((v) => nomesDasPautas.get(v.voz) || '');
+  const usarProprios = principais.length > 1 && proprios.every(Boolean) && new Set(proprios).size === proprios.length;
+  return principais.map((v, i) => ({ voz: v.voz, nome: usarProprios ? proprios[i] : nomes[i], membros: v.membros }));
 }
 
 // volume de cada nota: "todas" iguais; com uma voz escolhida, só ela ou ela com as outras bem baixinho, de fundo

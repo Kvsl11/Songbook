@@ -413,8 +413,9 @@ export function distribuirLetra(pauta, texto, { inicio = 0, estrofe = 0 } = {}) 
 }
 
 // ---- rascunho automático (IA): das notas ouvidas (Basic Pitch: { startTimeSeconds, durationSeconds, pitchMidi,
-// amplitude }) para a melodia na partitura. A IA ouve tudo (voz e instrumentos); aqui fica uma linha só: em cada
-// momento, a nota mais forte dentro da extensão de voz, já no compasso e no andamento.
+// amplitude }) para a partitura. A IA ouve tudo (voz e instrumentos); a melodia é uma linha só (em cada momento, a
+// nota mais forte dentro da extensão de voz) e o coral separa as notas em Soprano, Contralto, Tenor e Baixo, já no
+// compasso e no andamento.
 
 const SUST = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const BEM = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -496,10 +497,9 @@ export function claveDaVoz(notas, modo = 'mistura') {
   const mediana = alt[Math.floor(alt.length / 2)] ?? 67;
   return modo === 'voz' && mediana < 60 ? { clave: 'G8', centro: 55 } : { clave: 'G', centro: 67 };
 }
-export function melodiaDasNotas(notas, { bpm = 80, fifths = 0, modo = 'mistura', faixa = faixaDoModo(modo), oitava = 0, minAmp = 0.2, centro = 67, meioTempo = false } = {}) {
+// a grade de semicolcheias onde as notas ouvidas se encaixam: onde começa (num tempo) e quantos passos tem
+function gradeDasNotas(notas, validas, { bpm, minAmp, meioTempo }) {
   const passo = 60 / bpm / 4; // semicolcheia, em segundos
-  const validas = notas.filter((n) => n.pitchMidi >= faixa[0] && n.pitchMidi <= faixa[1] && (n.amplitude ?? 1) >= minAmp && n.durationSeconds > passo * 0.6);
-  if (!validas.length) return [];
   // onde caem os tempos: a média circular dos começos de TODAS as notas ouvidas — o baixo e os acordes da banda mudam
   // no tempo — com as mais fortes e longas pesando mais. A grade começa num tempo, e não na primeira nota: música que
   // começa no contratempo não fica toda deslocada meio tempo
@@ -517,19 +517,12 @@ export function melodiaDasNotas(notas, { bpm = 80, fifths = 0, modo = 'mistura',
   const primeira = Math.min(...validas.map((n) => n.startTimeSeconds));
   const comeco = fase + Math.floor((primeira - fase + passo / 2) / tempo) * tempo;
   const fim = Math.max(...validas.map((n) => n.startTimeSeconds + n.durationSeconds));
-  const nPassos = Math.ceil((fim - comeco) / passo);
-  // em cada semicolcheia, a nota mais forte que soa (desempate: a mais aguda, que costuma ser a voz)
-  const grade = new Array(nPassos).fill(null);
-  for (let k = 0; k < nPassos; k++) {
-    const t = comeco + (k + 0.5) * passo;
-    let melhor = null;
-    for (const n of validas) {
-      if (n.startTimeSeconds > t || n.startTimeSeconds + n.durationSeconds < t) continue;
-      const forca = (n.amplitude ?? 1) + n.pitchMidi / 1000;
-      if (!melhor || forca > melhor.forca) melhor = { n, forca };
-    }
-    grade[k] = melhor?.n || null;
-  }
+  return { passo, comeco, nPassos: Math.ceil((fim - comeco) / passo) };
+}
+const soaEm = (n, t) => n.startTimeSeconds <= t && n.startTimeSeconds + n.durationSeconds >= t;
+
+// de uma linha da grade (a nota de cada semicolcheia, ou null) para os eventos da partitura
+function eventosDaGrade(grade, passo) {
   // blocos: a mesma nota seguida vira uma só; uma nota nova começa onde muda
   const blocos = [];
   for (const n of grade) {
@@ -568,11 +561,115 @@ export function melodiaDasNotas(notas, { bpm = 80, fifths = 0, modo = 'mistura',
   marcas.push(Math.round(t / 2) * 2);
   juntos.forEach((b, i) => { b.len = marcas[i + 1] - marcas[i]; });
   for (let i = juntos.length - 1; i >= 0; i--) if (juntos[i].len <= 0) juntos.splice(i, 1);
+  return juntos;
+}
+const paraEventos = (juntos, desloc, fifths) => juntos.map((b) => ({ a: b.n ? [alturaDoMidi(b.n.pitchMidi + desloc, fifths)] : [], d: b.len * 2, l: [], c: '' }));
+
+export function melodiaDasNotas(notas, { bpm = 80, fifths = 0, modo = 'mistura', faixa = faixaDoModo(modo), oitava = 0, minAmp = 0.2, centro = 67, meioTempo = false } = {}) {
+  const passoS = 60 / bpm / 4;
+  const validas = notas.filter((n) => n.pitchMidi >= faixa[0] && n.pitchMidi <= faixa[1] && (n.amplitude ?? 1) >= minAmp && n.durationSeconds > passoS * 0.6);
+  if (!validas.length) return [];
+  const { passo, comeco, nPassos } = gradeDasNotas(notas, validas, { bpm, minAmp, meioTempo });
+  // em cada semicolcheia, a nota mais forte que soa (desempate: a mais aguda, que costuma ser a voz)
+  const grade = new Array(nPassos).fill(null);
+  for (let k = 0; k < nPassos; k++) {
+    const t = comeco + (k + 0.5) * passo;
+    let melhor = null;
+    for (const n of validas) {
+      if (!soaEm(n, t)) continue;
+      const forca = (n.amplitude ?? 1) + n.pitchMidi / 1000;
+      if (!melhor || forca > melhor.forca) melhor = { n, forca };
+    }
+    grade[k] = melhor?.n || null;
+  }
+  const juntos = eventosDaGrade(grade, passo);
   // oitava: a melodia inteira vai para perto da extensão da clave (centro: Sol4 na clave de sol, Sol3 na de tenor)
   const alturas = juntos.filter((b) => b.n).map((b) => b.n.pitchMidi);
   const mediana = [...alturas].sort((a, b) => a - b)[Math.floor(alturas.length / 2)] ?? 67;
   const desloc = Math.round((centro - mediana) / 12) * 12 + oitava * 12;
-  return juntos.map((b) => ({ a: b.n ? [alturaDoMidi(b.n.pitchMidi + desloc, fifths)] : [], d: b.len * 2, l: [], c: '' }));
+  return paraEventos(juntos, desloc, fifths);
+}
+
+// coral a 4 vozes: em cada semicolcheia, as notas que soam (da mais aguda para a mais grave) vão para Soprano,
+// Contralto, Tenor e Baixo sem cruzar as vozes; com menos de 4 notas, cada uma vai para a voz que estava mais perto
+// (ou, no começo, para o meio da extensão dela) e as outras ficam em pausa. Com mais de 4 (acordes da banda), ficam
+// as 4 que melhor continuam as vozes. Devolve as pautas (já com nome e clave), na altura real.
+export const VOZES_CORAL = [
+  { id: 's', nome: 'Soprano', clave: 'G', centro: 67, faixa: [58, 84] },
+  { id: 'c', nome: 'Contralto', clave: 'G', centro: 62, faixa: [52, 77] },
+  { id: 't', nome: 'Tenor', clave: 'G8', centro: 55, faixa: [46, 70] },
+  { id: 'b', nome: 'Baixo', clave: 'F', centro: 48, faixa: [38, 64] },
+];
+// todas as formas de escolher k de n índices, em ordem
+function combinacoes(n, k) {
+  const out = [];
+  const rec = (ini, acc) => {
+    if (acc.length === k) { out.push(acc.slice()); return; }
+    for (let i = ini; i <= n - (k - acc.length); i++) { acc.push(i); rec(i + 1, acc); acc.pop(); }
+  };
+  rec(0, []);
+  return out;
+}
+export function vozesDasNotas(notas, { bpm = 80, fifths = 0, oitava = 0, minAmp = 0.2, meioTempo = false, faixa = [38, 84] } = {}) {
+  const vozes = VOZES_CORAL;
+  const vazias = () => vozes.map((v) => ({ id: v.id, nome: v.nome, clave: v.clave, ev: [] }));
+  const passoS = 60 / bpm / 4;
+  const validas = notas.filter((n) => n.pitchMidi >= faixa[0] && n.pitchMidi <= faixa[1] && (n.amplitude ?? 1) >= minAmp && n.durationSeconds > passoS * 0.6);
+  if (!validas.length) return vazias();
+  const { passo, comeco, nPassos } = gradeDasNotas(notas, validas, { bpm, minAmp, meioTempo });
+  const grades = vozes.map(() => new Array(nPassos).fill(null));
+  const ultima = vozes.map((v) => v.centro); // altura recente de cada voz (para seguir a linha dela)
+  const anterior = vozes.map(() => null); // a nota que cada voz cantava no passo anterior
+  for (let k = 0; k < nPassos; k++) {
+    const t = comeco + (k + 0.5) * passo;
+    // as notas que soam, uma por altura (a mais forte), da mais aguda para a mais grave; no máximo 8 (as mais fortes)
+    const porAltura = new Map();
+    for (const n of validas) {
+      if (!soaEm(n, t)) continue;
+      const a = Math.round(n.pitchMidi);
+      const ja = porAltura.get(a);
+      if (!ja || (n.amplitude ?? 1) > (ja.amplitude ?? 1)) porAltura.set(a, n);
+    }
+    let soando = [...porAltura.values()];
+    if (soando.length > 8) soando = soando.sort((a, b) => (b.amplitude ?? 1) - (a.amplitude ?? 1)).slice(0, 8);
+    soando.sort((a, b) => b.pitchMidi - a.pitchMidi);
+    if (!soando.length) { for (let v = 0; v < vozes.length; v++) anterior[v] = null; continue; }
+    // custo de uma voz cantar uma nota: a distância da linha dela, mais um castigo fora da extensão; continuar a mesma
+    // nota que já cantava é de graça (não troca de voz no meio de uma nota)
+    const custo = (v, n) => {
+      if (anterior[v] === n) return -3;
+      const [lo, hi] = vozes[v].faixa;
+      const fora = n.pitchMidi < lo ? lo - n.pitchMidi : n.pitchMidi > hi ? n.pitchMidi - hi : 0;
+      return Math.abs(n.pitchMidi - ultima[v]) * 0.5 + fora * 3;
+    };
+    const kNotas = Math.min(soando.length, vozes.length);
+    let melhor = null;
+    // escolhe quais notas entram (se há mais de 4) e para quais vozes vão, sem cruzar: a mais aguda na voz mais aguda
+    for (const quais of combinacoes(soando.length, kNotas)) {
+      for (const onde of combinacoes(vozes.length, kNotas)) {
+        let c = 0;
+        for (let j = 0; j < kNotas; j++) c += custo(onde[j], soando[quais[j]]);
+        if (!melhor || c < melhor.c) melhor = { c, quais, onde };
+      }
+    }
+    for (let v = 0; v < vozes.length; v++) {
+      const j = melhor.onde.indexOf(v);
+      const n = j >= 0 ? soando[melhor.quais[j]] : null;
+      grades[v][k] = n;
+      anterior[v] = n;
+      if (n) ultima[v] = ultima[v] * 0.3 + n.pitchMidi * 0.7;
+    }
+  }
+  const pautas = vazias();
+  const linhas = grades.map((g) => eventosDaGrade(g, passo));
+  // todas as vozes do mesmo tamanho (as que acabam antes ganham a pausa do fim)
+  const total = Math.max(...linhas.map((l) => l.reduce((a, b) => a + b.len, 0)));
+  linhas.forEach((l, v) => {
+    const falta = total - l.reduce((a, b) => a + b.len, 0);
+    if (falta > 0) l.push({ n: null, len: falta });
+    pautas[v].ev = paraEventos(l, oitava * 12, fifths);
+  });
+  return pautas;
 }
 
 // leitura ao vivo: as notas de um pedaço analisado (com contexto antes do corte, a partir de "de") entram na lista;

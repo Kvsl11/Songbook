@@ -48,8 +48,11 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   **Nova partitura** (escolhendo a música) e **Gerar com IA**: o app ouve a música pelo microfone (com o vídeo
   tocando), pelo som de uma aba (computador) ou de um arquivo de áudio, e o modelo **Basic Pitch** (Spotify, código
   aberto, roda no próprio aparelho) transforma o som em notas; o app escolhe a melodia, acha tom (pela cifra ou pelo
-  que ouviu) e andamento, põe no compasso e mostra a prévia para ajustar antes de abrir no editor. É um rascunho:
-  funciona melhor com voz e violão do que com banda completa.
+  que ouviu) e andamento, põe no compasso e mostra a prévia para ajustar antes de abrir no editor. Em **Vozes**, *Coral
+  a 4 vozes* separa as notas que soam juntas em **Soprano, Contralto, Tenor e Baixo** (cada uma na sua pauta e clave,
+  sem cruzar as vozes e seguindo a linha de cada uma: `vozesDasNotas`). É um rascunho: funciona melhor com voz e
+  violão (ou o coral sozinho) do que com banda completa. Com mais de uma voz, a partitura mostra o nome de cada pauta
+  e o ensaio usa esses nomes para tocar uma voz só.
 - **Buscar (qualquer música)**: digite música, artista ou trecho e aparece uma lista só de **Músicas** (resultados do
   Cifra Club e do Letras juntos) e os **Vídeos** do YouTube. Tocar numa música já traz tudo junto: a **cifra** (Cifra
   Club, que já tem a letra; sem cifra, a letra do Letras), o **vídeo** do YouTube e o compositor. Um vídeo tocado
