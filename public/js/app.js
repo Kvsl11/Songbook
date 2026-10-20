@@ -45,7 +45,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-126';
+export const APP_VERSAO = '2026.10.20-127';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -3969,7 +3969,7 @@ async function revisarSet(set) {
     return;
   }
   // de onde veio cada canto (a pasta do acervo diz o tempo: ADVENTO, QUARESMA…)
-  const ac = set.items.some((it) => /^(acervo|hinario):/.test(db.song(it.songId)?.source || '')) ? await acervoClassificado().catch(() => null) : null;
+  const ac = await acervoClassificado().catch(() => null);
   const itens = set.items.map((it) => {
     const s = db.song(it.songId) || {};
     const m = ac?.musicas.find((x) => x.fonte === s.source);
@@ -3985,14 +3985,84 @@ async function revisarSet(set) {
   }
   const avisos = revisarRepertorio(lit, itens, { recentes });
   if (!box.isConnected) return;
+  // sugestões para trocar: os cantos do acervo e do Hinário que combinam com a parte e com o dia (os da Missa litúrgica)
+  const precisa = avisos.some((a) => a.acao === 'trocar' && a.parte);
+  let sug = {};
+  if (precisa && ac?.musicas.length) {
+    const cadernos = await carregarHinario().catch(() => []);
+    const m0 = lit.missas?.[0] || {};
+    sug = sugerirParaODia(ac.musicas, lit, { caderno: cadernoDoDia(cadernos, lit, set.date)?.caderno.id, textos: { salmo: m0.salmo?.refrao, aclamacao: m0.aclamacao?.versiculo } });
+    if (!box.isConnected) return;
+  }
+  const quaresma = /quaresma|cinzas|ramos|paixao|semana santa/.test(normalizar(`${lit.tempo || ''} ${lit.celebracao || ''}`));
+  const usadas = new Set(itens.map((x) => x.source).filter(Boolean));
+  const opcoes = (a) => {
+    const lista = (sug[a.parte] || []).map(({ musica }) => musica)
+      .filter((m) => !usadas.has(m.fonte) && !(quaresma && /\baleluia\b/i.test(m.chordpro || '')))
+      .slice(0, 3).map((m) => ({ titulo: m.titulo, fonte: m.fonte, de: m.fonte.startsWith('hinario:') ? 'Hinário CNBB' : 'Acervo' }));
+    // salmo: o do dia, com o texto oficial da CNBB, sempre em primeiro
+    if (a.parte === 'salmo' && lit.missas?.[0]?.salmo) lista.unshift({ titulo: `Salmo do dia — ${lit.missas[0].salmo.refrao}`, fonte: 'cnbb', de: 'Texto oficial da CNBB' });
+    return lista;
+  };
+  const comSugestao = new Set(); // a mesma música com dois avisos: as sugestões aparecem uma vez só
+  const sugestoesHTML = (a, k) => {
+    if (a.acao === 'trocar' && comSugestao.has(a.i)) return '';
+    if (a.acao) comSugestao.add(a.i);
+    if (a.acao === 'remover') return `<div class="sugestoes"><button class="btn small" data-remover="${a.i}">${icon('trash', 14)} Tirar do repertório</button></div>`;
+    if (a.acao !== 'trocar') return '';
+    const ops = a.parte ? opcoes(a) : [];
+    if (!ops.length) return `<div class="sugestoes"><small class="muted">Sem sugestão no acervo para esta parte: troque por outra música da sua biblioteca ou da busca.</small></div>`;
+    a.opcoes = ops;
+    return `<div class="sugestoes"><small class="muted">Sugestões para o dia:</small>${ops.map((o, j) => `<div class="sug"><span><b>${esc(o.titulo)}</b><small>${esc(o.de)}</small></span>
+      ${o.fonte !== 'cnbb' ? `<button class="icon-btn" data-ver-sug="${k}:${j}" aria-label="Ver" title="Ver a música">${icon('next', 16)}</button>` : ''}<button class="btn small" data-trocar="${k}:${j}">Trocar</button></div>`).join('')}</div>`;
+  };
   const n = (nv) => avisos.filter((a) => a.nivel === nv).length;
   const resumo = avisos.length ? [n('erro') && `${n('erro')} ${n('erro') > 1 ? 'erros' : 'erro'}`, n('atencao') && `${n('atencao')} ${n('atencao') > 1 ? 'atenções' : 'atenção'}`, n('info') && `${n('info')} ${n('info') > 1 ? 'observações' : 'observação'}`].filter(Boolean).join(' · ') : 'Tudo certo';
   const ic = { erro: 'x', atencao: 'info', info: 'check' };
   box.innerHTML = `<details class="revisao ${n('erro') ? 'com-erro' : n('atencao') ? 'com-atencao' : 'ok'}" ${n('erro') ? 'open' : ''}>
-    <summary>${icon(avisos.length ? 'cross' : 'check', 18)}<span><b>Revisão litúrgica</b><small>${esc(lit.celebracao || '')}</small></span><span class="chip sm">${resumo}</span>${avisos.length ? icon('down', 18) : ''}</summary>
-    ${avisos.length ? `<ul>${avisos.map((a) => `<li class="${a.nivel}" ${a.i !== undefined ? `data-ir="${a.i}"` : ''}>${icon(ic[a.nivel], 15)}<span>${esc(a.texto)}</span></li>`).join('')}</ul>`
+    <summary>${icon(avisos.length ? 'cross' : 'check', 18)}<span><b>Revisão litúrgica</b><small>${esc(lit.celebracao || '')}</small><em class="rev-resumo">${resumo}</em></span><span class="chip sm">${resumo}</span>${avisos.length ? icon('down', 18) : ''}</summary>
+    ${avisos.length ? `<ul>${avisos.map((a, k) => `<li class="${a.nivel}"><div class="rev-aviso" ${a.i !== undefined ? `data-ir="${a.i}"` : ''}>${icon(ic[a.nivel], 15)}<span>${esc(a.texto)}</span></div>${sugestoesHTML(a, k)}</li>`).join('')}</ul>`
     : ''}</details>`;
   if (!avisos.length) $('summary', box).addEventListener('click', (e) => e.preventDefault());
+  // trocar a música do aviso por uma sugestão (a parte da missa continua a mesma) ou tirá-la do repertório
+  box.querySelectorAll('[data-trocar], [data-ver-sug]').forEach((b) => b.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const [k, j] = (b.dataset.trocar || b.dataset.verSug).split(':').map(Number);
+    const a = avisos[k];
+    const o = a?.opcoes?.[j];
+    if (!o) return;
+    try {
+      b.disabled = true;
+      let content;
+      let source;
+      if (o.fonte === 'cnbb') {
+        const p = (await getMissa(set.date)).partes.find((x) => x.chave === 'salmo');
+        if (!p?.chordpro) throw new Error('salmo do dia indisponível');
+        [content, source] = [p.chordpro, `cnbb:${set.date}:salmo`];
+      } else {
+        const m = ac.musicas.find((x) => x.fonte === o.fonte);
+        if (b.dataset.verSug) { abrirMusicaAcervo(m); return; }
+        [content, source] = [m.chordpro, m.fonte];
+      }
+      const nova = db.songBySource(source) || db.saveSong({ content, source });
+      const atual = db.set(set.id);
+      const anterior = db.song(atual.items[a.i].songId)?.title;
+      atual.items[a.i] = { ...atual.items[a.i], songId: nova.id };
+      db.saveSet(atual);
+      desenharLateral();
+      toast(`${anterior ? `“${anterior}” trocado por` : 'Agora:'} “${nova.title}”`, 3500);
+      viewSet(set.id);
+    } catch (err) { toast('Erro: ' + err.message); } finally { b.disabled = false; }
+  }));
+  box.querySelectorAll('[data-remover]').forEach((b) => b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const atual = db.set(set.id);
+    const [tirada] = atual.items.splice(Number(b.dataset.remover), 1);
+    db.saveSet(atual);
+    desenharLateral();
+    toast(`“${db.song(tirada?.songId)?.title || 'Música'}” saiu do repertório`);
+    viewSet(set.id);
+  }));
   box.querySelectorAll('[data-ir]').forEach((li) => li.addEventListener('click', () => {
     const alvo = view.querySelector(`.set-item[data-i="${li.dataset.ir}"]`);
     if (!alvo) return;

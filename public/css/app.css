@@ -554,6 +554,14 @@ label.setting { cursor: pointer; }
 .cta-bar .info b { display: block; color: var(--text); font-size: 15px; }
 .cta-bar .info span { display: none; }
 @media (min-width: 900px) { .cta-bar .info span { display: inline; } }
+.cta-bar .info b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* celular: a contagem em cima e os dois botões embaixo, largos (antes disputavam a mesma linha e se sobrepunham) */
+@media (max-width: 600px) {
+  .cta-bar { flex-wrap: wrap; padding: 10px 12px; row-gap: 8px; }
+  .cta-bar .info { flex: 1 1 100%; }
+  .cta-bar > .row { flex: 1 1 100%; flex-wrap: nowrap; }
+  .cta-bar > .row .btn { flex: 1; justify-content: center; white-space: nowrap; }
+}
 .fonte { font-size: 12px; color: var(--subtle); margin: 24px 2px 0; line-height: 1.6; }
 .fonte a { color: var(--muted); }
 
@@ -982,6 +990,7 @@ body.performance .convite-instalar { display: none; }
 .setting-ajuda ol { padding-left: 20px; margin: 6px 0 12px; line-height: 1.6; }
 .setting-ajuda code { background: var(--surface-2); padding: 2px 6px; border-radius: 4px; word-break: break-all; font-size: 12px; }
 .setting.wrap { flex-wrap: wrap; }
+.setting.wrap .grow { min-width: 190px; } /* no celular, o seletor desce para a linha de baixo em vez de espremer o texto */
 .setting.wrap .seg { margin-left: auto; }
 
 /* ============================================================ desenho dos acordes */
@@ -1292,12 +1301,12 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 .setores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 8px; }
 @media (min-width: 700px) { .setores { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 1200px) { .setores { grid-template-columns: repeat(5, 1fr); } }
-.setor { position: relative; display: flex; flex-direction: column; gap: 4px; min-height: 104px; padding: 14px 64px 14px 14px; overflow: hidden; border-radius: 10px;
+.setor { position: relative; display: flex; flex-direction: column; gap: 4px; min-height: 104px; padding: 14px 14px 14px 14px; overflow: hidden; border-radius: 10px;
   text-decoration: none; color: #fff; background: linear-gradient(135deg, hsl(var(--h) 55% 40%), hsl(calc(var(--h) + 30) 50% 26%)); transition: transform 0.15s, filter 0.15s; }
 .setor:hover { filter: brightness(1.08); }
 .setor:active { transform: scale(0.98); }
 .setor b { font-size: 17px; line-height: 1.15; }
-.setor small { font-size: 12px; line-height: 1.3; opacity: 0.85; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.setor small { padding-right: 30px; font-size: 12px; line-height: 1.3; opacity: 0.85; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .setor-ic { position: absolute; right: -6px; bottom: -6px; transform: rotate(18deg); opacity: 0.9; }
 .grade-partes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .parte-card { display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; min-height: 84px; padding: 12px; border-radius: 10px; text-decoration: none; color: #fff;
@@ -1478,14 +1487,23 @@ a.source { text-decoration: none; color: inherit; }
 .revisao.com-erro summary > svg:first-child { color: var(--danger); }
 .revisao[open] summary > svg:last-child { transform: rotate(180deg); }
 .revisao ul { list-style: none; margin: 0; padding: 0 10px 10px; display: grid; gap: 4px; }
-.revisao li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 8px; font-size: 14px; line-height: 1.45; }
-.revisao li svg { flex: none; margin-top: 2px; }
-.revisao li[data-ir] { cursor: pointer; }
-.revisao li[data-ir]:hover { background: var(--surface-2); }
+.revisao li { padding: 8px 10px; border-radius: 8px; font-size: 14px; line-height: 1.45; }
+.revisao .rev-aviso { display: flex; gap: 10px; align-items: flex-start; }
+.revisao .rev-aviso svg { flex: none; margin-top: 2px; }
+.revisao .rev-aviso[data-ir] { cursor: pointer; }
+.revisao .rev-aviso[data-ir]:hover span { text-decoration: underline; text-decoration-color: var(--subtle); }
+.revisao .sugestoes { display: grid; gap: 6px; margin: 8px 0 2px 25px; }
+.revisao .sug { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border-radius: 8px; background: var(--surface-2); }
+.revisao .sug > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.revisao .sug b { font-weight: 700; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.revisao .sug small { color: var(--muted); font-size: 11.5px; }
+.revisao .sug .icon-btn { flex: none; width: 32px; height: 32px; }
+.revisao .sug .btn { flex: none; }
+.revisao .sugestoes > .btn { justify-self: start; }
 .revisao li.erro { background: var(--danger-soft); }
-.revisao li.erro svg { color: var(--danger); }
-.revisao li.atencao svg { color: #e3b341; }
-.revisao li.info svg { color: var(--muted); }
+.revisao li.erro .rev-aviso svg { color: var(--danger); }
+.revisao li.atencao .rev-aviso svg { color: #e3b341; }
+.revisao li.info .rev-aviso svg { color: var(--muted); }
 @keyframes piscar { 0%, 100% { background: transparent; } 30% { background: var(--accent-soft); } }
 .set-item.piscar { animation: piscar 1.4s ease 1; }
 
@@ -1512,3 +1530,8 @@ a.source { text-decoration: none; color: inherit; }
   .barra-sel .spacer { display: none; }
   .barra-sel #sel-cancelar, .barra-sel .btn.solid { flex: 1 1 40%; justify-content: center; }
 }
+
+/* revisão no celular: a contagem vai para baixo do título (ao lado, espremia o título) */
+.revisao summary b { white-space: nowrap; }
+.revisao .rev-resumo { display: none; font-style: normal; font-size: 12.5px; font-weight: 700; color: var(--text); }
+@media (max-width: 600px) { .revisao summary > .chip { display: none; } .revisao .rev-resumo { display: block; } }
