@@ -209,3 +209,24 @@ test('letra automática: sílabas do português e a letra em todas as vozes', as
   assert.equal(sobrou, 1);
   assert.equal(temLetra(m), true);
 });
+
+test('cifra automática: cada acorde na sílaba onde cai e na nota dela (só na primeira voz)', async () => {
+  const { silabasDaLetra, colocarLetra, temCifra } = await import('../public/js/lib/partitura.js');
+  const { linhasDaLetraComCifra } = await import('../public/js/chordpro.js');
+  const linhas = linhasDaLetraComCifra('{title: T}\n{soc}\n[G]Santo, san[D]to é o [Em]Senhor\n[C]Deus [D]\n{eoc}\n[A] [B]\nO céu');
+  const sil = silabasDaLetra(linhas);
+  assert.equal(sil.map((x) => (x.c ? `[${x.c}]` : '') + x.s).join(' '), '[G]San- to, san- [D]to é o [Em]Se- nhor [C]Deus [D]O céu');
+  const m = novaPartitura({ tipo: 'duas' });
+  m.pautas[0].ev = Array.from({ length: 6 }, () => n('C4', 8, { c: 'X' }));
+  m.pautas[1].ev = Array.from({ length: 6 }, () => n('A3', 8));
+  colocarLetra(m, sil, { cifras: true });
+  assert.deepEqual(m.pautas[0].ev.map((e) => e.c), ['G', '', '', 'D', '', '']);
+  assert.deepEqual(m.pautas[0].ev.map((e) => e.l[0]), ['San-', 'to,', 'san-', 'to', 'é', 'o']);
+  assert.ok(m.pautas[1].ev.every((e) => !e.c));
+  // só a cifra: a letra que havia fica
+  m.pautas[0].ev[0].l = ['Ho-'];
+  colocarLetra(m, sil.map((x) => ({ ...x, c: x.c === 'G' ? 'Am' : x.c })), { comLetra: false, cifras: true });
+  assert.equal(m.pautas[0].ev[0].c, 'Am');
+  assert.equal(m.pautas[0].ev[0].l[0], 'Ho-');
+  assert.equal(temCifra(m), true);
+});

@@ -1,6 +1,6 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
-import { definirMeta, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
+import { definirMeta, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasDaLetraComCifra, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
 import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
@@ -12,7 +12,7 @@ import { duracaoTotal, nomearVozes, passoNoTempo, segundosPorSemibreve, volumeDa
 import {
   acordesDoTom as acordesDaArmadura, alterar, alturaPeloNome, CLAVES, COMPASSOS, deMusicXML, distribuirLetra, DURACOES, emCompassos, frequenciaDa, midiDa, moverGrau,
   mudarOitava, NOMES_NOTA, nomeDaAltura, nomeDoTom, nomeDuracao, novaPartitura, paraMusicXML, tiquesDoCompasso,
-  claveDaVoz, estimarAndamento, estimarTom, faixaDoModo, juntarPedaco, melodiaDasNotas, tomDaCifra, vozesDasNotas, colocarLetra, letraEmSilabas, temLetra,
+  claveDaVoz, estimarAndamento, estimarTom, faixaDoModo, juntarPedaco, melodiaDasNotas, tomDaCifra, vozesDasNotas, colocarLetra, letraEmSilabas, temLetra, silabasDaLetra, temCifra as temCifraNaPartitura,
 } from './lib/partitura.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
@@ -3195,6 +3195,21 @@ function somNota(alturas) {
 
 // letra da música (só as linhas cantadas, sem acordes nem marcações), já separada em sílabas para cair nota por nota
 const letraParaPartitura = (content) => letraEmSilabas(linhasDaLetra(content).join('\n'));
+// letra e cifra da música, sílaba por sílaba ([{ s, c }]): cada acorde na sílaba onde ele cai na cifra
+const silabasDaMusica = (content) => silabasDaLetra(linhasDaLetraComCifra(content));
+// o que entra sozinho numa partitura com notas: a letra (se ela não tem nenhuma) e a cifra (se não tem nenhuma), uma
+// vez só (m.letraAuto / m.cifraAuto: se a pessoa apagar, não volta). Devolve { letra, cifra } (o que vai entrar)
+function letraECifraAutomaticas(m, silabas) {
+  const notas = m.pautas.some((p) => p.ev.some((e) => e.a?.length));
+  if (!notas || !silabas.length) return { letra: false, cifra: false };
+  return { letra: !m.letraAuto && !temLetra(m), cifra: !m.cifraAuto && !temCifraNaPartitura(m) && silabas.some((x) => x.c) };
+}
+function aplicarLetraECifra(m, silabas, { letra, cifra }) {
+  if (letra || cifra) colocarLetra(m, silabas, { comLetra: letra, cifras: cifra });
+  m.letraAuto = true;
+  m.cifraAuto = true;
+}
+const avisoAutomatico = ({ letra, cifra }) => `${letra && cifra ? 'Letra e cifra colocadas' : letra ? 'Letra colocada' : 'Cifra colocada'} automaticamente: confira e corrija nas abas ${letra && cifra ? 'Letra e Cifra' : letra ? 'Letra' : 'Cifra'}`;
 
 // lê um arquivo MusicXML (.musicxml/.xml ou o compactado .mxl) e devolve o texto do XML
 async function textoDoMusicXML(arquivoOuUrl) {
@@ -3793,6 +3808,7 @@ function editorPartitura(song, titulo) {
         { valor: 'ver', rotulo: 'Ver a partitura', sub: 'Do jeito que fica para cantar e ensaiar', ic: 'score' },
         { valor: 'ajustes', rotulo: 'Ajustes', sub: 'Título, compasso, tom, andamento e vozes', ic: 'settings' },
         { valor: 'letra', rotulo: 'Colocar a letra da música', sub: `Nas notas de todas as vozes, estrofe ${estrofe + 1}, sílaba por sílaba`, ic: 'text' },
+        { valor: 'cifra', rotulo: 'Colocar a cifra da música', sub: 'Cada acorde na nota da sílaba onde ele cai na cifra', ic: 'chord' },
         { valor: 'pdf', rotulo: 'Imprimir ou salvar em PDF', sub: 'Em preto e branco', ic: 'file' },
         { valor: 'xml', rotulo: 'Exportar MusicXML', sub: 'Abre no MuseScore, Finale, Sibelius…', ic: 'download' },
         { valor: 'importar', rotulo: 'Importar MusicXML', sub: 'Troca esta partitura pela do arquivo', ic: 'upload' },
@@ -3809,6 +3825,16 @@ function editorPartitura(song, titulo) {
       let sobrou = 0;
       mudar(() => { sobrou = colocarLetra(m, texto, { estrofe }); m.letraAuto = true; });
       toast(sobrou ? `Letra colocada; faltaram notas para ${sobrou} sílaba(s)` : 'Letra colocada: corrija na aba Letra se precisar');
+    }
+    if (v === 'cifra') {
+      const silabas = silabasDaMusica(song.content);
+      if (!silabas.some((x) => x.c)) { toast('Esta música não tem cifra para colocar'); return; }
+      if (!m.pautas.some((p) => p.ev.some((e) => e.a.length))) { toast('Escreva as notas primeiro'); return; }
+      if (temCifraNaPartitura(m) && !(await ask({ title: 'Trocar a cifra?', text: 'As cifras da primeira voz saem e entram as da música, do começo.', ok: 'Trocar' }))) return;
+      mudar(() => { colocarLetra(m, silabas, { comLetra: false, cifras: true }); m.cifraAuto = true; });
+      aba = 'cifra';
+      atualizarPalheta();
+      toast('Cifra colocada: toque numa nota e corrija na aba Cifra se precisar');
     }
     if (v === 'xml') download(`${nomeArquivo(m.titulo || titulo)}.musicxml`, paraMusicXML(m), 'application/vnd.recordare.musicxml+xml');
     if (v === 'pdf') imprimirPartitura(m, m.titulo || titulo);
@@ -3881,12 +3907,13 @@ function editorPartitura(song, titulo) {
   };
   document.addEventListener('keydown', teclas);
   aoSair(() => document.removeEventListener('keydown', teclas));
-  // a letra vem sozinha: partitura com notas e sem letra nenhuma recebe a letra da música (uma vez; dá para desfazer
-  // e corrigir sílaba por sílaba na aba Letra)
-  const letraAuto = letraParaPartitura(song.content);
-  if (letraAuto && !m.letraAuto && !temLetra(m) && m.pautas.some((p) => p.ev.some((e) => e.a.length))) {
-    mudar(() => { colocarLetra(m, letraAuto); m.letraAuto = true; });
-    toast('Letra colocada automaticamente: confira e corrija na aba Letra');
+  // a letra e a cifra vêm sozinhas: partitura com notas e sem letra (ou sem cifra) recebe a da música (uma vez; dá
+  // para desfazer e corrigir nota por nota nas abas Letra e Cifra)
+  const silabasAuto = silabasDaMusica(song.content);
+  const auto = letraECifraAutomaticas(m, silabasAuto);
+  if (auto.letra || auto.cifra) {
+    mudar(() => aplicarLetraECifra(m, silabasAuto, auto));
+    toast(avisoAutomatico(auto));
   } else desenhar();
 }
 
@@ -4523,8 +4550,11 @@ async function gerarComIA(song, titulo) {
     let oitava = 0;
     let meioTempo = false;
     let coral = false; // separar em Soprano, Contralto, Tenor e Baixo
-    const textoLetra = letraParaPartitura(song.content);
-    let comLetra = !!textoLetra; // a letra da música já nas notas
+    const silabasMusica = silabasDaMusica(song.content);
+    const textoLetra = silabasMusica.length > 0;
+    const temCifraMusica = silabasMusica.some((x) => x.c);
+    let comLetra = textoLetra; // a letra da música já nas notas
+    let comCifra = temCifraMusica; // e os acordes da cifra
     let osmd = null;
     const montar = () => {
       let m;
@@ -4537,8 +4567,10 @@ async function gerarComIA(song, titulo) {
         m.pautas[0].nome = modoIA === 'voz' ? 'Voz' : 'Melodia';
         m.pautas[0].ev = melodiaDasNotas(notas, { bpm, fifths, oitava, modo: modoIA, centro, meioTempo });
       }
-      if (comLetra) colocarLetra(m, textoLetra);
-      m.letraAuto = true; // não coloca de novo ao abrir no editor (se a pessoa desligou, fica sem)
+      if (comLetra || comCifra) colocarLetra(m, silabasMusica, { comLetra, cifras: comCifra });
+      // não coloca de novo ao abrir no editor (se a pessoa desligou, fica sem)
+      m.letraAuto = true;
+      m.cifraAuto = true;
       return m;
     };
     passo.innerHTML = `<div class="section-title">Rascunho pronto</div>
@@ -4551,6 +4583,7 @@ async function gerarComIA(song, titulo) {
         <div class="setting wrap"><span class="ico">${icon('clock', 18)}</span><div class="grow"><div class="t">Compasso</div></div>
           <div class="chips" id="ia-compasso">${[[2, 4], [3, 4], [4, 4], [6, 8]].map(([a, b]) => `<button class="chip" data-c="${a}/${b}" aria-pressed="${a === 4 && b === 4}">${a}/${b}</button>`).join('')}</div></div>
         ${textoLetra ? `<label class="setting"><span class="ico">${icon('text', 18)}</span><div class="grow"><div class="t">Letra da música</div><div class="s">Uma sílaba em cada nota; confira e corrija na aba Letra do editor</div></div><input type="checkbox" class="switch" id="ia-letra" checked></label>` : ''}
+        ${temCifraMusica ? `<label class="setting"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Cifra da música</div><div class="s">Cada acorde na nota da sílaba onde ele cai; corrija na aba Cifra do editor</div></div><input type="checkbox" class="switch" id="ia-cifra" checked></label>` : ''}
         <label class="setting"><span class="ico">${icon('clock', 18)}</span><div class="grow"><div class="t">Começa no contratempo</div><div class="s">Se as notas ficaram deslocadas meio tempo (comum com a voz sozinha), ligue</div></div><input type="checkbox" class="switch" id="ia-meio"></label>
         <div class="setting"><span class="ico">${icon('up', 18)}</span><div class="grow"><div class="t">Oitava</div></div>
           <div class="seg"><button data-oit="-1">8ª↓</button><span class="val" id="ia-oit">0</span><button data-oit="1">8ª↑</button></div></div>
@@ -4593,6 +4626,7 @@ async function gerarComIA(song, titulo) {
     passo.onchange = (e) => {
       if (e.target.id === 'ia-meio') { meioTempo = e.target.checked; previa(); }
       if (e.target.id === 'ia-letra') { comLetra = e.target.checked; previa(); }
+      if (e.target.id === 'ia-cifra') { comCifra = e.target.checked; previa(); }
     };
     previa();
   }
@@ -4611,10 +4645,15 @@ async function viewPartitura(id) {
   view.innerHTML = `<div class="partitura"><div class="loading-note"><span class="spin"></span>Preparando a partitura…</div></div>`;
   // a partitura feita no app (Compor) vale mais que a desenhada por leitura automática da original
   const propria = song.partitura?.pautas?.some((p) => p.ev?.length);
-  // partitura feita no app ainda sem letra: a letra da música entra sozinha (uma vez; corrige-se no editor)
-  if (propria && id !== 'previa' && !song.partitura.letraAuto && !temLetra(song.partitura)) {
-    const texto = letraParaPartitura(song.content);
-    if (texto) { const m = JSON.parse(JSON.stringify(song.partitura)); colocarLetra(m, texto); m.letraAuto = true; db.updateSong(id, { partitura: m }); }
+  // partitura feita no app ainda sem letra ou sem cifra: a da música entra sozinha (uma vez; corrige-se no editor)
+  if (propria && id !== 'previa') {
+    const silabas = silabasDaMusica(song.content);
+    const auto = letraECifraAutomaticas(song.partitura, silabas);
+    if (auto.letra || auto.cifra) {
+      const m = JSON.parse(JSON.stringify(song.partitura));
+      aplicarLetraECifra(m, silabas, auto);
+      db.updateSong(id, { partitura: m });
+    }
   }
   const temDesenho = propria || (mxl ? await fetch(mxl, { method: 'HEAD' }).then((r) => r.ok).catch(() => false) : false);
   if (!view.querySelector('.partitura')) return;

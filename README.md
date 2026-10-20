@@ -46,7 +46,9 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   guardada na música (`lib/partitura.js` converte para MusicXML).
   **Letra automática**: a letra da música entra sozinha nas notas de todas as vozes, sílaba por sílaba (separação de
   sílabas do português: `separarSilabas`, `colocarLetra`), no rascunho da IA, ao abrir o editor ou a partitura sem
-  letra, e em ⋯ → *Colocar a letra da música*; corrige-se na aba **Letra**. No editor, o ▶ do topo vira ⏸ enquanto
+  letra, e em ⋯ → *Colocar a letra da música*; corrige-se na aba **Letra**. A **cifra** vem junto: cada acorde da
+  cifra da música vai para a nota da sílaba onde ele cai (`silabasDaLetra`), na primeira voz (rascunho da IA, partitura
+  sem cifra e ⋯ → *Colocar a cifra da música*); corrige-se na aba **Cifra**. No editor, o ▶ do topo vira ⏸ enquanto
   toca; na partitura e no editor (ouvindo), tocar numa nota leva a música para ali e toca a partir dela.
 - **Partituras** (menu do app): as partituras feitas no app e as prontas (acervo/Hinário) das músicas da biblioteca, com
   **Nova partitura** (escolhendo a música) e **Gerar com IA**: o app ouve a música pelo microfone (com o vídeo

@@ -399,6 +399,10 @@ export function deMusicXML(doc) {
 export function distribuirLetra(pauta, texto, { inicio = 0, estrofe = 0 } = {}) {
   const silabas = String(texto).trim().split(/\s+/).filter(Boolean)
     .flatMap((palavra) => { const ps = palavra.split('-').filter(Boolean); return ps.map((s, i) => s + (i < ps.length - 1 ? '-' : '')); });
+  return distribuirSilabas(pauta, silabas.map((s) => ({ s, c: '' })), { inicio, estrofe });
+}
+// as sílabas ({ s, c }) nas notas; com "cifras", a cifra de cada sílaba vai para a nota dela
+function distribuirSilabas(pauta, silabas, { inicio = 0, estrofe = 0, cifras = false } = {}) {
   let k = 0;
   let ultimo = -1;
   for (let i = inicio; i < pauta.ev.length && k < silabas.length; i++) {
@@ -406,7 +410,9 @@ export function distribuirLetra(pauta, texto, { inicio = 0, estrofe = 0 } = {}) 
     const continuaLigadura = i > 0 && pauta.ev[i - 1].lig && pauta.ev[i - 1].a?.length;
     if (!ev.a?.length || continuaLigadura) continue;
     ev.l = [...(ev.l || [])];
-    ev.l[estrofe] = silabas[k++];
+    ev.l[estrofe] = silabas[k].s;
+    if (cifras && silabas[k].c) ev.c = silabas[k].c;
+    k++;
     ultimo = i;
   }
   return { ultimo, sobrou: silabas.length - k };
@@ -467,20 +473,66 @@ export function separarSilabas(palavra) {
   out[out.length - 1] += depois;
   return out;
 }
+// sílabas da letra com a cifra de cada uma: as linhas vêm com os acordes no lugar ("[G]San[D]to, santo"); o acorde
+// fica na sílaba onde ele cai (o que cai num espaço ou no fim da linha vai para a próxima sílaba).
+// Devolve [{ s: sílaba (com "-" se a palavra continua), c: cifra ou '' }]
+export function silabasDaLetra(linhas) {
+  const out = [];
+  let pendente = '';
+  for (const linha of [].concat(linhas)) {
+    // o texto sem os acordes e onde cada acorde cai nele
+    const acordes = [];
+    let texto = '';
+    const re = /\[([^\]]*)\]/g;
+    let ult = 0;
+    let m;
+    while ((m = re.exec(linha))) { texto += linha.slice(ult, m.index); acordes.push({ at: texto.length, c: m[1].trim() }); ult = re.lastIndex; }
+    texto += linha.slice(ult);
+    const silabas = [];
+    for (const w of texto.matchAll(/\S+/g)) {
+      let at = w.index;
+      const partes = separarSilabas(w[0]);
+      partes.forEach((sil, i) => { silabas.push({ ini: at, fim: at + sil.length, s: sil + (i < partes.length - 1 ? '-' : ''), c: '' }); at += sil.length; });
+    }
+    if (pendente && silabas.length) { silabas[0].c = pendente; pendente = ''; }
+    for (const a of acordes) {
+      if (!a.c) continue;
+      const alvo = silabas.find((x) => a.at < x.fim);
+      if (alvo) alvo.c = a.c; else pendente = a.c;
+    }
+    for (const x of silabas) out.push({ s: x.s, c: x.c });
+  }
+  return out;
+}
+
 // texto inteiro com as sílabas separadas por hífen (o formato que distribuirLetra lê)
 export const letraEmSilabas = (texto) => String(texto || '').split(/\s+/).filter(Boolean).map((p) => separarSilabas(p).join('-')).join(' ');
 
 // a letra em todas as vozes (cada uma canta o texto inteiro, do começo), numa estrofe; tira a letra que havia nela.
-// Devolve quantas sílabas sobraram (na voz que mais faltou nota)
-export function colocarLetra(modelo, texto, { estrofe = 0 } = {}) {
+// "letra": o texto com hífens ou as sílabas de silabasDaLetra. Com "cifras" (e as sílabas trazendo a cifra), os
+// acordes da música vão para as notas da primeira voz com notas (as cifras que ela tinha saem); com letra: false,
+// só a cifra entra. Devolve quantas sílabas sobraram (na voz que mais faltou nota)
+export function colocarLetra(modelo, letra, { estrofe = 0, cifras = false, comLetra = true } = {}) {
+  const silabas = typeof letra === 'string'
+    ? letra.trim().split(/\s+/).filter(Boolean).flatMap((w) => { const ps = w.split('-').filter(Boolean); return ps.map((s, i) => ({ s: s + (i < ps.length - 1 ? '-' : ''), c: '' })); })
+    : letra;
   let sobrou = 0;
+  let primeira = true;
   for (const p of modelo.pautas) {
     if (!p.ev.some((e) => e.a?.length)) continue;
+    const comCifra = cifras && primeira;
+    primeira = false;
+    if (!comLetra && !comCifra) continue;
+    const antes = p.ev.map((e) => e.l);
+    if (comCifra) for (const e of p.ev) e.c = '';
     for (const e of p.ev) if (e.l?.[estrofe]) { e.l = [...e.l]; e.l[estrofe] = ''; while (e.l.length && !e.l[e.l.length - 1]) e.l.pop(); }
-    sobrou = Math.max(sobrou, distribuirLetra(p, texto, { estrofe }).sobrou);
+    sobrou = Math.max(sobrou, distribuirSilabas(p, silabas, { estrofe, cifras: comCifra }).sobrou);
+    if (!comLetra) p.ev.forEach((e, i) => { e.l = antes[i] || []; }); // só a cifra: a letra que havia fica
   }
   return sobrou;
 }
+const temCifra = (modelo) => modelo.pautas.some((p) => p.ev.some((e) => e.c));
+export { temCifra };
 const temLetra = (modelo) => modelo.pautas.some((p) => p.ev.some((e) => e.l?.some(Boolean)));
 export { temLetra };
 
