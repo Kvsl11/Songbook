@@ -28,6 +28,8 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 const simples = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 // coletâneas (muitos cantos num PDF só, sem separação legível) e pastas que não são cantos
 const FORA = /HINÁRIO ATUALIZADO|HINÁRIOS LITÚRGICOS OFICIAIS|ÁLBUNS DE LITURGIA|Volumes em PDF|Partes Fixas Compiladas|LIVES E VÍDEOS|^GRADUAL/i;
+// arquivos que não entram no app: livros licenciados (com nome e e-mail do comprador em cada página)
+export const ARQUIVOS_FORA = /^40 CANTOS GREGORIANOS COM CIFRAS/i;
 
 export async function baixar(id, destino) {
   for (let t = 1; ; t++) {
@@ -77,7 +79,7 @@ async function ler(it) {
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const itens = expandir(JSON.parse(await readFile(ACERVO, 'utf8')));
   const arquivos = itens.filter((it) => (it.tipo === 'pdf' || (it.tipo === 'texto' && /\.docx$/i.test(it.nome.trim())))
-    && !ehLivro(it) && !FORA.test(it.caminho.join('/')));
+    && !ehLivro(it) && !FORA.test(it.caminho.join('/')) && !ARQUIVOS_FORA.test(it.nome.trim()));
   await mkdir(CACHE, { recursive: true });
   const cantos = [];
   let lidos = 0;
