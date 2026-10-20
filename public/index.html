@@ -10,6 +10,17 @@
       document.documentElement.dataset.theme = t;
       if (p.sideCollapsed) document.documentElement.classList.add('side-collapsed');
     } catch (e) {}
+    // rede de segurança: se o app não terminar de carregar (arquivo de outra versão, cópia offline estragada),
+    // apaga a cópia offline e recarrega (uma vez por sessão)
+    window.__recuperarApp = function () {
+      if (window.__songbookOk) return;
+      try { if (sessionStorage.getItem('recuperacao')) return; sessionStorage.setItem('recuperacao', '1'); } catch (e) { return; }
+      var limpar = window.caches ? caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf('songbook-v') === 0; }).map(function (k) { return caches.delete(k); })); }) : Promise.resolve();
+      var tirar = navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }) : Promise.resolve();
+      Promise.all([limpar, tirar]).then(function () { location.reload(); }, function () { location.reload(); });
+    };
+    window.addEventListener('error', function (ev) { if (!window.__songbookOk && /\.js/.test(String(ev.filename || '')) ) window.__recuperarApp(); });
+    setTimeout(window.__recuperarApp, 20000);
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Songbook Litúrgico</title>
@@ -63,6 +74,6 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <input type="file" id="file-input" accept=".cho,.chopro,.chordpro,.crd,.pro,.txt,.json,.onsong" multiple hidden>
 
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js" onerror="window.__recuperarApp()"></script>
 </body>
 </html>

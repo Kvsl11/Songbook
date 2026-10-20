@@ -1,14 +1,23 @@
-// Service worker: funciona offline, mas sempre busca a versão mais nova quando há internet.
-// - arquivos do app: "rede primeiro" sem usar o cache HTTP do navegador (cache: 'no-cache'),
-//   com a cópia local como reserva offline;
-// - ao publicar uma versão nova, mude VERSION: o app recarrega sozinho com ela.
-const VERSION = 'songbook-v112';
+// Service worker: funciona offline e se atualiza sozinho.
+// - código do app (SHELL: HTML, CSS, JS, ícones): vem do pacote desta versão, baixado inteiro na instalação.
+//   Assim o app nunca junta um arquivo da versão nova com outro da antiga (com internet lenta, isso quebrava
+//   o carregamento: ícones vazios, app parado). Se um arquivo do pacote não baixar, a versão nova não entra
+//   (a anterior continua) e tenta de novo depois;
+// - dados (liturgia, músicas, partituras, API): "rede primeiro", com a cópia local como reserva offline;
+// - ao publicar uma versão nova, mude VERSION: o app baixa o pacote novo e recarrega sozinho com ele.
+const VERSION = 'songbook-v113';
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/store.js', 'js/render.js', 'js/chordpro.js', 'js/icons.js', 'js/pdf.js', 'js/powerpoint.js', 'js/lib/pptx-missa.js', 'js/lib/pptx-simples.js', 'js/fonte.js', 'js/lib/html.js', 'js/lib/cnbb.js', 'js/lib/cindy.js', 'js/lib/missa.js', 'js/lib/mpm.js', 'js/lib/pocket.js', 'js/lib/web.js', 'js/lib/acervo.js', 'js/lib/hinario.js', 'js/lib/sugestoes-liturgicas.js', 'js/acordes.js', 'icon.svg', 'icon-192-v7.png', 'icon-512-v7.png', 'apple-touch-icon-v7.png', 'manifest.webmanifest'];
+
+// caminhos (absolutos) dos arquivos do pacote, para reconhecer as requisições
+const DO_APP = new Set(SHELL.map((u) => new URL(u, self.registration.scope).pathname));
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(VERSION)
-      .then((c) => Promise.all(SHELL.map((u) => fetch(new Request(u, { cache: 'reload' })).then((r) => r.ok && c.put(u, r)).catch(() => {}))))
+      .then((c) => Promise.all(SHELL.map((u) => fetch(new Request(u, { cache: 'reload' })).then((r) => {
+        if (!r.ok) throw new Error(`${u}: ${r.status}`);
+        return c.put(u, r);
+      }))))
       .then(() => self.skipWaiting()),
   );
 });
@@ -51,10 +60,18 @@ self.addEventListener('fetch', (e) => {
 
   if (url.origin === location.origin) {
     const api = url.pathname.includes('/api/');
+    // código do app: sempre do pacote desta versão (as páginas abrem o index.html do pacote)
+    if (!api && (req.mode === 'navigate' || DO_APP.has(url.pathname))) {
+      e.respondWith(caches.open(VERSION)
+        .then((c) => c.match(req.mode === 'navigate' ? 'index.html' : req, { ignoreSearch: true }))
+        .then((r) => r || redePrimeiro(req, VERSION))
+        .catch(() => (req.mode === 'navigate' ? caches.match('index.html').then((r) => r || Response.error()) : Response.error())));
+      return;
+    }
     const destino = api ? VERSION + '-api' : VERSION;
     e.respondWith(redePrimeiro(req, destino).catch(() => (api
       ? new Response(JSON.stringify({ erro: 'Sem conexão' }), { status: 503, headers: { 'Content-Type': 'application/json' } })
-      : caches.match('index.html').then((r) => r || Response.error()))));
+      : Response.error()))); // um arquivo que não veio nunca recebe a página no lugar
     return;
   }
   // capas (Cindy, YouTube…): guardadas na primeira vez que aparecem, para o modo offline
