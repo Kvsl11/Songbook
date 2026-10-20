@@ -49,7 +49,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-137';
+export const APP_VERSAO = '2026.10.20-138';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -3136,12 +3136,12 @@ function escolherArquivoMusicXML() {
   });
 }
 
-async function viewCompor(id) {
+async function viewCompor(id, de = '') {
   if (id === 'previa') {
     if (!preview) return viewNotFound();
     const salva = db.songBySource(preview.source) || db.saveSong({ content: preview.content, source: preview.source, transpose: preview.transpose || 0, capo: preview.capo || 0 });
     toast('Música salva na biblioteca para guardar a partitura');
-    history.replaceState(null, '', `#/musica/${salva.id}/compor`);
+    history.replaceState(null, '', `#/musica/${salva.id}/compor${de ? '/' + de : ''}`);
     id = salva.id;
   }
   const song = db.song(id);
@@ -3149,6 +3149,22 @@ async function viewCompor(id) {
   const titulo = renderSong(song.content).meta.title || song.title || 'Partitura';
   setTab('biblioteca');
   setTint('#2c3b3d');
+  // "Editar" numa partitura pronta (a desenhada pelo app): copia as notas dela direto para o editor
+  const mxl = mxlDaPartitura(song.content);
+  if (!song.partitura?.pautas?.length && de === 'desenhada' && mxl) {
+    setHeader(titulo, { back: `#/musica/${id}/partitura`, eyebrow: 'Editar partitura' });
+    view.innerHTML = `<div class="loading-note"><span class="spin"></span>Abrindo a partitura para editar…</div>`;
+    try {
+      const modelo = modeloDoXML(await textoDoMusicXML(mxl));
+      if (!location.hash.startsWith(`#/musica/${id}/compor`)) return;
+      modelo.titulo ||= titulo;
+      db.updateSong(id, { partitura: modelo });
+      toast('Partitura pronta para editar: confira as vozes, que vêm da leitura automática');
+      return editorPartitura(db.song(id), titulo);
+    } catch (e) {
+      toast('Não consegui abrir a partitura pronta: ' + e.message);
+    }
+  }
   if (!song.partitura?.pautas?.length) return comecarPartitura(song, titulo);
   return editorPartitura(song, titulo);
 }
@@ -3804,7 +3820,7 @@ async function viewPartitura(id) {
   view.innerHTML = `<div class="partitura">
     <div class="partitura-barra">
       ${temDesenho && paginas.length ? `<div class="seg"><button data-modo="desenhada">${icon('score', 15)} ${propria ? 'Do app' : 'Desenhada'}</button><button data-modo="original">${icon('file', 15)} Original</button></div>` : ''}
-      <a class="btn small cp-editar" href="#/musica/${id}/compor" title="${propria ? 'Editar a partitura feita no app' : 'Escrever a partitura aqui no app, nota por nota'}">${icon('edit', 15)} ${propria ? 'Editar' : 'Criar no app'}</a>
+      <a class="btn small cp-editar" href="#/musica/${id}/compor${!propria && temDesenho ? '/desenhada' : ''}" title="${propria ? 'Editar a partitura feita no app' : temDesenho ? 'Abrir esta partitura no editor para corrigir notas, letra e cifras' : 'Escrever a partitura aqui no app, nota por nota'}">${icon('edit', 15)} ${propria || temDesenho ? 'Editar' : 'Criar no app'}</a>
       <div class="seg so-desenhada"><button data-cor="app">Cores do app</button><button data-cor="pb">Preto e branco</button></div>
       <div class="seg so-desenhada"><button data-tom="-1" aria-label="Meio tom abaixo">${icon('minus', 15)}</button><span class="val" id="tom-part"><small>Tom</small>0</span><button data-tom="1" aria-label="Meio tom acima">${icon('plus', 15)}</button></div>
       <span class="spacer"></span>
@@ -3946,7 +3962,11 @@ function viewSong(id, ctx = {}) {
           ${isPreview ? `<button role="menuitem" id="btn-edit-prev">${icon('edit', 18)}<span>Editar cifra</span></button>`
             : `<a role="menuitem" href="#/editar/${song.id}">${icon('edit', 18)}<span>Editar cifra</span></a>`}
           <button role="menuitem" id="btn-pdf">${icon('file', 18)}<span>Exportar PDF</span></button>
-          ${!isPreview && db.song(song.id)?.partitura ? '' : `<a role="menuitem" href="#/musica/${isPreview ? 'previa' : song.id}/compor">${icon('score', 18)}<span>Criar partitura</span></a>`}
+          ${(() => {
+            const propria = !isPreview && db.song(song.id)?.partitura;
+            const pronta = mxlDaPartitura(song.content);
+            return `<a role="menuitem" href="#/musica/${isPreview ? 'previa' : song.id}/compor${!propria && pronta ? '/desenhada' : ''}">${icon('score', 18)}<span>${propria || pronta ? 'Editar partitura' : 'Criar partitura'}</span></a>`;
+          })()}
         </div>
       </div>
     </div>
@@ -5911,7 +5931,7 @@ function route() {
     case 'artista': return d === 'album' ? viewAlbum(b, c, e) : viewArtista(b, c);
     case 'biblioteca': return viewLibrary(b);
     case 'repertorios': return viewLibrary('repertorios');
-    case 'musica': return c === 'partitura' ? viewPartitura(b) : c === 'compor' ? viewCompor(b) : viewSong(b, { tocar: c === 'tocar' });
+    case 'musica': return c === 'partitura' ? viewPartitura(b) : c === 'compor' ? viewCompor(b, d) : viewSong(b, { tocar: c === 'tocar' });
     case 'editar': return viewEditor(b, c);
     case 'repertorio': return c !== undefined ? viewSetSong(b, Number(c)) : viewSet(b);
     case 'liturgia': return viewLiturgia(b);
