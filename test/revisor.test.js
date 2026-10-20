@@ -75,3 +75,15 @@ test('fontes católicas e letras de Páscoa no Tempo Comum não geram alarme fal
   ]);
   assert.doesNotMatch(textos(avisos), /fala da Páscoa|não parece um canto religioso/);
 });
+
+test('cada aviso de música diz o que fazer: trocar (com a parte) ou tirar', () => {
+  const avisos = revisarRepertorio(quaresma, [
+    it('Entrada', 'Eis o tempo'), it('Glória', 'Glória a Deus'),
+    it('Aclamação ao Evangelho', 'Aleluia VI', { letra: 'Aleluia, aleluia' }), it('Comunhão', 'Pão da vida'),
+  ]);
+  const gloria = avisos.find((a) => /Glória não se canta/.test(a.texto));
+  const aleluia = avisos.find((a) => /aclamação quaresmal/.test(a.texto));
+  assert.equal(gloria.acao, 'remover');
+  assert.equal(aleluia.acao, 'trocar');
+  assert.equal(aleluia.parte, 'aclamacao');
+});

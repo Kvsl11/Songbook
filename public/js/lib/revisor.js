@@ -32,7 +32,7 @@ const ehSolene = (lit) => /solenidade|\bfesta\b|ceia do senhor|natal do senhor|v
 // itens: [{ parte (rótulo no repertório), titulo, artista, letra, origem (pasta/arquivo do acervo, subtítulo…), source, songId }]
 // vale para qualquer música (acervo, Hinário, Cindy Ferrarezi, Músicas para Missa, Cifra Club, feitas à mão)
 // recentes: [{ songId, data, nome }] — o mesmo canto em outras missas pouco antes desta
-// devolve [{ nivel: 'erro' | 'atencao' | 'info', texto, i (item, quando é de um) }]
+// devolve [{ nivel: 'erro' | 'atencao' | 'info', texto, i (item, quando é de um), acao ('trocar' | 'remover', quando há o que fazer), parte }]
 export function revisarRepertorio(lit, itens, { recentes = [] } = {}) {
   if (!lit) return [];
   const dia = infoDoDia(lit);
@@ -48,37 +48,37 @@ export function revisarRepertorio(lit, itens, { recentes = [] } = {}) {
     const letra = simples(it.letra);
     const nome = `“${it.titulo}”`;
     if (k === 'gloria' && semGloria) {
-      avisos.push({ nivel: 'erro', i, texto: `${nome}: o Glória não se canta ${EM_TEMPO[dia.tempo]} (só em solenidades e festas).` });
+      avisos.push({ nivel: 'erro', i, acao: 'remover', texto: `${nome}: o Glória não se canta ${EM_TEMPO[dia.tempo]} (só em solenidades e festas).` });
     }
     if (dia.tempo === 'quaresma' && !solene && /\baleluia\b/.test(letra)) {
-      avisos.push({ nivel: 'erro', i, texto: k === 'aclamacao' ? `${nome}: na Quaresma não se canta o Aleluia. Use uma aclamação quaresmal (ex.: “Louvor e glória a ti, Senhor”).` : `${nome} tem “Aleluia”, que não se canta na Quaresma.` });
+      avisos.push({ nivel: 'erro', i, acao: 'trocar', texto: k === 'aclamacao' ? `${nome}: na Quaresma não se canta o Aleluia. Use uma aclamação quaresmal (ex.: “Louvor e glória a ti, Senhor”).` : `${nome} tem “Aleluia”, que não se canta na Quaresma.` });
     }
     // canto marcado com outro tempo: pela pasta do acervo, pelo título, pelo subtítulo ou pelo endereço (Cindy, Músicas para Missa…)
     const enderecoSemSite = String(it.source || '').replace(/^https?:\/\/[^/]+/, '').replace(/^(acervo|hinario|cnbb):.*$/, '');
     const tempo = tempoDoTexto(`${it.origem || ''} ${it.titulo || ''} ${enderecoSemSite}`);
     const naSemanaSanta = tempo === 'quaresma' && /ramos|paixao|semana santa/.test(dia.celebracao);
     if (tempo && dia.tempo && tempo !== dia.tempo && !naSemanaSanta) {
-      avisos.push({ nivel: 'atencao', i, texto: `${nome} é ${NOME_TEMPO[tempo]}; esta missa é ${NOME_TEMPO[dia.tempo]}.` });
+      avisos.push({ nivel: 'atencao', i, acao: 'trocar', texto: `${nome} é ${NOME_TEMPO[tempo]}; esta missa é ${NOME_TEMPO[dia.tempo]}.` });
     } else if (!tempo && dia.tempo && letra) {
       // sem marca no nome: a letra fala de outro tempo?
       const t = LETRA_DO_TEMPO.find(([tp, re]) => tp !== dia.tempo && re.test(letra) && DESTOA[tp]?.includes(dia.tempo));
-      if (t) avisos.push({ nivel: 'atencao', i, texto: `A letra de ${nome} fala ${t[0] === 'natal' ? 'do Natal' : t[0] === 'pascoa' ? 'da Páscoa' : t[0] === 'quaresma' ? 'da Quaresma' : 'do Advento'}; esta missa é ${NOME_TEMPO[dia.tempo]}.` });
+      if (t) avisos.push({ nivel: 'atencao', i, acao: 'trocar', texto: `A letra de ${nome} fala ${t[0] === 'natal' ? 'do Natal' : t[0] === 'pascoa' ? 'da Páscoa' : t[0] === 'quaresma' ? 'da Quaresma' : 'do Advento'}; esta missa é ${NOME_TEMPO[dia.tempo]}.` });
     }
     // condiz com a missa? letra sem nada de fé, ou de artista evangélico
     const letraPura = simples(String(it.letra || '').replace(/\{[^}]*\}/g, ' ').replace(/\[[^\]]*\]/g, ''));
     // (as fontes católicas — acervo, Hinário, CNBB, Cindy Ferrarezi, Músicas para Missa — não precisam da conferência)
     const fonteCatolica = /^(acervo|hinario|cnbb):|cindyferrarezi|musicasparamissa/.test(String(it.source || ''));
     if (!fonteCatolica && letraPura.split(' ').length >= 25 && !FE.test(letraPura) && !FE.test(simples(it.titulo))) {
-      avisos.push({ nivel: 'atencao', i, texto: `${nome} não parece um canto religioso: confira se condiz com a missa.` });
+      avisos.push({ nivel: 'atencao', i, acao: 'trocar', texto: `${nome} não parece um canto religioso: confira se condiz com a missa.` });
     } else if (EVANGELICOS.test(simples(it.artista))) {
-      avisos.push({ nivel: 'atencao', i, texto: `${nome} é de ${it.artista}, artista evangélico: confira se a letra condiz com a fé católica e com a liturgia.` });
+      avisos.push({ nivel: 'atencao', i, acao: 'trocar', texto: `${nome} é de ${it.artista}, artista evangélico: confira se a letra condiz com a fé católica e com a liturgia.` });
     }
     // salmo: o refrão do dia tem que estar na letra (o texto oficial da CNBB sempre serve)
     const refrao = lit.missas?.[0]?.salmo?.refrao;
     if (k === 'salmo' && refrao && !String(it.source || '').startsWith('cnbb:')) {
       const ps = palavras(refrao);
       const achou = ps.filter((p) => letra.includes(p)).length;
-      if (ps.length && achou / ps.length < 0.6) avisos.push({ nivel: 'atencao', i, texto: `${nome} não parece o salmo de hoje. Refrão do dia: “${refrao}”.` });
+      if (ps.length && achou / ps.length < 0.6) avisos.push({ nivel: 'atencao', i, acao: 'trocar', texto: `${nome} não parece o salmo de hoje. Refrão do dia: “${refrao}”.` });
     }
   });
 
@@ -112,6 +112,7 @@ export function revisarRepertorio(lit, itens, { recentes = [] } = {}) {
     if (i >= 0) avisos.push({ nivel: 'info', i, texto: `“${itens[i].titulo}” também foi cantado em ${r.data.split('-').reverse().join('/')} (${r.nome}).` });
   }
 
+  for (const a of avisos) if (a.i !== undefined) a.parte = chaves[a.i];
   const peso = { erro: 0, atencao: 1, info: 2 };
   return avisos.sort((a, b) => peso[a.nivel] - peso[b.nivel]);
 }
