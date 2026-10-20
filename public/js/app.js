@@ -43,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-113';
+export const APP_VERSAO = '2026.10.20-116';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -201,12 +201,30 @@ function capa(item = {}, { ic = 'music', cls = '' } = {}) {
   return `<div class="cover gen ${cls}" style="--h:${hue(titulo)}">${icon(ic, 24)}</div>`;
 }
 function capaRepertorio(set, cls = '') {
+  if (set.capa) return `<div class="cover ${cls}"><img src="${esc(set.capa)}" alt="${esc(set.name)}"></div>`;
   const songs = set.items.map((it) => db.song(it.songId)).filter(Boolean);
   const comImg = [...new Map(songs.filter((s) => s.cover || s.youtube).map((s) => [s.cover || s.youtube, s])).values()];
   if (comImg.length >= 4) return `<div class="cover mosaic ${cls}">${comImg.slice(0, 4).map((s) => capa(s)).join('')}</div>`;
   if (comImg.length) return capa(comImg[0], { cls });
-  return `<div class="cover gen ${cls}" style="--h:${hue(set.name)}">${icon('list', 24)}</div>`;
+  return `<div class="cover gen ${cls}" style="--h:${hue(set.name)}">${icon(ehPlaylist(set) ? 'disc' : 'list', 24)}</div>`;
 }
+// repertório (para cantar: cifra e letra) ou playlist (para ouvir: toca os vídeos em sequência no player)
+const ehPlaylist = (set) => set?.tipo === 'playlist';
+const tipoDoSet = (set) => (ehPlaylist(set) ? 'Playlist' : 'Repertório');
+// toca a playlist no player a partir da música i (pula as que não têm vídeo)
+function tocarPlaylist(set, i = 0) {
+  const k = set.items.findIndex((it, j) => j >= i && db.song(it.songId)?.youtube);
+  if (k < 0) { toast(set.items.length ? 'Nenhuma música desta playlist tem vídeo ainda' : 'Playlist vazia'); return; }
+  player.tocar(itemDoPlayer(db.song(set.items[k].songId), set, k));
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-tocar-set]');
+  const set = b && db.set(b.dataset.tocarSet);
+  if (!set) return;
+  e.preventDefault();
+  e.stopPropagation();
+  tocarPlaylist(set);
+});
 
 // ---------------------------------------------------------------- tema e cor de destaque
 export const COR_PADRAO = '#06b6d4'; // ciano (cor da logo)
@@ -754,7 +772,7 @@ function desenharLateral() {
   const sets = db.sets();
   box.innerHTML = sets.length ? `<ul class="tracks">${sets.map((s) => `
     <li class="track clickable" style="grid-template-columns:auto 1fr" data-href="#/repertorio/${s.id}">
-      ${capaRepertorio(s)}<a class="info" href="#/repertorio/${s.id}"><div class="t">${esc(s.name)}</div><div class="s">Repertório · ${resumoRepertorio(s)}</div></a></li>`).join('')}</ul>`
+      ${capaRepertorio(s)}<a class="info" href="#/repertorio/${s.id}"><div class="t">${esc(s.name)}</div><div class="s">${tipoDoSet(s)} · ${resumoRepertorio(s)}</div></a></li>`).join('')}</ul>`
     : `<p class="muted" style="padding:8px 12px;font-size:13px">Seus repertórios aparecem aqui. Monte o da missa de hoje na aba Liturgia.</p>`;
 }
 
@@ -1233,7 +1251,7 @@ function resumoRepertorio(set) {
 function linhaItemRepertorio(set, it, i, { atual = -1, fila = false } = {}) {
   const s = db.song(it.songId);
   return `<li class="track set-item ${i === atual ? 'atual' : ''}" data-i="${i}">
-    <span class="lead">${capa(s || {})}</span>
+    <span class="lead"><span class="marca-sel" aria-hidden="true">${icon('check', 14)}</span>${capa(s || {})}</span>
     <a class="info" href="#/repertorio/${set.id}/${i}" ${fila ? 'data-ir' : ''}><div class="t ${i === atual ? 'playing' : ''}">${i === atual ? icon('music', 13, 'style="display:inline;vertical-align:-1px;margin-right:4px"') : ''}${esc(s?.title || '(música removida)')}</div>
       <div class="s">${it.label ? `<b class="parte-tag">${esc(it.label)}</b> ` : ''}${indicadores(s)}${esc(s?.artist || '')}<span class="dur-faixa">${s?.duracao ? ` · ${fmtTempo(s.duracao)}` : ''}</span></div></a>
     ${s?.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '<span></span>'}
@@ -1383,7 +1401,7 @@ function tileMusica(s) {
 }
 function tileRepertorio(s) {
   return `<a class="tile" href="#/repertorio/${s.id}"><div class="tile-art">${capaRepertorio(s)}
-    ${s.items.length ? `<button class="tile-play" data-href="#/repertorio/${s.id}/0" aria-label="Tocar repertório">${icon('play', 18)}</button>` : ''}</div>
+    ${s.items.length ? (ehPlaylist(s) ? `<button class="tile-play" data-tocar-set="${s.id}" aria-label="Ouvir a playlist">${icon('play', 18)}</button>` : `<button class="tile-play" data-href="#/repertorio/${s.id}/0" aria-label="Tocar repertório">${icon('play', 18)}</button>`) : ''}</div>
     <b>${esc(s.name)}</b><small>${fmtData(s.date)} · ${resumoRepertorio(s)}</small></a>`;
 }
 function ligarTiles(box) {
@@ -2313,19 +2331,87 @@ async function viewParteDoSetor(setor, pk) {
   setTab('buscar');
   setTint(`hsl(${setor[4]} 45% 32%)`);
   setHeader(parte[1], { back: '#/setor/' + setor[0], eyebrow: setor[1] });
+  const completas = pk === 'missas-completas';
   view.innerHTML = `<h2 class="greet">${esc(parte[1])}</h2>
+    ${completas ? `<div id="missa-sugerida"><div class="loading-note"><span class="spin"></span>Montando a missa de hoje…</div></div>
+      <div class="shelf-head"><h2>Missas completas do acervo</h2></div>` : ''}
     <label class="field">${icon('search', 20)}<input class="search" type="search" placeholder="Procurar em ${esc(parte[1])}"></label>
     <div id="cantos" style="margin-top:12px"><div class="loading-note"><span class="spin"></span>Carregando as músicas…</div></div>`;
+  if (completas) missaCompletaSugerida($('#missa-sugerida'));
   const ac = await acervoClassificado();
   const box = $('#cantos');
   if (!box) return;
   if (!ac.musicas.length) { box.innerHTML = avisoAcervo(); return; }
   const itens = (setor[0] === 'fixas' ? ac.fixas : ac.tempos).get(pk) || [];
-  const vazio = `Ainda não há músicas de ${esc(parte[1])} no acervo. <a href="#/buscar" id="na-internet">Procurar na internet</a>`;
+  const vazio = completas ? 'Ainda não há missas completas (todas as partes num arquivo só) no acervo. Use a sugestão de hoje, acima.'
+    : `Ainda não há músicas de ${esc(parte[1])} no acervo. <a href="#/buscar" id="na-internet">Procurar na internet</a>`;
   ligarMusicas(box);
   desenharMusicas(box, itens, { vazio });
   $('#na-internet')?.addEventListener('click', () => { sessionStorage.setItem('busca', parte[1].replace(/\s*\(.*$/, '')); sessionStorage.setItem('buscaFiltro', 'tudo'); });
   $('.search').oninput = (e) => desenharMusicas(box, itens, { filtro: e.target.value, vazio: 'Nada com esse nome.' });
+}
+
+// "Missas completas": a liturgia de hoje com um canto sugerido para cada momento (a Missa litúrgica da Liturgia)
+async function missaCompletaSugerida(box) {
+  const data = hojeISO();
+  let missa;
+  try {
+    missa = missaCache.get(data);
+    if (!missa) { missa = await getMissa(data); missaCache.set(data, missa); }
+    missa = await missaLiturgica(missa, data);
+  } catch {
+    if (box.isConnected) box.innerHTML = `<a class="source" href="#/liturgia/${data}"><span class="ico">${icon('cross', 18)}</span><span>${navigator.onLine === false ? 'Sem internet e sem a liturgia de hoje guardada.' : 'Não foi possível montar a missa de hoje.'} Abrir a liturgia do dia</span></a>`;
+    return;
+  }
+  if (!box.isConnected) return;
+  const lit = missa.liturgia;
+  const cor = CORES[lit.cor] || '#555';
+  document.documentElement.style.setProperty('--lit-cor', cor);
+  document.documentElement.style.setProperty('--lit-ink', lit.cor === 'branco' ? '#d8b54a' : `color-mix(in srgb, ${cor} 60%, #fff)`);
+  const chave = 'lit:' + data;
+  if (!escolhas.has(chave)) escolhas.set(chave, Object.fromEntries(missa.partes.map((p) => [p.chave, escolhaPadrao(p)])));
+  const sel = escolhas.get(chave);
+  let n = 0;
+  const linhas = missa.partes.map((p) => {
+    const v = sel[p.chave];
+    if (LEITURAS.includes(p.chave)) {
+      const ref = p.liturgia?.referenciaCompleta || p.liturgia?.referencia || '';
+      return ref ? `<li class="track" style="grid-template-columns:auto 1fr"><span class="step leitura">${icon('book', 18)}</span><div class="info"><div class="t">${esc(p.nome)}</div><div class="s">${esc(ref)}</div></div></li>` : '';
+    }
+    if (!v) return '';
+    const c = p.cantos.find((x) => x.url === v);
+    const titulo = v === 'cnbb' ? 'Texto oficial (CNBB)' : c?.titulo || '';
+    const fonte = c?.fonte === 'hinario' ? 'Hinário CNBB' : c?.fonte === 'acervo' ? 'Acervo' : '';
+    return `<li class="track clickable" data-parte="${esc(p.chave)}" style="grid-template-columns:auto 1fr auto"><span class="step">${++n}</span>
+      <div class="info"><div class="t">${esc(titulo)}</div><div class="s">${esc(p.nome)}${fonte ? ` · ${fonte}` : ''}</div></div>
+      <span class="acts"><button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
+  }).join('');
+  box.innerHTML = `
+    <section class="hero ${lit.cor === 'branco' ? 'claro' : ''}">
+      ${linhaCor(lit)}
+      <h2>${esc(lit.celebracao)}</h2>
+      <div class="sub">${esc([lit.data_extenso, lit.ano].filter(Boolean).join(' · '))}</div>
+      ${blocoCor(lit)}
+      ${lit.leituras?.length ? `<div class="refs">${lit.leituras.map((l) => `<span>${esc(l)}</span>`).join('')}</div>` : ''}
+    </section>
+    <div class="shelf-head"><h2>Sugestão de missa completa</h2><a href="#/liturgia/${data}">Trocar cantos</a></div>
+    <p class="muted" style="margin:-6px 0 10px">A liturgia de hoje com um canto para cada momento, entre os sugeridos na Liturgia.</p>
+    ${n ? `<ul class="tracks">${linhas}</ul>
+      <div class="row" style="margin:12px 0 22px"><button class="btn primary" id="montar">${icon('list', 16)} Criar repertório</button><button class="btn" id="montar-pl" title="Para ouvir: as músicas tocam uma atrás da outra">${icon('disc', 16)} Criar playlist</button></div>`
+    : `<p class="muted">Sem cantos sugeridos para hoje. <a href="#/liturgia/${data}">Abrir a liturgia do dia</a></p>`}`;
+  $('#montar', box)?.addEventListener('click', (e) => montarRepertorio(missa, sel, data, { btn: e.currentTarget }));
+  $('#montar-pl', box)?.addEventListener('click', (e) => montarRepertorio(missa, sel, data, { btn: e.currentTarget, tipo: 'playlist' }));
+  box.addEventListener('click', async (e) => {
+    const li = e.target.closest('li[data-parte]');
+    const p = li && missa.partes.find((x) => x.chave === li.dataset.parte);
+    if (!p) return;
+    try {
+      const s = await songFromChoice(p, sel[p.chave], lit);
+      const salva = db.songBySource(s.source);
+      if (salva) location.hash = '#/musica/' + salva.id;
+      else await abrirPrevia(s.content, s.source, location.hash);
+    } catch (err) { toast('Erro: ' + err.message); }
+  });
 }
 
 // navegar pelas pastas do acervo (subpastas e músicas)
@@ -2401,23 +2487,26 @@ function viewLibrary(filtro = 'repertorios', { selecionando = false, marcados = 
   setTab('biblioteca');
   setTint('#2b3d4f');
   setHeader('Sua biblioteca', { actions: [{ icon: 'edit', label: 'Criar música do zero', href: '#/editar/novo' }, { icon: 'upload', label: 'Importar arquivos', onClick: openImport }] });
-  const FILTROS = [['repertorios', 'Repertórios'], ['musicas', 'Músicas'], ['video', 'Com vídeo'], ['proprias', 'Cifras próprias']];
-  const ehRep = filtro === 'repertorios';
+  const FILTROS = [['repertorios', 'Repertórios'], ['playlists', 'Playlists'], ['musicas', 'Músicas'], ['video', 'Com vídeo'], ['proprias', 'Cifras próprias']];
+  const ehRep = filtro === 'repertorios' || filtro === 'playlists';
+  const ehPl = filtro === 'playlists';
   let songs = db.songs();
   if (filtro === 'video') songs = songs.filter((s) => s.youtube);
   if (filtro === 'proprias') songs = songs.filter((s) => !/^https?:|^cnbb:/.test(s.source || ''));
-  const itens = ehRep ? db.sets() : songs;
+  const itens = ehRep ? db.sets().filter((x) => ehPlaylist(x) === ehPl) : songs;
   const marca = (id) => `<span class="marca-sel" aria-hidden="true">${icon('check', 14)}</span>`;
   const lixeira = (id, nome) => `<button class="icon-btn lixo" data-excluir="${id}" aria-label="Excluir ${esc(nome)}" title="Excluir">${icon('trash', 16)}</button>`;
   const linha = ehRep
     ? (s) => `<li class="track clickable lib-item" data-k="${s.id}">${marca(s.id)}${capaRepertorio(s)}
-        <div class="info"><div class="t">${esc(s.name)}</div><div class="s">Repertório · ${fmtData(s.date)} · ${resumoRepertorio(s)}</div></div>
-        <span class="acts">${s.items.length ? `<a class="icon-btn" href="#/repertorio/${s.id}/0" aria-label="Tocar">${icon('play', 16)}</a>` : ''}${lixeira(s.id, s.name)}</span></li>`
+        <div class="info"><div class="t">${esc(s.name)}</div><div class="s">${tipoDoSet(s)} · ${fmtData(s.date)} · ${resumoRepertorio(s)}</div></div>
+        <span class="acts">${s.items.length ? (ehPlaylist(s) ? `<button class="icon-btn" data-tocar-set="${s.id}" aria-label="Ouvir">${icon('play', 16)}</button>` : `<a class="icon-btn" href="#/repertorio/${s.id}/0" aria-label="Tocar">${icon('play', 16)}</a>`) : ''}${lixeira(s.id, s.name)}</span></li>`
     : (s) => `<li class="track clickable lib-item" data-k="${s.id}">${marca(s.id)}${capa(s)}
         <div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>
         <span class="acts">${s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : ''}${s.youtube ? `<button class="icon-btn" data-play="${s.id}" aria-label="Tocar referência">${icon('play', 16)}</button>` : ''}${lixeira(s.id, s.title)}</span></li>`;
   const vazio = ehRep
-    ? `<div class="empty"><div class="bubble">${icon('list', 32)}</div><h3>Crie seu primeiro repertório</h3><p>Monte o da missa de hoje automaticamente ou crie uma lista do zero.</p>
+    ? ehPl ? `<div class="empty"><div class="bubble">${icon('disc', 32)}</div><h3>Crie sua primeira playlist</h3><p>Playlists são para ouvir: as músicas tocam uma atrás da outra no player. Em Buscar → Missas completas, crie a da missa de hoje.</p>
+        <div class="row"><button class="btn primary" id="vazio-pl">Nova playlist</button><a class="btn" href="#/setor/fixas/missas-completas">Missa de hoje</a></div></div>`
+    : `<div class="empty"><div class="bubble">${icon('list', 32)}</div><h3>Crie seu primeiro repertório</h3><p>Monte o da missa de hoje automaticamente ou crie uma lista do zero.</p>
         <div class="row"><a class="btn primary" href="#/editar/novo">Criar música</a><a class="btn" href="#/liturgia">Missa de hoje</a></div></div>`
     : `<div class="empty"><div class="bubble">${icon('music', 32)}</div><h3>${db.songs().length ? 'Nada nesta lista' : 'Sua biblioteca está vazia'}</h3>
       <p>Busque cantos, monte a missa do dia ou importe arquivos ChordPro.</p>
@@ -2425,16 +2514,19 @@ function viewLibrary(filtro = 'repertorios', { selecionando = false, marcados = 
   view.innerHTML = `
     <h2 class="greet">Sua biblioteca</h2>
     <div class="chips">${FILTROS.map(([k, n]) => `<a class="chip" href="#/biblioteca/${k}" aria-pressed="${k === filtro}">${n}</a>`).join('')}</div>
-    <div class="actions-row" style="margin:4px 0 14px"><a class="btn small primary" href="#/editar/novo" title="Escrever título, estrutura, letra e cifra">${icon('edit', 15)} Criar música do zero</a><button class="btn small" id="lib-novo-rep">${icon('plus', 15)} Novo repertório</button>
-      ${itens.length ? `<button class="btn small" id="lib-sel" aria-pressed="${selecionando}">${icon('check', 15)} ${selecionando ? 'Cancelar seleção' : 'Selecionar'}</button>` : ''}</div>
+    <div class="actions-row" style="margin:4px 0 14px"><a class="btn small primary" href="#/editar/novo" title="Escrever título, estrutura, letra e cifra">${icon('edit', 15)} Criar música do zero</a><button class="btn small" id="lib-novo-rep">${icon('plus', 15)} Novo repertório</button><button class="btn small" id="lib-nova-pl">${icon('disc', 15)} Nova playlist</button>
+      ${itens.length ? `<button class="btn small" id="lib-sel" aria-pressed="${selecionando}">${icon('check', 15)} ${selecionando ? 'Cancelar seleção' : 'Selecionar'}</button>` : ''}
+      ${itens.length && !selecionando ? `<button class="btn small" id="lib-sel-todos">${icon('check', 15)} Selecionar tudo</button>` : ''}</div>
     <div id="lib" class="${selecionando ? 'selecionando' : ''}">${itens.length ? `<ul class="tracks">${itens.map(linha).join('')}</ul>` : vazio}</div>
     <div class="barra-sel" id="barra-sel" ${selecionando ? '' : 'hidden'}>
       <span id="sel-n"></span><button class="btn small ghost" id="sel-todos"></button><span class="spacer"></span>
       <button class="btn small danger solid" id="sel-excluir">${icon('trash', 15)} Excluir</button></div>
-    <button class="fab" ${selecionando ? 'hidden' : ''} aria-label="${ehRep ? 'Novo repertório' : 'Nova música'}">${icon('plus', 24)}<span>${ehRep ? 'Novo repertório' : 'Nova música'}</span></button>`;
+    <button class="fab" ${selecionando ? 'hidden' : ''} aria-label="${ehPl ? 'Nova playlist' : ehRep ? 'Novo repertório' : 'Nova música'}">${icon('plus', 24)}<span>${ehPl ? 'Nova playlist' : ehRep ? 'Novo repertório' : 'Nova música'}</span></button>`;
   const lib = $('#lib');
-  $('.fab').onclick = () => (ehRep ? novoRepertorio() : (location.hash = '#/editar/novo'));
-  $('#lib-novo-rep').onclick = novoRepertorio;
+  $('.fab').onclick = () => (ehRep ? novoRepertorio(ehPl ? 'playlist' : '') : (location.hash = '#/editar/novo'));
+  $('#lib-novo-rep').onclick = () => novoRepertorio();
+  $('#lib-nova-pl').onclick = () => novoRepertorio('playlist');
+  $('#vazio-pl')?.addEventListener('click', () => novoRepertorio('playlist'));
   $('#imp')?.addEventListener('click', openImport);
   const redesenhar = (sel = selecionando) => viewLibrary(filtro, { selecionando: sel, marcados: sel ? marcados : new Set() });
   const atualizarSel = () => {
@@ -2446,6 +2538,7 @@ function viewLibrary(filtro = 'repertorios', { selecionando = false, marcados = 
   };
   if (selecionando) atualizarSel();
   $('#lib-sel')?.addEventListener('click', () => redesenhar(!selecionando));
+  $('#lib-sel-todos')?.addEventListener('click', () => { itens.forEach((x) => marcados.add(x.id)); redesenhar(true); });
   $('#sel-todos').onclick = () => { if (marcados.size === itens.length) marcados.clear(); else itens.forEach((x) => marcados.add(x.id)); atualizarSel(); };
   // exclui e confirma antes; músicas saem também dos repertórios
   const excluir = async (ids) => {
@@ -2490,7 +2583,7 @@ function viewLibrary(filtro = 'repertorios', { selecionando = false, marcados = 
     }
     const p = e.target.closest('[data-play]');
     if (p) { const s = db.song(p.dataset.play); if (s) tocarReferencia(s); return; }
-    if (e.target.closest('a')) return;
+    if (e.target.closest('a, [data-tocar-set]')) return;
     location.hash = ehRep ? '#/repertorio/' + li.dataset.k : '#/musica/' + li.dataset.k;
   };
 }
@@ -3462,36 +3555,44 @@ const PARTES_MISSA = ['Entrada', 'Ato Penitencial', 'Glória', 'Salmo Responsori
 
 // ------------------------------------------------------------- repertórios
 
-async function novoRepertorio() {
-  const name = await ask({ title: 'Novo repertório', value: 'Missa ' + fmtData(hojeISO()), ok: 'Criar' });
+async function novoRepertorio(tipo = '') {
+  const pl = tipo === 'playlist';
+  const name = await ask({ title: pl ? 'Nova playlist' : 'Novo repertório', value: (pl ? 'Para ouvir · ' : 'Missa ') + fmtData(hojeISO()), ok: 'Criar' });
   if (!name) return;
-  const s = db.saveSet({ name });
+  const s = db.saveSet(pl ? { name, tipo: 'playlist' } : { name });
   desenharLateral();
   location.hash = '#/repertorio/' + s.id;
 }
 
-function viewSet(id) {
+function viewSet(id, { selecionando = false, marcados = new Set() } = {}) {
   const set = db.set(id);
   if (!set) return viewNotFound();
   setTab('biblioteca');
   setTint(corDaMusica(set.name));
-  setHeader(set.name, { back: '#/biblioteca/repertorios', eyebrow: 'Repertório' });
+  const pl = ehPlaylist(set);
+  const tipo = tipoDoSet(set);
+  setHeader(set.name, { back: pl ? '#/biblioteca/playlists' : '#/biblioteca/repertorios', eyebrow: tipo });
   view.innerHTML = `
-    <section class="page-hero">${capaRepertorio(set)}
-      <div><div class="kind">Repertório</div><h2>${esc(set.name)}</h2>
+    <section class="page-hero"><button class="capa-editar" id="capa-ed" aria-label="Editar capa e detalhes" title="Editar capa e detalhes">${capaRepertorio(set)}<span class="lapis">${icon('edit', 28)}<small>Escolher foto</small></span></button>
+      <div><div class="kind">${tipo}</div><h2 id="set-nome" class="editavel" title="Editar detalhes">${esc(set.name)}</h2>
         <div class="meta"><b>${dataPorExtenso(set.date)}</b><span id="set-resumo">· ${resumoRepertorio(set)}</span></div></div></section>
     <div class="actions-row">
-      ${set.items.length ? `<a class="play-big" href="#/repertorio/${id}/0" aria-label="Tocar repertório" title="Tocar">${icon('play', 24)}</a>` : ''}
+      ${set.items.length ? (pl ? `<button class="play-big" data-tocar-set="${id}" aria-label="Ouvir a playlist" title="Ouvir">${icon('play', 24)}</button>`
+    : `<a class="play-big" href="#/repertorio/${id}/0" aria-label="Tocar repertório" title="Tocar">${icon('play', 24)}</a>`) : ''}
       <button class="icon-btn" id="add" aria-label="Adicionar música da biblioteca" title="Adicionar música da biblioteca">${icon('plus', 24)}</button>
       <a class="btn small" href="#/editar/novo/${id}" title="Escrever uma música nova (letra, cifra, estrutura) e já colocar neste repertório">${icon('edit', 15)} Criar música</a>
-      <button class="icon-btn" id="ren" aria-label="Renomear" title="Renomear">${icon('edit', 22)}</button>
+      <button class="icon-btn" id="ren" aria-label="Editar detalhes" title="Editar capa, nome e tipo">${icon('edit', 22)}</button>
       ${set.items.length ? `<button class="btn small" id="exp" title="Exportar o repertório inteiro em PDF (com ou sem cifra) ou backup">${icon('file', 15)} Exportar PDF</button>` : ''}
       ${set.items.length ? `<button class="btn small" id="pptx" title="Gerar o PowerPoint da missa no modelo do grupo, com as letras nos lugares certos">${icon('grid', 15)} PowerPoint</button>` : ''}
-      <button class="icon-btn danger" id="del" aria-label="Excluir repertório" title="Excluir">${icon('trash', 22)}</button>
+      <button class="icon-btn danger" id="del" aria-label="Excluir ${tipo.toLowerCase()}" title="Excluir">${icon('trash', 22)}</button>
       <div class="seg-tabs" style="min-width:190px">${campoData('set-date', set.date, 'Data do repertório')}</div>
     </div>
-    ${set.items.length ? `<p class="muted" style="font-size:13px;margin:0 0 4px">Para mudar a ordem, segure uma música e arraste (no computador, clique e arraste).</p>
-    <ul class="tracks">${set.items.map((it, i) => linhaItemRepertorio(set, it, i)).join('')}</ul>` : `<div class="empty"><div class="bubble">${icon('music', 30)}</div><h3>Repertório vazio</h3><p>Adicione músicas da sua biblioteca ou crie uma do zero.</p>
+    ${set.items.length ? `<div class="row" style="margin:0 0 6px"><p class="muted" style="font-size:13px;margin:0;flex:1">${selecionando ? 'Toque nas músicas para marcar ou desmarcar.' : 'Para mudar a ordem, segure uma música e arraste (no computador, clique e arraste).'}</p>
+      ${selecionando ? '' : `<button class="btn small" id="set-sel">${icon('check', 15)} Selecionar</button><button class="btn small" id="set-sel-todos">${icon('check', 15)} Selecionar tudo</button>`}</div>
+    <ul class="tracks ${selecionando ? 'selecionando' : ''}">${set.items.map((it, i) => linhaItemRepertorio(set, it, i)).join('')}</ul>
+    <div class="barra-sel" id="barra-sel" ${selecionando ? '' : 'hidden'}>
+      <span id="sel-n"></span><button class="btn small ghost" id="sel-todos"></button><span class="spacer"></span>
+      <button class="btn small ghost" id="sel-cancelar">Cancelar</button><button class="btn small danger solid" id="sel-remover">${icon('trash', 15)} Remover</button></div>` : `<div class="empty"><div class="bubble">${icon('music', 30)}</div><h3>${tipo} vazi${pl ? 'a' : 'o'}</h3><p>Adicione músicas da sua biblioteca ou crie uma do zero.</p>
       <div class="row"><a class="btn primary" href="#/editar/novo/${id}">${icon('edit', 16)} Criar música</a></div></div>`}`;
   ligarCampoData('set-date', (v) => { set.date = v; db.saveSet(set); });
   $('#add').onclick = async () => {
@@ -3503,12 +3604,15 @@ function viewSet(id) {
     db.saveSet(set);
     viewSet(id);
   };
-  $('#ren').onclick = async () => { const n = await ask({ title: 'Renomear repertório', value: set.name, ok: 'Salvar' }); if (n) { set.name = n; db.saveSet(set); desenharLateral(); viewSet(id); } };
+  const editar = async () => { if (await editarDetalhesSet(set)) { desenharLateral(); viewSet(id); } };
+  $('#ren').onclick = editar;
+  $('#capa-ed').onclick = editar;
+  $('#set-nome').onclick = editar;
   $('#exp')?.addEventListener('click', () => exportarRepertorioPdf(set));
   $('#pptx')?.addEventListener('click', () => exportarPowerPoint(set));
   $('#del').onclick = async () => {
-    if (await ask({ title: 'Excluir repertório?', text: `“${set.name}” será apagado. As músicas continuam na biblioteca.`, ok: 'Excluir', danger: true })) {
-      db.deleteSet(id); desenharLateral(); toast('Repertório excluído'); location.hash = '#/biblioteca/repertorios';
+    if (await ask({ title: `Excluir ${tipo.toLowerCase()}?`, text: `“${set.name}” será apagad${pl ? 'a' : 'o'}. As músicas continuam na biblioteca.`, ok: 'Excluir', danger: true })) {
+      db.deleteSet(id); desenharLateral(); toast(`${tipo} excluíd${pl ? 'a' : 'o'}`); location.hash = pl ? '#/biblioteca/playlists' : '#/biblioteca/repertorios';
     }
   };
   // durações que faltam: procura (três de cada vez) e atualiza o total e as faixas, como no Spotify
@@ -3525,11 +3629,49 @@ function viewSet(id) {
     return proximaDuracao();
   };
   proximaDuracao(); proximaDuracao(); proximaDuracao();
+  if (pl) videosDaPlaylist(set, () => db.set(id) && $('#set-resumo') && location.hash === '#/repertorio/' + id && viewSet(id));
   const ul = view.querySelector('.tracks');
+  // modo Selecionar: marcar várias (ou todas) e remover de uma vez
+  const selecionar = (todas) => viewSet(id, { selecionando: true, marcados: new Set(todas ? set.items.map((_, i) => i) : []) });
+  $('#set-sel')?.addEventListener('click', () => selecionar(false));
+  $('#set-sel-todos')?.addEventListener('click', () => selecionar(true));
+  if (ul && selecionando) {
+    const atualizarSel = () => {
+      ul.querySelectorAll('li[data-i]').forEach((li) => li.classList.toggle('marcado', marcados.has(Number(li.dataset.i))));
+      const n = marcados.size;
+      $('#sel-n').textContent = n ? `${n} selecionad${n > 1 ? 'as' : 'a'}` : 'Toque para selecionar';
+      $('#sel-todos').textContent = n === set.items.length ? 'Desmarcar todas' : 'Selecionar todas';
+      $('#sel-remover').disabled = !n;
+    };
+    atualizarSel();
+    ul.addEventListener('click', (e) => {
+      const li = e.target.closest('li[data-i]');
+      if (!li) return;
+      e.preventDefault();
+      const i = Number(li.dataset.i);
+      if (marcados.has(i)) marcados.delete(i); else marcados.add(i);
+      atualizarSel();
+    });
+    $('#sel-todos').onclick = () => { if (marcados.size === set.items.length) marcados.clear(); else set.items.forEach((_, i) => marcados.add(i)); atualizarSel(); };
+    $('#sel-cancelar').onclick = () => viewSet(id);
+    $('#sel-remover').onclick = async () => {
+      const n = marcados.size;
+      if (!n) return;
+      const todas = n === set.items.length;
+      if (!(await ask({ title: todas ? `Remover todas as músicas?` : `Remover ${n} ${n > 1 ? 'músicas' : 'música'}?`, text: `Saem d${pl ? 'a playlist' : 'o repertório'} “${set.name}”. As músicas continuam na biblioteca.`, ok: 'Remover', danger: true }))) return;
+      set.items = set.items.filter((_, i) => !marcados.has(i));
+      db.saveSet(set);
+      desenharLateral();
+      toast(`${n} ${n > 1 ? 'músicas removidas' : 'música removida'}`);
+      viewSet(id);
+    };
+    return;
+  }
   if (ul) {
     ativarArrastar(ul, (de, para) => { mover(set.items, de, para); db.saveSet(set); viewSet(id); });
     ul.addEventListener('click', (e) => {
       const li = e.target.closest('li[data-i]');
+      if (pl && li && e.target.closest('.info')) { e.preventDefault(); tocarPlaylist(set, Number(li.dataset.i)); return; }
       if (li && e.target.closest('[data-parte]')) { trocarParte(set, Number(li.dataset.i)).then((mudou) => mudou && viewSet(id)); return; }
       if (!li || !e.target.closest('[data-rm]')) return;
       set.items.splice(Number(li.dataset.i), 1);
@@ -3538,6 +3680,91 @@ function viewSet(id) {
       viewSet(id);
     });
   }
+}
+
+// playlist: procura o vídeo do YouTube das músicas que ainda não têm (uma vez por música em cada sessão)
+const videoProcurado = new Set();
+async function videosDaPlaylist(set, aoAchar) {
+  let achou = false;
+  for (const it of set.items) {
+    const s = db.song(it.songId);
+    if (!s || s.youtube || videoProcurado.has(s.id)) continue;
+    videoProcurado.add(s.id);
+    const v = await videoDaMusica(s.title, s.artist, s.source).catch(() => null);
+    const atual = db.song(s.id);
+    if (v && atual && !atual.youtube) { db.saveSong({ ...atual, content: definirMeta(atual.content, 'youtube', v.url) }); achou = true; }
+  }
+  if (achou) aoAchar?.();
+}
+
+// imagem escolhida → capa quadrada (recortada no centro), pequena o bastante para guardar no aparelho
+function capaDeArquivo(file, lado = 400) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = c.height = lado;
+      const m = Math.min(img.naturalWidth, img.naturalHeight);
+      c.getContext('2d').drawImage(img, (img.naturalWidth - m) / 2, (img.naturalHeight - m) / 2, m, m, 0, 0, lado, lado);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('imagem inválida')); };
+    img.src = url;
+  });
+}
+
+// "Editar detalhes", como no Spotify: capa (escolher foto ou voltar à automática), nome e tipo (repertório ou playlist)
+function editarDetalhesSet(set) {
+  let capa = set.capa || '';
+  let tipo = ehPlaylist(set) ? 'playlist' : '';
+  const previa = () => capaRepertorio({ ...set, capa, tipo });
+  return openDialog(`
+    <h3>Editar detalhes</h3>
+    <div class="detalhes-set">
+      <button class="capa-editar" data-foto aria-label="Escolher foto" title="Escolher foto"><span data-previa>${previa()}</span><span class="lapis">${icon('edit', 28)}<small>Escolher foto</small></span></button>
+      <div class="detalhes-campos">
+        <input class="input" data-nome value="${esc(set.name)}" placeholder="Nome" aria-label="Nome">
+        <div class="chips" style="margin:0">
+          <button class="chip" data-tipo="" aria-pressed="${!tipo}">${icon('list', 14)} Repertório</button>
+          <button class="chip" data-tipo="playlist" aria-pressed="${tipo === 'playlist'}">${icon('disc', 14)} Playlist</button>
+        </div>
+        <small class="muted" data-dica-tipo></small>
+        <button class="link-btn" data-sem-foto ${capa ? '' : 'hidden'}>Remover foto (usar a capa automática)</button>
+      </div>
+    </div>
+    <input type="file" accept="image/*" data-arquivo hidden>
+    <div class="acts"><button class="btn ghost" data-no>Cancelar</button><button class="btn primary" data-ok>Salvar</button></div>`,
+  (dlg, done) => {
+    const dica = () => { $('[data-dica-tipo]', dlg).textContent = tipo ? 'Para ouvir: as músicas tocam uma atrás da outra no player.' : 'Para cantar: abre a cifra e a letra de cada música, em ordem.'; };
+    const redesenhar = () => { $('[data-previa]', dlg).innerHTML = previa(); $('[data-sem-foto]', dlg).hidden = !capa; };
+    dica();
+    $('[data-foto]', dlg).onclick = () => $('[data-arquivo]', dlg).click();
+    $('[data-arquivo]', dlg).onchange = async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      try { capa = await capaDeArquivo(f); redesenhar(); } catch { toast('Não foi possível abrir esta imagem'); }
+    };
+    $('[data-sem-foto]', dlg).onclick = () => { capa = ''; redesenhar(); };
+    dlg.querySelectorAll('[data-tipo]').forEach((b) => (b.onclick = () => {
+      tipo = b.dataset.tipo;
+      dlg.querySelectorAll('[data-tipo]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      redesenhar();
+      dica();
+    }));
+    $('[data-no]', dlg).onclick = () => done(false);
+    $('[data-ok]', dlg).onclick = () => {
+      const nome = $('[data-nome]', dlg).value.trim();
+      if (!nome) { $('[data-nome]', dlg).focus(); return; }
+      const novo = { ...set, name: nome, capa, tipo };
+      if (!capa) delete novo.capa;
+      if (!tipo) delete novo.tipo;
+      db.saveSet(novo);
+      Object.assign(set, novo);
+      done(true);
+    };
+  });
 }
 
 function exportSet(set) {
@@ -3740,7 +3967,8 @@ async function viewLiturgia(data) {
     <div id="missal-dia"></div>
     <div class="cta-bar">
       <div class="info"><b id="cta-count"></b><span>${liturgica ? 'Reunidos num repertório, com a letra (e a cifra ou a partitura, quando houver)' : 'Serão baixados com cifra e reunidos num repertório'}</span></div>
-      <button class="btn primary" id="montar">${icon('sparkles', 18)} Montar repertório</button>
+      <div class="row"><button class="btn" id="montar-pl" title="Para ouvir: as músicas tocam uma atrás da outra">${icon('disc', 18)} Playlist</button>
+      <button class="btn primary" id="montar">${icon('sparkles', 18)} Montar repertório</button></div>
     </div>
     <p class="fonte">Textos litúrgicos: <a href="${esc(lit.fonte.url)}" target="_blank" rel="noopener">${esc(lit.fonte.nome)}</a>. ${liturgica ? 'Cantos: acervo litúrgico (hinários e subsídios da CNBB).' : 'Cantos, cifras e capas: <a href="https://cindyferrarezi.com/" target="_blank" rel="noopener">cindyferrarezi.com</a>.'} Conteúdo obtido sob demanda para uso pessoal e pastoral; os direitos pertencem aos respectivos autores.</p>`;
 
@@ -3784,6 +4012,7 @@ async function viewLiturgia(data) {
     }
   });
   $('#montar').onclick = () => montarRepertorio(missa, sel, data);
+  $('#montar-pl').onclick = (e) => montarRepertorio(missa, sel, data, { btn: e.currentTarget, tipo: 'playlist' });
   desenharMissalDoDia(data);
   $('#lit').querySelectorAll('[data-tipo]').forEach((b) => (b.onclick = () => {
     if (b.dataset.tipo === tipoMissa()) return;
@@ -3847,8 +4076,9 @@ async function songFromChoice(parte, valor, lit) {
   return { id: 'previa', content: c.chordpro, source: c.url, transpose: 0, capo: 0 };
 }
 
-async function montarRepertorio(missa, sel, data) {
-  const btn = $('#montar');
+// repertório (para cantar) ou playlist (para ouvir: já procura o vídeo de cada música e começa a tocar)
+async function montarRepertorio(missa, sel, data, { btn = $('#montar'), tipo = '' } = {}) {
+  const pl = tipo === 'playlist';
   const original = btn.innerHTML;
   btn.disabled = true;
   const lit = missa.liturgia;
@@ -3870,12 +4100,18 @@ async function montarRepertorio(missa, sel, data) {
           continue;
         }
       }
+      if (pl && !song.youtube) {
+        const vid = await videoDaMusica(song.title, song.artist, song.source).catch(() => null);
+        if (vid) song = db.saveSong({ ...song, content: definirMeta(song.content, 'youtube', vid.url) });
+      }
       items.push({ songId: song.id, label: p.nome });
     }
-    const set = db.saveSet({ name: `Missa ${fmtData(data)} – ${lit.celebracao}`, date: data, items });
+    const set = db.saveSet({ name: `${pl ? 'Ouvir · ' : ''}Missa ${fmtData(data)} – ${lit.celebracao}`, date: data, items, ...(pl ? { tipo: 'playlist' } : {}) });
     desenharLateral();
-    toast(falhas.length ? `Repertório criado (falhou: ${falhas.join(', ')})` : 'Repertório da missa criado!', 4000);
+    const nome = pl ? 'Playlist' : 'Repertório';
+    toast(falhas.length ? `${nome} criad${pl ? 'a' : 'o'} (falhou: ${falhas.join(', ')})` : `${nome} da missa criad${pl ? 'a' : 'o'}!`, 4000);
     location.hash = '#/repertorio/' + set.id;
+    if (pl) tocarPlaylist(set);
   } finally {
     btn.disabled = false;
     btn.innerHTML = original;
@@ -4039,6 +4275,57 @@ const abasOracoes = (ativa) => `<nav class="abas-oracoes" aria-label="Orações"
 
 const ROMANO = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 // "Oração Eucarística (01) I ou Cânon Romano" -> { grupo, numero: 'I', nome: 'Cânon Romano' }
+// Cartões das orações (como os das Orações Eucarísticas): [[grupo, cor (hue), [{ item, small, big, nome, sub }]]].
+// Cada categoria tem seus grupos; a primeira regra que bate vence e o que sobra vai para o último grupo.
+const ROMANOS_RE = /\s+((?:X{0,3})(?:IX|IV|V?I{0,3})A?)$/;
+const GRUPOS_ORACOES = {
+  'missal-romano': [['Ordinário da Missa', 265, /^ordinario/], ['Proclamação da Páscoa', 45, /./]],
+  prefacios: [
+    ['Advento', 275, /advento/], ['Natal e Epifania', 45, /natal|epifania|batismo do senhor|apresentacao|anunciacao/], ['Quaresma', 285, /quaresma/],
+    ['Paixão e Cruz', 0, /paixao|cruz/], ['Páscoa e Ascensão', 45, /pascoa|ascensao/], ['Espírito Santo', 8, /pentecostes|espirito santo/],
+    ['Tempo Comum', 130, /tempo comum|^prefacio comum/], ['Solenidades do Senhor', 40, /trindade|eucaristia|sagrado coracao|rei do universo|transfiguracao/],
+    ['Nossa Senhora', 210, /maria/], ['Santos', 350, /santos?\b|apostolos|joao batista|sao |santa |martires|doutores|pastores|anjos|virgens/],
+    ['Sacramentos e ritos', 190, /batismo|crisma|matrimonio|ordens|uncao|viatico|profissao|dedicacao|unidade/], ['Defuntos', 250, /defuntos/],
+    ['Das Orações Eucarísticas', 300, /./],
+  ],
+  'oracoes-em-latim': [
+    ['Ordinário da Missa', 265, /kyrie|gloria|credo|sanctus|agnus|pater noster/], ['Nossa Senhora', 210, /ave maria|salve|alma redemptoris|sub tuum|stabat|nossa senhora|angelus/],
+    ['Hinos e sequências', 45, /adoro te|veni|anima christi|benedictus|litaniae|ladainha/], ['Outras orações', 160, /./],
+  ],
+  _: [
+    ['Orações da missa e do dia', 265, /^(pai nosso|credo|gloria|santo|cordeiro|sinal da cruz|confesso|magnificat|benedictus|angelus)|ato penitencial/],
+    ['Consagrações', 285, /consagra/], ['Nossa Senhora', 210, /maria|nossa senhora|ave |salve rainha|regina|rainha|mae de|magnificat|virgem/], ['Ladainhas', 30, /ladainha/],
+    ['Espírito Santo', 8, /espirito/], ['Jesus e o Santíssimo', 0, /jesus|cristo|santissimo|hostia|chagas|sangue|sagrada face|eucarist|comunhao|crucifixo/],
+    ['Manhã, noite e refeições', 40, /manha|noite|refeic|oferecimento|dia\b|15h|tres horas/],
+    ['Família e pessoas queridas', 330, /famil|filhos|pais|esposo|conjuge|casais|namorados|irmao|amigos|avos|lar|padrinhos|crianca|nascituro/],
+    ['Proteção e libertação', 350, /libert|exorcismo|batalha|protec|tentac|inveja|levanta se|armadura|legioes|cura|renuncia|tempestade|peste|pandemia/],
+    ['Outras orações', 160, /./],
+  ],
+};
+function cartoesOracoes(cat, itens) {
+  const grupos = GRUPOS_ORACOES[cat] || GRUPOS_ORACOES._;
+  const saida = grupos.map(([g, h]) => [g, h, []]);
+  for (const item of itens) {
+    const t = String(item.titulo || '').trim();
+    const n = normalizar(t);
+    const k = Math.max(0, grupos.findIndex(([, , re]) => re.test(n)));
+    let x;
+    if (cat === 'missal-romano') {
+      const m = /^Ordinário \((\d+)\)\s*(.*)$/.exec(t);
+      x = m ? { small: 'Ordinário', big: m[1], nome: m[2] } : { small: 'Proclamação da Páscoa', nome: t.replace(/\s*\(Proclamação da Páscoa\)/, '').replace(/^Proclamação da Páscoa\s*\((.*)\)$/, 'Exulte — $1') };
+    } else if (cat === 'prefacios') {
+      const [cab, ...resto] = t.replace(/^Prefácio\s+/, '').split(/\s+-\s+/);
+      const rom = ROMANOS_RE.exec(cab);
+      const nome = (rom ? cab.slice(0, rom.index) : cab).replace(/^(da|do|das|dos|de)\s+/i, '');
+      x = rom && rom[1] ? { small: nome, big: rom[1], sub: resto.join(' - ') } : { small: 'Prefácio', nome, sub: resto.join(' - ') };
+    } else {
+      x = { small: cat === 'oracoes-em-latim' ? 'Latim' : /^ladainha/.test(n) ? 'Ladainha' : cat === 'oracoes-para-o-dia-a-dia' ? 'Dia a dia' : 'Oração', nome: t.replace(/:$/, '') };
+    }
+    saida[k][2].push({ item, ...x });
+  }
+  return saida.filter(([, , xs]) => xs.length);
+}
+
 function partesDaOE(titulo) {
   const m = /\((\w+)\)\s*(.*)$/.exec(titulo) || [];
   const cod = m[1] || '';
@@ -4077,10 +4364,9 @@ async function viewOracoes() {
     return [...grupos].map(([g, xs]) => `<h3 class="grupo-oe">${esc(g)}</h3><div class="grade-oe">${xs.map((i, k) => `<a class="cartao-oe" href="${link(i)}" style="--h:${(k * 28 + (g === 'Principais' ? 265 : g.startsWith('Para missas') ? 190 : g.startsWith('Para diversas') ? 25 : 330)) % 360}">
       <small>Oração Eucarística</small><b>${esc(i.numero)}</b>${i.nome ? `<span>${esc(i.nome)}</span>` : ''}</a>`).join('')}</div>`).join('');
   };
-  const ordinario = (itens) => { let n = 0; return `<ol class="passos-ordinario">${itens.map((i) => {
-    const m = /^Ordinário \((\d+)\)\s*(.*)$/.exec(i.titulo);
-    return `<li><a href="${link(i)}"><span class="num">${m ? ++n : icon('sparkles', 16)}</span><span><b>${esc(m ? m[2] : i.titulo)}</b>${m ? '<small>Ordinário da Missa</small>' : ''}</span>${icon('next', 16)}</a></li>`;
-  }).join('')}</ol>`; };
+  // as outras categorias também em cartões, agrupadas (ver cartoesOracoes)
+  const cartoes = (cat, itens) => cartoesOracoes(cat, itens).map(([g, h, xs]) => `<h3 class="grupo-oe">${esc(g)}</h3><div class="grade-oe">${xs.map((x, k) => `<a class="cartao-oe ${x.big ? '' : 'texto'}" href="${link(x.item)}" style="--h:${(h + k * 9) % 360}">
+      <small>${esc(x.small)}</small><b>${esc(x.big || x.nome)}</b>${x.big && x.nome ? `<span>${esc(x.nome)}</span>` : ''}${x.sub ? `<span>${esc(x.sub)}</span>` : ''}</a>`).join('')}</div>`).join('');
   const desenhar = (termo = '') => {
     const t = normalizar(termo);
     const palavras = t.split(' ').filter(Boolean);
@@ -4091,9 +4377,7 @@ async function viewOracoes() {
       html = indice.map((c) => { const itens = filtra(c); return itens.length ? `<h3 class="grupo-oe">${esc(c.nome)}</h3><ul class="lista-oracoes">${itens.map((i) => linha(i)).join('')}</ul>` : ''; }).join('') || '<p class="muted">Nenhuma oração encontrada.</p>';
     } else {
       const c = indice.find((x) => x.categoria === cat);
-      html = c.categoria === 'oracoes-eucaristicas' ? eucaristicas(c.itens)
-        : c.categoria === 'missal-romano' ? ordinario(c.itens)
-          : `<ul class="lista-oracoes">${c.itens.map((i) => linha(i, c.categoria === 'prefacios' ? 'sparkles' : c.categoria === 'oracoes-em-latim' ? 'text' : 'book')).join('')}</ul>`;
+      html = c.categoria === 'oracoes-eucaristicas' ? eucaristicas(c.itens) : cartoes(c.categoria, c.itens);
     }
     $('#lista-oracoes').innerHTML = html;
   };
