@@ -4,11 +4,15 @@ import { definirMeta, paraEditor, doEditor, completarCifra, temCifra, chordsOver
 import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
-import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
+import { apagarModelo, carregarJSZip, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
 import { COLECOES_LITURGICAS, parteFixa, PARTES_FIXAS, tempoDe, TEMPOS } from './lib/acervo.js';
 import { sugerirParaODia } from './lib/sugestoes-liturgicas.js';
 import { revisarRepertorio } from './lib/revisor.js';
 import { duracaoTotal, nomearVozes, passoNoTempo, segundosPorSemibreve, volumeDa } from './lib/ensaio.js';
+import {
+  acordesDoTom as acordesDaArmadura, alterar, alturaPeloNome, CLAVES, COMPASSOS, deMusicXML, distribuirLetra, DURACOES, emCompassos, frequenciaDa, midiDa, moverGrau,
+  mudarOitava, NOMES_NOTA, nomeDaAltura, nomeDoTom, nomeDuracao, novaPartitura, paraMusicXML, tiquesDoCompasso,
+} from './lib/partitura.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -45,7 +49,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-136';
+export const APP_VERSAO = '2026.10.20-137';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -857,6 +861,29 @@ function openDialog(html, setup) {
   });
 }
 
+// lista de escolha do app (no lugar do <select> do sistema): folha que sobe do rodapé no celular, janela no PC.
+// opcoes: [{ valor, rotulo, sub, ic (ícone) ou capa (html) }]; devolve o valor escolhido (ou undefined)
+function escolherNaLista({ titulo, opcoes, atual }) {
+  const dlg = document.createElement('dialog');
+  dlg.className = 'lista-dlg';
+  dlg.innerHTML = `<div class="lista-cab"><h3>${esc(titulo)}</h3><button class="icon-btn" data-fechar aria-label="Fechar">${icon('x', 20)}</button></div>
+    <div class="lista-opcoes" role="listbox">${opcoes.map((o, i) => `<button class="lista-op" role="option" data-i="${i}" aria-selected="${o.valor === atual}">
+      ${o.capa || (o.ic ? `<span class="lista-ic">${icon(o.ic, 18)}</span>` : '')}<span class="lista-txt"><b>${esc(o.rotulo)}</b>${o.sub ? `<small>${esc(o.sub)}</small>` : ''}</span>
+      ${o.valor === atual ? `<span class="lista-ok">${icon('check', 18)}</span>` : ''}</button>`).join('')}</div>`;
+  document.body.append(dlg);
+  return new Promise((resolve) => {
+    let valor;
+    dlg.addEventListener('click', (e) => {
+      if (e.target === dlg || e.target.closest('[data-fechar]')) { dlg.close(); return; }
+      const b = e.target.closest('[data-i]');
+      if (b) { valor = opcoes[Number(b.dataset.i)].valor; dlg.close(); }
+    });
+    dlg.addEventListener('close', () => { dlg.remove(); resolve(valor); });
+    dlg.showModal();
+    (dlg.querySelector('[aria-selected="true"]') || dlg.querySelector('.lista-op'))?.focus({ preventScroll: false });
+  });
+}
+
 function ask({ title, text = '', value = null, ok = 'Confirmar', danger = false }) {
   return openDialog(`
     <h3>${esc(title)}</h3>
@@ -1014,12 +1041,21 @@ async function exportarPowerPointModelo(set) {
     if (!ok || !(modelo = await enviarModeloPptx())) return;
   }
   const itens = set.items.map((it) => ({ ...it, song: db.song(it.songId) })).filter((x) => x.song);
-  const escolha = sugerirCantos(modelo.partes, itens);
-  const opcoesItens = (sel) => `<option value="">— deixar como está no modelo —</option>${itens.map((it, i) => `<option value="${i}" ${sel === i ? 'selected' : ''}>${i + 1}. ${esc(it.song.title)}${it.label ? ` (${esc(it.label)})` : ''}</option>`).join('')}`;
+  const escolha = { ...sugerirCantos(modelo.partes, itens) };
+  // cada parte do modelo numa linha (capa e nome do canto); tocar abre a lista de cantos do repertório
+  const linhaParte = (p) => {
+    const it = itens[escolha[p.chave]];
+    return `<button type="button" class="pptx-parte${it ? '' : ' vazia'}" data-parte="${esc(p.chave)}">
+      ${it ? capa(it.song) : `<span class="pptx-parte-vazio">${icon('file', 18)}</span>`}
+      <span class="pptx-parte-txt"><small>${esc(p.nome)}</small><b>${it ? esc(it.song.title) : 'Como está no modelo'}</b>${it?.label ? `<span>${esc(it.label)}</span>` : ''}</span>
+      ${icon('down', 16)}</button>`;
+  };
+  const resumoPartes = () => `${Object.keys(escolha).length} de ${modelo.partes.length} partes com canto`;
   const r = await openDialog(`
     <h3 style="display:flex;gap:8px;align-items:center">${icon('file', 20)} PowerPoint da missa</h3>
-    <p>Escolha o canto de cada parte; o visual do modelo não muda.<br><small>Modelo: ${esc(modelo.nome)}</small></p>
-    <div class="pptx-partes">${modelo.partes.map((p) => `<label><span>${esc(p.nome)}</span><select class="input" data-parte="${p.chave}">${opcoesItens(escolha[p.chave])}</select></label>`).join('')}</div>
+    <p>Escolha o canto de cada momento; o visual do modelo não muda.<br><small>Modelo: ${esc(modelo.nome)}</small></p>
+    <div class="pptx-cab"><b>Momentos da missa</b><small id="pptx-resumo">${resumoPartes()}</small></div>
+    <div class="pptx-partes">${modelo.partes.map(linhaParte).join('')}</div>
     <div class="pdf-opcoes">
       <label class="check"><input type="checkbox" data-refrao checked> Repetir o refrão depois de cada estrofe</label>
       <label class="check"><input type="checkbox" data-lit checked> Preencher capa e leituras com a liturgia de ${fmtData(set.date) || 'hoje'} (CNBB)</label>
@@ -1027,13 +1063,24 @@ async function exportarPowerPointModelo(set) {
     </div>
     <div class="acts"><button class="btn ghost" data-trocar>Trocar modelo</button><button class="btn ghost" data-no>Cancelar</button><button class="btn primary" data-ok>${icon('download', 16)} Gerar PowerPoint</button></div>`,
   (dlg, done) => {
+    $('.pptx-partes', dlg).addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-parte]');
+      if (!b) return;
+      const parte = modelo.partes.find((p) => p.chave === b.dataset.parte);
+      const v = await escolherNaLista({
+        titulo: parte.nome,
+        atual: escolha[parte.chave] === undefined ? '' : String(escolha[parte.chave]),
+        opcoes: [{ valor: '', rotulo: 'Deixar como está no modelo', sub: 'Não muda os slides desta parte', ic: 'file' },
+          ...itens.map((it, i) => ({ valor: String(i), rotulo: `${i + 1}. ${it.song.title}`, sub: [it.label, it.song.artist].filter(Boolean).join(' · '), capa: capa(it.song) }))],
+      });
+      if (v === undefined) return;
+      if (v === '') delete escolha[parte.chave]; else escolha[parte.chave] = Number(v);
+      b.outerHTML = linhaParte(parte);
+      $('#pptx-resumo', dlg).textContent = resumoPartes();
+    });
     $('[data-no]', dlg).onclick = () => done(null);
     $('[data-trocar]', dlg).onclick = () => done('trocar');
-    $('[data-ok]', dlg).onclick = () => {
-      const esc2 = {};
-      dlg.querySelectorAll('[data-parte]').forEach((s) => { if (s.value !== '') esc2[s.dataset.parte] = Number(s.value); });
-      done({ escolha: esc2, repetirRefrao: $('[data-refrao]', dlg).checked, comLiturgia: $('[data-lit]', dlg).checked });
-    };
+    $('[data-ok]', dlg).onclick = () => done({ escolha: { ...escolha }, repetirRefrao: $('[data-refrao]', dlg).checked, comLiturgia: $('[data-lit]', dlg).checked });
   });
   if (r === 'trocar') { if (await enviarModeloPptx()) exportarPowerPointModelo(set); return; }
   if (!r) return;
@@ -3017,6 +3064,724 @@ function criarEnsaio(osmd, barra, tomAtual) {
   };
 }
 
+// ---------------------------------------------------------------- Compor partitura
+// Editor de partitura feito no app: notas, pausas, durações, acordes (várias notas juntas), ligaduras, letra (várias
+// estrofes), cifras e várias vozes. Fica guardado na música (song.partitura) e aparece em "Partitura" e no ensaio.
+const NOTA_SVG = {
+  32: '<ellipse cx="12" cy="15" rx="5" ry="3.6" fill="none" stroke="currentColor" stroke-width="2"/>',
+  16: '<ellipse cx="10" cy="17" rx="4.6" ry="3.3" fill="none" stroke="currentColor" stroke-width="2" transform="rotate(-20 10 17)"/><path d="M14.3 16V3" stroke="currentColor" stroke-width="1.8"/>',
+  8: '<ellipse cx="10" cy="17" rx="4.6" ry="3.3" fill="currentColor" transform="rotate(-20 10 17)"/><path d="M14.3 16V3" stroke="currentColor" stroke-width="1.8"/>',
+  4: '<ellipse cx="9" cy="17" rx="4.6" ry="3.3" fill="currentColor" transform="rotate(-20 9 17)"/><path d="M13.3 16V3c0 3 5 4 5 8" fill="none" stroke="currentColor" stroke-width="1.8"/>',
+  2: '<ellipse cx="9" cy="17" rx="4.6" ry="3.3" fill="currentColor" transform="rotate(-20 9 17)"/><path d="M13.3 16V3c0 2.5 5 3 5 6.5M13.3 7.5c0 2.5 5 3 5 6.5" fill="none" stroke="currentColor" stroke-width="1.8"/>',
+  pausa: '<path d="M10 3l4.5 5-3.5 4 4 5c-3-1.5-5.5 0-3.5 4-4-2.5-3.5-6 .5-5L8 12l3.5-4z" fill="currentColor"/>',
+  ponto: '<circle cx="12" cy="12" r="3" fill="currentColor"/>',
+  lig: '<path d="M4 10c3 6 13 6 16 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+  acorde: '<ellipse cx="9" cy="18" rx="4.2" ry="3" fill="currentColor" transform="rotate(-20 9 18)"/><ellipse cx="9" cy="11" rx="4.2" ry="3" fill="currentColor" transform="rotate(-20 9 11)"/><path d="M13 17V3" stroke="currentColor" stroke-width="1.8"/>',
+};
+const notaSvg = (k, t = 22) => `<svg class="ic" width="${t}" height="${t}" viewBox="0 0 24 24" aria-hidden="true">${NOTA_SVG[k]}</svg>`;
+
+// som curto de uma nota (ao escrever ou tocar numa nota)
+let somCtx = null;
+function somNota(alturas) {
+  try {
+    somCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+    if (somCtx.state === 'suspended') somCtx.resume();
+    const t = somCtx.currentTime + 0.01;
+    for (const a of [].concat(alturas)) {
+      const g = somCtx.createGain();
+      g.connect(somCtx.destination);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.16, t + 0.02);
+      g.gain.setTargetAtTime(0, t + 0.25, 0.12);
+      for (const [tipo, mult, nivel] of [['triangle', 1, 1], ['sine', 2, 0.2]]) {
+        const o = somCtx.createOscillator();
+        const og = somCtx.createGain();
+        o.type = tipo;
+        o.frequency.value = frequenciaDa(a) * mult;
+        og.gain.value = nivel;
+        o.connect(og).connect(g);
+        o.start(t);
+        o.stop(t + 0.9);
+      }
+    }
+  } catch { /* sem áudio */ }
+}
+
+// letra da cifra, sem acordes nem marcações (para distribuir pelas notas)
+const letraSemCifra = (content) => String(content || '').split('\n')
+  .filter((l) => !/^\s*\{/.test(l) && !/^\s*#/.test(l))
+  .map((l) => l.replace(/\[[^\]]*\]/g, '').trim()).filter(Boolean).join('\n');
+
+// lê um arquivo MusicXML (.musicxml/.xml ou o compactado .mxl) e devolve o texto do XML
+async function textoDoMusicXML(arquivoOuUrl) {
+  const blob = typeof arquivoOuUrl === 'string' ? await fetch(arquivoOuUrl).then((r) => { if (!r.ok) throw new Error('arquivo não encontrado'); return r.blob(); }) : arquivoOuUrl;
+  const bytes = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
+  if (bytes[0] !== 0x50 || bytes[1] !== 0x4b) return blob.text(); // não é zip: XML puro
+  const JSZip = await carregarJSZip();
+  const zip = await JSZip.loadAsync(blob);
+  const container = await zip.file('META-INF/container.xml')?.async('string');
+  const raiz = container && /full-path="([^"]+)"/.exec(container)?.[1];
+  const nome = raiz || Object.keys(zip.files).find((n) => !n.startsWith('META-INF') && /\.(xml|musicxml)$/i.test(n));
+  if (!nome) throw new Error('o .mxl não tem a partitura');
+  return zip.file(nome).async('string');
+}
+const modeloDoXML = (xml) => deMusicXML(new DOMParser().parseFromString(xml, 'application/xml'));
+function escolherArquivoMusicXML() {
+  return new Promise((resolve) => {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = '.musicxml,.xml,.mxl,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml';
+    inp.onchange = () => resolve(inp.files[0] || null);
+    inp.click();
+  });
+}
+
+async function viewCompor(id) {
+  if (id === 'previa') {
+    if (!preview) return viewNotFound();
+    const salva = db.songBySource(preview.source) || db.saveSong({ content: preview.content, source: preview.source, transpose: preview.transpose || 0, capo: preview.capo || 0 });
+    toast('Música salva na biblioteca para guardar a partitura');
+    history.replaceState(null, '', `#/musica/${salva.id}/compor`);
+    id = salva.id;
+  }
+  const song = db.song(id);
+  if (!song) return viewNotFound();
+  const titulo = renderSong(song.content).meta.title || song.title || 'Partitura';
+  setTab('biblioteca');
+  setTint('#2c3b3d');
+  if (!song.partitura?.pautas?.length) return comecarPartitura(song, titulo);
+  return editorPartitura(song, titulo);
+}
+
+// tela de começo: o tipo de partitura, compasso, tom e andamento — ou começar de um arquivo / da desenhada pelo app
+async function comecarPartitura(song, titulo) {
+  setHeader(titulo, { back: '#/musica/' + song.id, eyebrow: 'Criar partitura' });
+  const mxl = mxlDaPartitura(song.content);
+  let compasso = [4, 4];
+  let fifths = 0;
+  let modo = 'major';
+  let bpm = 80;
+  const tipos = [
+    ['melodia', 'Melodia', 'Uma voz, para o canto da assembleia'],
+    ['duas', 'Duas vozes', 'Primeira e segunda voz, em pautas separadas'],
+    ['satb', 'Coral a 4 vozes', 'Soprano, contralto, tenor e baixo'],
+    ['piano', 'Piano ou órgão', 'Mão direita e mão esquerda'],
+  ];
+  view.innerHTML = `<div class="compor-inicio">
+    <h2 class="greet">Criar a partitura</h2>
+    <p class="muted">Escreva nota por nota aqui no app, com letra, cifras e várias vozes. Depois dá para ver, ensaiar ouvindo cada voz, imprimir e exportar.</p>
+    <div class="section-title">Comece por</div>
+    <div class="cp-tipos">${tipos.map(([k, n, d]) => `<button class="pptx-tipo" data-tipo="${k}"><b>${n}</b><span>${d}</span></button>`).join('')}</div>
+    <div class="section-title">Ajustes</div>
+    <div class="settings-group cp-ini-ajustes">
+      <div class="setting wrap"><span class="ico">${icon('clock', 18)}</span><div class="grow"><div class="t">Compasso</div></div>
+        <div class="chips" id="ini-compasso">${COMPASSOS.map(([a, b]) => `<button class="chip" data-c="${a}/${b}" aria-pressed="${a === 4 && b === 4}">${a}/${b}</button>`).join('')}</div></div>
+      <div class="setting"><span class="ico">${icon('music', 18)}</span><div class="grow"><div class="t">Tom</div><div class="s">A armadura de clave</div></div>
+        <button class="btn small" id="ini-tom">${nomeDoTom(0)}</button></div>
+      <div class="setting"><span class="ico">${icon('gauge', 18)}</span><div class="grow"><div class="t">Andamento</div><div class="s">Semínimas por minuto</div></div>
+        <div class="seg"><button data-bpm="-5" aria-label="Mais devagar">${icon('minus', 15)}</button><span class="val" id="ini-bpm">80</span><button data-bpm="5" aria-label="Mais rápido">${icon('plus', 15)}</button></div></div>
+    </div>
+    <div class="section-title">Ou comece de uma partitura pronta</div>
+    <div class="cp-tipos">
+      ${mxl ? `<button class="pptx-tipo" id="ini-desenhada" hidden><b>${icon('score', 16)} Da partitura desenhada pelo app</b><span>Copia as notas lidas da partitura original para você corrigir e completar</span></button>` : ''}
+      <button class="pptx-tipo" id="ini-arquivo"><b>${icon('upload', 16)} De um arquivo MusicXML</b><span>.musicxml, .xml ou .mxl (exportado do MuseScore, Finale, Sibelius…)</span></button>
+    </div></div>`;
+  if (mxl) fetch(mxl, { method: 'HEAD' }).then((r) => { if (r.ok && $('#ini-desenhada')) $('#ini-desenhada').hidden = false; }).catch(() => {});
+  const guardar = (modelo) => {
+    modelo.titulo ||= titulo;
+    db.updateSong(song.id, { partitura: modelo });
+    route();
+  };
+  view.querySelectorAll('[data-tipo]').forEach((b) => (b.onclick = () => guardar(novaPartitura({ titulo, tipo: b.dataset.tipo, compasso, fifths, modo, bpm }))));
+  $('#ini-compasso').onclick = (e) => {
+    const b = e.target.closest('[data-c]');
+    if (!b) return;
+    compasso = b.dataset.c.split('/').map(Number);
+    $('#ini-compasso').querySelectorAll('[data-c]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  };
+  $('#ini-tom').onclick = async () => {
+    const v = await escolherTomPartitura(fifths, modo);
+    if (!v) return;
+    [fifths, modo] = v;
+    $('#ini-tom').textContent = nomeDoTom(fifths, modo);
+  };
+  view.querySelectorAll('[data-bpm]').forEach((b) => (b.onclick = () => { bpm = Math.max(30, Math.min(220, bpm + Number(b.dataset.bpm))); $('#ini-bpm').textContent = bpm; }));
+  const importar = async (fonte) => {
+    try {
+      toast('Lendo a partitura…');
+      guardar(modeloDoXML(await textoDoMusicXML(fonte)));
+      toast('Partitura pronta para editar');
+    } catch (e) { toast('Não consegui ler: ' + e.message); }
+  };
+  $('#ini-desenhada')?.addEventListener('click', () => importar(mxl));
+  $('#ini-arquivo').onclick = async () => { const f = await escolherArquivoMusicXML(); if (f) importar(f); };
+}
+
+function escolherTomPartitura(fifths, modo) {
+  const opcoes = [];
+  for (const md of ['major', 'minor']) for (let f = -7; f <= 7; f++) {
+    opcoes.push({ valor: `${f}|${md}`, rotulo: nomeDoTom(f, md), sub: f ? `${Math.abs(f)} ${f > 0 ? 'sustenido' : 'bemol'}${Math.abs(f) > 1 ? 's' : ''} na armadura` : 'Sem acidentes na armadura' });
+  }
+  return escolherNaLista({ titulo: 'Tom da partitura', opcoes, atual: `${fifths}|${modo}` })
+    .then((v) => (v ? [Number(v.split('|')[0]), v.split('|')[1]] : null));
+}
+
+function editorPartitura(song, titulo) {
+  const id = song.id;
+  let m = JSON.parse(JSON.stringify(song.partitura));
+  m.pautas.forEach((p, i) => { p.id ||= 'p' + i; p.ev ||= []; });
+  let sel = { p: 0, i: m.pautas[0].ev.length - 1 };
+  let porToque = false; // a seleção veio de um toque/seta (aí as durações mudam a nota); depois de escrever, não
+  let dur = 8;
+  let ponto = false;
+  let acorde = false;
+  let aba = 'notas';
+  let estrofe = 0;
+  const desfazer = [];
+  const refazer = [];
+  let osmd = null;
+  let ensaio = null;
+  let alvos = []; // [{ p, i, el }] para tocar numa nota da partitura
+  let salvarTimer = 0;
+  aoSair(() => { ensaio?.parar(); clearTimeout(salvarTimer); if (m) db.updateSong(id, { partitura: m }); });
+
+  const verPartitura = () => { location.hash = `#/musica/${id}/partitura`; };
+  setHeader(titulo, {
+    back: verPartitura, eyebrow: 'Compor partitura',
+    actions: [
+      { icon: 'undo', label: 'Desfazer (Ctrl+Z)', onClick: () => historico(desfazer, refazer) },
+      { icon: 'redo', label: 'Refazer (Ctrl+Y)', onClick: () => historico(refazer, desfazer) },
+      { icon: 'play', label: 'Ouvir a partitura', onClick: () => ouvir() },
+      { icon: 'more', label: 'Mais opções', onClick: () => maisOpcoes() },
+    ],
+  });
+  view.innerHTML = `<div class="compor">
+    <div class="compor-topo">
+      <div class="chips" id="cp-pautas"></div>
+      <button class="chip cp-ajustes" id="cp-ajustes" title="Título, compasso, tom, andamento e vozes">${icon('settings', 15)}<span id="cp-resumo"></span></button>
+    </div>
+    <div class="osmd-box compor-folha" id="cp-folha"><div class="loading-note"><span class="spin"></span>Preparando o editor…</div></div>
+    <div class="ensaio" id="cp-ensaio" hidden></div>
+    <div class="compor-palheta" id="cp-palheta">
+      <div class="cp-cabeca">
+        <div class="seg cp-abas" role="tablist">
+          <button data-aba="notas" role="tab">${notaSvg(8, 16)} Notas</button>
+          <button data-aba="letra" role="tab">${icon('text', 15)} Letra</button>
+          <button data-aba="cifra" role="tab">${icon('chord', 15)} Cifra</button>
+        </div>
+        <div class="cp-status" id="cp-status" aria-live="polite"></div>
+      </div>
+      <div class="cp-painel" data-painel="notas">
+        <div class="cp-linha cp-duracoes">
+          ${DURACOES.filter((x) => x.d > 1).map((x) => `<button class="cp-b" data-dur="${x.d}" title="${x.nome}" aria-label="${x.nome}">${notaSvg(x.d)}</button>`).join('')}
+          <button class="cp-b" data-ponto title="Ponto de aumento (.)" aria-label="Ponto de aumento">${notaSvg('ponto')}</button>
+          <button class="cp-b" data-lig title="Ligar com a próxima nota (T)" aria-label="Ligadura">${notaSvg('lig')}</button>
+          <button class="cp-b" data-pausa title="Pausa (0)" aria-label="Pausa">${notaSvg('pausa')}</button>
+        </div>
+        <div class="cp-linha cp-teclas">${['C', 'D', 'E', 'F', 'G', 'A', 'B'].map((p) => `<button class="cp-tecla" data-nota="${p}" title="${NOMES_NOTA[p]} (${p})"><b>${NOMES_NOTA[p]}</b><small>${p}</small></button>`).join('')}</div>
+        <div class="cp-linha cp-edicao">
+          <button class="cp-b" data-mover="-1" title="Nota anterior (←)" aria-label="Nota anterior">${icon('back', 18)}</button>
+          <button class="cp-b" data-mover="1" title="Próxima nota (→)" aria-label="Próxima nota">${icon('next', 18)}</button>
+          <button class="cp-b" data-grau="1" title="Subir um grau (↑)" aria-label="Subir um grau">${icon('up', 18)}</button>
+          <button class="cp-b" data-grau="-1" title="Descer um grau (↓)" aria-label="Descer um grau">${icon('down', 18)}</button>
+          <button class="cp-b cp-txt" data-oitava="1" title="Uma oitava acima (Ctrl+↑)">8ª↑</button>
+          <button class="cp-b cp-txt" data-oitava="-1" title="Uma oitava abaixo (Ctrl+↓)">8ª↓</button>
+          <button class="cp-b cp-txt" data-alt="1" title="Sustenido (+)">♯</button>
+          <button class="cp-b cp-txt" data-alt="-1" title="Bemol (-)">♭</button>
+          <button class="cp-b" data-acorde title="Acorde: a próxima nota entra junto com a selecionada" aria-label="Escrever acorde">${notaSvg('acorde')}</button>
+          <button class="cp-b cp-apagar" data-apagar title="Apagar (Backspace)" aria-label="Apagar">${icon('trash', 18)}</button>
+        </div>
+      </div>
+      <div class="cp-painel" data-painel="letra" hidden>
+        <div class="cp-linha"><div class="chips" id="cp-estrofes"></div></div>
+        <div class="cp-linha cp-entrada">
+          <button class="cp-b" data-silaba="-1" aria-label="Nota anterior">${icon('back', 18)}</button>
+          <input class="input" id="cp-silaba" placeholder="Sílaba desta nota" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="next">
+          <button class="cp-b" data-silaba="1" aria-label="Próxima nota">${icon('next', 18)}</button>
+        </div>
+        <p class="cp-dica">Espaço ou Enter vai para a próxima nota; hífen (-) liga a sílaba à seguinte. Ou <button class="link-btn" id="cp-colar">cole a letra inteira</button>.</p>
+      </div>
+      <div class="cp-painel" data-painel="cifra" hidden>
+        <div class="cp-linha cp-entrada">
+          <button class="cp-b" data-cifra-mover="-1" aria-label="Nota anterior">${icon('back', 18)}</button>
+          <input class="input" id="cp-cifra" placeholder="Cifra (ex.: G, Em7, D/F#)" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="next">
+          <button class="cp-b" data-cifra-mover="1" aria-label="Próxima nota">${icon('next', 18)}</button>
+        </div>
+        <div class="cp-linha"><div class="chips" id="cp-acordes"></div></div>
+      </div>
+    </div></div>`;
+  const folha = $('#cp-folha');
+
+  // ---- estado e histórico
+  const pauta = () => m.pautas[sel.p];
+  const evSel = () => pauta()?.ev[sel.i];
+  const salvar = () => { clearTimeout(salvarTimer); salvarTimer = setTimeout(() => db.updateSong(id, { partitura: m }), 300); };
+  const mudar = (fn) => {
+    desfazer.push(JSON.stringify({ m, sel }));
+    if (desfazer.length > 300) desfazer.shift();
+    refazer.length = 0;
+    fn();
+    salvar();
+    desenhar();
+  };
+  function historico(de, para) {
+    if (!de.length) { toast(de === desfazer ? 'Nada para desfazer' : 'Nada para refazer'); return; }
+    para.push(JSON.stringify({ m, sel }));
+    ({ m, sel } = JSON.parse(de.pop()));
+    porToque = true;
+    salvar();
+    desenhar();
+  }
+  const alturaAnterior = (i = sel.i) => {
+    for (let k = i; k >= 0; k--) { const e = pauta().ev[k]; if (e?.a.length) return e.a[e.a.length - 1]; }
+    return null;
+  };
+  const cantaveis = (p) => p.ev.map((e, i) => i).filter((i) => p.ev[i].a.length && !(i > 0 && p.ev[i - 1].lig && p.ev[i - 1].a.length));
+
+  // ---- desenho
+  const corDestaque = () => getComputedStyle(document.documentElement).getPropertyValue('--accent-ink').trim() || '#06b6d4';
+  let desenhando = null;
+  let deNovo = false;
+  const pararDeOuvir = () => {
+    if (!ensaio) return;
+    ensaio.parar();
+    ensaio = null;
+    $('#cp-ensaio').hidden = true;
+    $('#cp-palheta').hidden = false;
+  };
+  async function desenhar() {
+    pararDeOuvir();
+    atualizarPalheta();
+    if (desenhando) { deNovo = true; return; }
+    desenhando = (async () => {
+      try {
+        if (!osmd) {
+          await carregarScript(OSMD_JS);
+          if (!folha.isConnected) return;
+          folha.innerHTML = '';
+          osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(folha, {
+            autoResize: false, backend: 'svg', drawTitle: false, drawSubtitle: false, drawComposer: false, drawLyricist: false,
+            drawCredits: false, drawPartNames: m.pautas.length > 1, drawMeasureNumbers: true, defaultFontFamily: 'Figtree, sans-serif',
+          });
+        }
+        const css = getComputedStyle(document.documentElement);
+        const cor = css.getPropertyValue('--text').trim() || '#f2f2f2';
+        osmd.setOptions({ drawPartNames: m.pautas.length > 1, defaultColorMusic: cor, defaultColorNotehead: cor, defaultColorStem: cor, defaultColorRest: cor, defaultColorLabel: cor, defaultColorTitle: cor });
+        await osmd.load(paraMusicXML(m, { marcar: evSel() ? { pauta: sel.p, i: sel.i } : null, cor: corDestaque() }));
+        osmd.zoom = innerWidth < 640 ? 0.8 : 1;
+        osmd.render();
+        folha.querySelectorAll('svg text').forEach((t) => { if (CIFRA_NO_TEXTO.test(t.textContent.trim())) { t.setAttribute('fill', corDestaque()); t.style.fontWeight = '700'; } });
+        mapearAlvos();
+      } catch (e) {
+        console.error(e);
+        folha.innerHTML = `<div class="alert">${icon('info', 18)}<span>Não consegui desenhar a partitura (${esc(e.message)}).</span></div>`;
+      }
+    })();
+    await desenhando;
+    desenhando = null;
+    if (deNovo) { deNovo = false; desenhar(); }
+  }
+  // liga cada nota/pausa desenhada ao evento do modelo (para tocar nela e mostrar a seleção)
+  function mapearAlvos() {
+    alvos = [];
+    const { porPauta } = emCompassos(m);
+    const lista = osmd.GraphicSheet?.MeasureList || [];
+    porPauta.forEach((pp, pi) => pp.onde.forEach((o, i) => {
+      const gm = lista[o.compasso]?.[pi];
+      const se = gm?.staffEntries?.[o.figura];
+      const nota = se?.graphicalVoiceEntries?.[0]?.notes?.[0];
+      let el = null;
+      try { el = nota?.getSVGGElement?.() || null; } catch { /* versão sem o método */ }
+      if (el) alvos.push({ p: pi, i, el });
+    }));
+    folha.querySelectorAll('.cp-marca').forEach((x) => x.remove());
+    const alvo = alvos.find((a) => a.p === sel.p && a.i === sel.i);
+    if (alvo) {
+      const r = alvo.el.getBoundingClientRect();
+      const base = folha.getBoundingClientRect();
+      const marca = document.createElement('div');
+      marca.className = 'cp-marca';
+      Object.assign(marca.style, { left: `${r.left - base.left + folha.scrollLeft - 5}px`, top: `${r.top - base.top - 5}px`, width: `${r.width + 10}px`, height: `${r.height + 10}px` });
+      folha.append(marca);
+      // a nota selecionada fica à vista (acima da palheta)
+      const limite = $('#cp-palheta').getBoundingClientRect().top - 16;
+      if (r.bottom > limite || r.top < 80) marca.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }
+  folha.addEventListener('click', (e) => {
+    if (!alvos.length) return;
+    const x = e.clientX;
+    const y = e.clientY;
+    let melhor = null;
+    for (const a of alvos) {
+      const r = a.el.getBoundingClientRect();
+      const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0;
+      const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
+      const dist = dx + dy * 3;
+      if (!melhor || dist < melhor.dist) melhor = { a, dist };
+    }
+    if (!melhor || melhor.dist > 90) return;
+    sel = { p: melhor.a.p, i: melhor.a.i };
+    selecionouPorToque();
+    const ev = evSel();
+    if (ev?.a.length) somNota(ev.a);
+    desenhar();
+  });
+  // ao escolher uma nota, a palheta mostra a duração dela
+  function selecionouPorToque() {
+    porToque = true;
+    const ev = evSel();
+    if (!ev) return;
+    const base = DURACOES.find((x) => x.d === ev.d || x.d * 1.5 === ev.d);
+    if (base) { dur = base.d; ponto = base.d !== ev.d; }
+  }
+
+  // ---- palheta
+  const resumo = () => `${m.compasso.join('/')} · ${nomeDoTom(m.fifths, m.modo)} · ♩ ${m.bpm}`;
+  function atualizarPalheta() {
+    $('#cp-resumo').textContent = resumo();
+    $('#cp-pautas').innerHTML = m.pautas.length > 1 ? m.pautas.map((p, i) => `<button class="chip" data-pauta="${i}" aria-pressed="${i === sel.p}">${esc(p.nome)}</button>`).join('') : `<span class="cp-uma">${esc(m.pautas[0].nome)}</span>`;
+    view.querySelectorAll('[data-aba]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.aba === aba)));
+    view.querySelectorAll('[data-aba]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.aba === aba)));
+    view.querySelectorAll('[data-painel]').forEach((x) => (x.hidden = x.dataset.painel !== aba));
+    view.querySelectorAll('[data-dur]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.dur) === dur)));
+    $('[data-ponto]', view).setAttribute('aria-pressed', String(ponto));
+    const ev = evSel();
+    $('[data-lig]', view).setAttribute('aria-pressed', String(!!ev?.lig));
+    $('[data-acorde]', view).setAttribute('aria-pressed', String(acorde));
+    const p = pauta();
+    const descr = !ev ? (p.ev.length ? 'Nada selecionado' : 'Pauta vazia: toque numa nota para começar')
+      : ev.a.length ? `${ev.a.map(nomeDaAltura).join(' + ')} · ${nomeDuracao(ev.d)}${ev.lig ? ' · ligada' : ''}`
+        : `Pausa · ${nomeDuracao(ev.d)}`;
+    $('#cp-status').textContent = `${m.pautas.length > 1 ? p.nome + ' · ' : ''}${ev ? `${sel.i + 1}/${p.ev.length} · ` : ''}${descr}`;
+    // letra
+    const nEstrofes = Math.max(1, ...m.pautas.flatMap((x) => x.ev.map((e) => (e.l || []).length)), estrofe + 1);
+    $('#cp-estrofes').innerHTML = Array.from({ length: nEstrofes }, (_, i) => `<button class="chip" data-estrofe="${i}" aria-pressed="${i === estrofe}">Estrofe ${i + 1}</button>`).join('')
+      + `<button class="chip" data-estrofe="${nEstrofes}" aria-label="Nova estrofe">${icon('plus', 14)}</button>`;
+    const silaba = $('#cp-silaba');
+    if (document.activeElement !== silaba || silaba.dataset.i !== String(sel.i)) silaba.value = ev?.a.length ? (ev.l?.[estrofe] || '') : '';
+    silaba.dataset.i = sel.i;
+    silaba.disabled = !ev?.a.length;
+    silaba.placeholder = ev?.a.length ? 'Sílaba desta nota' : 'Escolha uma nota (não pausa)';
+    const cifra = $('#cp-cifra');
+    if (document.activeElement !== cifra || cifra.dataset.i !== String(sel.i)) cifra.value = ev?.c || '';
+    cifra.dataset.i = sel.i;
+    cifra.disabled = !ev;
+    $('#cp-acordes').innerHTML = acordesDaArmadura(m.fifths, m.modo).map((c) => `<button class="chip" data-acorde-tom="${esc(c)}" aria-pressed="${ev?.c === c}">${esc(c)}</button>`).join('')
+      + `<button class="chip" data-acorde-tom="" title="Tirar a cifra desta nota">${icon('x', 14)} Tirar</button>`;
+  }
+
+  // ---- ações de escrita
+  const duracaoAtual = () => dur * (ponto ? 1.5 : 1);
+  function escreverNota(passo) {
+    const ev = evSel();
+    if (acorde && ev?.a.length) {
+      mudar(() => {
+        const topo = ev.a[ev.a.length - 1];
+        let nova = alturaPeloNome(passo, { fifths: m.fifths, anterior: topo, clave: pauta().clave });
+        if (midiDa(nova) <= midiDa(topo)) nova = mudarOitava(nova, 1);
+        if (!ev.a.includes(nova)) ev.a.push(nova);
+        somNota(ev.a);
+      });
+      return;
+    }
+    const a = alturaPeloNome(passo, { fifths: m.fifths, anterior: alturaAnterior(), clave: pauta().clave });
+    mudar(() => {
+      pauta().ev.splice(sel.i + 1, 0, { a: [a], d: duracaoAtual(), l: [], c: '' });
+      sel.i++;
+      porToque = false;
+    });
+    somNota(a);
+  }
+  function escreverPausa() {
+    mudar(() => {
+      pauta().ev.splice(sel.i + 1, 0, { a: [], d: duracaoAtual(), l: [], c: '' });
+      sel.i++;
+      porToque = false;
+    });
+  }
+  function escolherDuracao(d) {
+    dur = d;
+    const ev = evSel();
+    if (porToque && ev) mudar(() => { ev.d = duracaoAtual(); }); else atualizarPalheta();
+  }
+  function trocarPonto() {
+    ponto = !ponto;
+    const ev = evSel();
+    if (porToque && ev) mudar(() => { ev.d = duracaoAtual(); }); else atualizarPalheta();
+  }
+  // as edições de altura valem para a última nota do acorde (a que foi escrita por último)
+  const editarAltura = (fn) => {
+    const ev = evSel();
+    if (!ev?.a.length) { toast('Escolha uma nota'); return; }
+    mudar(() => { const k = ev.a.length - 1; ev.a[k] = fn(ev.a[k]); });
+    somNota(ev.a);
+  };
+  function mover(n) {
+    const p = pauta();
+    if (!p.ev.length) return;
+    sel.i = Math.max(0, Math.min(p.ev.length - 1, sel.i + n));
+    selecionouPorToque();
+    const ev = evSel();
+    if (ev?.a.length) somNota(ev.a);
+    desenhar();
+  }
+  function apagar() {
+    const ev = evSel();
+    if (!ev) return;
+    mudar(() => {
+      if (acorde && ev.a.length > 1) { ev.a.pop(); return; }
+      pauta().ev.splice(sel.i, 1);
+      sel.i = Math.min(sel.i, pauta().ev.length - 1);
+      if (sel.i < 0 && pauta().ev.length) sel.i = 0;
+    });
+  }
+
+  // ---- letra e cifra
+  function proximaCantavel(n) {
+    const lista = cantaveis(pauta());
+    const atual = lista.indexOf(sel.i);
+    const alvo = atual < 0 ? lista.find((i) => (n > 0 ? i > sel.i : i < sel.i)) ?? lista[n > 0 ? 0 : lista.length - 1] : lista[atual + n];
+    if (alvo === undefined) return false;
+    sel.i = alvo;
+    porToque = true;
+    return true;
+  }
+  function gravarSilaba(texto, avancar) {
+    const ev = evSel();
+    if (!ev?.a.length) return;
+    mudar(() => {
+      ev.l = [...(ev.l || [])];
+      ev.l[estrofe] = texto.trim();
+      while (ev.l.length && !ev.l[ev.l.length - 1]) ev.l.pop();
+      if (avancar) proximaCantavel(1);
+    });
+    if (avancar) requestAnimationFrame(() => { const s = $('#cp-silaba'); s.focus(); s.select(); });
+  }
+  const silaba = $('#cp-silaba');
+  silaba.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Tab') { e.preventDefault(); gravarSilaba(silaba.value, true); }
+    else if (e.key === '-') { e.preventDefault(); gravarSilaba(silaba.value.replace(/-+$/, '') + '-', true); }
+    else if (e.key === 'Backspace' && !silaba.value) { e.preventDefault(); if (proximaCantavel(-1)) { desenhar(); requestAnimationFrame(() => silaba.focus()); } }
+  });
+  // teclado do celular: o espaço e o hífen às vezes chegam só no "input"
+  silaba.addEventListener('input', () => {
+    if (/[\s]$/.test(silaba.value)) gravarSilaba(silaba.value, true);
+    else if (/[^-]-$/.test(silaba.value) && silaba.value.length > 1) gravarSilaba(silaba.value, true);
+  });
+  silaba.addEventListener('change', () => { if (evSel()?.a.length && (evSel().l?.[estrofe] || '') !== silaba.value.trim()) gravarSilaba(silaba.value, false); });
+  const cifra = $('#cp-cifra');
+  const gravarCifra = (texto, avancar) => {
+    const ev = evSel();
+    if (!ev) return;
+    mudar(() => {
+      ev.c = texto.trim().replace(/\s+/g, '');
+      if (avancar && sel.i < pauta().ev.length - 1) { sel.i++; porToque = true; }
+    });
+    if (avancar) requestAnimationFrame(() => cifra.focus());
+  };
+  cifra.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); gravarCifra(cifra.value, true); } });
+  cifra.addEventListener('change', () => { if (evSel() && (evSel().c || '') !== cifra.value.trim()) gravarCifra(cifra.value, false); });
+  $('#cp-colar').onclick = colarLetra;
+  async function colarLetra() {
+    const p = pauta();
+    if (!cantaveis(p).length) { toast('Escreva as notas primeiro'); return; }
+    const inicio = evSel()?.a.length ? sel.i : cantaveis(p)[0];
+    const texto = await openDialog(`
+      <h3>Colar a letra</h3>
+      <p>As sílabas vão para as notas a partir da selecionada${m.pautas.length > 1 ? ` (${esc(p.nome)})` : ''}, estrofe ${estrofe + 1}. Separe as sílabas com hífen: <b>Ma-ri-a és ben-di-ta</b>.</p>
+      <textarea class="input cp-texto" rows="7" placeholder="Ma-ri-a és ben-di-ta"></textarea>
+      <button class="btn small ghost" data-usar style="justify-self:start">${icon('text', 15)} Usar a letra da música</button>
+      <div class="acts"><button class="btn ghost" data-no>Cancelar</button><button class="btn primary" data-ok>Distribuir</button></div>`,
+    (dlg, done) => {
+      $('[data-usar]', dlg).onclick = () => { $('textarea', dlg).value = letraSemCifra(song.content); $('textarea', dlg).focus(); };
+      $('[data-no]', dlg).onclick = () => done(null);
+      $('[data-ok]', dlg).onclick = () => done($('textarea', dlg).value);
+    });
+    if (!texto?.trim()) return;
+    let r = null;
+    mudar(() => { r = distribuirLetra(p, texto, { inicio, estrofe }); if (r.ultimo >= 0) { sel.i = r.ultimo; porToque = true; } });
+    toast(r.sobrou ? `Faltaram notas para ${r.sobrou} sílaba(s)` : 'Letra distribuída');
+  }
+
+  // ---- ouvir, ajustes e mais opções
+  function ouvir() {
+    if (!osmd) return;
+    if (ensaio) { pararDeOuvir(); return; }
+    if (!m.pautas.some((p) => p.ev.some((e) => e.a.length))) { toast('Escreva algumas notas para ouvir'); return; }
+    const barra = $('#cp-ensaio');
+    ensaio = criarEnsaio(osmd, barra, () => 0);
+    if (!ensaio) return;
+    // enquanto ouve, o painel do ensaio fica no lugar da palheta
+    $('#cp-palheta').hidden = true;
+    barra.insertAdjacentHTML('beforeend', `<button class="btn small ghost cp-voltar" data-voltar>${icon('edit', 15)} Voltar a escrever</button>`);
+    $('[data-voltar]', barra).onclick = pararDeOuvir;
+    $('[data-e="play"]', barra)?.click();
+  }
+  async function ajustes() {
+    let comp = [...m.compasso];
+    let tom = [m.fifths, m.modo];
+    let andamento = m.bpm;
+    let anac = m.anacruse || 0;
+    let pautas = m.pautas.map((p) => ({ ...p }));
+    const linhaPauta = (p, i) => `<div class="cp-voz" data-i="${i}">
+      <input class="input" data-nome value="${esc(p.nome)}" aria-label="Nome da voz">
+      <div class="seg">${Object.keys(CLAVES).map((c) => `<button data-clave="${c}" aria-pressed="${p.clave === c}" title="${CLAVES[c]}">${c === 'G' ? 'Sol' : c === 'G8' ? 'Sol 8ª' : 'Fá'}</button>`).join('')}</div>
+      <button class="icon-btn" data-tirar aria-label="Tirar esta voz" ${pautas.length < 2 ? 'disabled' : ''}>${icon('trash', 16)}</button></div>`;
+    const anacruses = [[0, 'Sem'], [4, '1 colcheia'], [8, '1 tempo'], [16, '2 tempos'], [24, '3 tempos']];
+    const r = await openDialog(`
+      <h3>Ajustes da partitura</h3>
+      <label class="cp-campo"><small>Título</small><input class="input" data-titulo value="${esc(m.titulo || titulo)}"></label>
+      <div class="cp-campo"><small>Compasso</small><div class="chips" data-comp>${COMPASSOS.map(([a, b]) => `<button class="chip" data-c="${a}/${b}" aria-pressed="${a === comp[0] && b === comp[1]}">${a}/${b}</button>`).join('')}</div></div>
+      <div class="cp-campo"><small>Começa com anacruse (compasso incompleto)</small><div class="chips" data-anac>${anacruses.map(([v, n]) => `<button class="chip" data-a="${v}" aria-pressed="${v === anac}">${n}</button>`).join('')}</div></div>
+      <div class="cp-campo cp-lado"><div><small>Tom</small><button class="btn small" data-tom>${nomeDoTom(...tom)}</button></div>
+        <div><small>Andamento (♩ por minuto)</small><div class="seg"><button data-bpm="-5" aria-label="Mais devagar">${icon('minus', 15)}</button><span class="val" data-bpm-val>${andamento}</span><button data-bpm="5" aria-label="Mais rápido">${icon('plus', 15)}</button></div></div></div>
+      <div class="cp-campo"><small>Vozes (pautas)</small><div class="cp-vozes">${pautas.map(linhaPauta).join('')}</div>
+        <button class="btn small ghost" data-mais-voz style="justify-self:start">${icon('plus', 15)} Adicionar voz</button></div>
+      <small class="muted">Mudar o tom troca a armadura; as notas já escritas continuam as mesmas.</small>
+      <div class="acts"><button class="btn ghost" data-no>Cancelar</button><button class="btn primary" data-ok>Aplicar</button></div>`,
+    (dlg, done) => {
+      const lerNomes = () => dlg.querySelectorAll('.cp-voz').forEach((row) => { pautas[Number(row.dataset.i)].nome = $('[data-nome]', row).value.trim() || pautas[Number(row.dataset.i)].nome; });
+      const redesenharVozes = () => { lerNomes(); $('.cp-vozes', dlg).innerHTML = pautas.map(linhaPauta).join(''); };
+      dlg.addEventListener('click', async (e) => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        if (b.dataset.c) { comp = b.dataset.c.split('/').map(Number); dlg.querySelectorAll('[data-c]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }
+        if (b.dataset.a !== undefined) { anac = Number(b.dataset.a); dlg.querySelectorAll('[data-a]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }
+        if (b.dataset.bpm) { andamento = Math.max(30, Math.min(220, andamento + Number(b.dataset.bpm))); $('[data-bpm-val]', dlg).textContent = andamento; }
+        if (b.dataset.tom !== undefined) { const v = await escolherTomPartitura(...tom); if (v) { tom = v; b.textContent = nomeDoTom(...tom); } }
+        const row = b.closest('.cp-voz');
+        if (row && b.dataset.clave) { lerNomes(); pautas[Number(row.dataset.i)].clave = b.dataset.clave; redesenharVozes(); }
+        if (row && b.dataset.tirar !== undefined) {
+          const p = pautas[Number(row.dataset.i)];
+          if (p.ev.length && !(await ask({ title: `Tirar "${p.nome}"?`, text: 'As notas desta voz serão apagadas.', ok: 'Tirar', danger: true }))) return;
+          lerNomes();
+          pautas.splice(Number(row.dataset.i), 1);
+          redesenharVozes();
+        }
+        if (b.dataset.maisVoz !== undefined) { lerNomes(); pautas.push({ id: 'p' + Date.now().toString(36), nome: `Voz ${pautas.length + 1}`, clave: 'G', ev: [] }); redesenharVozes(); }
+      });
+      $('[data-no]', dlg).onclick = () => done(null);
+      $('[data-ok]', dlg).onclick = () => { lerNomes(); done({ titulo: $('[data-titulo]', dlg).value.trim() }); };
+    });
+    if (!r) return;
+    mudar(() => {
+      Object.assign(m, { titulo: r.titulo || m.titulo, compasso: comp, fifths: tom[0], modo: tom[1], bpm: andamento, anacruse: anac < tiquesDoCompasso(comp) ? anac : 0, pautas });
+      sel.p = Math.min(sel.p, m.pautas.length - 1);
+      sel.i = Math.min(sel.i, pauta().ev.length - 1);
+    });
+  }
+  async function maisOpcoes() {
+    const v = await escolherNaLista({
+      titulo: 'Partitura',
+      opcoes: [
+        { valor: 'ver', rotulo: 'Ver a partitura', sub: 'Do jeito que fica para cantar e ensaiar', ic: 'score' },
+        { valor: 'ajustes', rotulo: 'Ajustes', sub: 'Título, compasso, tom, andamento e vozes', ic: 'settings' },
+        { valor: 'pdf', rotulo: 'Imprimir ou salvar em PDF', sub: 'Em preto e branco', ic: 'file' },
+        { valor: 'xml', rotulo: 'Exportar MusicXML', sub: 'Abre no MuseScore, Finale, Sibelius…', ic: 'download' },
+        { valor: 'importar', rotulo: 'Importar MusicXML', sub: 'Troca esta partitura pela do arquivo', ic: 'upload' },
+        { valor: 'apagar', rotulo: 'Apagar a partitura', sub: 'A música continua; só a partitura sai', ic: 'trash' },
+      ],
+    });
+    if (v === 'ver') verPartitura();
+    if (v === 'ajustes') ajustes();
+    if (v === 'xml') download(`${nomeArquivo(m.titulo || titulo)}.musicxml`, paraMusicXML(m), 'application/vnd.recordare.musicxml+xml');
+    if (v === 'pdf') imprimirPartitura(m, m.titulo || titulo);
+    if (v === 'importar') {
+      const f = await escolherArquivoMusicXML();
+      if (!f) return;
+      try { const novo = modeloDoXML(await textoDoMusicXML(f)); mudar(() => { m = novo; m.titulo ||= titulo; sel = { p: 0, i: m.pautas[0].ev.length - 1 }; }); toast('Partitura importada'); } catch (e) { toast('Não consegui ler: ' + e.message); }
+    }
+    if (v === 'apagar' && await ask({ title: 'Apagar a partitura?', text: 'Todas as notas, letras e cifras desta partitura saem. A música continua na biblioteca.', ok: 'Apagar', danger: true })) {
+      clearTimeout(salvarTimer);
+      m = null;
+      db.updateSong(id, { partitura: null });
+      location.hash = '#/musica/' + id;
+    }
+  }
+
+  // ---- eventos da palheta
+  $('#cp-palheta').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const d = b.dataset;
+    if (d.aba) { aba = d.aba; atualizarPalheta(); if (aba === 'letra') { if (!evSel()?.a.length && proximaCantavel(1)) desenhar(); setTimeout(() => $('#cp-silaba').focus(), 50); } return; }
+    if (d.dur) return escolherDuracao(Number(d.dur));
+    if (d.ponto !== undefined) return trocarPonto();
+    if (d.lig !== undefined) { const ev = evSel(); if (ev?.a.length) mudar(() => { ev.lig = !ev.lig; }); return; }
+    if (d.pausa !== undefined) return escreverPausa();
+    if (d.nota) return escreverNota(d.nota);
+    if (d.mover) return mover(Number(d.mover));
+    if (d.grau) return editarAltura((a) => moverGrau(a, Number(d.grau), m.fifths));
+    if (d.oitava) return editarAltura((a) => mudarOitava(a, Number(d.oitava)));
+    if (d.alt) return editarAltura((a) => alterar(a, Number(d.alt)));
+    if (d.acorde !== undefined) { acorde = !acorde; toast(acorde ? 'Acorde: as próximas notas entram junto com a selecionada' : 'Acorde desligado'); atualizarPalheta(); return; }
+    if (d.apagar !== undefined) return apagar();
+    if (d.estrofe) { estrofe = Number(d.estrofe); atualizarPalheta(); $('#cp-silaba').focus(); return; }
+    if (d.silaba) { if (silaba.value !== (evSel()?.l?.[estrofe] || '')) gravarSilaba(silaba.value, false); if (proximaCantavel(Number(d.silaba))) desenhar(); return; }
+    if (d.cifraMover) { mover(Number(d.cifraMover)); return; }
+    if (d.acordeTom !== undefined) { gravarCifra(d.acordeTom, true); return; }
+  });
+  $('#cp-pautas').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pauta]');
+    if (!b) return;
+    sel = { p: Number(b.dataset.pauta), i: m.pautas[Number(b.dataset.pauta)].ev.length - 1 };
+    porToque = false;
+    desenhar();
+  });
+  $('#cp-ajustes').onclick = ajustes;
+  // teclado do computador (como no MuseScore)
+  const teclas = (e) => {
+    if (!m || e.target.closest('input, textarea, select, dialog') || document.querySelector('dialog[open]')) return;
+    const k = e.key;
+    const ctrl = e.ctrlKey || e.metaKey;
+    const feito = () => e.preventDefault();
+    if (ctrl && k.toLowerCase() === 'z') { feito(); historico(e.shiftKey ? refazer : desfazer, e.shiftKey ? desfazer : refazer); return; }
+    if (ctrl && k.toLowerCase() === 'y') { feito(); historico(refazer, desfazer); return; }
+    if (ctrl || e.altKey) {
+      if (k === 'ArrowUp' || k === 'ArrowDown') { feito(); editarAltura((a) => mudarOitava(a, k === 'ArrowUp' ? 1 : -1)); }
+      return;
+    }
+    if (/^[a-g]$/i.test(k)) { feito(); escreverNota(k.toUpperCase()); return; }
+    const durs = { 2: 2, 3: 4, 4: 8, 5: 16, 6: 32 };
+    if (durs[k]) { feito(); escolherDuracao(durs[k]); return; }
+    if (k === '.') { feito(); trocarPonto(); return; }
+    if (k === '0') { feito(); escreverPausa(); return; }
+    if (k === 'ArrowLeft' || k === 'ArrowRight') { feito(); mover(k === 'ArrowLeft' ? -1 : 1); return; }
+    if (k === 'ArrowUp' || k === 'ArrowDown') { feito(); editarAltura((a) => moverGrau(a, k === 'ArrowUp' ? 1 : -1, m.fifths)); return; }
+    if (k === 'Backspace' || k === 'Delete') { feito(); apagar(); return; }
+    if (k === '+' || k === '#') { feito(); editarAltura((a) => alterar(a, 1)); return; }
+    if (k === '-') { feito(); editarAltura((a) => alterar(a, -1)); return; }
+    if (k.toLowerCase() === 't') { feito(); const ev = evSel(); if (ev?.a.length) mudar(() => { ev.lig = !ev.lig; }); }
+  };
+  document.addEventListener('keydown', teclas);
+  aoSair(() => document.removeEventListener('keydown', teclas));
+  desenhar();
+}
+
+// impressão em preto e branco: a partitura desenhada numa folha à parte (iframe) e o "imprimir" do navegador
+async function imprimirPartitura(modelo, titulo) {
+  toast('Preparando a impressão…');
+  try {
+    await carregarScript(OSMD_JS);
+    const caixa = document.createElement('div');
+    caixa.style.cssText = 'position:fixed;left:-10000px;top:0;width:760px;background:#fff';
+    document.body.append(caixa);
+    const o = new opensheetmusicdisplay.OpenSheetMusicDisplay(caixa, { autoResize: false, backend: 'svg', drawTitle: true, drawPartNames: modelo.pautas.length > 1, defaultFontFamily: 'Figtree, sans-serif' });
+    await o.load(paraMusicXML(modelo));
+    o.render();
+    const svgs = [...caixa.querySelectorAll('svg')].map((s) => s.outerHTML).join('');
+    caixa.remove();
+    const f = document.createElement('iframe');
+    f.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0';
+    document.body.append(f);
+    f.contentDocument.open();
+    f.contentDocument.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>@page{margin:12mm}body{margin:0;font-family:Figtree,sans-serif}svg{width:100%;height:auto;display:block;page-break-inside:avoid}</style></head><body>${svgs}</body></html>`);
+    f.contentDocument.close();
+    setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 60000); }, 300);
+  } catch (e) { toast('Não foi possível imprimir: ' + e.message); }
+}
+
 async function viewPartitura(id) {
   const song = id === 'previa' ? preview : db.song(id);
   if (!song) return viewNotFound();
@@ -3027,16 +3792,19 @@ async function viewPartitura(id) {
   setTint('#3a3a3a');
   setHeader(titulo, { back: '#/musica/' + id, eyebrow: 'Partitura' });
   view.innerHTML = `<div class="partitura"><div class="loading-note"><span class="spin"></span>Preparando a partitura…</div></div>`;
-  const temDesenho = mxl ? await fetch(mxl, { method: 'HEAD' }).then((r) => r.ok).catch(() => false) : false;
+  // a partitura feita no app (Compor) vale mais que a desenhada por leitura automática da original
+  const propria = song.partitura?.pautas?.some((p) => p.ev?.length);
+  const temDesenho = propria || (mxl ? await fetch(mxl, { method: 'HEAD' }).then((r) => r.ok).catch(() => false) : false);
   if (!view.querySelector('.partitura')) return;
   const prefs = db.prefs();
-  let modo = temDesenho && prefs.partituraModo !== 'original' ? 'desenhada' : 'original';
+  let modo = temDesenho && (prefs.partituraModo !== 'original' || !paginas.length) ? 'desenhada' : 'original';
   let cores = prefs.partituraCores === 'pb' ? 'pb' : 'app';
   let tom = 0;
   let zoom = Number(sessionStorage.getItem('zoomPartitura')) || 1;
   view.innerHTML = `<div class="partitura">
     <div class="partitura-barra">
-      ${temDesenho ? `<div class="seg"><button data-modo="desenhada">${icon('score', 15)} Desenhada</button><button data-modo="original">${icon('file', 15)} Original</button></div>` : ''}
+      ${temDesenho && paginas.length ? `<div class="seg"><button data-modo="desenhada">${icon('score', 15)} ${propria ? 'Do app' : 'Desenhada'}</button><button data-modo="original">${icon('file', 15)} Original</button></div>` : ''}
+      <a class="btn small cp-editar" href="#/musica/${id}/compor" title="${propria ? 'Editar a partitura feita no app' : 'Escrever a partitura aqui no app, nota por nota'}">${icon('edit', 15)} ${propria ? 'Editar' : 'Criar no app'}</a>
       <div class="seg so-desenhada"><button data-cor="app">Cores do app</button><button data-cor="pb">Preto e branco</button></div>
       <div class="seg so-desenhada"><button data-tom="-1" aria-label="Meio tom abaixo">${icon('minus', 15)}</button><span class="val" id="tom-part"><small>Tom</small>0</span><button data-tom="1" aria-label="Meio tom acima">${icon('plus', 15)}</button></div>
       <span class="spacer"></span>
@@ -3044,7 +3812,7 @@ async function viewPartitura(id) {
     </div>
     <div id="part-desenhada" class="osmd-box"></div>
     <div class="ensaio so-desenhada" id="ensaio" hidden></div>
-    <div class="partitura-paginas" id="part-original">${paginas.length ? paginas.map((src, i) => `<img src="${esc(src)}" alt="Página ${i + 1} da partitura" loading="${i ? 'lazy' : 'eager'}" onerror="this.remove()">`).join('') : '<p class="muted">Esta música não tem partitura.</p>'}</div>
+    <div class="partitura-paginas" id="part-original">${paginas.length ? paginas.map((src, i) => `<img src="${esc(src)}" alt="Página ${i + 1} da partitura" loading="${i ? 'lazy' : 'eager'}" onerror="this.remove()">`).join('') : `<div class="empty"><h3>Sem partitura ainda</h3><p>Escreva a partitura aqui no app, nota por nota, com letra, cifras e várias vozes.</p><a class="btn primary" href="#/musica/${id}/compor">${icon('edit', 16)} Criar partitura</a></div>`}</div>
     <p class="fonte" id="part-aviso"></p></div>`;
   let osmd = null;
   let ensaio = null;
@@ -3069,7 +3837,7 @@ async function viewPartitura(id) {
           autoResize: true, backend: 'svg', drawTitle: false, drawSubtitle: false, drawComposer: false, drawLyricist: false,
           drawCredits: false, drawPartNames: false, defaultFontFamily: 'Figtree, sans-serif',
         });
-        await osmd.load(mxl);
+        await osmd.load(propria ? paraMusicXML(song.partitura) : mxl);
         osmd.TransposeCalculator = new opensheetmusicdisplay.TransposeCalculator();
       }
       osmd.setOptions({ defaultColorMusic: c.musica, defaultColorNotehead: c.musica, defaultColorStem: c.musica, defaultColorRest: c.musica, defaultColorLabel: c.texto, defaultColorTitle: c.texto });
@@ -3081,7 +3849,7 @@ async function viewPartitura(id) {
       caixa.querySelectorAll('svg text').forEach((t) => { if (CIFRA_NO_TEXTO.test(t.textContent.trim())) { t.setAttribute('fill', c.cifra); t.style.fontWeight = '700'; } });
       if (!ensaio) ensaio = criarEnsaio(osmd, $('#ensaio'), () => tom);
       else ensaio.redesenhou();
-      $('#part-aviso').textContent = 'Partitura desenhada a partir do arquivo original por leitura automática: confira em “Original” se algo parecer estranho.';
+      $('#part-aviso').textContent = propria ? 'Partitura feita no app. Toque em “Editar” para mudar notas, letra ou cifras.' : 'Partitura desenhada a partir do arquivo original por leitura automática: confira em “Original” se algo parecer estranho, ou toque em “Criar no app” para corrigir.';
     } catch (e) {
       caixa.innerHTML = `<div class="alert">${icon('info', 18)}<span>Não consegui desenhar a partitura agora (${esc(e.message)}). Veja a original.</span></div>`;
     }
@@ -3178,6 +3946,7 @@ function viewSong(id, ctx = {}) {
           ${isPreview ? `<button role="menuitem" id="btn-edit-prev">${icon('edit', 18)}<span>Editar cifra</span></button>`
             : `<a role="menuitem" href="#/editar/${song.id}">${icon('edit', 18)}<span>Editar cifra</span></a>`}
           <button role="menuitem" id="btn-pdf">${icon('file', 18)}<span>Exportar PDF</span></button>
+          ${!isPreview && db.song(song.id)?.partitura ? '' : `<a role="menuitem" href="#/musica/${isPreview ? 'previa' : song.id}/compor">${icon('score', 18)}<span>Criar partitura</span></a>`}
         </div>
       </div>
     </div>
@@ -3188,7 +3957,7 @@ function viewSong(id, ctx = {}) {
       <div class="seg modos" role="group" aria-label="Ver a música como">
         ${semCifra ? '' : `<button data-act="modo" data-modo="cifra" aria-pressed="${comCifra}" title="Letra com os acordes">${icon('chord', 15)}<span>Cifra</span></button>`}
         <button data-act="modo" data-modo="letra" aria-pressed="${!comCifra}" title="${semCifra ? 'Esta música só tem a letra' : 'Só a letra, sem os acordes'}">${icon('text', 15)}<span>Letra</span></button>
-        ${paginasDaPartitura(song.content).length ? `<a class="seg-link" id="btn-partitura" href="#/musica/${isPreview ? 'previa' : song.id}/partitura" title="Ver a partitura (na desenhada, dá para ensaiar ouvindo cada voz)">${icon('score', 15)}<span>Partitura</span></a>` : ''}
+        ${paginasDaPartitura(song.content).length || (!isPreview && db.song(song.id)?.partitura) ? `<a class="seg-link" id="btn-partitura" href="#/musica/${isPreview ? 'previa' : song.id}/partitura" title="Ver a partitura (na desenhada, dá para ensaiar ouvindo cada voz)">${icon('score', 15)}<span>Partitura</span></a>` : ''}
       </div>
       <div class="ferramentas">
         <div class="seg so-cifra"><button class="tom-btn" data-act="tom" aria-label="Escolher o tom" title="Escolher o tom"><span class="val" id="key"></span>${icon('down', 14)}</button></div>
@@ -5142,7 +5911,7 @@ function route() {
     case 'artista': return d === 'album' ? viewAlbum(b, c, e) : viewArtista(b, c);
     case 'biblioteca': return viewLibrary(b);
     case 'repertorios': return viewLibrary('repertorios');
-    case 'musica': return c === 'partitura' ? viewPartitura(b) : viewSong(b, { tocar: c === 'tocar' });
+    case 'musica': return c === 'partitura' ? viewPartitura(b) : c === 'compor' ? viewCompor(b) : viewSong(b, { tocar: c === 'tocar' });
     case 'editar': return viewEditor(b, c);
     case 'repertorio': return c !== undefined ? viewSetSong(b, Number(c)) : viewSet(b);
     case 'liturgia': return viewLiturgia(b);
