@@ -27,12 +27,14 @@ jobs:
       - name: Instalar o Audiveris e os idiomas do reconhecimento de texto
         run: |
           curl -sSL -o aud.deb https://github.com/Audiveris/audiveris/releases/download/5.6.2/Audiveris-5.6.2-ubuntu24.04-x86_64.deb
+          # extraído sem instalar: o instalador falha ao criar o atalho de menu (não há área de trabalho)
+          dpkg-deb -x aud.deb "$HOME/aud"
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ./aud.deb poppler-utils zip unzip
+          sudo apt-get install -y -qq poppler-utils zip unzip
           mkdir -p ~/.config/AudiverisLtd/audiveris/tessdata
           for l in por eng; do curl -sSL -o ~/.config/AudiverisLtd/audiveris/tessdata/$l.traineddata https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/$l.traineddata; done
       - name: Ler as partituras desta fatia
-        run: AUDIVERIS=/opt/audiveris/bin/Audiveris node scripts/partituras-omr.mjs --paralelo 3 --parte ${{ matrix.parte }} --de 16
+        run: AUDIVERIS="$HOME/aud/opt/audiveris/bin/Audiveris" node scripts/partituras-omr.mjs --paralelo 3 --parte ${{ matrix.parte }} --de 16
       - uses: actions/upload-artifact@v4
         if: always()
         with:
