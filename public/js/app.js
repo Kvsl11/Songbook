@@ -45,7 +45,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-134';
+export const APP_VERSAO = '2026.10.20-135';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2734,7 +2734,7 @@ const carregarScript = (src) => {
 const OSMD_JS = 'https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.2/build/opensheetmusicdisplay.min.js';
 const CIFRA_NO_TEXTO = /^[A-G][#b♯♭]?(m|maj|min|dim|aug|sus|add|°|º|ø|M)?[\d()+#b♯♭]*(\/[A-G][#b♯♭]?)?$/;
 
-// Ensaio: toca a partitura desenhada (todas as vozes, uma voz em destaque ou só ela), com o cursor
+// Ensaio: toca a partitura desenhada (todas as vozes, só a voz escolhida ou ela com as outras baixinho), com o cursor
 // andando sobre as notas, no andamento escolhido e no tom da tela. Som feito no próprio navegador (Web Audio).
 function criarEnsaio(osmd, barra, tomAtual) {
   if (!barra) return null;
@@ -2773,7 +2773,7 @@ function criarEnsaio(osmd, barra, tomAtual) {
   const fim = duracaoTotal(passos);
   let bpm = Math.round(osmd.Sheet.SourceMeasures[0]?.TempoInBPM || osmd.Sheet.DefaultStartTempoInBpm || 90);
   let escolhida = '';
-  let so = false;
+  let so = true; // escolher uma voz toca só ela; as outras de fundo só se pedir
   let audio = null;
   let mestre = null;
   let tocando = false;
@@ -2793,7 +2793,7 @@ function criarEnsaio(osmd, barra, tomAtual) {
       <div class="seg"><button data-e="lento" aria-label="Mais devagar">${icon('minus', 15)}</button><span class="val" id="ens-bpm"><small>♩ =</small>${bpm}</span><button data-e="rapido" aria-label="Mais rápido">${icon('plus', 15)}</button></div>
     </div>
     ${vozes2 ? `<div class="ensaio-linha vozes"><div class="chips" id="ens-vozes"><button class="chip" data-voz="">Todas</button>${vozes.map((v) => `<button class="chip" data-voz="${esc(v.voz)}">${esc(v.nome)}</button>`).join('')}</div>
-      <label class="ens-so" title="Desligado: a voz escolhida em destaque e as outras baixinho"><input type="checkbox" id="ens-so"> Só esta voz</label></div>` : ''}`;
+      <label class="ens-so" title="Ligado: a voz escolhida em destaque e as outras bem baixinho, de fundo"><input type="checkbox" id="ens-so"> Outras vozes de fundo</label></div>` : ''}`;
   const desenharBarra = () => {
     barra.querySelector('[data-e="play"]').innerHTML = icon(tocando ? 'pause' : 'play', 22);
     barra.querySelector('[data-e="play"]').setAttribute('aria-label', tocando ? 'Pausar' : 'Tocar');
@@ -2905,7 +2905,7 @@ function criarEnsaio(osmd, barra, tomAtual) {
     if (acao === 'inicio') irPara(0);
     if (acao === 'lento' || acao === 'rapido') { bpm = Math.max(30, Math.min(200, bpm + (acao === 'rapido' ? 5 : -5))); reajustar(); }
   });
-  $('#ens-so', barra)?.addEventListener('change', (e) => { so = e.target.checked; reajustar(); });
+  $('#ens-so', barra)?.addEventListener('change', (e) => { so = !e.target.checked; reajustar(); });
   desenharBarra();
   return {
     parar() { pausar(); audio?.close?.(); },

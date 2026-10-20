@@ -29,10 +29,10 @@ export function nomearVozes(passos, { minimo = 0.4 } = {}) {
   return principais.map((v, i) => ({ voz: v.voz, nome: nomes[i], membros: v.membros }));
 }
 
-// volume de cada nota: "todas" iguais; com uma voz escolhida, ela em destaque (as outras baixinho) ou só ela
+// volume de cada nota: "todas" iguais; com uma voz escolhida, só ela ou ela com as outras bem baixinho, de fundo
 export function volumeDa(voz, { escolhida = '', so = false } = {}) {
   if (!escolhida || voz === escolhida) return 1;
-  return so ? 0 : 0.18;
+  return so ? 0 : 0.08;
 }
 
 // segundos por semibreve: o andamento é em semínimas por minuto, ajustado pela velocidade do ensaio (1 = normal)
