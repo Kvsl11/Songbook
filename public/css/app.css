@@ -129,7 +129,11 @@ body.performance .palco-ctrl:hover, body.performance .palco-ctrl:focus-within { 
      qualquer elemento que a use (painel da letra, topo com vídeo, prateleiras) para ir de ponta a ponta */
   .main-col { border-radius: var(--radius); container-type: inline-size; }
   main { --gutter: max(32px, calc((100cqw - 1680px) / 2)); padding-bottom: 48px; } /* conteúdo bem largo: só uma margem confortável dos lados */
-  .side { display: flex; flex-direction: column; gap: 8px; width: 300px; flex: none; }
+  .side { display: flex; flex-direction: column; gap: 8px; width: 300px; flex: none; min-height: 0; }
+  /* tela baixa (ou menu recolhido, que fica mais alto): o menu rola e a engrenagem dos Ajustes nunca sai da tela */
+  .brand-row { flex: none; }
+  .nav { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+  .side-lib-head, .side-foot { flex: none; }
   .brand-row { display: flex; align-items: center; gap: 8px; padding: 14px 12px 6px 16px; background: var(--bg); border-radius: var(--radius) var(--radius) 0 0; margin-bottom: -8px; }
   .side .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; flex: 1; min-width: 0; }
   .brand-name { font-weight: 900; font-size: 19px; letter-spacing: -0.03em; line-height: 1; }
@@ -151,11 +155,11 @@ body.performance .palco-ctrl:hover, body.performance .palco-ctrl:focus-within { 
   :root[data-theme="light"] .nav { background: var(--bg); }
   .nav a { flex-direction: row; gap: 16px; font-size: 15px; font-weight: 700; padding: 10px 12px; border-radius: 6px; transition: color 0.15s; }
   .nav a:hover { color: var(--text); }
-  .side-lib { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--bg); border-radius: var(--radius); padding: 8px; }
+  .side-lib { display: flex; flex-direction: column; flex: 1; min-height: 116px; background: var(--bg); border-radius: var(--radius); padding: 8px; }
   .side-lib-head { display: flex; align-items: center; gap: 12px; padding: 8px 12px; color: var(--muted); font-weight: 700; }
   .side-lib-head b { flex: 1; }
   .side-lib-head .icon-btn { width: 32px; height: 32px; background: none; color: var(--muted); }
-  #side-sets { overflow-y: auto; flex: 1; }
+  #side-sets { overflow-y: auto; flex: 1; min-height: 0; }
   #side-sets .track { margin: 0; }
 }
 
@@ -508,6 +512,8 @@ label.setting { cursor: pointer; }
 .parte > summary::-webkit-details-marker { display: none; }
 .parte > summary:hover { background: rgb(255 255 255 / 0.04); }
 .parte .step { position: relative; width: 48px; height: 48px; border-radius: 4px; flex: none; display: grid; place-items: center; font-weight: 900; font-size: 16px; color: var(--lit-ink); background: color-mix(in srgb, var(--lit-cor) 22%, var(--surface-2)); overflow: hidden; }
+#missa-sugerida .step { width: 40px; height: 40px; border-radius: 4px; display: grid; place-items: center; font-weight: 900; color: var(--lit-ink); background: color-mix(in srgb, var(--lit-cor) 22%, var(--surface-2)); }
+#missa-sugerida .hero { margin-bottom: 18px; }
 .parte .step img { width: 100%; height: 100%; object-fit: cover; }
 .parte .step em { position: absolute; left: 3px; top: 3px; font-style: normal; font-size: 10px; font-weight: 900; background: rgb(0 0 0 / 0.7); color: #fff; border-radius: 3px; padding: 0 4px; }
 .parte .step.leitura { background: var(--surface-2); color: var(--muted); }

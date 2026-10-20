@@ -43,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-112';
+export const APP_VERSAO = '2026.10.20-113';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2313,19 +2313,86 @@ async function viewParteDoSetor(setor, pk) {
   setTab('buscar');
   setTint(`hsl(${setor[4]} 45% 32%)`);
   setHeader(parte[1], { back: '#/setor/' + setor[0], eyebrow: setor[1] });
+  const completas = pk === 'missas-completas';
   view.innerHTML = `<h2 class="greet">${esc(parte[1])}</h2>
+    ${completas ? `<div id="missa-sugerida"><div class="loading-note"><span class="spin"></span>Montando a missa de hoje…</div></div>
+      <div class="shelf-head"><h2>Missas completas do acervo</h2></div>` : ''}
     <label class="field">${icon('search', 20)}<input class="search" type="search" placeholder="Procurar em ${esc(parte[1])}"></label>
     <div id="cantos" style="margin-top:12px"><div class="loading-note"><span class="spin"></span>Carregando as músicas…</div></div>`;
+  if (completas) missaCompletaSugerida($('#missa-sugerida'));
   const ac = await acervoClassificado();
   const box = $('#cantos');
   if (!box) return;
   if (!ac.musicas.length) { box.innerHTML = avisoAcervo(); return; }
   const itens = (setor[0] === 'fixas' ? ac.fixas : ac.tempos).get(pk) || [];
-  const vazio = `Ainda não há músicas de ${esc(parte[1])} no acervo. <a href="#/buscar" id="na-internet">Procurar na internet</a>`;
+  const vazio = completas ? 'Ainda não há missas completas (todas as partes num arquivo só) no acervo. Use a sugestão de hoje, acima.'
+    : `Ainda não há músicas de ${esc(parte[1])} no acervo. <a href="#/buscar" id="na-internet">Procurar na internet</a>`;
   ligarMusicas(box);
   desenharMusicas(box, itens, { vazio });
   $('#na-internet')?.addEventListener('click', () => { sessionStorage.setItem('busca', parte[1].replace(/\s*\(.*$/, '')); sessionStorage.setItem('buscaFiltro', 'tudo'); });
   $('.search').oninput = (e) => desenharMusicas(box, itens, { filtro: e.target.value, vazio: 'Nada com esse nome.' });
+}
+
+// "Missas completas": a liturgia de hoje com um canto sugerido para cada momento (a Missa litúrgica da Liturgia)
+async function missaCompletaSugerida(box) {
+  const data = hojeISO();
+  let missa;
+  try {
+    missa = missaCache.get(data);
+    if (!missa) { missa = await getMissa(data); missaCache.set(data, missa); }
+    missa = await missaLiturgica(missa, data);
+  } catch {
+    if (box.isConnected) box.innerHTML = `<a class="source" href="#/liturgia/${data}"><span class="ico">${icon('cross', 18)}</span><span>${navigator.onLine === false ? 'Sem internet e sem a liturgia de hoje guardada.' : 'Não foi possível montar a missa de hoje.'} Abrir a liturgia do dia</span></a>`;
+    return;
+  }
+  if (!box.isConnected) return;
+  const lit = missa.liturgia;
+  const cor = CORES[lit.cor] || '#555';
+  document.documentElement.style.setProperty('--lit-cor', cor);
+  document.documentElement.style.setProperty('--lit-ink', lit.cor === 'branco' ? '#d8b54a' : `color-mix(in srgb, ${cor} 60%, #fff)`);
+  const chave = 'lit:' + data;
+  if (!escolhas.has(chave)) escolhas.set(chave, Object.fromEntries(missa.partes.map((p) => [p.chave, escolhaPadrao(p)])));
+  const sel = escolhas.get(chave);
+  let n = 0;
+  const linhas = missa.partes.map((p) => {
+    const v = sel[p.chave];
+    if (LEITURAS.includes(p.chave)) {
+      const ref = p.liturgia?.referenciaCompleta || p.liturgia?.referencia || '';
+      return ref ? `<li class="track" style="grid-template-columns:auto 1fr"><span class="step leitura">${icon('book', 18)}</span><div class="info"><div class="t">${esc(p.nome)}</div><div class="s">${esc(ref)}</div></div></li>` : '';
+    }
+    if (!v) return '';
+    const c = p.cantos.find((x) => x.url === v);
+    const titulo = v === 'cnbb' ? 'Texto oficial (CNBB)' : c?.titulo || '';
+    const fonte = c?.fonte === 'hinario' ? 'Hinário CNBB' : c?.fonte === 'acervo' ? 'Acervo' : '';
+    return `<li class="track clickable" data-parte="${esc(p.chave)}" style="grid-template-columns:auto 1fr auto"><span class="step">${++n}</span>
+      <div class="info"><div class="t">${esc(titulo)}</div><div class="s">${esc(p.nome)}${fonte ? ` · ${fonte}` : ''}</div></div>
+      <span class="acts"><button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
+  }).join('');
+  box.innerHTML = `
+    <section class="hero ${lit.cor === 'branco' ? 'claro' : ''}">
+      ${linhaCor(lit)}
+      <h2>${esc(lit.celebracao)}</h2>
+      <div class="sub">${esc([lit.data_extenso, lit.ano].filter(Boolean).join(' · '))}</div>
+      ${blocoCor(lit)}
+      ${lit.leituras?.length ? `<div class="refs">${lit.leituras.map((l) => `<span>${esc(l)}</span>`).join('')}</div>` : ''}
+    </section>
+    <div class="shelf-head"><h2>Sugestão de missa completa</h2><a href="#/liturgia/${data}">Trocar cantos</a></div>
+    <p class="muted" style="margin:-6px 0 10px">A liturgia de hoje com um canto para cada momento, entre os sugeridos na Liturgia.</p>
+    ${n ? `<ul class="tracks">${linhas}</ul>
+      <div class="row" style="margin:12px 0 22px"><button class="btn primary" id="montar">${icon('list', 16)} Criar repertório desta missa</button></div>`
+    : `<p class="muted">Sem cantos sugeridos para hoje. <a href="#/liturgia/${data}">Abrir a liturgia do dia</a></p>`}`;
+  $('#montar', box)?.addEventListener('click', () => montarRepertorio(missa, sel, data));
+  box.addEventListener('click', async (e) => {
+    const li = e.target.closest('li[data-parte]');
+    const p = li && missa.partes.find((x) => x.chave === li.dataset.parte);
+    if (!p) return;
+    try {
+      const s = await songFromChoice(p, sel[p.chave], lit);
+      const salva = db.songBySource(s.source);
+      if (salva) location.hash = '#/musica/' + salva.id;
+      else await abrirPrevia(s.content, s.source, location.hash);
+    } catch (err) { toast('Erro: ' + err.message); }
+  });
 }
 
 // navegar pelas pastas do acervo (subpastas e músicas)
