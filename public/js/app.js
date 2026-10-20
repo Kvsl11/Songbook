@@ -45,7 +45,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-131';
+export const APP_VERSAO = '2026.10.20-132';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -3072,6 +3072,7 @@ function viewSong(id, ctx = {}) {
       <div class="mais-wrap">
         <button class="icon-btn" id="btn-mais" aria-haspopup="menu" aria-expanded="false" aria-label="Mais opções" title="Mais opções">${icon('more', 22)}</button>
         <div class="menu-mais" id="menu-mais" role="menu" hidden>
+          <div class="menu-mais-titulo" aria-hidden="true"><b>${esc(song.title)}</b>${song.artist ? `<span>${esc(song.artist)}</span>` : ''}</div>
           ${isPreview ? `<button role="menuitem" id="btn-edit-prev">${icon('edit', 18)}<span>Editar cifra</span></button>`
             : `<a role="menuitem" href="#/editar/${song.id}">${icon('edit', 18)}<span>Editar cifra</span></a>`}
           <button role="menuitem" id="btn-pdf">${icon('file', 18)}<span>Exportar PDF</span></button>
@@ -3259,12 +3260,31 @@ function viewSong(id, ctx = {}) {
   }
   $('#btn-palco').onclick = entrarPalco;
   const menuMais = $('#menu-mais');
-  const abrirMais = (abre) => { menuMais.hidden = !abre; $('#btn-mais').setAttribute('aria-expanded', String(abre)); menuMais.closest('.song-topo')?.classList.toggle('menu-aberto', abre); };
-  $('#btn-mais').onclick = (e) => { e.stopPropagation(); abrirMais(menuMais.hidden); };
-  menuMais.addEventListener('click', () => abrirMais(false));
-  const foraDoMenu = (e) => { if (!menuMais.hidden && !e.target.closest('.mais-wrap')) abrirMais(false); };
+  // no celular o menu vira uma folha que sobe do rodapé (sai do topo para não cobrir a barra de leitura)
+  const btnMais = $('#btn-mais'), casaMenu = menuMais.parentElement, celular = matchMedia('(max-width: 699px)');
+  let fundoMenu = null;
+  const abrirMais = (abre) => {
+    menuMais.hidden = !abre;
+    btnMais.setAttribute('aria-expanded', String(abre));
+    menuMais.closest('.song-topo')?.classList.toggle('menu-aberto', abre);
+    if (abre && celular.matches) {
+      fundoMenu = document.createElement('div');
+      fundoMenu.className = 'menu-mais-fundo';
+      document.body.append(fundoMenu, menuMais);
+      menuMais.classList.add('folha');
+    } else if (!abre && menuMais.classList.contains('folha')) {
+      fundoMenu?.remove(); fundoMenu = null;
+      menuMais.classList.remove('folha');
+      casaMenu.append(menuMais);
+    }
+  };
+  btnMais.onclick = (e) => { e.stopPropagation(); abrirMais(menuMais.hidden); };
+  menuMais.addEventListener('click', (e) => { if (e.target.closest('[role="menuitem"]')) abrirMais(false); });
+  const foraDoMenu = (e) => { if (!menuMais.hidden && !e.target.closest('.mais-wrap, .menu-mais')) abrirMais(false); };
+  const escMenu = (e) => { if (e.key === 'Escape' && !menuMais.hidden) abrirMais(false); };
   document.addEventListener('click', foraDoMenu);
-  aoSair(() => document.removeEventListener('click', foraDoMenu));
+  document.addEventListener('keydown', escMenu);
+  aoSair(() => { document.removeEventListener('click', foraDoMenu); document.removeEventListener('keydown', escMenu); abrirMais(false); });
   $('#btn-pdf').onclick = () => exportarMusicaPdf({ ...song, transpose, capo });
   $('#palco-ctrl').addEventListener('click', (e) => {
     const b = e.target.closest('[data-palco]');
