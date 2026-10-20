@@ -43,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-114';
+export const APP_VERSAO = '2026.10.20-115';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1251,7 +1251,7 @@ function resumoRepertorio(set) {
 function linhaItemRepertorio(set, it, i, { atual = -1, fila = false } = {}) {
   const s = db.song(it.songId);
   return `<li class="track set-item ${i === atual ? 'atual' : ''}" data-i="${i}">
-    <span class="lead">${capa(s || {})}</span>
+    <span class="lead"><span class="marca-sel" aria-hidden="true">${icon('check', 14)}</span>${capa(s || {})}</span>
     <a class="info" href="#/repertorio/${set.id}/${i}" ${fila ? 'data-ir' : ''}><div class="t ${i === atual ? 'playing' : ''}">${i === atual ? icon('music', 13, 'style="display:inline;vertical-align:-1px;margin-right:4px"') : ''}${esc(s?.title || '(música removida)')}</div>
       <div class="s">${it.label ? `<b class="parte-tag">${esc(it.label)}</b> ` : ''}${indicadores(s)}${esc(s?.artist || '')}<span class="dur-faixa">${s?.duracao ? ` · ${fmtTempo(s.duracao)}` : ''}</span></div></a>
     ${s?.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '<span></span>'}
@@ -2515,7 +2515,8 @@ function viewLibrary(filtro = 'repertorios', { selecionando = false, marcados = 
     <h2 class="greet">Sua biblioteca</h2>
     <div class="chips">${FILTROS.map(([k, n]) => `<a class="chip" href="#/biblioteca/${k}" aria-pressed="${k === filtro}">${n}</a>`).join('')}</div>
     <div class="actions-row" style="margin:4px 0 14px"><a class="btn small primary" href="#/editar/novo" title="Escrever título, estrutura, letra e cifra">${icon('edit', 15)} Criar música do zero</a><button class="btn small" id="lib-novo-rep">${icon('plus', 15)} Novo repertório</button><button class="btn small" id="lib-nova-pl">${icon('disc', 15)} Nova playlist</button>
-      ${itens.length ? `<button class="btn small" id="lib-sel" aria-pressed="${selecionando}">${icon('check', 15)} ${selecionando ? 'Cancelar seleção' : 'Selecionar'}</button>` : ''}</div>
+      ${itens.length ? `<button class="btn small" id="lib-sel" aria-pressed="${selecionando}">${icon('check', 15)} ${selecionando ? 'Cancelar seleção' : 'Selecionar'}</button>` : ''}
+      ${itens.length && !selecionando ? `<button class="btn small" id="lib-sel-todos">${icon('check', 15)} Selecionar tudo</button>` : ''}</div>
     <div id="lib" class="${selecionando ? 'selecionando' : ''}">${itens.length ? `<ul class="tracks">${itens.map(linha).join('')}</ul>` : vazio}</div>
     <div class="barra-sel" id="barra-sel" ${selecionando ? '' : 'hidden'}>
       <span id="sel-n"></span><button class="btn small ghost" id="sel-todos"></button><span class="spacer"></span>
@@ -2537,6 +2538,7 @@ function viewLibrary(filtro = 'repertorios', { selecionando = false, marcados = 
   };
   if (selecionando) atualizarSel();
   $('#lib-sel')?.addEventListener('click', () => redesenhar(!selecionando));
+  $('#lib-sel-todos')?.addEventListener('click', () => { itens.forEach((x) => marcados.add(x.id)); redesenhar(true); });
   $('#sel-todos').onclick = () => { if (marcados.size === itens.length) marcados.clear(); else itens.forEach((x) => marcados.add(x.id)); atualizarSel(); };
   // exclui e confirma antes; músicas saem também dos repertórios
   const excluir = async (ids) => {
@@ -3562,7 +3564,7 @@ async function novoRepertorio(tipo = '') {
   location.hash = '#/repertorio/' + s.id;
 }
 
-function viewSet(id) {
+function viewSet(id, { selecionando = false, marcados = new Set() } = {}) {
   const set = db.set(id);
   if (!set) return viewNotFound();
   setTab('biblioteca');
@@ -3585,8 +3587,12 @@ function viewSet(id) {
       <button class="icon-btn danger" id="del" aria-label="Excluir ${tipo.toLowerCase()}" title="Excluir">${icon('trash', 22)}</button>
       <div class="seg-tabs" style="min-width:190px">${campoData('set-date', set.date, 'Data do repertório')}</div>
     </div>
-    ${set.items.length ? `<p class="muted" style="font-size:13px;margin:0 0 4px">Para mudar a ordem, segure uma música e arraste (no computador, clique e arraste).</p>
-    <ul class="tracks">${set.items.map((it, i) => linhaItemRepertorio(set, it, i)).join('')}</ul>` : `<div class="empty"><div class="bubble">${icon('music', 30)}</div><h3>${tipo} vazi${pl ? 'a' : 'o'}</h3><p>Adicione músicas da sua biblioteca ou crie uma do zero.</p>
+    ${set.items.length ? `<div class="row" style="margin:0 0 6px"><p class="muted" style="font-size:13px;margin:0;flex:1">${selecionando ? 'Toque nas músicas para marcar ou desmarcar.' : 'Para mudar a ordem, segure uma música e arraste (no computador, clique e arraste).'}</p>
+      ${selecionando ? '' : `<button class="btn small" id="set-sel">${icon('check', 15)} Selecionar</button><button class="btn small" id="set-sel-todos">${icon('check', 15)} Selecionar tudo</button>`}</div>
+    <ul class="tracks ${selecionando ? 'selecionando' : ''}">${set.items.map((it, i) => linhaItemRepertorio(set, it, i)).join('')}</ul>
+    <div class="barra-sel" id="barra-sel" ${selecionando ? '' : 'hidden'}>
+      <span id="sel-n"></span><button class="btn small ghost" id="sel-todos"></button><span class="spacer"></span>
+      <button class="btn small ghost" id="sel-cancelar">Cancelar</button><button class="btn small danger solid" id="sel-remover">${icon('trash', 15)} Remover</button></div>` : `<div class="empty"><div class="bubble">${icon('music', 30)}</div><h3>${tipo} vazi${pl ? 'a' : 'o'}</h3><p>Adicione músicas da sua biblioteca ou crie uma do zero.</p>
       <div class="row"><a class="btn primary" href="#/editar/novo/${id}">${icon('edit', 16)} Criar música</a></div></div>`}`;
   ligarCampoData('set-date', (v) => { set.date = v; db.saveSet(set); });
   $('#add').onclick = async () => {
@@ -3625,6 +3631,42 @@ function viewSet(id) {
   proximaDuracao(); proximaDuracao(); proximaDuracao();
   if (pl) videosDaPlaylist(set, () => db.set(id) && $('#set-resumo') && location.hash === '#/repertorio/' + id && viewSet(id));
   const ul = view.querySelector('.tracks');
+  // modo Selecionar: marcar várias (ou todas) e remover de uma vez
+  const selecionar = (todas) => viewSet(id, { selecionando: true, marcados: new Set(todas ? set.items.map((_, i) => i) : []) });
+  $('#set-sel')?.addEventListener('click', () => selecionar(false));
+  $('#set-sel-todos')?.addEventListener('click', () => selecionar(true));
+  if (ul && selecionando) {
+    const atualizarSel = () => {
+      ul.querySelectorAll('li[data-i]').forEach((li) => li.classList.toggle('marcado', marcados.has(Number(li.dataset.i))));
+      const n = marcados.size;
+      $('#sel-n').textContent = n ? `${n} selecionad${n > 1 ? 'as' : 'a'}` : 'Toque para selecionar';
+      $('#sel-todos').textContent = n === set.items.length ? 'Desmarcar todas' : 'Selecionar todas';
+      $('#sel-remover').disabled = !n;
+    };
+    atualizarSel();
+    ul.addEventListener('click', (e) => {
+      const li = e.target.closest('li[data-i]');
+      if (!li) return;
+      e.preventDefault();
+      const i = Number(li.dataset.i);
+      if (marcados.has(i)) marcados.delete(i); else marcados.add(i);
+      atualizarSel();
+    });
+    $('#sel-todos').onclick = () => { if (marcados.size === set.items.length) marcados.clear(); else set.items.forEach((_, i) => marcados.add(i)); atualizarSel(); };
+    $('#sel-cancelar').onclick = () => viewSet(id);
+    $('#sel-remover').onclick = async () => {
+      const n = marcados.size;
+      if (!n) return;
+      const todas = n === set.items.length;
+      if (!(await ask({ title: todas ? `Remover todas as músicas?` : `Remover ${n} ${n > 1 ? 'músicas' : 'música'}?`, text: `Saem d${pl ? 'a playlist' : 'o repertório'} “${set.name}”. As músicas continuam na biblioteca.`, ok: 'Remover', danger: true }))) return;
+      set.items = set.items.filter((_, i) => !marcados.has(i));
+      db.saveSet(set);
+      desenharLateral();
+      toast(`${n} ${n > 1 ? 'músicas removidas' : 'música removida'}`);
+      viewSet(id);
+    };
+    return;
+  }
   if (ul) {
     ativarArrastar(ul, (de, para) => { mover(set.items, de, para); db.saveSet(set); viewSet(id); });
     ul.addEventListener('click', (e) => {
