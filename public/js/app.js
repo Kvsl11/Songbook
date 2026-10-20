@@ -43,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-111';
+export const APP_VERSAO = '2026.10.20-112';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -3597,7 +3597,9 @@ function leituraHTML(l) {
 
 function skeletonLiturgia() {
   return `<div class="skeleton sk-hero"></div>
-    <div class="loading-note"><span class="spin"></span>Buscando a liturgia na CNBB e os cantos da Cindy Ferrarezi…</div>
+    <div class="loading-note"><span class="spin"></span>${tipoMissa() === 'liturgica'
+    ? 'Buscando a liturgia na CNBB e os cantos do acervo litúrgico e do Hinário da CNBB…'
+    : 'Buscando a liturgia na CNBB e os cantos da Cindy Ferrarezi e do Músicas para Missa…'}</div>
     ${'<div class="skeleton sk-row"></div>'.repeat(6)}`;
 }
 
