@@ -1397,3 +1397,32 @@ a.source { text-decoration: none; color: inherit; }
 .osmd-box { margin: 0 -6px 18px; padding: 6px 0 24px; border-radius: 12px; overflow-x: auto; }
 .osmd-box.pb { background: #fff; padding: 14px 6px 28px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.35); }
 .osmd-box svg { max-width: none; }
+
+/* modo claro: o painel da letra surge e some do fundo branco numa curva suave (mistura com o fundo, sem passar
+   pelo cinza do "transparente"); a letra começa já sobre a cor cheia */
+:root[data-theme="light"] .song.lyrics-mode {
+  --fim: var(--bg);
+  background: linear-gradient(180deg,
+    var(--fim) 0, color-mix(in srgb, var(--painel) 4%, var(--fim)) 24px, color-mix(in srgb, var(--painel) 12%, var(--fim)) 48px,
+    color-mix(in srgb, var(--painel) 26%, var(--fim)) 72px, color-mix(in srgb, var(--painel) 45%, var(--fim)) 96px, color-mix(in srgb, var(--painel) 66%, var(--fim)) 120px,
+    color-mix(in srgb, var(--painel) 84%, var(--fim)) 144px, color-mix(in srgb, var(--painel) 95%, var(--fim)) 166px, var(--painel) 186px,
+    var(--painel) calc(100% - 210px), color-mix(in srgb, var(--painel) 95%, var(--fim)) calc(100% - 190px), color-mix(in srgb, var(--painel) 84%, var(--fim)) calc(100% - 166px),
+    color-mix(in srgb, var(--painel) 66%, var(--fim)) calc(100% - 140px), color-mix(in srgb, var(--painel) 45%, var(--fim)) calc(100% - 112px),
+    color-mix(in srgb, var(--painel) 26%, var(--fim)) calc(100% - 84px), color-mix(in srgb, var(--painel) 12%, var(--fim)) calc(100% - 56px),
+    color-mix(in srgb, var(--painel) 4%, var(--fim)) calc(100% - 28px), var(--fim) 100%);
+  padding-top: 176px; padding-bottom: 230px;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-theme="auto"] .song.lyrics-mode {
+    --fim: var(--bg);
+    background: linear-gradient(180deg,
+      var(--fim) 0, color-mix(in srgb, var(--painel) 4%, var(--fim)) 24px, color-mix(in srgb, var(--painel) 12%, var(--fim)) 48px,
+      color-mix(in srgb, var(--painel) 26%, var(--fim)) 72px, color-mix(in srgb, var(--painel) 45%, var(--fim)) 96px, color-mix(in srgb, var(--painel) 66%, var(--fim)) 120px,
+      color-mix(in srgb, var(--painel) 84%, var(--fim)) 144px, color-mix(in srgb, var(--painel) 95%, var(--fim)) 166px, var(--painel) 186px,
+      var(--painel) calc(100% - 210px), color-mix(in srgb, var(--painel) 95%, var(--fim)) calc(100% - 190px), color-mix(in srgb, var(--painel) 84%, var(--fim)) calc(100% - 166px),
+      color-mix(in srgb, var(--painel) 66%, var(--fim)) calc(100% - 140px), color-mix(in srgb, var(--painel) 45%, var(--fim)) calc(100% - 112px),
+      color-mix(in srgb, var(--painel) 26%, var(--fim)) calc(100% - 84px), color-mix(in srgb, var(--painel) 12%, var(--fim)) calc(100% - 56px),
+      color-mix(in srgb, var(--painel) 4%, var(--fim)) calc(100% - 28px), var(--fim) 100%);
+    padding-top: 176px; padding-bottom: 230px;
+  }
+}
