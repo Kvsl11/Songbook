@@ -50,7 +50,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-148';
+export const APP_VERSAO = '2026.10.20-149';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2687,16 +2687,24 @@ async function viewBuscaAcervo(termo) {
 
 // ------------------------------------------------------------- biblioteca
 
-function viewLibrary(filtro = 'repertorios', { selecionando = false, marcados = new Set() } = {}) {
+function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new Set() } = {}) {
   setTab('biblioteca');
   setTint('#2b3d4f');
-  setHeader('Sua biblioteca', { actions: [{ icon: 'edit', label: 'Criar música do zero', href: '#/editar/novo' }, { icon: 'upload', label: 'Importar arquivos', onClick: openImport }] });
-  const FILTROS = [['repertorios', 'Repertórios'], ['playlists', 'Playlists'], ['musicas', 'Músicas'], ['video', 'Com vídeo'], ['proprias', 'Cifras próprias']];
+  setHeader('Sua biblioteca');
+  // Músicas primeiro (é o que mais se abre); cada filtro mostra quantos itens tem
+  const todas = db.songs();
+  const sets = db.sets();
+  const ehPropria = (x) => !/^https?:|^cnbb:/.test(x.source || '');
+  const temPartitura = (x) => x.partitura?.pautas?.length || mxlDaPartitura(x.content) || paginasDaPartitura(x.content).length;
+  const FILTROS = [['musicas', 'Músicas', todas.length], ['repertorios', 'Repertórios', sets.filter((x) => !ehPlaylist(x)).length], ['playlists', 'Playlists', sets.filter(ehPlaylist).length],
+    ['video', 'Com vídeo', todas.filter((x) => x.youtube).length], ['partitura', 'Com partitura', todas.filter(temPartitura).length], ['proprias', 'Cifras próprias', todas.filter(ehPropria).length]];
+  if (!FILTROS.some(([k]) => k === filtro)) filtro = 'musicas';
   const ehRep = filtro === 'repertorios' || filtro === 'playlists';
   const ehPl = filtro === 'playlists';
   let songs = db.songs();
   if (filtro === 'video') songs = songs.filter((s) => s.youtube);
-  if (filtro === 'proprias') songs = songs.filter((s) => !/^https?:|^cnbb:/.test(s.source || ''));
+  if (filtro === 'proprias') songs = songs.filter(ehPropria);
+  if (filtro === 'partitura') songs = songs.filter(temPartitura);
   const itens = ehRep ? db.sets().filter((x) => ehPlaylist(x) === ehPl) : songs;
   const marca = (id) => `<span class="marca-sel" aria-hidden="true">${icon('check', 14)}</span>`;
   const lixeira = (id, nome) => `<button class="icon-btn lixo" data-excluir="${id}" aria-label="Excluir ${esc(nome)}" title="Excluir">${icon('trash', 16)}</button>`;
@@ -2711,16 +2719,31 @@ function viewLibrary(filtro = 'repertorios', { selecionando = false, marcados = 
     ? ehPl ? `<div class="empty"><div class="bubble">${icon('disc', 32)}</div><h3>Crie sua primeira playlist</h3><p>Playlists são para ouvir: as músicas tocam uma atrás da outra no player. Em Buscar → Missas completas, crie a da missa de hoje.</p>
         <div class="row"><button class="btn primary" id="vazio-pl">Nova playlist</button><a class="btn" href="#/setor/fixas/missas-completas">Missa de hoje</a></div></div>`
     : `<div class="empty"><div class="bubble">${icon('list', 32)}</div><h3>Crie seu primeiro repertório</h3><p>Monte o da missa de hoje automaticamente ou crie uma lista do zero.</p>
-        <div class="row"><a class="btn primary" href="#/editar/novo">Criar música</a><a class="btn" href="#/liturgia">Missa de hoje</a></div></div>`
-    : `<div class="empty"><div class="bubble">${icon('music', 32)}</div><h3>${db.songs().length ? 'Nada nesta lista' : 'Sua biblioteca está vazia'}</h3>
+        <div class="row"><button class="btn primary" id="vazio-rep">${icon('plus', 15)} Novo repertório</button><a class="btn" href="#/liturgia">Missa de hoje</a></div></div>`
+    : !todas.length ? `<div class="empty"><div class="bubble">${icon('music', 32)}</div><h3>Sua biblioteca está vazia</h3>
       <p>Busque cantos, monte a missa do dia ou importe arquivos ChordPro.</p>
-      <div class="row"><a class="btn primary" href="#/editar/novo">Criar música</a><a class="btn" href="#/liturgia">Missa de hoje</a><a class="btn" href="#/buscar">Buscar</a><button class="btn" id="imp">Importar</button></div></div>`;
+      <div class="row"><a class="btn primary" href="#/buscar">Buscar músicas</a><a class="btn" href="#/liturgia">Missa de hoje</a><button class="btn" id="imp">Importar</button></div></div>`
+    : `<div class="empty"><div class="bubble">${icon(filtro === 'video' ? 'youtube' : filtro === 'partitura' ? 'score' : 'edit', 30)}</div><h3>${filtro === 'video' ? 'Nenhuma música com vídeo' : filtro === 'partitura' ? 'Nenhuma música com partitura' : 'Nenhuma cifra própria'}</h3>
+      <p>${filtro === 'video' ? 'Abra uma música e escolha um vídeo do YouTube para ela.' : filtro === 'partitura' ? 'Crie uma partitura no app ou salve músicas do acervo litúrgico, que já vêm com partitura.' : 'Cifras que você escreveu ou importou aparecem aqui.'}</p>
+      <div class="row">${filtro === 'partitura' ? '<a class="btn primary" href="#/partituras">Ir para Partituras</a>' : filtro === 'proprias' ? '<a class="btn primary" href="#/editar/novo">Criar música</a>' : '<a class="btn primary" href="#/biblioteca/musicas">Ver todas as músicas</a>'}</div></div>`;
+  const nRep = FILTROS[1][2];
+  const nPl = FILTROS[2][2];
+  const acao = ehPl ? ['lib-nova-pl', 'disc', 'Nova playlist'] : ehRep ? ['lib-novo-rep', 'plus', 'Novo repertório'] : ['lib-nova-mus', 'edit', 'Criar música'];
+  const busca = sessionStorage.getItem('buscaBib') || '';
   view.innerHTML = `
-    <h2 class="greet">Sua biblioteca</h2>
-    <div class="chips">${FILTROS.map(([k, n]) => `<a class="chip" href="#/biblioteca/${k}" aria-pressed="${k === filtro}">${n}</a>`).join('')}</div>
-    <div class="actions-row" style="margin:4px 0 14px"><a class="btn small primary" href="#/editar/novo" title="Escrever título, estrutura, letra e cifra">${icon('edit', 15)} Criar música do zero</a><button class="btn small" id="lib-novo-rep">${icon('plus', 15)} Novo repertório</button><button class="btn small" id="lib-nova-pl">${icon('disc', 15)} Nova playlist</button>
-      ${itens.length ? `<button class="btn small" id="lib-sel" aria-pressed="${selecionando}">${icon('check', 15)} ${selecionando ? 'Cancelar seleção' : 'Selecionar'}</button>` : ''}
-      ${itens.length && !selecionando ? `<button class="btn small" id="lib-sel-todos">${icon('check', 15)} Selecionar tudo</button>` : ''}</div>
+    <section class="bib-hero">
+      <div class="kind">Sua biblioteca</div><h2>Suas músicas e repertórios</h2>
+      <div class="part-numeros"><span><b>${todas.length}</b> música${todas.length === 1 ? '' : 's'}</span><span><b>${nRep}</b> repertório${nRep === 1 ? '' : 's'}</span><span><b>${nPl}</b> playlist${nPl === 1 ? '' : 's'}</span></div>
+    </section>
+    <nav class="bib-filtros chips" aria-label="Filtrar a biblioteca">${FILTROS.map(([k, n, c]) => `<a class="chip" href="#/biblioteca/${k}" aria-pressed="${k === filtro}">${n}<b>${c}</b></a>`).join('')}</nav>
+    <div class="bib-barra">
+      ${itens.length ? `<label class="field bib-busca">${icon('search', 18)}<input class="search" id="bib-busca" type="search" placeholder="Buscar ${ehRep ? (ehPl ? 'nas playlists' : 'nos repertórios') : 'nas músicas'}" value="${esc(busca)}" autocomplete="off"></label>` : '<span class="spacer"></span>'}
+      <div class="bib-acoes">
+        <button class="btn small primary" id="${acao[0]}">${icon(acao[1], 15)} ${acao[2]}</button>
+        ${ehRep ? '' : `<button class="btn small" id="lib-importar" title="Importar arquivos ChordPro, PDF, texto">${icon('upload', 15)} Importar</button>`}
+        ${itens.length ? `<button class="btn small${selecionando ? ' ativo' : ''}" id="lib-sel" aria-pressed="${selecionando}" title="Selecionar para excluir">${icon(selecionando ? 'x' : 'check', 15)} ${selecionando ? 'Cancelar' : 'Selecionar'}</button>` : ''}
+      </div>
+    </div>
     <div id="lib" class="${selecionando ? 'selecionando' : ''}">${itens.length ? `<ul class="tracks">${itens.map(linha).join('')}</ul>` : vazio}</div>
     <div class="barra-sel" id="barra-sel" ${selecionando ? '' : 'hidden'}>
       <span id="sel-n"></span><button class="btn small ghost" id="sel-todos"></button><span class="spacer"></span>
@@ -2728,9 +2751,23 @@ function viewLibrary(filtro = 'repertorios', { selecionando = false, marcados = 
     <button class="fab" ${selecionando ? 'hidden' : ''} aria-label="${ehPl ? 'Nova playlist' : ehRep ? 'Novo repertório' : 'Nova música'}">${icon('plus', 24)}<span>${ehPl ? 'Nova playlist' : ehRep ? 'Novo repertório' : 'Nova música'}</span></button>`;
   const lib = $('#lib');
   $('.fab').onclick = () => (ehRep ? novoRepertorio(ehPl ? 'playlist' : '') : (location.hash = '#/editar/novo'));
-  $('#lib-novo-rep').onclick = () => novoRepertorio();
-  $('#lib-nova-pl').onclick = () => novoRepertorio('playlist');
+  $('#lib-novo-rep')?.addEventListener('click', () => novoRepertorio());
+  $('#lib-nova-pl')?.addEventListener('click', () => novoRepertorio('playlist'));
+  $('#lib-nova-mus')?.addEventListener('click', () => { location.hash = '#/editar/novo'; });
+  $('#lib-importar')?.addEventListener('click', openImport);
+  // busca dentro da biblioteca: esconde as linhas que não batem (sem redesenhar a lista)
+  const filtrarBusca = (q) => {
+    const nq = normalizar(q);
+    let vis = 0;
+    lib.querySelectorAll('.lib-item').forEach((li) => { const ok = !nq || normalizar(li.textContent).includes(nq); li.hidden = !ok; if (ok) vis++; });
+    let nada = $('#bib-nada');
+    if (!vis && nq) { if (!nada) lib.insertAdjacentHTML('beforeend', '<p class="muted bib-nada" id="bib-nada">Nada encontrado com esse nome.</p>'); }
+    else nada?.remove();
+  };
+  $('#bib-busca')?.addEventListener('input', (e) => { sessionStorage.setItem('buscaBib', e.target.value); filtrarBusca(e.target.value); });
+  if (busca) filtrarBusca(busca);
   $('#vazio-pl')?.addEventListener('click', () => novoRepertorio('playlist'));
+  $('#vazio-rep')?.addEventListener('click', () => novoRepertorio());
   $('#imp')?.addEventListener('click', openImport);
   const redesenhar = (sel = selecionando) => viewLibrary(filtro, { selecionando: sel, marcados: sel ? marcados : new Set() });
   const atualizarSel = () => {
