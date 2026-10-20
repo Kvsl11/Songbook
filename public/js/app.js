@@ -43,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-116';
+export const APP_VERSAO = '2026.10.20-122';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2308,7 +2308,20 @@ async function viewSetor(k, parte) {
   if (!corpo) return;
   if (!ac.musicas.length) { corpo.innerHTML = avisoAcervo(); return; }
   const cartaoParte = ([pk, nome], n, i) => `<a class="parte-card" href="#/setor/${k}/${pk}" style="--h:${(i * 37 + setor[4]) % 360}"><b>${esc(nome)}</b><small>${contagem(n)}</small></a>`;
-  if (k === 'fixas') corpo.innerHTML = `<div class="grade-partes">${PARTES_FIXAS.map((p, i) => cartaoParte(p, ac.fixas.get(p[0])?.length || 0, i)).join('')}</div>`;
+  if (k === 'fixas') {
+    corpo.innerHTML = `<div class="grade-partes">${PARTES_FIXAS.map((p, i) => cartaoParte(p, ac.fixas.get(p[0])?.length || 0, i)).join('')}</div>`;
+    // Missas completas: conta também os cantos da missa de hoje, que aparecem lá dentro
+    const arquivos = ac.fixas.get('missas-completas')?.length || 0;
+    const creio = corpo.querySelector('a[href$="/creio"] small');
+    if (creio && !ac.fixas.get('creio')?.length) creio.textContent = `${CREIO_TEXTOS.length} textos para rezar`;
+    const card = corpo.querySelector('a[href$="/missas-completas"] small');
+    if (card) {
+      card.textContent = arquivos ? contagem(arquivos) : 'montando a missa de hoje…';
+      missaDeHojeSugerida().then(({ cantos }) => {
+        if (card.isConnected) card.textContent = contagem(cantos + arquivos) + (cantos ? ' · missa de hoje' : '');
+      }).catch(() => { if (card.isConnected) card.textContent = arquivos ? contagem(arquivos) : 'a missa de hoje'; });
+    }
+  }
   else if (k === 'tempos') corpo.innerHTML = `<div class="grade-partes">${TEMPOS.map((p, i) => cartaoParte(p, ac.tempos.get(p[0])?.length || 0, i)).join('')}</div>`;
   else {
     const colecao = ([cam, nome, desc]) => {
@@ -2324,6 +2337,44 @@ async function viewSetor(k, parte) {
   corpo.insertAdjacentHTML('beforeend', `<p class="fonte" style="margin-top:18px">Músicas tiradas do acervo litúrgico (hinários e subsídios da CNBB): a letra fiel e, quando o arquivo trazia, a cifra.</p>`);
 }
 
+// o Creio quase sempre é rezado (o acervo não tem Creio cantado): os textos do Missal ficam na tela do Creio
+// "Por que este momento?": o sentido de cada parte da missa e de cada tempo, em poucas linhas
+// (com base na Instrução Geral do Missal Romano, IGMR, e nas Normas do Ano Litúrgico)
+const SENTIDO = {
+  'missas-completas': 'As partes fixas (o “ordinário”) são os cantos que se repetem em toda missa: Senhor, Glória, Creio, Santo e Cordeiro. Uma missa completa é um conjunto delas composto do mesmo jeito, com a mesma melodia e o mesmo estilo, para a celebração soar como um todo.',
+  'aclamacao-quaresma': 'Na Quaresma não se canta o Aleluia: ele fica guardado para a alegria da Páscoa. No lugar dele, a assembleia aclama Cristo, que vai falar no Evangelho, com outro refrão, como “Louvor e glória a ti, Senhor” (IGMR 62).',
+  'ato-penitencial': 'Logo no começo da missa, a comunidade se reconhece pecadora e pede a misericórdia de Deus, para celebrar de coração limpo. O “Senhor, tende piedade” (Kyrie) é um canto em que os fiéis aclamam o Senhor e imploram a sua misericórdia (IGMR 51–52).',
+  gloria: 'O Glória é um hino antiquíssimo, que começa com o canto dos anjos no nascimento de Jesus. Nele a Igreja louva o Pai e o Cordeiro. É cantado aos domingos (menos no Advento e na Quaresma), nas solenidades e nas festas (IGMR 53).',
+  aclamacao: 'Antes do Evangelho, a assembleia se põe de pé e acolhe o Senhor que vai falar, cantando o Aleluia (“louvai o Senhor”, em hebraico) e um versículo. É um rito por si mesmo, por isso deve ser cantado, e não só lido (IGMR 62).',
+  creio: 'Depois de ouvir a Palavra e a homilia, o povo responde professando a fé: recorda os grandes mistérios antes de celebrá-los na Eucaristia. O Creio é dito ou cantado aos domingos e nas solenidades (IGMR 67–68).',
+  santo: 'O Santo encerra o Prefácio, a ação de graças da Oração Eucarística. Unida aos anjos e santos (Is 6,3), a assembleia canta a santidade de Deus e aclama “Bendito o que vem em nome do Senhor”, como o povo na entrada de Jesus em Jerusalém (Mt 21,9; IGMR 79b).',
+  'oracao-eucaristica': 'É o centro e o ponto alto da missa: a grande oração de ação de graças e santificação, em que o pão e o vinho se tornam o Corpo e o Sangue de Cristo. Termina com a doxologia (“Por Cristo, com Cristo, em Cristo…”), que o povo confirma com o grande Amém (IGMR 78–79).',
+  'pai-nosso': 'Na preparação para a Comunhão, rezamos a oração que o próprio Jesus ensinou. Pedimos o pão de cada dia, que para os cristãos lembra também o pão eucarístico, e o perdão dos pecados, para receber o sacramento como irmãos (IGMR 81).',
+  cordeiro: 'O Cordeiro de Deus acompanha a fração do pão: o sacerdote parte a hóstia, gesto de Jesus na Última Ceia e sinal de que todos, sendo muitos, formam um só corpo. O canto se repete enquanto dura a fração e termina com “dai-nos a paz” (IGMR 83).',
+  marianas: 'As antífonas marianas encerram a Oração da Noite (Completas) e são muito usadas no fim da missa. Cada tempo tem a sua: Alma Redemptoris Mater (Advento e Natal), Ave Regina caelorum (até a Semana Santa), Regina caeli (tempo pascal) e Salve Rainha (Tempo Comum).',
+  recessionais: 'O rito final despede a assembleia (“Ide em paz…”) para viver na semana o que foi celebrado. O Missal não prevê um canto depois da bênção, mas o costume é cantar enquanto o padre e os ministros saem, muitas vezes um canto a Nossa Senhora ou de envio.',
+  'proclamacao-pascoa': 'O Exulte (Precônio pascal) é cantado na Vigília Pascal, a mãe de todas as vigílias, diante do círio aceso. É um grande louvor à noite em que Cristo venceu a morte, “a noite feliz que une o céu e a terra”.',
+  calenda: 'A Calenda é o anúncio solene do Natal, tirado do Martirológio Romano. Cantada antes da Missa da Noite, coloca o nascimento de Jesus dentro da história do mundo, da criação até “Belém de Judá”.',
+  sequencias: 'A sequência é um hino cantado antes do Aleluia em alguns dias. É obrigatória na Páscoa (Victimae paschali laudes) e em Pentecostes (Vinde, Espírito Santo), e opcional em Corpus Christi (Lauda Sion) e em Nossa Senhora das Dores (Stabat Mater) (IGMR 64).',
+  'semana-santa': 'A Semana Santa vai do Domingo de Ramos ao Tríduo Pascal: Ceia do Senhor (com o lava-pés), Paixão na Sexta-feira Santa e Vigília Pascal. São os dias mais importantes do ano, em que se celebra a paixão, a morte e a ressurreição de Jesus.',
+  advento: 'O Advento são as quatro semanas antes do Natal. É tempo de espera alegre: preparamos a celebração da primeira vinda de Jesus e esperamos a sua volta no fim dos tempos. Usa-se o roxo e não se canta o Glória, guardado para o Natal.',
+  natal: 'O tempo do Natal celebra a manifestação de Deus feito homem: vai do Natal até o Batismo do Senhor, passando pela Sagrada Família, por Santa Maria, Mãe de Deus, e pela Epifania, quando Jesus se revela a todos os povos.',
+  quaresma: 'A Quaresma são os quarenta dias da Quarta-feira de Cinzas à Quinta-feira Santa. É tempo de conversão, oração, jejum e caridade, preparando a Páscoa e lembrando o batismo. Não se canta o Aleluia, e o Glória só nas solenidades e festas.',
+  pentecostes: 'Pentecostes encerra os cinquenta dias da Páscoa: celebra o Espírito Santo enviado aos apóstolos e o nascimento da Igreja em missão. É o “selo” do tempo pascal.',
+  pascoa: 'O tempo pascal são os cinquenta dias do Domingo da Páscoa a Pentecostes, celebrados como um só dia de festa, “um grande domingo”. É o tempo do Aleluia, do círio aceso e da alegria pela ressurreição.',
+  'corpus-christi': 'Na solenidade do Corpo e Sangue de Cristo, a Igreja agradece a Eucaristia, presença real de Jesus. No Brasil é celebrada na quinta-feira depois da Santíssima Trindade, com procissão e, em muitos lugares, tapetes nas ruas.',
+  maria: 'A Igreja venera Maria, Mãe de Deus, unida de modo especial à obra do Filho. Ao longo do ano há solenidades, festas e memórias dela, e aos sábados do Tempo Comum pode-se celebrar a memória de Santa Maria.',
+  solenidades: 'As solenidades são os dias de maior importância no calendário, como a Santíssima Trindade e Cristo Rei. Têm Glória, Creio e duas leituras antes do Evangelho, mesmo fora do domingo. As festas vêm logo abaixo delas.',
+  defuntos: 'No dia de Finados (2 de novembro) e nas exéquias, a Igreja reza pelos falecidos e professa a fé na ressurreição: em Cristo, a vida não é tirada, mas transformada. Os cantos falam de esperança e da misericórdia de Deus.',
+  'tempo-comum': 'O Tempo Comum são as 33 ou 34 semanas fora dos tempos fortes. Nele se celebra o mistério de Cristo em sua plenitude, sobretudo aos domingos, acompanhando a vida e os ensinamentos de Jesus. A cor é o verde, da esperança.',
+};
+const sentidoHTML = (pk) => (SENTIDO[pk] ? `<aside class="sentido">${icon('info', 18)}<div><b>Por que este momento?</b><p>${esc(SENTIDO[pk])}</p></div></aside>` : '');
+
+const CREIO_TEXTOS = [
+  ['credo', 'Símbolo dos Apóstolos', 'Creio em Deus Pai'], ['credo-niceno-constantinopolitano', 'Niceno-Constan\u00adtinopolitano', 'Creio em um só Deus'],
+  ['credo-latim', 'Symbolum Apostolorum', 'Latim'], ['credo-niceno-constantinopolitano-latim', 'Credo Nicænum', 'Latim'],
+];
+
 async function viewParteDoSetor(setor, pk) {
   const lista = setor[0] === 'fixas' ? PARTES_FIXAS : TEMPOS;
   const parte = lista.find((p) => p[0] === pk);
@@ -2333,10 +2384,15 @@ async function viewParteDoSetor(setor, pk) {
   setHeader(parte[1], { back: '#/setor/' + setor[0], eyebrow: setor[1] });
   const completas = pk === 'missas-completas';
   view.innerHTML = `<h2 class="greet">${esc(parte[1])}</h2>
+    <label class="field">${icon('search', 20)}<input class="search" type="search" placeholder="Procurar em ${esc(parte[1])}"></label>
+    <div style="height:14px"></div>
     ${completas ? `<div id="missa-sugerida"><div class="loading-note"><span class="spin"></span>Montando a missa de hoje…</div></div>
       <div class="shelf-head"><h2>Missas completas do acervo</h2></div>` : ''}
-    <label class="field">${icon('search', 20)}<input class="search" type="search" placeholder="Procurar em ${esc(parte[1])}"></label>
-    <div id="cantos" style="margin-top:12px"><div class="loading-note"><span class="spin"></span>Carregando as músicas…</div></div>`;
+    ${pk === 'creio' ? `<div class="shelf-head"><h2>Rezar o Creio</h2></div><div class="grade-oe">${CREIO_TEXTOS.map(([slug, nome, sub], k) => `<a class="cartao-oe texto" href="#/oracao/${slug}" style="--h:${265 + k * 12}">
+      <small>Profissão de fé</small><b>${esc(nome)}</b><span>${esc(sub)}</span></a>`).join('')}</div>
+      <div class="shelf-head" id="creio-cantado" style="margin-top:18px" hidden><h2>Creio cantado</h2></div>` : ''}
+    <div id="cantos"><div class="loading-note"><span class="spin"></span>Carregando as músicas…</div></div>
+    ${sentidoHTML(pk)}`;
   if (completas) missaCompletaSugerida($('#missa-sugerida'));
   const ac = await acervoClassificado();
   const box = $('#cantos');
@@ -2344,21 +2400,41 @@ async function viewParteDoSetor(setor, pk) {
   if (!ac.musicas.length) { box.innerHTML = avisoAcervo(); return; }
   const itens = (setor[0] === 'fixas' ? ac.fixas : ac.tempos).get(pk) || [];
   const vazio = completas ? 'Ainda não há missas completas (todas as partes num arquivo só) no acervo. Use a sugestão de hoje, acima.'
-    : `Ainda não há músicas de ${esc(parte[1])} no acervo. <a href="#/buscar" id="na-internet">Procurar na internet</a>`;
+    : `Nenhum canto desta parte no acervo ainda. <a href="#/buscar" id="na-internet">Buscar “${esc(parte[1].replace(/\s*\(.*$/, ''))}” na internet</a> (cifras e vídeos).`;
   ligarMusicas(box);
+  // Creio: sem Creio cantado no acervo, ficam só os textos para rezar (sem a seção vazia)
+  if (pk === 'creio' && !itens.length) { box.innerHTML = ''; $('.field', view)?.nextElementSibling?.remove(); $('.field', view)?.remove(); return; }
+  if ($('#creio-cantado')) $('#creio-cantado').hidden = false;
   desenharMusicas(box, itens, { vazio });
   $('#na-internet')?.addEventListener('click', () => { sessionStorage.setItem('busca', parte[1].replace(/\s*\(.*$/, '')); sessionStorage.setItem('buscaFiltro', 'tudo'); });
   $('.search').oninput = (e) => desenharMusicas(box, itens, { filtro: e.target.value, vazio: 'Nada com esse nome.' });
 }
 
+// o texto do dia de uma parte (leitura, salmo, aclamação, evangelho), inteiro, numa janela
+function lerTextoDoDia(p) {
+  return openDialog(`<h3>${esc(p.nome)}</h3><div class="texto-liturgico ler-dia">${leituraHTML(p.liturgia).replace(' recolhida', '').replace(/<button[^>]*data-expand[\s\S]*?<\/button>/, '')}</div>
+    <div class="acts"><button class="btn primary" data-ok>Fechar</button></div>`, (dlg, done) => { $('[data-ok]', dlg).onclick = () => done(null); });
+}
+
 // "Missas completas": a liturgia de hoje com um canto sugerido para cada momento (a Missa litúrgica da Liturgia)
-async function missaCompletaSugerida(box) {
+// a missa de hoje (Missa litúrgica) e os cantos escolhidos para cada parte
+async function missaDeHojeSugerida() {
   const data = hojeISO();
+  let missa = missaCache.get(data);
+  if (!missa) { missa = await getMissa(data); missaCache.set(data, missa); }
+  missa = await missaLiturgica(missa, data);
+  const chave = 'lit:' + data;
+  if (!escolhas.has(chave)) escolhas.set(chave, Object.fromEntries(missa.partes.map((p) => [p.chave, escolhaPadrao(p)])));
+  const sel = escolhas.get(chave);
+  const cantos = missa.partes.filter((p) => !LEITURAS.includes(p.chave) && sel[p.chave]).length;
+  return { missa, sel, data, cantos };
+}
+async function missaCompletaSugerida(box) {
   let missa;
+  let sel;
+  let data = hojeISO();
   try {
-    missa = missaCache.get(data);
-    if (!missa) { missa = await getMissa(data); missaCache.set(data, missa); }
-    missa = await missaLiturgica(missa, data);
+    ({ missa, sel, data } = await missaDeHojeSugerida());
   } catch {
     if (box.isConnected) box.innerHTML = `<a class="source" href="#/liturgia/${data}"><span class="ico">${icon('cross', 18)}</span><span>${navigator.onLine === false ? 'Sem internet e sem a liturgia de hoje guardada.' : 'Não foi possível montar a missa de hoje.'} Abrir a liturgia do dia</span></a>`;
     return;
@@ -2368,23 +2444,28 @@ async function missaCompletaSugerida(box) {
   const cor = CORES[lit.cor] || '#555';
   document.documentElement.style.setProperty('--lit-cor', cor);
   document.documentElement.style.setProperty('--lit-ink', lit.cor === 'branco' ? '#d8b54a' : `color-mix(in srgb, ${cor} 60%, #fff)`);
-  const chave = 'lit:' + data;
-  if (!escolhas.has(chave)) escolhas.set(chave, Object.fromEntries(missa.partes.map((p) => [p.chave, escolhaPadrao(p)])));
-  const sel = escolhas.get(chave);
   let n = 0;
+  // a Oração Eucarística não tem canto: a linha leva às orações eucarísticas do Missal (depois do Santo)
+  const oe = `<li class="track clickable" data-oe style="grid-template-columns:auto 1fr auto"><span class="step leitura">${icon('book', 18)}</span>
+    <div class="info"><div class="t">Oração Eucarística</div><div class="s">Escolher no Missal Romano (I a V e outras)</div></div>
+    <span class="acts"><button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
+  let oePosta = Boolean(sel.oracao);
   const linhas = missa.partes.map((p) => {
     const v = sel[p.chave];
+    const ref = p.liturgia ? p.liturgia.referenciaCompleta || p.liturgia.referencia || '' : '';
     if (LEITURAS.includes(p.chave)) {
-      const ref = p.liturgia?.referenciaCompleta || p.liturgia?.referencia || '';
-      return ref ? `<li class="track" style="grid-template-columns:auto 1fr"><span class="step leitura">${icon('book', 18)}</span><div class="info"><div class="t">${esc(p.nome)}</div><div class="s">${esc(ref)}</div></div></li>` : '';
+      return ref ? `<li class="track clickable" data-ler="${esc(p.chave)}" style="grid-template-columns:auto 1fr auto"><span class="step leitura">${icon('book', 18)}</span><div class="info"><div class="t">${esc(p.nome)}</div><div class="s">${esc(ref)}</div></div>
+        <span class="acts"><button class="icon-btn" aria-label="Ler">${icon('next', 18)}</button></span></li>` : '';
     }
-    if (!v) return '';
+    if (p.chave === 'oracao' && !v) { if (oePosta) return ''; oePosta = true; return oe; }
+    if (!v) return p.liturgia ? `<li class="track clickable" data-ler="${esc(p.chave)}" style="grid-template-columns:auto 1fr auto"><span class="step leitura">${icon('book', 18)}</span><div class="info"><div class="t">${esc(p.nome)}</div><div class="s">${esc(ref)}</div></div>
+        <span class="acts"><button class="icon-btn" aria-label="Ler">${icon('next', 18)}</button></span></li>` : '';
     const c = p.cantos.find((x) => x.url === v);
     const titulo = v === 'cnbb' ? 'Texto oficial (CNBB)' : c?.titulo || '';
     const fonte = c?.fonte === 'hinario' ? 'Hinário CNBB' : c?.fonte === 'acervo' ? 'Acervo' : '';
     return `<li class="track clickable" data-parte="${esc(p.chave)}" style="grid-template-columns:auto 1fr auto"><span class="step">${++n}</span>
       <div class="info"><div class="t">${esc(titulo)}</div><div class="s">${esc(p.nome)}${fonte ? ` · ${fonte}` : ''}</div></div>
-      <span class="acts"><button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
+      <span class="acts">${p.liturgia ? `<button class="icon-btn" data-ler="${esc(p.chave)}" aria-label="Ler o texto do dia" title="Ler o texto do dia (${esc(ref)})">${icon('book', 17)}</button>` : ''}<button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>${p.chave === 'santo' && !oePosta ? (oePosta = true, oe) : ''}`;
   }).join('');
   box.innerHTML = `
     <section class="hero ${lit.cor === 'branco' ? 'claro' : ''}">
@@ -2402,6 +2483,10 @@ async function missaCompletaSugerida(box) {
   $('#montar', box)?.addEventListener('click', (e) => montarRepertorio(missa, sel, data, { btn: e.currentTarget }));
   $('#montar-pl', box)?.addEventListener('click', (e) => montarRepertorio(missa, sel, data, { btn: e.currentTarget, tipo: 'playlist' }));
   box.addEventListener('click', async (e) => {
+    const ler = e.target.closest('[data-ler]');
+    const pl = ler && missa.partes.find((x) => x.chave === ler.dataset.ler);
+    if (pl?.liturgia) { lerTextoDoDia(pl); return; }
+    if (e.target.closest('[data-oe]')) { sessionStorage.setItem('catOracao', 'oracoes-eucaristicas'); location.hash = '#/oracoes'; return; }
     const li = e.target.closest('li[data-parte]');
     const p = li && missa.partes.find((x) => x.chave === li.dataset.parte);
     if (!p) return;
@@ -3795,6 +3880,8 @@ const ordenarCantos = (cantos, f = fontePreferida()) => [...cantos].sort((a, b) 
 
 function escolhaPadrao(parte) {
   const cantos = ordenarCantos(parte.cantos);
+  // salmo do acervo só vale se for o do dia (tem o refrão do dia ou vem do caderno do Hinário); senão, o texto oficial
+  if (parte.chave === 'salmo' && parte.chordpro && typeof cantos[0]?.pontos === 'number' && cantos[0].pontos < 8) return 'cnbb';
   if (parte.chordpro && parte.chave === 'aclamacao') return cantos[0]?.url || 'cnbb';
   if (parte.chordpro) return cantos.find((c) => !c.sugestao)?.url || cantos[0]?.url || 'cnbb';
   if (!cantos.length || LEITURAS.includes(parte.chave) || parte.chave === 'oracao') return '';
@@ -4052,8 +4139,8 @@ async function missaLiturgica(missa, data) {
   const caderno = cadernoDoDia(cadernos, lit, data);
   const m0 = lit.missas[0] || {};
   const sug = sugerirParaODia(ac.musicas, lit, { caderno: caderno?.caderno.id, textos: { salmo: m0.salmo?.refrao, aclamacao: m0.aclamacao?.versiculo } });
-  const cantosDe = (chave) => (sug[chave] || []).map(({ musica: m }) => ({
-    titulo: m.titulo, url: m.fonte, fonte: m.fonte.startsWith('hinario:') ? 'hinario' : 'acervo', partitura: /x_partitura/.test(m.chordpro),
+  const cantosDe = (chave) => (sug[chave] || []).map(({ musica: m, pontos }) => ({
+    titulo: m.titulo, url: m.fonte, pontos, fonte: m.fonte.startsWith('hinario:') ? 'hinario' : 'acervo', partitura: /x_partitura/.test(m.chordpro),
   }));
   const partes = missa.partes.map((p) => ({ ...p, cantos: cantosDe(p.chave), texto: [] })).filter((p) => !['sinal', 'oracao'].includes(p.chave) || p.cantos.length);
   // o refrão orante do Hinário (antes da entrada) e o Glória, quando o caderno do dia traz
