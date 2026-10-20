@@ -43,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-115';
+export const APP_VERSAO = '2026.10.20-116';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -4654,6 +4654,9 @@ window.addEventListener('hashchange', route);
 applyTheme();
 let rotaInicial = true; // a 1ª tela ao abrir/recarregar o app
 route();
+// o app carregou inteiro: a rede de segurança do index.html não precisa agir
+window.__songbookOk = true;
+try { sessionStorage.removeItem('recuperacao'); } catch { /* sem sessionStorage */ }
 rotaInicial = false;
 
 // Service worker: sempre procura a versão nova; quando ela assume, recarrega a página uma vez.
