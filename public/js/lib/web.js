@@ -10,7 +10,7 @@
 // - YouTube: busca pelo Piped (instâncias públicas, com CORS); o oEmbed confirma um link colado.
 
 import { decodeEntities, normalize } from './html.js';
-import { cifraComCapo, doEditor, isChord, organizarPartes, semIntro, tiposDosBlocos } from '../chordpro.js';
+import { cifraComCapo, doEditor, isChord, organizarPartes, partesDosBlocos, semIntro } from '../chordpro.js';
 
 const NO_NAVEGADOR = typeof window !== 'undefined';
 const UA = NO_NAVEGADOR ? {} : { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36', 'Accept-Language': 'pt-BR,pt;q=0.9' };
@@ -134,10 +134,9 @@ export const viaProxy = (modelo, url) => (modelo.includes('{raw}') ? modelo.repl
   : modelo.includes('{url}') ? modelo.replace('{url}', encodeURIComponent(url)) : modelo + encodeURIComponent(url));
 const cabecalhosDoProxy = (modelo) => (/r\.jina\.ai/.test(modelo) ? { 'X-Return-Format': 'html' } : {});
 
-// Baixa a cifra: direto (no Node) e pelos proxies, na ordem. proxies = lista de modelos.
 // Lê uma página que não libera CORS: direto (no Node) e pelos proxies, na ordem; ler(html) interpreta
 async function lerPagina(url, ler, { proxies = [], fetchImpl, nome = 'o site' } = {}) {
-  const tentativas = [...(NO_NAVEGADOR ? [[url, {}]] : []), ...proxies.filter(Boolean).map((p) => [viaProxy(p, url), cabecalhosDoProxy(p)])];
+  const tentativas = [...(NO_NAVEGADOR ? [] : [[url, {}]]), ...proxies.filter(Boolean).map((p) => [viaProxy(p, url), cabecalhosDoProxy(p)])];
   let erro = new Error(`Sem acesso a ${nome}`);
   for (const [alvo, headers] of tentativas) {
     try {
@@ -314,8 +313,9 @@ export async function buscarLetras(termo, fetchImpl) {
   return buscarLetrasLrclib(q, fetchImpl);
 }
 
-async function buscarLetrasLrclib(q, fetchImpl) {
-  const res = await buscar(`https://lrclib.net/api/search?q=${encodeURIComponent(q)}`, { fetchImpl });
+export async function buscarLetrasLrclib(q, fetchImpl, { titulo = '', artista = '' } = {}) {
+  const params = titulo ? `track_name=${encodeURIComponent(titulo)}${artista ? `&artist_name=${encodeURIComponent(artista)}` : ''}` : `q=${encodeURIComponent(q)}`;
+  const res = await buscar(`https://lrclib.net/api/search?${params}`, { fetchImpl });
   if (!res.ok) throw new Error(`LRCLIB respondeu ${res.status}`);
   const vistos = new Set();
   return (await res.json())
@@ -325,11 +325,53 @@ async function buscarLetrasLrclib(q, fetchImpl) {
     .map((r) => ({ id: r.id, titulo: r.trackName, artista: r.artistName, album: r.albumName || '', letra: r.plainLyrics, url: `https://lrclib.net/api/get/${r.id}`, fonte: 'lrclib' }));
 }
 
-// Letra simples -> ChordPro: estrofes separadas por linha em branco; as partes saem sozinhas (tiposDosBlocos):
+// Vagalume (api.vagalume.com.br, com CORS): artista + música -> a letra
+export async function letraVagalume(titulo, artista, fetchImpl) {
+  if (!titulo || !artista) return null;
+  const res = await buscar(`https://api.vagalume.com.br/search.php?art=${encodeURIComponent(artista)}&mus=${encodeURIComponent(titulo)}`, { fetchImpl });
+  if (!res.ok) throw new Error(`Vagalume respondeu ${res.status}`);
+  const j = await res.json();
+  const m = j?.mus?.[0];
+  if (!/^(exact|aprox)$/.test(j?.type || '') || !m?.text) return null;
+  return { titulo: m.name || titulo, artista: j.art?.name || artista, letra: String(m.text).trim(), url: m.url || '', fonte: 'vagalume' };
+}
+
+// mesmo título: igual sem acentos, maiúsculas, pontuação, o que vem entre parênteses e um " - Ao Vivo" no fim; "Pelas Estradas da Vida, Sonhos e Aventuras…" NÃO é "Pelas Estradas da Vida"
+const tituloComparavel = (t) => normalize(String(t || '').replace(/\([^)]*\)|\[[^\]]*\]/g, ' ').replace(/\s+[-–—]\s+(ao vivo|live|ac[uú]stico|vers[aã]o|remaster|playback|instrumental|feat|part)\b.*$/i, '')).replace(/[^a-z0-9]+/g, ' ').trim();
+const mesmoTitulo = (a, b) => { const A = tituloComparavel(a); return !!A && A === tituloComparavel(b); };
+// mesmo artista: um nome contém o outro ("Martín Valverde, Guilherme de Sá" é de "Martin Valverde")
+const mesmoArtista = (a, b) => { const A = normalize(a); const B = normalize(b); return !!A && !!B && (` ${A} `.includes(` ${B} `) || ` ${B} `.includes(` ${A} `)); };
+
+// Letra de reserva quando a página do Letras não abre (ou a música não está lá): LRCLIB pelo título e
+// artista, depois só pelo título, e o Vagalume. Só aceita a letra da música com o mesmo título.
+export async function letraReserva({ titulo = '', artista = '' } = {}, fetchImpl) {
+  const t = String(titulo || '').trim();
+  const a = String(artista || '').trim();
+  if (!t) return null;
+  // [busca, precisa ser do mesmo artista]
+  const tentativas = [
+    [() => buscarLetrasLrclib('', fetchImpl, { titulo: t, artista: a }), !!a],
+    [() => buscarLetrasLrclib(`${t} ${a}`.trim(), fetchImpl), !!a],
+    [async () => [await letraVagalume(t, a, fetchImpl)].filter(Boolean), false],
+    // cantos de igreja aparecem com vários intérpretes: por último, a letra de mesmo título de outro artista
+    [() => (a ? buscarLetrasLrclib('', fetchImpl, { titulo: t }) : []), false],
+  ];
+  for (const [tentar, doArtista] of tentativas) {
+    const lista = await Promise.resolve().then(tentar).catch(() => []);
+    const achada = lista.find((r) => r.letra && mesmoTitulo(r.titulo, t) && (!doArtista || mesmoArtista(r.artista, a)));
+    if (achada) return achada;
+  }
+  return null;
+}
+
+// Letra simples -> ChordPro: estrofes separadas por linha em branco; as partes saem sozinhas (partesDosBlocos):
 // o bloco que mais se repete é o refrão (cópia idêntica vira {chorus}), e também ponte e pré-refrão.
 export function letraParaChordPro({ titulo = '', artista = '', letra = '', fonte = '', compositor = '' } = {}) {
-  const estrofes = String(letra).replace(/\r\n?/g, '\n').split(/\n\s*\n/).map((e) => e.split('\n').map((l) => l.trim()).filter(Boolean).join('\n')).filter(Boolean);
-  const tipos = tiposDosBlocos(estrofes.map((e) => e.split('\n')));
+  const blocos = String(letra).replace(/\r\n?/g, '\n').split(/\n\s*\n/).map((e) => e.split('\n').map((l) => l.trim()).filter(Boolean)).filter((b) => b.length);
+  // parágrafos com estrofe e refrão juntos são separados (dividirBlocos)
+  const partes = partesDosBlocos(blocos);
+  const estrofes = partes.map((p) => p.linhas.join('\n'));
+  const tipos = partes.map((p) => p.tipo);
   const cab = [`{title: ${titulo || 'Sem título'}}`];
   if (artista) cab.push(`{artist: ${artista}}`);
   if (compositor) cab.push(`{composer: ${compositor}}`);

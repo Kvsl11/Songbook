@@ -7,7 +7,7 @@ import { getMissa as getMissaDireto } from './lib/missa.js';
 import { buscarCantos as buscarDireto, getCanto as getCantoDireto } from './lib/cindy.js';
 import { ehMpm, getMusicaMpm } from './lib/mpm.js';
 import { getLiturgia as getLiturgiaDireto } from './lib/cnbb.js';
-import { buscarCifraClub as buscarCifraClubDireto, buscarLetras as buscarLetrasDireto, getCifraClub as getCifraClubDireto, buscarArtistasCifraClub as buscarArtistasDireto, getArtistaCifraClub as getArtistaDireto, getDiscografiaCifraClub as getDiscografiaDireto, getTodasMusicasCifraClub as getTodasMusicasDireto, getLetra as getLetraDireto, PROXIES_PUBLICOS } from './lib/web.js';
+import { buscarCifraClub as buscarCifraClubDireto, buscarLetras as buscarLetrasDireto, getCifraClub as getCifraClubDireto, buscarArtistasCifraClub as buscarArtistasDireto, getArtistaCifraClub as getArtistaDireto, getDiscografiaCifraClub as getDiscografiaDireto, getTodasMusicasCifraClub as getTodasMusicasDireto, getLetra as getLetraDireto, letraReserva as letraReservaDireto, PROXIES_PUBLICOS } from './lib/web.js';
 
 const PREFIXO = 'songbook.cache.';
 const VALIDADE = 12 * 3600e3;
@@ -167,6 +167,17 @@ export function buscarCifraClub(termo) {
 export function buscarLetras(termo) {
   const t = String(termo || '').trim();
   return obter('letras:' + t.toLowerCase(), () => buscarLetrasDireto(t), 'api/letras?q=' + encodeURIComponent(t));
+}
+
+// letra de reserva (LRCLIB, Vagalume) pelo título e artista, quando o Letras não abre ou não tem a música
+export function letraReserva(titulo, artista = '') {
+  const t = String(titulo || '').trim();
+  const a = String(artista || '').trim();
+  return obter(`letra-reserva:${t}|${a}`.toLowerCase(), async () => {
+    const r = await letraReservaDireto({ titulo: t, artista: a });
+    if (!r) throw new Error('Letra não encontrada');
+    return r;
+  }, `api/letra/reserva?titulo=${encodeURIComponent(t)}&artista=${encodeURIComponent(a)}`);
 }
 
 // artistas do Cifra Club: a busca (com CORS) e a página do artista (pelos proxies), guardadas

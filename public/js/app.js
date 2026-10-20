@@ -15,7 +15,7 @@ import {
   claveDaVoz, estimarAndamento, estimarTom, faixaDoModo, juntarPedaco, melodiaDasNotas, tomDaCifra,
 } from './lib/partitura.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
-import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
+import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const view = $('#view');
@@ -1735,8 +1735,12 @@ async function trazerMusica({ titulo, artista = '', cifra = '', letra = null, vi
   const pVideo = (video ? Promise.resolve([video])
     : cifra ? pCifra.then((c) => buscarYoutube(c ? `${c.titulo} ${c.artista || ''}` : termo)) : buscarYoutube(termo)).catch(() => []);
   const pLetra = (async () => {
-    const item = letra || mesmaMusica(await buscarLetras(termo), titulo, artista, artistaIncerto);
-    return item ? { ...(await trazerLetra(item)), url: item.url } : null;
+    // no Letras: pelo título com o artista e, se não achar, só pelo título
+    let item = letra || mesmaMusica(await buscarLetras(termo).catch(() => []), titulo, artista, artistaIncerto);
+    if (!item && artista) item = mesmaMusica(await buscarLetras(tituloLimpo(titulo)).catch(() => []), titulo, artista, artistaIncerto);
+    if (item) { const l = await trazerLetra(item); return { ...l, url: l.url || item.url }; }
+    // fora do Letras: LRCLIB e Vagalume
+    return await letraReserva(tituloLimpo(titulo), artistaIncerto ? '' : artista);
   })().catch(() => null);
   const c = await pCifra;
   let content;
@@ -1836,12 +1840,14 @@ async function abrirPrevia(content, source, back, videoJa = null) {
   if (jaNaPrevia) route(); else location.hash = '#/musica/previa';
 }
 
-// Letra: do Letras (lida na hora) ou do LRCLIB (já vem com a letra); se o Letras não abrir, tenta o LRCLIB
+// Letra: do Letras (lida na hora) ou do LRCLIB (já vem com a letra); se a página do Letras não abrir, procura
+// a mesma música no LRCLIB e no Vagalume (antes a reserva buscava no próprio Letras de novo e nunca achava)
 async function trazerLetra(item) {
   if (item.letra) return item;
   try { return { ...item, ...(await getLetra(item.url)) }; } catch {
-    const alt = (await buscarLetras(`${item.titulo} ${item.artista}`).catch(() => [])).find((x) => x.letra);
-    if (alt) return { ...alt, url: item.url };
+    const alt = await letraReserva(tituloLimpo(item.titulo), item.artista).catch(() => null)
+      || await letraReserva(tituloLimpo(item.titulo)).catch(() => null);
+    if (alt) return { ...alt, url: alt.url || item.url };
     throw new Error('O Letras não respondeu agora');
   }
 }
@@ -4788,7 +4794,7 @@ function viewSong(id, ctx = {}) {
   // letra que veio da internet sem acordes: procura a cifra da mesma música no Cifra Club e troca sozinho,
   // mantendo o vídeo, a parte da missa e os quadros (uma vez só; se não achar, fica como está)
   // (a letra do Hinário e do acervo litúrgico e o texto oficial da CNBB ficam como estão: letra fiel)
-  const procuraCifra = () => (isPreview ? !/^(cnbb|hinario|acervo):/.test(song.source || '') : /letras\.mus\.br|lrclib/.test(song.source || ''))
+  const procuraCifra = () => (isPreview ? !/^(cnbb|hinario|acervo):/.test(song.source || '') : /letras\.mus\.br|lrclib|vagalume/.test(song.source || ''))
     && !(Date.now() - Number(renderSong(song.content).meta.x_sem_cifra || 0) < 7 * 864e5) && !!song.title;
   // só depois de o app já ter procurado: um aviso simples do que esta música não tem
   const avisoFalta = () => {
@@ -4950,7 +4956,7 @@ function viewSong(id, ctx = {}) {
     ['Álbum', metaR.album],
     ['Ano', metaR.year],
     ['Tom original', tomBase],
-    [/letras\.mus\.br|lrclib/.test(song.source || '') ? 'Fonte da letra' : /cifraclub/.test(song.source || '') ? 'Fonte da cifra' : 'Fonte', fonte && song.source ? `<a href="${esc(song.source)}" target="_blank" rel="noopener">${esc(fonte)}</a>` : esc(fonte), true],
+    [/letras\.mus\.br|lrclib|vagalume/.test(song.source || '') ? 'Fonte da letra' : /cifraclub/.test(song.source || '') ? 'Fonte da cifra' : 'Fonte', fonte && song.source ? `<a href="${esc(song.source)}" target="_blank" rel="noopener">${esc(fonte)}</a>` : esc(fonte), true],
     ['Na biblioteca desde', !isPreview && song.createdAt ? new Date(song.createdAt).toLocaleDateString('pt-BR') : ''],
   ].filter(([, v]) => v);
   $('#creditos').innerHTML = creditos.length ? `<div class="creditos"><h3>Créditos</h3>${creditos.map(([k, v, html]) => `<div class="cred"><span>${esc(k)}</span><b>${html ? v : esc(v)}</b></div>`).join('')}
