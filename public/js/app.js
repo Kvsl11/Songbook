@@ -7,6 +7,7 @@ import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
 import { COLECOES_LITURGICAS, parteFixa, PARTES_FIXAS, tempoDe, TEMPOS } from './lib/acervo.js';
 import { sugerirParaODia } from './lib/sugestoes-liturgicas.js';
+import { revisarRepertorio } from './lib/revisor.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -43,7 +44,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-122';
+export const APP_VERSAO = '2026.10.20-123';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -3672,6 +3673,7 @@ function viewSet(id, { selecionando = false, marcados = new Set() } = {}) {
       <button class="icon-btn danger" id="del" aria-label="Excluir ${tipo.toLowerCase()}" title="Excluir">${icon('trash', 22)}</button>
       <div class="seg-tabs" style="min-width:190px">${campoData('set-date', set.date, 'Data do repertório')}</div>
     </div>
+    ${!pl && set.items.length && set.date && !selecionando ? '<div id="revisao"></div>' : ''}
     ${set.items.length ? `<div class="row" style="margin:0 0 6px"><p class="muted" style="font-size:13px;margin:0;flex:1">${selecionando ? 'Toque nas músicas para marcar ou desmarcar.' : 'Para mudar a ordem, segure uma música e arraste (no computador, clique e arraste).'}</p>
       ${selecionando ? '' : `<button class="btn small" id="set-sel">${icon('check', 15)} Selecionar</button><button class="btn small" id="set-sel-todos">${icon('check', 15)} Selecionar tudo</button>`}</div>
     <ul class="tracks ${selecionando ? 'selecionando' : ''}">${set.items.map((it, i) => linhaItemRepertorio(set, it, i)).join('')}</ul>
@@ -3679,7 +3681,8 @@ function viewSet(id, { selecionando = false, marcados = new Set() } = {}) {
       <span id="sel-n"></span><button class="btn small ghost" id="sel-todos"></button><span class="spacer"></span>
       <button class="btn small ghost" id="sel-cancelar">Cancelar</button><button class="btn small danger solid" id="sel-remover">${icon('trash', 15)} Remover</button></div>` : `<div class="empty"><div class="bubble">${icon('music', 30)}</div><h3>${tipo} vazi${pl ? 'a' : 'o'}</h3><p>Adicione músicas da sua biblioteca ou crie uma do zero.</p>
       <div class="row"><a class="btn primary" href="#/editar/novo/${id}">${icon('edit', 16)} Criar música</a></div></div>`}`;
-  ligarCampoData('set-date', (v) => { set.date = v; db.saveSet(set); });
+  ligarCampoData('set-date', (v) => { set.date = v; db.saveSet(set); revisarSet(set); });
+  revisarSet(set);
   $('#add').onclick = async () => {
     const songId = await pickSong();
     if (songId === 'nova') { location.hash = '#/editar/novo/' + id; return; }
@@ -3765,6 +3768,50 @@ function viewSet(id, { selecionando = false, marcados = new Set() } = {}) {
       viewSet(id);
     });
   }
+}
+
+// Revisão litúrgica do repertório (js/lib/revisor.js): a liturgia da data do repertório contra os cantos escolhidos
+async function revisarSet(set) {
+  const box = $('#revisao');
+  if (!box || !set.date || !set.items.length) return;
+  box.innerHTML = `<div class="revisao carregando">${icon('cross', 18)}<span>Conferindo com a liturgia de ${fmtData(set.date)}…</span></div>`;
+  let lit;
+  try { lit = liturgiaGuardada(set.date) || await getLiturgiaDoDia(set.date); } catch {
+    if (box.isConnected) box.innerHTML = '';
+    return;
+  }
+  // de onde veio cada canto (a pasta do acervo diz o tempo: ADVENTO, QUARESMA…)
+  const ac = set.items.some((it) => /^(acervo|hinario):/.test(db.song(it.songId)?.source || '')) ? await acervoClassificado().catch(() => null) : null;
+  const itens = set.items.map((it) => {
+    const s = db.song(it.songId) || {};
+    const m = ac?.musicas.find((x) => x.fonte === s.source);
+    return { parte: it.label || s.parte || '', titulo: s.title || '(música removida)', letra: s.content || '', origem: m ? `${m.caminho.join('/')} ${m.arquivo || ''}` : '', source: s.source || '', songId: it.songId };
+  });
+  // o mesmo canto em outra missa nas 3 semanas anteriores
+  const ini = somaDias(set.date, -21);
+  const recentes = [];
+  for (const o of db.sets()) {
+    if (o.id === set.id || ehPlaylist(o) || !o.date || o.date < ini || o.date >= set.date) continue;
+    for (const it of o.items) if (itens.some((x) => x.songId === it.songId) && !recentes.some((r) => r.songId === it.songId)) recentes.push({ songId: it.songId, data: o.date, nome: o.name });
+  }
+  const avisos = revisarRepertorio(lit, itens, { recentes });
+  if (!box.isConnected) return;
+  const n = (nv) => avisos.filter((a) => a.nivel === nv).length;
+  const resumo = avisos.length ? [n('erro') && `${n('erro')} ${n('erro') > 1 ? 'erros' : 'erro'}`, n('atencao') && `${n('atencao')} ${n('atencao') > 1 ? 'atenções' : 'atenção'}`, n('info') && `${n('info')} ${n('info') > 1 ? 'observações' : 'observação'}`].filter(Boolean).join(' · ') : 'Tudo certo';
+  const ic = { erro: 'x', atencao: 'info', info: 'check' };
+  box.innerHTML = `<details class="revisao ${n('erro') ? 'com-erro' : n('atencao') ? 'com-atencao' : 'ok'}" ${n('erro') ? 'open' : ''}>
+    <summary>${icon(avisos.length ? 'cross' : 'check', 18)}<span><b>Revisão litúrgica</b><small>${esc(lit.celebracao || '')}</small></span><span class="chip sm">${resumo}</span>${avisos.length ? icon('down', 18) : ''}</summary>
+    ${avisos.length ? `<ul>${avisos.map((a) => `<li class="${a.nivel}" ${a.i !== undefined ? `data-ir="${a.i}"` : ''}>${icon(ic[a.nivel], 15)}<span>${esc(a.texto)}</span></li>`).join('')}</ul>`
+    : ''}</details>`;
+  if (!avisos.length) $('summary', box).addEventListener('click', (e) => e.preventDefault());
+  box.querySelectorAll('[data-ir]').forEach((li) => li.addEventListener('click', () => {
+    const alvo = view.querySelector(`.set-item[data-i="${li.dataset.ir}"]`);
+    if (!alvo) return;
+    alvo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    alvo.classList.remove('piscar');
+    void alvo.offsetWidth;
+    alvo.classList.add('piscar');
+  }));
 }
 
 // playlist: procura o vídeo do YouTube das músicas que ainda não têm (uma vez por música em cada sessão)

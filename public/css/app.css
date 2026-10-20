@@ -1464,3 +1464,27 @@ a.source { text-decoration: none; color: inherit; }
 .sentido svg { flex: none; margin-top: 2px; color: var(--accent-ink); }
 .sentido b { display: block; color: var(--text); font-size: 15px; margin-bottom: 4px; }
 .sentido p { margin: 0; font-family: var(--serif); font-size: 16px; line-height: 1.55; }
+
+/* ============================================================ revisão litúrgica do repertório */
+.revisao { margin: 0 0 14px; border-radius: 12px; background: var(--surface); overflow: hidden; }
+.revisao.carregando { display: flex; align-items: center; gap: 10px; padding: 12px 14px; color: var(--muted); font-size: 14px; }
+.revisao summary { display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; list-style: none; }
+.revisao summary::-webkit-details-marker { display: none; }
+.revisao summary > span:first-of-type { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.revisao summary small { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.revisao summary > svg:first-child { flex: none; }
+.revisao.ok summary > svg:first-child { color: #1ed760; }
+.revisao.com-atencao summary > svg:first-child { color: #e3b341; }
+.revisao.com-erro summary > svg:first-child { color: var(--danger); }
+.revisao[open] summary > svg:last-child { transform: rotate(180deg); }
+.revisao ul { list-style: none; margin: 0; padding: 0 10px 10px; display: grid; gap: 4px; }
+.revisao li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 8px; font-size: 14px; line-height: 1.45; }
+.revisao li svg { flex: none; margin-top: 2px; }
+.revisao li[data-ir] { cursor: pointer; }
+.revisao li[data-ir]:hover { background: var(--surface-2); }
+.revisao li.erro { background: var(--danger-soft); }
+.revisao li.erro svg { color: var(--danger); }
+.revisao li.atencao svg { color: #e3b341; }
+.revisao li.info svg { color: var(--muted); }
+@keyframes piscar { 0%, 100% { background: transparent; } 30% { background: var(--accent-soft); } }
+.set-item.piscar { animation: piscar 1.4s ease 1; }
