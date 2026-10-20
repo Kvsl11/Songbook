@@ -639,25 +639,33 @@ export function aplicarEstrutura(src, partes) {
 const linhaComparavel = (l) => String(l).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
 export function tiposDosBlocos(blocos) {
   const conj = blocos.map((b) => b.map(linhaComparavel).filter(Boolean));
+  // parecidos: a maior parte das linhas iguais nos DOIS blocos (um bloco curto contido num longo não conta:
+  // senão "estrofe + refrão" juntos num parágrafo puxavam a música inteira para o refrão)
   const parecidos = (a, b) => {
     if (!a.length || !b.length) return false;
     const [menor, maior] = a.length <= b.length ? [a, b] : [b, a];
     const s = new Set(maior);
     const iguais = menor.filter((l) => s.has(l)).length;
-    return menor.length === 1 ? iguais === 1 && maior.length <= 2 : iguais / menor.length >= 0.6;
+    return menor.length === 1 ? iguais === 1 && maior.length <= 2 : iguais / menor.length >= 0.6 && iguais / maior.length >= 0.5;
   };
-  // grupos de blocos parecidos
-  const grupo = blocos.map((_, i) => i);
-  const raiz = (i) => (grupo[i] === i ? i : (grupo[i] = raiz(grupo[i])));
-  for (let i = 0; i < blocos.length; i++) for (let j = i + 1; j < blocos.length; j++) if (parecidos(conj[i], conj[j])) grupo[raiz(j)] = raiz(i);
-  const membros = new Map();
-  blocos.forEach((_, i) => { const r = raiz(i); if (!membros.has(r)) membros.set(r, []); membros.get(r).push(i); });
-  const repetidos = [...membros.values()].filter((m) => m.length > 1);
+  // grupos de blocos parecidos: um bloco só entra num grupo se for parecido com todos os que já estão nele
+  // (sem isso, A ~ B e B ~ C juntavam A e C, e em cadeia a letra toda virava um grupo só)
+  const grupos = [];
+  const grupoDe = blocos.map((_, i) => {
+    const g = grupos.find((m) => m.every((j) => parecidos(conj[i], conj[j])));
+    if (g) { g.push(i); return g; }
+    const novo = [i];
+    grupos.push(novo);
+    return novo;
+  });
+  const repetidos = grupos.filter((m) => m.length > 1);
   const tipos = blocos.map(() => 'estrofe');
   if (!repetidos.length) return tipos;
   // refrão: o que mais se repete; empate -> o que aparece mais tarde (a estrofe costuma vir primeiro)
   repetidos.sort((a, b) => b.length - a.length || b[0] - a[0]);
   const refrao = repetidos[0];
+  // todos os blocos no mesmo grupo: é uma estrofe que se repete (ladainha), não dá para dizer que tudo é refrão
+  if (refrao.length === blocos.length) return tipos;
   refrao.forEach((i) => (tipos[i] = 'refrao'));
   for (const m of repetidos.slice(1)) if (m.every((i) => tipos[i + 1] === 'refrao')) m.forEach((i) => (tipos[i] = 'pre-refrao'));
   // tamanho mais comum das estrofes
@@ -667,11 +675,68 @@ export function tiposDosBlocos(blocos) {
   let refroes = 0;
   tipos.forEach((t, i) => {
     if (t === 'refrao') { refroes++; return; }
-    const unico = membros.get(raiz(i)).length === 1;
+    const unico = grupoDe[i].length === 1;
     const depois = tipos.slice(i + 1).find((x) => x !== 'pre-refrao');
     if (t === 'estrofe' && unico && refroes >= 2 && (depois === 'refrao' || depois === undefined) && conj[i].length !== tamEstrofe && i > 0) tipos[i] = 'ponte';
   });
   return tipos;
+}
+
+// Muitos sites juntam estrofe e refrão no mesmo parágrafo. Quando um trecho de 2 ou mais linhas seguidas aparece
+// em outro bloco, ele é separado do resto (o que sobra de cada lado também fica com 2 linhas ou mais; uma linha
+// solta, como um "Mas Deus te quer sorrindo" repetido no fim, continua junto). blocos: [[linha, …], …] ->
+// [{ bloco: índice do bloco, inicio: 1ª linha do pedaço dentro do bloco, linhas }]
+export function dividirBlocos(blocos) {
+  let pedacos = blocos.map((linhas, bloco) => ({ bloco, inicio: 0, linhas }));
+  const cmp = (p) => p.linhas.map(linhaComparavel);
+  // maior trecho de linhas seguidas em comum entre a e b: [início em a, início em b, tamanho]
+  const trechoComum = (a, b) => {
+    let melhor = [0, 0, 0];
+    const ant = new Array(b.length + 1).fill(0);
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = b.length; j >= 1; j--) {
+        ant[j] = a[i - 1] && a[i - 1] === b[j - 1] ? ant[j - 1] + 1 : 0;
+        if (ant[j] > melhor[2]) melhor = [i - ant[j], j - ant[j], ant[j]];
+      }
+    }
+    return melhor;
+  };
+  const cortes = (p, ini, tam) => {
+    const antes = ini;
+    const depois = p.linhas.length - ini - tam;
+    if ((antes && antes < 2) || (depois && depois < 2) || (!antes && !depois)) return null;
+    return [[0, antes], [ini, tam], [ini + tam, depois]].filter(([, n]) => n)
+      .map(([d, n]) => ({ bloco: p.bloco, inicio: p.inicio + d, linhas: p.linhas.slice(d, d + n) }));
+  };
+  for (let volta = 0; volta < 60; volta++) {
+    let mudou = false;
+    const c = pedacos.map(cmp);
+    for (let i = 0; i < pedacos.length && !mudou; i++) {
+      for (let j = 0; j < pedacos.length && !mudou; j++) {
+        if (i === j) continue;
+        const [ia, ib, tam] = trechoComum(c[i], c[j]);
+        if (tam < 2) continue;
+        // o trecho é o bloco j inteiro, ou tem 3 linhas ou mais e o resto dos dois blocos é diferente
+        // (dois refrões com uma linha trocada não são partidos ao meio)
+        if (tam < c[j].length) {
+          const resto = new Set([...c[j].slice(0, ib), ...c[j].slice(ib + tam)]);
+          const restoI = [...c[i].slice(0, ia), ...c[i].slice(ia + tam)];
+          if (tam < 3 || restoI.filter((l) => resto.has(l)).length * 2 >= Math.min(restoI.length, resto.size)) continue;
+        }
+        const novos = cortes(pedacos[i], ia, tam);
+        if (novos) { pedacos.splice(i, 1, ...novos); mudou = true; }
+      }
+    }
+    if (!mudou) break;
+  }
+  return pedacos;
+}
+
+// as partes da letra: os blocos divididos (dividirBlocos) e o tipo de cada pedaço (tiposDosBlocos)
+export function partesDosBlocos(blocos) {
+  const pedacos = dividirBlocos(blocos);
+  const tipos = tiposDosBlocos(pedacos.map((p) => p.linhas));
+  return pedacos.map((p, i) => ({ ...p, tipo: tipos[i] }));
 }
 
 // Cifra/letra sem refrão marcado: coloca as partes sozinha (refrão, estrofes, ponte…). Só põe marcações:
@@ -690,7 +755,7 @@ export function organizarPartes(src) {
     } else if (!l.trim() || ehCabecalho(l)) atual = null;
   }
   if (blocos.length < 2) return texto;
-  const tipos = tiposDosBlocos(blocos.map((b) => b.linhas));
-  if (!tipos.includes('refrao')) return texto;
-  return aplicarEstrutura(texto, blocos.map((b, i) => ({ inicio: b.inicio, tipo: tipos[i] })));
+  const partes = partesDosBlocos(blocos.map((b) => b.linhas));
+  if (!partes.some((p) => p.tipo === 'refrao')) return texto;
+  return aplicarEstrutura(texto, partes.map((p) => ({ inicio: blocos[p.bloco].inicio + p.inicio, tipo: p.tipo })));
 }

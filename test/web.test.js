@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cifraTextoParaChordPro, ehCifraClub, simplificarCifra, parseLetras, resultadosLetras, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
+  cifraTextoParaChordPro, ehCifraClub, letraReserva, simplificarCifra, parseLetras, resultadosLetras, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
 } from '../public/js/lib/web.js';
-import { organizarPartes, tiposDosBlocos, semIntro, aplicarEstrutura, aplicarLetra, definirMeta, doEditor, letraDe, linhasDaLetra, paraEditor, parseChordPro } from '../public/js/chordpro.js';
+import { organizarPartes, partesDosBlocos, tiposDosBlocos, semIntro, aplicarEstrutura, aplicarLetra, definirMeta, doEditor, letraDe, linhasDaLetra, paraEditor, parseChordPro } from '../public/js/chordpro.js';
 
 test('lê a busca do Cifra Club (JSONP) e monta links e capas', () => {
   const json = lerJsonp('({"response":{"docs":[{"t":"1","m":"Artista","d":"artista"},{"t":"2","m":"Noites Traiçoeiras","a":"Padre Marcelo Rossi","i":"7/6/4/6/abc-tb.jpg","d":"padre-marcelo-rossi","u":"noite-traicoeira"}]}})');
@@ -239,4 +239,44 @@ test('cifra sem partes marcadas ganha refrão e estrofes; acordes e letra não m
   assert.match(r, /\[G\]Deus está \[D\]aqui/);
   // já tem refrão marcado: fica como está
   assert.equal(organizarPartes(r), r);
+});
+
+test('partes automáticas: estrofe e refrão no mesmo parágrafo não viram tudo refrão', () => {
+  const r = ['Vem, Espírito Santo', 'vem nos renovar', 'acende em nós', 'o fogo do teu amor', 'vem, Senhor', 'vem nos transformar'];
+  const v1 = ['Quando eu andava', 'longe do teu caminho', 'tu me chamaste', 'pelo nome'];
+  const v2 = ['Hoje eu canto', 'tua glória', 'e anuncio', 'teu amor'];
+  const v3 = ['Quero viver', 'na tua presença', 'todos os dias', 'da minha vida'];
+  const letra = [[...v1, ...r], [...v2, ...r], [...v3, ...r]].map((b) => b.join('\n')).join('\n\n');
+  const pro = letraParaChordPro({ titulo: 'T', letra });
+  assert.deepEqual(parseChordPro(pro).sections.map((x) => x.type), ['verse', 'chorus', 'verse', 'chorus', 'verse', 'chorus']);
+  // o refrão sozinho e depois junto da estrofe
+  assert.deepEqual(partesDosBlocos([r, [...v1, ...r], v2]).map((p) => p.tipo), ['refrao', 'estrofe', 'refrao', 'estrofe']);
+  // refrões com uma linha trocada não são partidos ao meio
+  const r2 = [...r.slice(0, 3), 'o fogo do teu amor, Senhor', ...r.slice(4)];
+  assert.deepEqual(partesDosBlocos([v1, r, v2, r2]).map((p) => p.tipo), ['estrofe', 'refrao', 'estrofe', 'refrao']);
+  // a mesma estrofe repetida (ladainha) não vira refrão
+  assert.deepEqual(tiposDosBlocos([v1, v1, v1]), ['estrofe', 'estrofe', 'estrofe']);
+});
+
+test('letra de reserva: LRCLIB pelo título e artista, depois Vagalume; só aceita o mesmo título', async () => {
+  const pedidos = [];
+  const resposta = (dados) => ({ ok: true, status: 200, json: async () => dados });
+  const fetchImpl = async (url) => {
+    pedidos.push(url);
+    if (url.includes('lrclib.net')) return resposta(url.includes('artist_name') ? [{ id: 1, trackName: 'Outra Música', artistName: 'Pe. Zezinho', plainLyrics: 'x' }] : []);
+    return resposta({ type: 'exact', art: { name: 'Padre Zezinho' }, mus: [{ name: 'Maria de Nazaré', url: 'https://www.vagalume.com.br/padre-zezinho/maria-de-nazare.html', text: 'Maria de Nazaré\nMaria me cativou' }] });
+  };
+  const r = await letraReserva({ titulo: 'Maria de Nazaré', artista: 'Padre Zezinho' }, fetchImpl);
+  assert.equal(r.fonte, 'vagalume');
+  assert.match(r.letra, /^Maria de Nazaré/);
+  assert.ok(pedidos[0].includes('track_name=Maria%20de%20Nazar%C3%A9&artist_name=Padre%20Zezinho'));
+  assert.equal(await letraReserva({ titulo: '' }, fetchImpl), null);
+});
+
+test('letra de reserva: título parecido de outra música não serve', async () => {
+  const fetchImpl = async (url) => ({ ok: true, status: 200, json: async () => (url.includes('lrclib') ? [
+    { id: 1, trackName: 'Pelas Estradas da Vida, Sonhos e Aventuras de um Herói', artistName: 'Outro', plainLyrics: 'errada' },
+    { id: 2, trackName: 'Pelas Estradas da Vida - Ao Vivo', artistName: 'Coral', plainLyrics: 'certa' },
+  ] : { type: 'notfound' }) });
+  assert.equal((await letraReserva({ titulo: 'Pelas Estradas da Vida', artista: 'Músicas Católicas' }, fetchImpl)).letra, 'certa');
 });

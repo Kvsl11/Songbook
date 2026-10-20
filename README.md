@@ -93,6 +93,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   **Partes automáticas**: quando a cifra ou a letra vem sem o refrão marcado, o próprio app (sem IA paga) compara
   os blocos da letra e marca o refrão (o que mais se repete, mesmo com pequenas diferenças), as estrofes, o
   pré-refrão e a ponte; músicas já salvas são organizadas ao abrir. Nenhuma palavra ou acorde muda (`organizarPartes`).
+  Parágrafos que juntam estrofe e refrão são separados (`dividirBlocos`), e um bloco só conta como repetição de outro
+  se a maior parte das linhas dos dois for igual — assim a música não vira "tudo refrão".
   Ao abrir uma música da busca (Cifra Club, letras, cantos), o app procura o vídeo no YouTube sozinho e já
   vincula; se não achar, mostra o aviso com "Escolher vídeo".
 
@@ -182,7 +184,7 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 | **Pocket Terço** | missal do dia (antífonas, coleta, oferendas, comunhão, leituras, homilia) e orações (orações eucarísticas, prefácios, ordinário da missa) | cópia diária pelo GitHub Actions (`scripts/liturgia-sync.mjs`) em `data/pt/` |
 | **Junior Música Católica** | diretório de hinários da CNBB, salmos, partituras, documentos e formação | cópia diária em `data/junior.json` (aba Orações → Hinários, partituras e formação; os arquivos abrem no app) |
 | **Cifra Club** | busca e cifra completa de qualquer música | busca direta (serviço de busca do site libera CORS); a página da cifra pelo Jina Reader (r.jina.ai, público, com CORS), com proxies de reserva; se nada responder, colando o texto |
-| **Letras.mus.br** | letras de músicas (com compositor) | busca direta (serviço de busca do site, com CORS); a página da letra pelo Jina Reader; reserva: LRCLIB (API aberta) |
+| **Letras.mus.br** | letras de músicas (com compositor) | busca direta (serviço de busca do site, com CORS); a página da letra pelo Jina Reader; se a página não abrir ou a música não estiver lá: LRCLIB (pelo título e artista, depois só pelo título) e Vagalume — só vale a letra com o mesmo título |
 | **YouTube** | vídeo de referência, player | busca pelo Piped (público, com CORS), oEmbed para links colados, player embutido |
 
 As sugestões das fontes são misturadas em cada parte da missa (as do Músicas para Missa aparecem com a
@@ -264,7 +266,9 @@ test/             testes com node:test
 | `GET /api/cindy/busca?q=…&tipo=salmo\|aclamacao\|todos` | Busca no site da Cindy |
 | `GET /api/cifraclub?url=…` | Cifra do Cifra Club em ChordPro |
 | `GET /api/cifraclub/busca?q=…` | Busca no Cifra Club |
-| `GET /api/letras?q=…` | Busca de letras (LRCLIB) |
+| `GET /api/letras?q=…` | Busca de letras (Letras.mus.br; reserva: LRCLIB) |
+| `GET /api/letra?url=…` | Letra de uma página do Letras.mus.br |
+| `GET /api/letra/reserva?titulo=…&artista=…` | Letra pelo título e artista (LRCLIB, Vagalume) |
 
 ### Como as fontes foram mapeadas (engenharia reversa das páginas web)
 
