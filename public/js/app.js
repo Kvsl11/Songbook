@@ -43,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-116';
+export const APP_VERSAO = '2026.10.20-117';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2308,7 +2308,18 @@ async function viewSetor(k, parte) {
   if (!corpo) return;
   if (!ac.musicas.length) { corpo.innerHTML = avisoAcervo(); return; }
   const cartaoParte = ([pk, nome], n, i) => `<a class="parte-card" href="#/setor/${k}/${pk}" style="--h:${(i * 37 + setor[4]) % 360}"><b>${esc(nome)}</b><small>${contagem(n)}</small></a>`;
-  if (k === 'fixas') corpo.innerHTML = `<div class="grade-partes">${PARTES_FIXAS.map((p, i) => cartaoParte(p, ac.fixas.get(p[0])?.length || 0, i)).join('')}</div>`;
+  if (k === 'fixas') {
+    corpo.innerHTML = `<div class="grade-partes">${PARTES_FIXAS.map((p, i) => cartaoParte(p, ac.fixas.get(p[0])?.length || 0, i)).join('')}</div>`;
+    // Missas completas: conta também os cantos da missa de hoje, que aparecem lá dentro
+    const arquivos = ac.fixas.get('missas-completas')?.length || 0;
+    const card = corpo.querySelector('a[href$="/missas-completas"] small');
+    if (card) {
+      card.textContent = arquivos ? contagem(arquivos) : 'montando a missa de hoje…';
+      missaDeHojeSugerida().then(({ cantos }) => {
+        if (card.isConnected) card.textContent = contagem(cantos + arquivos) + (cantos ? ' · missa de hoje' : '');
+      }).catch(() => { if (card.isConnected) card.textContent = arquivos ? contagem(arquivos) : 'a missa de hoje'; });
+    }
+  }
   else if (k === 'tempos') corpo.innerHTML = `<div class="grade-partes">${TEMPOS.map((p, i) => cartaoParte(p, ac.tempos.get(p[0])?.length || 0, i)).join('')}</div>`;
   else {
     const colecao = ([cam, nome, desc]) => {
@@ -2352,13 +2363,24 @@ async function viewParteDoSetor(setor, pk) {
 }
 
 // "Missas completas": a liturgia de hoje com um canto sugerido para cada momento (a Missa litúrgica da Liturgia)
-async function missaCompletaSugerida(box) {
+// a missa de hoje (Missa litúrgica) e os cantos escolhidos para cada parte
+async function missaDeHojeSugerida() {
   const data = hojeISO();
+  let missa = missaCache.get(data);
+  if (!missa) { missa = await getMissa(data); missaCache.set(data, missa); }
+  missa = await missaLiturgica(missa, data);
+  const chave = 'lit:' + data;
+  if (!escolhas.has(chave)) escolhas.set(chave, Object.fromEntries(missa.partes.map((p) => [p.chave, escolhaPadrao(p)])));
+  const sel = escolhas.get(chave);
+  const cantos = missa.partes.filter((p) => !LEITURAS.includes(p.chave) && sel[p.chave]).length;
+  return { missa, sel, data, cantos };
+}
+async function missaCompletaSugerida(box) {
   let missa;
+  let sel;
+  let data = hojeISO();
   try {
-    missa = missaCache.get(data);
-    if (!missa) { missa = await getMissa(data); missaCache.set(data, missa); }
-    missa = await missaLiturgica(missa, data);
+    ({ missa, sel, data } = await missaDeHojeSugerida());
   } catch {
     if (box.isConnected) box.innerHTML = `<a class="source" href="#/liturgia/${data}"><span class="ico">${icon('cross', 18)}</span><span>${navigator.onLine === false ? 'Sem internet e sem a liturgia de hoje guardada.' : 'Não foi possível montar a missa de hoje.'} Abrir a liturgia do dia</span></a>`;
     return;
@@ -2368,9 +2390,6 @@ async function missaCompletaSugerida(box) {
   const cor = CORES[lit.cor] || '#555';
   document.documentElement.style.setProperty('--lit-cor', cor);
   document.documentElement.style.setProperty('--lit-ink', lit.cor === 'branco' ? '#d8b54a' : `color-mix(in srgb, ${cor} 60%, #fff)`);
-  const chave = 'lit:' + data;
-  if (!escolhas.has(chave)) escolhas.set(chave, Object.fromEntries(missa.partes.map((p) => [p.chave, escolhaPadrao(p)])));
-  const sel = escolhas.get(chave);
   let n = 0;
   const linhas = missa.partes.map((p) => {
     const v = sel[p.chave];
