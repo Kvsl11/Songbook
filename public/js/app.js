@@ -8,6 +8,7 @@ import { apagarModelo, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salva
 import { COLECOES_LITURGICAS, parteFixa, PARTES_FIXAS, tempoDe, TEMPOS } from './lib/acervo.js';
 import { sugerirParaODia } from './lib/sugestoes-liturgicas.js';
 import { revisarRepertorio } from './lib/revisor.js';
+import { duracaoTotal, nomearVozes, passoNoTempo, segundosPorSemibreve, volumeDa } from './lib/ensaio.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -44,7 +45,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-123';
+export const APP_VERSAO = '2026.10.20-124';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2733,6 +2734,187 @@ const carregarScript = (src) => {
 const OSMD_JS = 'https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.2/build/opensheetmusicdisplay.min.js';
 const CIFRA_NO_TEXTO = /^[A-G][#b♯♭]?(m|maj|min|dim|aug|sus|add|°|º|ø|M)?[\d()+#b♯♭]*(\/[A-G][#b♯♭]?)?$/;
 
+// Ensaio: toca a partitura desenhada (todas as vozes, uma voz em destaque ou só ela), com o cursor
+// andando sobre as notas, no andamento escolhido e no tom da tela. Som feito no próprio navegador (Web Audio).
+function criarEnsaio(osmd, barra, tomAtual) {
+  if (!barra) return null;
+  // as notas de cada momento da partitura (o cursor do desenho percorre tudo, já com as repetições)
+  const passos = [];
+  const cur = osmd.cursor;
+  cur.reset();
+  for (let guarda = 0; !cur.Iterator.EndReached && guarda < 20000; guarda++) {
+    const t = cur.Iterator.CurrentEnrolledTimestamp.RealValue;
+    const notas = [];
+    for (const ve of cur.Iterator.CurrentVoiceEntries || []) {
+      const voz = `${ve.ParentVoice.Parent.Id}:${ve.ParentVoice.VoiceId}`;
+      for (const n of ve.Notes) {
+        if (!n.Pitch || n.isRest()) continue;
+        if (n.NoteTie && n.NoteTie.StartNote !== n) continue; // nota ligada: soa uma vez, com a duração somada
+        // altura pela posição da nota (halfTone 57 = Lá 440); fora da extensão de voz é erro de leitura e fica de fora
+        const freq = 440 * 2 ** ((n.Pitch.halfTone - 57) / 12);
+        if (!(freq >= 60 && freq <= 1400)) continue;
+        const dur = n.NoteTie ? n.NoteTie.Notes.reduce((d, x) => d + x.Length.RealValue, 0) : n.Length.RealValue;
+        notas.push({ freq, dur, voz });
+      }
+    }
+    passos.push({ t, notas });
+    cur.next();
+  }
+  cur.reset();
+  if (!passos.some((p) => p.notas.length)) return null;
+  // o cursor na cor de destaque do app (o desenho volta à cor padrão a cada vez que é refeito)
+  const mostrarCursor = () => {
+    const c = osmd.cursor;
+    try { c.CursorOptions = { ...c.CursorOptions, color: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#06b6d4', alpha: 0.45, follow: false }; } catch { /* versão sem a opção */ }
+    c.show();
+  };
+  const vozes = nomearVozes(passos);
+  const grupoDe = new Map(vozes.flatMap((g) => g.membros.map((m) => [m, g.voz])));
+  const fim = duracaoTotal(passos);
+  let bpm = Math.round(osmd.Sheet.SourceMeasures[0]?.TempoInBPM || osmd.Sheet.DefaultStartTempoInBpm || 90);
+  let escolhida = '';
+  let so = false;
+  let audio = null;
+  let mestre = null;
+  let tocando = false;
+  let inicioAudio = 0; // currentTime do áudio quando começou a tocar
+  let inicioT = 0; // ponto da música (semibreves) onde começou
+  let proximo = 0; // próximo passo a agendar
+  let mostrado = -1; // passo em que o cursor está
+  let timer = 0;
+  let quadro = 0;
+  const vozes2 = vozes.length > 1;
+  barra.hidden = false;
+  barra.innerHTML = `
+    <div class="ensaio-linha">
+      <button class="icon-btn" data-e="inicio" aria-label="Voltar ao começo" title="Voltar ao começo">${icon('skipBack', 18)}</button>
+      <button class="play-big" data-e="play" aria-label="Tocar" title="Tocar a partitura">${icon('play', 22)}</button>
+      <div class="ensaio-info"><b>Ensaiar</b><small id="ens-pos">${vozes2 ? `${vozes.length} vozes` : 'Melodia'} · toque para ouvir</small></div>
+      <div class="seg"><button data-e="lento" aria-label="Mais devagar">${icon('minus', 15)}</button><span class="val" id="ens-bpm"><small>♩ =</small>${bpm}</span><button data-e="rapido" aria-label="Mais rápido">${icon('plus', 15)}</button></div>
+    </div>
+    ${vozes2 ? `<div class="ensaio-linha vozes"><div class="chips" id="ens-vozes"><button class="chip" data-voz="">Todas</button>${vozes.map((v) => `<button class="chip" data-voz="${esc(v.voz)}">${esc(v.nome)}</button>`).join('')}</div>
+      <label class="ens-so" title="Desligado: a voz escolhida em destaque e as outras baixinho"><input type="checkbox" id="ens-so"> Só esta voz</label></div>` : ''}`;
+  const desenharBarra = () => {
+    barra.querySelector('[data-e="play"]').innerHTML = icon(tocando ? 'pause' : 'play', 22);
+    barra.querySelector('[data-e="play"]').setAttribute('aria-label', tocando ? 'Pausar' : 'Tocar');
+    $('#ens-bpm', barra).innerHTML = `<small>♩ =</small>${bpm}`;
+    barra.querySelectorAll('[data-voz]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.voz === escolhida)));
+  };
+  const tAgora = () => (tocando ? inicioT + (audio.currentTime - inicioAudio) / segundosPorSemibreve(bpm) : inicioT);
+  // som: um timbre suave (triângulo com um pouco da oitava), com ataque e soltura curtos
+  const nota = (freq, quando, dur, vol) => {
+    if (vol <= 0) return;
+    const f = freq * 2 ** (tomAtual() / 12);
+    const g = audio.createGain();
+    g.connect(mestre);
+    const pico = 0.22 * vol;
+    g.gain.setValueAtTime(0, quando);
+    g.gain.linearRampToValueAtTime(pico, quando + 0.015);
+    g.gain.setTargetAtTime(pico * 0.55, quando + 0.04, 0.25);
+    const solta = quando + Math.max(0.08, dur - 0.03);
+    g.gain.setTargetAtTime(0, solta, 0.04);
+    for (const [tipo, mult, nivel] of [['triangle', 1, 1], ['sine', 2, 0.25]]) {
+      const o = audio.createOscillator();
+      const og = audio.createGain();
+      o.type = tipo;
+      o.frequency.value = f * mult;
+      og.gain.value = nivel;
+      o.connect(og).connect(g);
+      o.start(quando);
+      o.stop(solta + 0.3);
+    }
+  };
+  const agendar = () => {
+    const spw = segundosPorSemibreve(bpm);
+    const ate = tAgora() + 0.25 / spw * 1; // 250 ms adiante
+    while (proximo < passos.length && passos[proximo].t <= ate) {
+      const p = passos[proximo];
+      const quando = inicioAudio + (p.t - inicioT) * spw;
+      for (const n of p.notas) nota(n.freq, Math.max(audio.currentTime, quando), n.dur * spw, volumeDa(grupoDe.get(n.voz), { escolhida, so }));
+      proximo++;
+    }
+    if (proximo >= passos.length && tAgora() >= fim) { pausar(); irPara(0); }
+  };
+  // cursor: segue o passo que está soando e a tela acompanha a linha
+  const moverCursor = (i) => {
+    if (i === mostrado) return;
+    if (i < mostrado || mostrado < 0) { osmd.cursor.reset(); mostrado = 0; }
+    while (mostrado < i && !osmd.cursor.Iterator.EndReached) { osmd.cursor.next(); mostrado++; }
+    const el = osmd.cursor.cursorElement;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      if (r.top < 90 || r.bottom > innerHeight - 160) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    const compasso = osmd.cursor.Iterator.CurrentMeasureIndex;
+    $('#ens-pos', barra).textContent = `${tocando ? 'Tocando' : 'Pausado'} · compasso ${(compasso ?? 0) + 1}`;
+  };
+  const acompanhar = () => {
+    if (!tocando) return;
+    moverCursor(passoNoTempo(passos, tAgora()));
+    quadro = requestAnimationFrame(acompanhar);
+  };
+  const tocar = async () => {
+    if (!audio) {
+      audio = new (window.AudioContext || window.webkitAudioContext)();
+      mestre = audio.createGain();
+      mestre.gain.value = 0.9;
+      mestre.connect(audio.destination);
+    }
+    if (audio.state === 'suspended') await audio.resume();
+    mostrarCursor();
+    tocando = true;
+    inicioAudio = audio.currentTime + 0.08;
+    proximo = passoNoTempo(passos, inicioT);
+    if (passos[proximo] && passos[proximo].t < inicioT) inicioT = passos[proximo].t;
+    agendar();
+    timer = setInterval(agendar, 40);
+    acompanhar();
+    desenharBarra();
+  };
+  function pausar() {
+    if (!tocando) return;
+    inicioT = tAgora();
+    tocando = false;
+    clearInterval(timer);
+    cancelAnimationFrame(quadro);
+    // corta o que já estava agendado
+    mestre.disconnect();
+    mestre = audio.createGain();
+    mestre.gain.value = 0.9;
+    mestre.connect(audio.destination);
+    desenharBarra();
+    $('#ens-pos', barra).textContent = `Pausado · compasso ${(osmd.cursor.Iterator.CurrentMeasureIndex ?? 0) + 1}`;
+  }
+  function irPara(t) {
+    const estava = tocando;
+    if (estava) pausar();
+    inicioT = t;
+    mostrado = -1;
+    mostrarCursor();
+    moverCursor(passoNoTempo(passos, t));
+    if (estava) tocar();
+  }
+  // mudar andamento ou voz tocando: recomeça do ponto atual com o novo jeito
+  const reajustar = () => { if (tocando) { const t = tAgora(); pausar(); inicioT = t; tocar(); } else desenharBarra(); };
+  barra.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-e], [data-voz]');
+    if (!b) return;
+    if (b.dataset.voz !== undefined) { escolhida = b.dataset.voz; reajustar(); return; }
+    const acao = b.dataset.e;
+    if (acao === 'play') { if (tocando) pausar(); else tocar(); }
+    if (acao === 'inicio') irPara(0);
+    if (acao === 'lento' || acao === 'rapido') { bpm = Math.max(30, Math.min(200, bpm + (acao === 'rapido' ? 5 : -5))); reajustar(); }
+  });
+  $('#ens-so', barra)?.addEventListener('change', (e) => { so = e.target.checked; reajustar(); });
+  desenharBarra();
+  return {
+    parar() { pausar(); audio?.close?.(); },
+    pausar,
+    // a partitura foi desenhada de novo (zoom, cores, tom): o cursor volta ao ponto em que estava
+    redesenhou() { const t = tAgora(); mostrado = -1; if (inicioT || tocando) { mostrarCursor(); moverCursor(passoNoTempo(passos, t)); } },
+  };
+}
+
 async function viewPartitura(id) {
   const song = id === 'previa' ? preview : db.song(id);
   if (!song) return viewNotFound();
@@ -2759,9 +2941,12 @@ async function viewPartitura(id) {
       <div class="seg"><button data-z="-1" aria-label="Diminuir">A−</button><button data-z="1" aria-label="Aumentar">A+</button></div>
     </div>
     <div id="part-desenhada" class="osmd-box"></div>
+    <div class="ensaio so-desenhada" id="ensaio" hidden></div>
     <div class="partitura-paginas" id="part-original">${paginas.length ? paginas.map((src, i) => `<img src="${esc(src)}" alt="Página ${i + 1} da partitura" loading="${i ? 'lazy' : 'eager'}" onerror="this.remove()">`).join('') : '<p class="muted">Esta música não tem partitura.</p>'}</div>
     <p class="fonte" id="part-aviso"></p></div>`;
   let osmd = null;
+  let ensaio = null;
+  aoSair(() => ensaio?.parar());
   const caixa = $('#part-desenhada');
   // cores: as do tema escolhido no app (notas e letra no tom do texto, cifras na cor de destaque) ou preto e branco
   const coresDoTema = () => {
@@ -2792,6 +2977,8 @@ async function viewPartitura(id) {
       osmd.render();
       // cifras na cor de destaque (o desenho não tem cor própria para elas)
       caixa.querySelectorAll('svg text').forEach((t) => { if (CIFRA_NO_TEXTO.test(t.textContent.trim())) { t.setAttribute('fill', c.cifra); t.style.fontWeight = '700'; } });
+      if (!ensaio) ensaio = criarEnsaio(osmd, $('#ensaio'), () => tom);
+      else ensaio.redesenhou();
       $('#part-aviso').textContent = 'Partitura desenhada a partir do arquivo original por leitura automática: confira em “Original” se algo parecer estranho.';
     } catch (e) {
       caixa.innerHTML = `<div class="alert">${icon('info', 18)}<span>Não consegui desenhar a partitura agora (${esc(e.message)}). Veja a original.</span></div>`;
@@ -2801,6 +2988,7 @@ async function viewPartitura(id) {
     view.querySelectorAll('[data-modo]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.modo === modo)));
     view.querySelectorAll('[data-cor]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cor === cores)));
     view.querySelectorAll('.so-desenhada').forEach((x) => (x.hidden = modo !== 'desenhada'));
+    if (modo !== 'desenhada') ensaio?.pausar();
     caixa.hidden = modo !== 'desenhada';
     $('#part-original').hidden = modo !== 'original';
     $('#part-aviso').hidden = modo !== 'desenhada';
@@ -2878,7 +3066,7 @@ function viewSong(id, ctx = {}) {
       <button class="play-big ${song.youtube ? '' : 'off'}" id="btn-play" aria-label="${song.youtube ? 'Tocar' : 'Escolher vídeo'}" title="${song.youtube ? 'Tocar (continua tocando no player enquanto você navega)' : 'Sem vídeo: escolher um no YouTube'}">${icon(song.youtube ? (player.tocandoAgora(song.youtube) ? 'pause' : 'play') : 'youtube', 24)}</button>
       <button class="salvar-btn${isPreview ? '' : ' salva'}" id="btn-biblio" data-salvar aria-pressed="${!isPreview}" aria-label="${isPreview ? 'Salvar na biblioteca' : 'Na biblioteca (tocar para tirar)'}" title="${isPreview ? 'Salvar na biblioteca' : 'Na sua biblioteca — tocar para tirar'}">${icon(isPreview ? 'plus' : 'check', 18)}</button>
       <button class="icon-btn" id="btn-add" aria-label="Adicionar a repertório" title="Adicionar a um repertório">${icon('list', 22)}</button>
-      ${paginasDaPartitura(song.content).length ? `<a class="partitura-btn" id="btn-partitura" href="#/musica/${isPreview ? 'previa' : song.id}/partitura" title="Ver a partitura">${icon('score', 18)} Partitura</a>` : ''}
+      ${paginasDaPartitura(song.content).length ? `<a class="partitura-btn" id="btn-partitura" href="#/musica/${isPreview ? 'previa' : song.id}/partitura" title="Ver a partitura (na desenhada, dá para ensaiar ouvindo cada voz)">${icon('score', 18)} Partitura</a>` : ''}
       ${isPreview ? `<button class="icon-btn" id="btn-edit-prev" aria-label="Editar cifra" title="Salvar e editar a cifra">${icon('edit', 22)}</button>`
         : `<a class="icon-btn" href="#/editar/${song.id}" aria-label="Editar" title="Editar cifra">${icon('edit', 22)}</a>`}
       <button class="icon-btn" id="btn-palco" aria-label="Só a letra (tela cheia)" title="Só a letra, tela cheia">${icon('expand', 22)}</button>

@@ -1488,3 +1488,18 @@ a.source { text-decoration: none; color: inherit; }
 .revisao li.info svg { color: var(--muted); }
 @keyframes piscar { 0%, 100% { background: transparent; } 30% { background: var(--accent-soft); } }
 .set-item.piscar { animation: piscar 1.4s ease 1; }
+
+/* ============================================================ ensaio com a partitura (tocar as vozes) */
+.ensaio { position: sticky; z-index: 15; bottom: 8px; /* o rodapé da tela já desconta o menu e o player */ margin: 12px 0 0; padding: 10px 12px;
+  border-radius: 14px; background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-lg); display: grid; gap: 8px; }
+.ensaio:empty { display: none; }
+.ensaio-linha { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ensaio-linha.vozes { flex-wrap: wrap; gap: 6px 10px; }
+.ensaio .play-big { width: 46px; height: 46px; }
+.ensaio-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ensaio-info small { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ensaio .icon-btn { flex: none; }
+.ensaio .vozes .chips { margin: 0; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.ensaio .vozes .chips .chip { flex: none; }
+.ens-so { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); white-space: nowrap; }
