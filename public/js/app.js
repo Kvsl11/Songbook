@@ -50,7 +50,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-139';
+export const APP_VERSAO = '2026.10.20-140';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -613,6 +613,8 @@ const player = (() => {
     get estado() { return estado; },
     // segundos do vídeo agora (o YouTube avisa algumas vezes por segundo; entre um aviso e outro, estima)
     get tempoAgora() { return tempo + (estado === 'tocando' && marcaTempo ? (performance.now() - marcaTempo) / 1000 : 0); },
+    // o último tempo que o YouTube informou (não anda sozinho: no anúncio fica parado)
+    get tempoInformado() { return tempo; },
     get duracao() { return duracao; },
     tocandoAgora: (youtube) => desta(youtube) && estado === 'tocando',
     desta,
@@ -3873,28 +3875,175 @@ function escolherMusica(titulo) {
 // Basic Pitch (Spotify, código aberto) roda no próprio aparelho e transforma o som em notas; o app escolhe a
 // melodia, acha tom e andamento e põe no compasso. Sai um rascunho para conferir e corrigir no editor.
 const BASIC_PITCH = 'https://cdn.jsdelivr.net/npm/@spotify/basic-pitch@1.0.1';
-let basicPitch = null;
-async function notasDoAudio(amostras, progresso) {
-  const bp = await import(`${BASIC_PITCH}/+esm`);
-  basicPitch ||= new bp.BasicPitch(`${BASIC_PITCH}/model/model.json`);
-  const frames = [];
-  const onsets = [];
-  const contours = [];
-  await basicPitch.evaluateModel(amostras, (f, o, c) => { frames.push(...f); onsets.push(...o); contours.push(...c); }, progresso);
-  return bp.noteFramesToTime(bp.addPitchBendsToNoteEvents(contours, bp.outputToNotesPoly(frames, onsets, 0.3, 0.3, 8)));
+const SR_IA = 22050; // o modelo ouve em 22050 Hz, mono
+// A IA roda num Worker (outra linha de execução): analisar o áudio é pesado e, na mesma linha da tela, o app travava
+const CODIGO_IA = `
+import * as bp from '${BASIC_PITCH}/+esm';
+let modelo = null;
+self.onmessage = async (e) => {
+  const { id, amostras } = e.data;
+  try {
+    modelo ||= new bp.BasicPitch('${BASIC_PITCH}/model/model.json');
+    const f = [], o = [], c = [];
+    await modelo.evaluateModel(amostras, (a, b, d) => { f.push(...a); o.push(...b); c.push(...d); }, () => {});
+    const notas = bp.noteFramesToTime(bp.addPitchBendsToNoteEvents(c, bp.outputToNotesPoly(f, o, 0.3, 0.3, 8)));
+    self.postMessage({ id, notas: notas.map((n) => ({ startTimeSeconds: n.startTimeSeconds, durationSeconds: n.durationSeconds, pitchMidi: n.pitchMidi, amplitude: n.amplitude })) });
+  } catch (err) { self.postMessage({ id, erro: String(err?.message || err) }); }
+};`;
+let workerIA = null;
+let pedidoIA = 0;
+const esperandoIA = new Map();
+function notasDoAudio(amostras) {
+  if (!workerIA) {
+    workerIA = new Worker(URL.createObjectURL(new Blob([CODIGO_IA], { type: 'text/javascript' })), { type: 'module' });
+    workerIA.onmessage = (e) => {
+      const p = esperandoIA.get(e.data.id);
+      esperandoIA.delete(e.data.id);
+      if (e.data.erro) p?.erro(new Error(e.data.erro)); else p?.ok(e.data.notas);
+    };
+    workerIA.onerror = (e) => {
+      for (const p of esperandoIA.values()) p.erro(new Error(e.message || 'não foi possível carregar a IA (sem internet?)'));
+      esperandoIA.clear();
+      workerIA = null;
+    };
+  }
+  const id = ++pedidoIA;
+  const copia = new Float32Array(amostras);
+  return new Promise((ok, erro) => {
+    esperandoIA.set(id, { ok, erro });
+    workerIA.postMessage({ id, amostras: copia }, [copia.buffer]);
+  });
 }
-// áudio em qualquer formato → mono, 22050 Hz (o que o modelo espera); no máximo 6 minutos
+// áudio de arquivo em qualquer formato → mono, 22050 Hz; no máximo 6 minutos
 async function audioParaModelo(arrayBuffer) {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   const buf = await ctx.decodeAudioData(arrayBuffer);
   ctx.close?.();
   const dur = Math.min(buf.duration, 360);
-  const off = new OfflineAudioContext(1, Math.ceil(dur * 22050), 22050);
+  const off = new OfflineAudioContext(1, Math.ceil(dur * SR_IA), SR_IA);
   const src = off.createBufferSource();
   src.buffer = buf;
   src.connect(off.destination);
   src.start();
-  return { amostras: (await off.startRendering()).getChannelData(0), segundos: dur, cortado: buf.duration > 360 };
+  return { amostras: (await off.startRendering()).getChannelData(0), cortado: buf.duration > 360 };
+}
+// reamostragem contínua (microfone a 44,1/48 kHz → 22050 Hz): média de cada intervalo (já filtra o agudo)
+function reamostrador(de) {
+  const passo = de / SR_IA;
+  let pos = 0; // posição fracionária dentro do bloco atual
+  let resto = new Float32Array(0);
+  return (bloco) => {
+    const x = new Float32Array(resto.length + bloco.length);
+    x.set(resto);
+    x.set(bloco, resto.length);
+    const out = [];
+    while (pos + passo <= x.length) {
+      const a = Math.floor(pos);
+      const b = Math.floor(pos + passo);
+      let s = 0;
+      for (let i = a; i < b; i++) s += x[i];
+      out.push(s / Math.max(1, b - a));
+      pos += passo;
+    }
+    const corte = Math.floor(pos);
+    resto = x.slice(corte);
+    pos -= corte;
+    return Float32Array.from(out);
+  };
+}
+// A IA ouvindo aos poucos: o áudio chega em pedaços e é analisado a cada 5 s (com 1 s de contexto antes, para não
+// perder a nota que atravessa o corte). As notas vão aparecendo enquanto a música toca.
+function criarLeitor(aoAtualizar) {
+  const PEDACO = 5 * SR_IA;
+  const ANTES = 1 * SR_IA;
+  let audio = new Float32Array(SR_IA * 60);
+  let total = 0;
+  let analisado = 0;
+  let notas = [];
+  let pendentes = [];
+  let rodando = null;
+  let erro = null;
+  const guardar = (x) => {
+    if (total + x.length > audio.length) { const maior = new Float32Array(Math.max(audio.length * 2, total + x.length)); maior.set(audio.subarray(0, total)); audio = maior; }
+    audio.set(x, total);
+    total += x.length;
+  };
+  async function processar(final = false) {
+    while (!erro && (total - analisado >= PEDACO || (final && total > analisado))) {
+      const ini = analisado;
+      const fim = Math.min(total, ini + PEDACO);
+      const de = Math.max(0, ini - ANTES);
+      try {
+        const achadas = await notasDoAudio(audio.slice(de, fim));
+        const t0 = ini / SR_IA;
+        const t1 = fim / SR_IA;
+        const novos = [];
+        for (const n of achadas) {
+          const s = n.startTimeSeconds + de / SR_IA;
+          const e = s + n.durationSeconds;
+          if (s < t0 - 0.05) {
+            // nota que já soava antes do corte: alonga a do pedaço anterior
+            const p = pendentes.find((x) => x.pitchMidi === n.pitchMidi);
+            if (p && e > p.startTimeSeconds + p.durationSeconds) p.durationSeconds = e - p.startTimeSeconds;
+            continue;
+          }
+          const nova = { startTimeSeconds: s, durationSeconds: n.durationSeconds, pitchMidi: n.pitchMidi, amplitude: n.amplitude };
+          notas.push(nova);
+          novos.push(nova);
+        }
+        pendentes = [...pendentes, ...novos].filter((x) => x.startTimeSeconds + x.durationSeconds >= t1 - 0.1);
+      } catch (e) { erro = e; break; }
+      analisado = fim;
+      aoAtualizar();
+    }
+  }
+  const pedir = (final) => { rodando = (rodando || Promise.resolve()).then(() => processar(final)); return rodando; };
+  return {
+    alimentar(x) { guardar(x); if (total - analisado >= PEDACO) pedir(false); aoAtualizar(); },
+    async terminar() { await pedir(true); if (erro) throw erro; return notas; },
+    get notas() { return notas; },
+    get segundos() { return total / SR_IA; },
+    get analisados() { return analisado / SR_IA; },
+  };
+}
+
+// faixa das notas ouvidas (como um rolo de piano): cada nota é uma barrinha na altura dela, passando da direita para
+// a esquerda; a linha à direita é o "agora"
+function desenharRolo(canvas, notas, agora, { janela = 10 } = {}) {
+  const dpr = devicePixelRatio || 1;
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  if (canvas.width !== Math.round(w * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); }
+  const g = canvas.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const css = getComputedStyle(document.documentElement);
+  const acento = css.getPropertyValue('--accent').trim() || '#06b6d4';
+  const linha = css.getPropertyValue('--surface-3').trim() || '#333';
+  const vis = notas.filter((n) => n.pitchMidi >= 40 && n.pitchMidi <= 88);
+  const [lo, hi] = vis.length ? [Math.min(...vis.map((n) => n.pitchMidi)) - 2, Math.max(...vis.map((n) => n.pitchMidi)) + 2] : [55, 79];
+  const faixa = Math.max(12, hi - lo);
+  const y = (p) => h - 8 - ((p - lo) / faixa) * (h - 16);
+  const xAgora = w - 24;
+  const x = (t) => xAgora - ((agora - t) / janela) * (xAgora - 8);
+  g.strokeStyle = linha;
+  g.lineWidth = 1;
+  for (let p = Math.ceil(lo / 12) * 12; p <= lo + faixa; p += 12) { g.beginPath(); g.moveTo(0, y(p)); g.lineTo(w, y(p)); g.stroke(); } // os Dós
+  const altura = Math.max(3, Math.min(9, (h - 16) / faixa));
+  for (const n of vis) {
+    const x0 = x(n.startTimeSeconds);
+    const x1 = x(n.startTimeSeconds + n.durationSeconds);
+    if (x1 < 0 || x0 > w) continue;
+    g.globalAlpha = 0.35 + 0.65 * Math.min(1, n.amplitude ?? 1);
+    g.fillStyle = acento;
+    g.beginPath();
+    g.roundRect?.(x0, y(n.pitchMidi) - altura / 2, Math.max(3, x1 - x0), altura, altura / 2);
+    if (!g.roundRect) g.rect(x0, y(n.pitchMidi) - altura / 2, Math.max(3, x1 - x0), altura);
+    g.fill();
+  }
+  g.globalAlpha = 1;
+  g.fillStyle = acento;
+  g.fillRect(xAgora, 4, 2, h - 8);
 }
 
 async function gerarComIA(song, titulo) {
@@ -3902,9 +4051,9 @@ async function gerarComIA(song, titulo) {
   setHeader(titulo, { back: '#/partituras', eyebrow: 'Gerar partitura com IA' });
   const celular = matchMedia('(max-width: 699px)').matches || /Android|iPhone|iPad/i.test(navigator.userAgent);
   const podeAba = !celular && !!navigator.mediaDevices?.getDisplayMedia;
-  const podeMic = !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined';
-  let gravacao = null; // { rec, stream, ctx, timer, inicio }
-  aoSair(() => pararGravacao(true));
+  const podeMic = !!navigator.mediaDevices?.getUserMedia;
+  let sessao = null; // captura em andamento
+  aoSair(() => pararCaptura());
   view.innerHTML = `<div class="ia">
     <section class="ia-topo">${capa(song)}<div><div class="kind">Gerar com IA</div><h2>${esc(titulo)}</h2>
       <p class="muted">O app ouve a música e escreve a <b>melodia</b> na partitura, já no tom e no andamento. É um rascunho: confira e corrija no editor (fica melhor com voz e violão do que com banda completa).</p></div></section>
@@ -3912,112 +4061,248 @@ async function gerarComIA(song, titulo) {
   const passo = $('#ia-passo');
 
   function telaFontes() {
+    passo.onclick = null;
     passo.innerHTML = `<div class="section-title">De onde vem o som?</div>
       <div class="ia-fontes">
-        ${podeMic ? `<div class="ia-fonte"><div class="ia-fonte-cab"><span class="part-acao-ic">${icon('mic', 22)}</span><div><b>Ouvir pelo microfone</b><small>${song.youtube ? 'Toque o vídeo da música e grave enquanto ele toca (volume alto, celular perto).' : 'Cante ou toque a melodia perto do aparelho.'}</small></div></div>
-          <div class="ia-fonte-acts">${song.youtube ? `<button class="btn small" id="ia-video">${icon('play', 15)} Tocar o vídeo</button>` : ''}<button class="btn small primary" id="ia-gravar">${icon('mic', 15)} Gravar</button></div></div>` : ''}
-        ${podeAba ? `<div class="ia-fonte"><div class="ia-fonte-cab"><span class="part-acao-ic">${icon('video', 22)}</span><div><b>Som de uma aba do navegador</b><small>Abra o vídeo noutra aba, escolha ela e marque “Compartilhar áudio da aba”. Sem ruído da sala.</small></div></div>
+        ${podeMic && song.youtube ? `<div class="ia-fonte destaque"><div class="ia-fonte-cab"><span class="part-acao-ic">${icon('youtube', 22)}</span><div><b>Do vídeo da música</b><small>O app toca o vídeo e ouve pelo microfone. Os anúncios ficam de fora: só grava enquanto a música está tocando. Volume alto, celular perto.</small></div></div>
+          <div class="ia-fonte-acts"><button class="btn small primary" id="ia-video">${icon('play', 15)} Tocar e criar a partitura</button></div></div>` : ''}
+        ${podeMic ? `<div class="ia-fonte"><div class="ia-fonte-cab"><span class="part-acao-ic">${icon('mic', 22)}</span><div><b>Cantar ou tocar</b><small>Cante ou toque a melodia perto do aparelho.</small></div></div>
+          <div class="ia-fonte-acts"><button class="btn small" id="ia-mic">${icon('mic', 15)} Gravar</button></div></div>` : ''}
+        ${podeAba ? `<div class="ia-fonte"><div class="ia-fonte-cab"><span class="part-acao-ic">${icon('video', 22)}</span><div><b>Som de uma aba do navegador</b><small>Abra o vídeo noutra aba (pule o anúncio antes), escolha a aba e marque “Compartilhar áudio da aba”.</small></div></div>
           <div class="ia-fonte-acts"><button class="btn small" id="ia-aba">${icon('video', 15)} Escolher a aba</button></div></div>` : ''}
         <div class="ia-fonte"><div class="ia-fonte-cab"><span class="part-acao-ic">${icon('upload', 22)}</span><div><b>Arquivo de áudio</b><small>MP3, M4A, WAV… da música (ou só da melodia). Até 6 minutos.</small></div></div>
           <div class="ia-fonte-acts"><button class="btn small" id="ia-arquivo">${icon('upload', 15)} Escolher arquivo</button></div></div>
       </div>`;
-    $('#ia-video')?.addEventListener('click', () => player.tocar(itemDoPlayer(song)));
-    $('#ia-gravar')?.addEventListener('click', () => gravar('mic'));
-    $('#ia-aba')?.addEventListener('click', () => gravar('aba'));
+    $('#ia-video')?.addEventListener('click', () => capturar('video'));
+    $('#ia-mic')?.addEventListener('click', () => capturar('mic'));
+    $('#ia-aba')?.addEventListener('click', () => capturar('aba'));
     $('#ia-arquivo').onclick = () => {
       const inp = document.createElement('input');
       inp.type = 'file';
       inp.accept = 'audio/*,video/mp4,.mp3,.m4a,.wav,.ogg,.webm,.aac,.flac';
-      inp.onchange = async () => { if (inp.files[0]) analisar(await inp.files[0].arrayBuffer()); };
+      inp.onchange = () => { if (inp.files[0]) lerArquivo(inp.files[0]); };
       inp.click();
     };
   }
 
-  async function gravar(tipo) {
-    let stream;
-    try {
-      if (tipo === 'mic') stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-      else {
-        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-        if (!stream.getAudioTracks().length) { stream.getTracks().forEach((t) => t.stop()); toast('Marque “Compartilhar áudio da aba” ao escolher a aba'); return; }
-      }
-    } catch (e) {
-      toast(tipo === 'mic' ? 'Sem acesso ao microfone: permita nas configurações do navegador' : 'Captura da aba cancelada');
-      return;
-    }
-    const audioStream = new MediaStream(stream.getAudioTracks());
-    const rec = new MediaRecorder(audioStream);
-    const pedacos = [];
-    rec.ondataavailable = (e) => e.data.size && pedacos.push(e.data);
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const analisador = ctx.createAnalyser();
-    analisador.fftSize = 512;
-    ctx.createMediaStreamSource(audioStream).connect(analisador);
-    const dados = new Uint8Array(analisador.fftSize);
-    const inicio = Date.now();
-    gravacao = { rec, stream, ctx, inicio, pedacos, timer: 0 };
-    passo.innerHTML = `<div class="ia-gravando">
-      <div class="ia-onda" id="ia-onda"><i></i></div>
-      <b id="ia-tempo">0:00</b>
-      <p class="muted">${tipo === 'mic' ? 'Gravando pelo microfone. Deixe tocar a música inteira (ou o trecho que quiser) e toque em Parar.' : 'Gravando o som da aba. Toque o vídeo lá e volte aqui para parar.'}</p>
-      <div class="row"><button class="btn ghost" id="ia-cancelar">Cancelar</button><button class="btn primary" id="ia-parar">${icon('pause', 16)} Parar e gerar</button></div></div>`;
-    const tick = () => {
-      if (!gravacao) return;
-      analisador.getByteTimeDomainData(dados);
-      let pico = 0;
-      for (const v of dados) pico = Math.max(pico, Math.abs(v - 128));
-      $('#ia-onda i').style.transform = `scaleX(${Math.min(1, pico / 70 + 0.02)})`;
-      const s = Math.floor((Date.now() - inicio) / 1000);
-      $('#ia-tempo').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-      if (s >= 360) { $('#ia-parar').click(); return; }
-      gravacao.timer = requestAnimationFrame(tick);
-    };
-    rec.start(1000);
-    tick();
-    $('#ia-cancelar').onclick = () => { pararGravacao(true); telaFontes(); };
-    $('#ia-parar').onclick = async () => {
-      const blob = await pararGravacao(false);
-      if (!blob || blob.size < 2000) { toast('A gravação ficou vazia'); telaFontes(); return; }
-      analisar(await blob.arrayBuffer());
-    };
+  // a tela da leitura: o rolo com as notas chegando, o que a IA já sabe (tom, andamento) e a partitura nascendo
+  function telaLeitura(tipo) {
+    osmdVivo = null;
+    rolo = 0;
+    nVivo = 0;
+    passo.innerHTML = `<div class="ia-leitura">
+      <div class="ia-estado"><span class="ia-pulso" id="ia-pulso"></span><b id="ia-status">Preparando…</b><span class="ia-relogio" id="ia-tempo">0:00</span></div>
+      <canvas class="ia-rolo" id="ia-rolo" aria-label="Notas que a IA está ouvindo"></canvas>
+      <div class="ia-numeros"><span><small>Notas</small><b id="ia-n">0</b></span><span><small>Tom provável</small><b id="ia-tom-vivo">—</b></span><span><small>Andamento</small><b id="ia-bpm-vivo">—</b></span></div>
+      <div class="ia-nasce"><div class="ia-nasce-cab">${icon('score', 16)} <b>A partitura nascendo</b><small id="ia-analisado"></small></div><div class="osmd-box" id="ia-viva"><p class="muted">As primeiras notas aparecem em alguns segundos…</p></div></div>
+      <div class="row ia-fim"><button class="btn ghost" id="ia-cancelar">Cancelar</button><button class="btn primary" id="ia-parar">${icon('check', 16)} ${tipo === 'arquivo' ? 'Aguarde…' : 'Terminar'}</button></div></div>`;
+    if (tipo === 'arquivo') $('#ia-parar').disabled = true;
   }
-  function pararGravacao(descartar) {
-    const g = gravacao;
-    if (!g) return Promise.resolve(null);
-    gravacao = null;
-    cancelAnimationFrame(g.timer);
-    return new Promise((resolve) => {
-      g.rec.onstop = () => {
-        g.stream.getTracks().forEach((t) => t.stop());
-        g.ctx.close?.();
-        resolve(descartar ? null : new Blob(g.pedacos, { type: g.rec.mimeType || 'audio/webm' }));
-      };
-      if (g.rec.state !== 'inactive') g.rec.stop(); else g.rec.onstop();
-    });
+  let osmdVivo = null;
+  let ultimoVivo = 0;
+  let nVivo = 0;
+  async function partituraViva(notas) {
+    // a cada pedaço analisado, a melodia até ali vira partitura (os últimos compassos ficam à vista)
+    if (!notas.length || notas.length === nVivo || Date.now() - ultimoVivo < 1500) return;
+    ultimoVivo = Date.now();
+    nVivo = notas.length;
+    const tomC = tomDaCifra(renderSong(song.content).key || song.key);
+    const { fifths, modo } = tomC || estimarTom(notas);
+    const bpm = estimarAndamento(notas);
+    $('#ia-tom-vivo') && ($('#ia-tom-vivo').textContent = nomeDoTom(fifths, modo));
+    $('#ia-bpm-vivo') && ($('#ia-bpm-vivo').textContent = `♩ ${bpm}`);
+    const m = novaPartitura({ titulo, fifths, modo, bpm });
+    m.pautas[0].ev = melodiaDasNotas(notas, { bpm, fifths });
+    if (!m.pautas[0].ev.length) return;
+    // só os últimos ~8 compassos (a tela não fica enorme e o desenho é rápido)
+    const cheio = tiquesDoCompasso(m.compasso);
+    let soma = 0;
+    let corte = m.pautas[0].ev.length;
+    while (corte > 0 && soma + m.pautas[0].ev[corte - 1].d <= cheio * 8) soma += m.pautas[0].ev[--corte].d;
+    const inicioCompasso = m.pautas[0].ev.slice(0, corte).reduce((a, e) => a + e.d, 0) % cheio;
+    m.pautas[0].ev = m.pautas[0].ev.slice(corte);
+    if (inicioCompasso) m.pautas[0].ev.unshift({ a: [], d: inicioCompasso, l: [], c: '' });
+    try {
+      await carregarScript(OSMD_JS);
+      const caixa = $('#ia-viva');
+      if (!caixa) return;
+      if (!osmdVivo || !caixa.contains(osmdVivo.container)) {
+        caixa.innerHTML = '';
+        osmdVivo = new opensheetmusicdisplay.OpenSheetMusicDisplay(caixa, { autoResize: false, backend: 'svg', drawTitle: false, drawPartNames: false, drawMeasureNumbers: false, defaultFontFamily: 'Figtree, sans-serif' });
+        osmdVivo.container = caixa;
+      }
+      const cor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#f2f2f2';
+      osmdVivo.setOptions({ defaultColorMusic: cor, defaultColorNotehead: cor, defaultColorStem: cor, defaultColorRest: cor, defaultColorLabel: cor });
+      await osmdVivo.load(paraMusicXML(m));
+      osmdVivo.zoom = innerWidth < 640 ? 0.6 : 0.8;
+      osmdVivo.render();
+      caixa.classList.remove('chegou');
+      void caixa.offsetWidth;
+      caixa.classList.add('chegou');
+    } catch { /* a prévia é só para acompanhar */ }
   }
 
-  let notas = null;
-  async function analisar(arrayBuffer) {
-    passo.innerHTML = `<div class="ia-analisando"><span class="spin"></span><b id="ia-etapa">Preparando o áudio…</b>
-      <div class="ia-barra"><i id="ia-prog"></i></div><p class="muted">Tudo acontece aqui no aparelho; pode levar um ou dois minutos.</p></div>`;
+  function ligarLeitor() {
+    const leitor = criarLeitor(() => {
+      $('#ia-n') && ($('#ia-n').textContent = leitor.notas.length);
+      const a = $('#ia-analisado');
+      if (a) a.textContent = leitor.analisados ? `IA analisou até ${fmtSeg(leitor.analisados)}` : '';
+      partituraViva(leitor.notas);
+    });
+    return leitor;
+  }
+  const fmtSeg = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  // a animação: o rolo anda com o tempo ouvido e o pulso mostra o volume que está chegando
+  // a faixa acompanha (suave) o ponto até onde a IA já analisou: as notas surgem à direita e vão andando
+  let rolo = 0;
+  function animar(leitor, estado) {
+    const canvas = $('#ia-rolo');
+    if (!canvas) return;
+    const alvo = Math.max(10, leitor.analisados + 1);
+    rolo = rolo < 1 ? alvo : rolo + (alvo - rolo) * 0.06;
+    desenharRolo(canvas, leitor.notas, rolo);
+    $('#ia-tempo').textContent = fmtSeg(leitor.segundos);
+    const pulso = $('#ia-pulso');
+    if (pulso) { pulso.style.setProperty('--nivel', String(estado.nivel || 0)); pulso.classList.toggle('pausa', !estado.ouvindo); }
+    $('#ia-status').textContent = estado.texto;
+  }
+
+  // captura ao vivo: microfone (com ou sem o vídeo) ou som de uma aba
+  async function capturar(tipo) {
+    let stream;
     try {
-      const { amostras, cortado } = await audioParaModelo(arrayBuffer);
+      if (tipo === 'aba') {
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        if (!stream.getAudioTracks().length) { stream.getTracks().forEach((t) => t.stop()); toast('Marque “Compartilhar áudio da aba” ao escolher a aba'); return; }
+      } else stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    } catch {
+      toast(tipo === 'aba' ? 'Captura da aba cancelada' : 'Sem acesso ao microfone: permita nas configurações do navegador');
+      return;
+    }
+    telaLeitura(tipo);
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const fonte = ctx.createMediaStreamSource(new MediaStream(stream.getAudioTracks()));
+    const proc = ctx.createScriptProcessor(4096, 1, 1);
+    const mudo = ctx.createGain();
+    mudo.gain.value = 0;
+    fonte.connect(proc);
+    proc.connect(mudo).connect(ctx.destination);
+    const reamostrar = reamostrador(ctx.sampleRate);
+    const leitor = ligarLeitor();
+    // vídeo: os blocos esperam ~1 s numa fila e só entram se o vídeo da música andou nesse meio-tempo
+    // (no anúncio, o tempo do vídeo fica parado; pausado também não entra)
+    const historico = []; // [{ t (ms), v (tempo do vídeo), tocando }]
+    const fila = [];
+    const estado = { nivel: 0, ouvindo: false, texto: 'Preparando…' };
+    const tocouEntre = (a, b) => {
+      const x = historico.find((h) => h.t >= a);
+      const y = [...historico].reverse().find((h) => h.t <= b);
+      return x && y && y.tocando && y.v - x.v > (b - a) / 1000 * 0.5;
+    };
+    proc.onaudioprocess = (e) => {
+      const bloco = new Float32Array(e.inputBuffer.getChannelData(0));
+      let pico = 0;
+      for (let i = 0; i < bloco.length; i += 16) pico = Math.max(pico, Math.abs(bloco[i]));
+      estado.nivel = Math.min(1, pico * 3);
+      const agora = performance.now();
+      if (tipo !== 'video') { leitor.alimentar(reamostrar(bloco)); estado.ouvindo = true; return; }
+      fila.push({ t: agora, bloco });
+      while (fila.length && agora - fila[0].t > 1100) {
+        const b = fila.shift();
+        if (tocouEntre(b.t - 300, b.t + 900)) leitor.alimentar(reamostrar(b.bloco));
+      }
+    };
+    let quadro = 0;
+    const laco = () => {
+      if (tipo === 'video') {
+        const tocando = player.desta(song.youtube) && player.estado === 'tocando';
+        historico.push({ t: performance.now(), v: player.tempoInformado, tocando });
+        while (historico.length > 400) historico.shift();
+        const recente = historico.filter((h) => performance.now() - h.t < 1500);
+        const anda = recente.length > 2 && recente[recente.length - 1].v - recente[0].v > 0.4;
+        estado.ouvindo = tocando && anda;
+        estado.texto = !player.desta(song.youtube) || player.estado === 'parado' ? 'Abrindo o vídeo…'
+          : player.estado !== 'tocando' ? 'Vídeo pausado: toque ▶ no player para continuar'
+            : anda ? `Ouvindo a música · ${fmtSeg(player.tempoInformado)}${player.duracao ? ' / ' + fmtSeg(player.duracao) : ''}`
+              : 'Esperando a música começar (anúncio ou carregando: não entra na partitura)';
+        // a música acabou: termina sozinho
+        if (player.duracao && player.tempoInformado >= player.duracao - 0.6 && !anda && leitor.segundos > 5) { terminar(); return; }
+      } else estado.texto = tipo === 'aba' ? 'Ouvindo o som da aba' : 'Ouvindo pelo microfone';
+      animar(leitor, estado);
+      quadro = requestAnimationFrame(laco);
+    };
+    sessao = { stream, ctx, proc, parar: () => cancelAnimationFrame(quadro) };
+    if (tipo === 'video') {
+      if (player.desta(song.youtube)) player.irPara(0);
+      player.tocar(itemDoPlayer(song));
+    }
+    laco();
+    $('#ia-cancelar').onclick = () => { pararCaptura(); if (tipo === 'video' && player.estado === 'tocando') player.alternar(); telaFontes(); };
+    $('#ia-parar').onclick = terminar;
+    async function terminar() {
+      if (!sessao) return;
+      pararCaptura();
+      if (tipo === 'video' && player.estado === 'tocando') player.alternar();
+      await concluir(leitor);
+    }
+  }
+  function pararCaptura() {
+    if (!sessao) return;
+    const s = sessao;
+    sessao = null;
+    s.parar();
+    s.proc.onaudioprocess = null;
+    s.stream.getTracks().forEach((t) => t.stop());
+    s.ctx.close?.();
+  }
+  async function lerArquivo(arquivo) {
+    telaLeitura('arquivo');
+    $('#ia-status').textContent = 'Preparando o áudio…';
+    let leitor;
+    try {
+      const { amostras, cortado } = await audioParaModelo(await arquivo.arrayBuffer());
       if (cortado) toast('Usei só os primeiros 6 minutos');
-      $('#ia-etapa').textContent = 'Carregando a IA…';
-      notas = await notasDoAudio(amostras, (p) => {
-        const el = $('#ia-prog');
-        if (!el) return;
-        el.style.width = `${Math.round(p * 100)}%`;
-        $('#ia-etapa').textContent = `Ouvindo a música… ${Math.round(p * 100)}%`;
-      });
-      if (!view.contains(passo)) return;
-      if (!notas.length) { toast('Não ouvi notas nesse áudio'); telaFontes(); return; }
-      resultado();
+      leitor = ligarLeitor();
+      $('#ia-cancelar').onclick = () => { leitor = null; telaFontes(); };
+      // o arquivo entra em pedaços, como se estivesse tocando (a tela acompanha a análise)
+      for (let i = 0; i < amostras.length && leitor; i += SR_IA * 5) {
+        leitor.alimentar(amostras.subarray(i, Math.min(amostras.length, i + SR_IA * 5)));
+        animar(leitor, { nivel: 0.6, ouvindo: true, texto: `Ouvindo o arquivo · ${fmtSeg(leitor.analisados)} de ${fmtSeg(amostras.length / SR_IA)}` });
+        await new Promise((r) => setTimeout(r, 0));
+        while (leitor && leitor.segundos - leitor.analisados > 10) {
+          await new Promise((r) => setTimeout(r, 120));
+          animar(leitor, { nivel: 0.6, ouvindo: true, texto: `Ouvindo o arquivo · ${fmtSeg(leitor.analisados)} de ${fmtSeg(amostras.length / SR_IA)}` });
+        }
+      }
+      if (leitor) await concluir(leitor);
     } catch (e) {
       console.error(e);
-      toast('Não consegui analisar: ' + e.message);
+      toast('Não consegui ler o áudio: ' + e.message);
       telaFontes();
     }
+  }
+  let notas = null;
+  async function concluir(leitor) {
+    const st = $('#ia-status');
+    if (st) st.textContent = 'Terminando de ouvir…';
+    $('#ia-parar') && ($('#ia-parar').disabled = true);
+    // a IA pode estar alguns segundos atrás da gravação: mostra quanto falta e a faixa continua andando
+    const falta = setInterval(() => {
+      animar(leitor, { nivel: 0.3, ouvindo: true, texto: `Terminando de ouvir… ${fmtSeg(leitor.analisados)} de ${fmtSeg(leitor.segundos)}` });
+    }, 100);
+    try {
+      notas = await leitor.terminar();
+    } catch (e) {
+      clearInterval(falta);
+      console.error(e);
+      toast('A IA não conseguiu ouvir: ' + e.message);
+      telaFontes();
+      return;
+    }
+    clearInterval(falta);
+    if (!view.contains(passo)) return;
+    if (!notas.length) { toast('Não ouvi notas: tente de novo com o volume mais alto'); telaFontes(); return; }
+    resultado();
   }
 
   // resultado: ajustes (andamento, tom, compasso, oitava) e a prévia; depois abre no editor

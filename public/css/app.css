@@ -1785,3 +1785,44 @@ a.pptx-tipo { text-decoration: none; }
 .ia-previa { margin-top: 14px; min-height: 160px; }
 .ia-fim { justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin: 4px 0 16px; }
 @media (max-width: 600px) { .ia-topo .cover { width: 72px; height: 72px; } .ia-fim .btn { flex: 1; } }
+.ia-fonte.destaque { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, var(--surface-2)), var(--surface-2) 75%); }
+.ia-leitura { display: grid; gap: 12px; margin-top: 12px; }
+.ia-estado { display: flex; align-items: center; gap: 12px; min-width: 0; padding-left: 8px; }
+.ia-estado b { flex: 1; min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; }
+.ia-relogio { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--muted); }
+/* o pulso: cresce com o volume que chega; cinza quando não está entrando na partitura (anúncio, pausa) */
+.ia-pulso { --nivel: 0; position: relative; width: 14px; height: 14px; flex: none; border-radius: 50%; background: var(--accent); }
+.ia-pulso::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; background: var(--accent); opacity: 0.35; transform: scale(calc(0.6 + var(--nivel) * 1.2)); transition: transform 0.08s linear; }
+.ia-pulso.pausa, .ia-pulso.pausa::after { background: var(--muted); }
+.ia-rolo { display: block; width: 100%; height: 170px; border-radius: 14px; background: var(--surface-2); }
+.ia-numeros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ia-numeros span { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); min-width: 0; }
+.ia-numeros small { color: var(--muted); font-size: 11.5px; font-weight: 700; }
+.ia-numeros b { font-size: 16px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ia-nasce { padding: 12px; border-radius: 14px; background: var(--surface); }
+.ia-nasce-cab { display: flex; align-items: center; gap: 8px; color: var(--accent-ink); }
+.ia-nasce-cab b { color: var(--text); }
+.ia-nasce-cab small { margin-left: auto; color: var(--muted); font-size: 12px; }
+.ia-nasce .osmd-box { margin: 6px 0 0; padding: 0; min-height: 90px; }
+.ia-nasce .osmd-box p { margin: 16px 4px; font-size: 13px; }
+.ia-nasce .osmd-box.chegou svg { animation: ia-chegou 0.5s ease; }
+@keyframes ia-chegou { from { opacity: 0.4; transform: translateX(10px); } }
+@media (prefers-reduced-motion: reduce) { .ia-nasce .osmd-box.chegou svg { animation: none; } }
+
+/* listas de escolha no PC e no tablet: janela larga e baixa, a lista rola por dentro (o título e a busca ficam
+   parados) e as opções em colunas — nada de uma tirinha estreita e comprida */
+dialog.lista-dlg[open] { display: flex; flex-direction: column; overflow: hidden; }
+.lista-cab, .lista-busca, .lista-rodape { flex: none; }
+.lista-opcoes { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; align-content: start; }
+@media (min-width: 700px) {
+  dialog.lista-dlg { width: min(820px, calc(100% - 64px)); max-width: none; max-height: min(80vh, 760px); border-radius: 16px; }
+  .lista-cab { padding: 18px 16px 10px 24px; }
+  .lista-cab h3 { font-size: 20px; }
+  .lista-busca { padding: 0 24px 12px; }
+  .lista-opcoes { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 4px 8px; padding: 0 16px 16px; }
+  .lista-rodape { padding: 10px 24px 18px; border-top: 1px solid var(--border); }
+  /* janelas com listas (repertórios, momentos do PowerPoint, vozes): mais largas e com a lista rolando por dentro */
+  dialog:has(.dlg > ul.tracks), dialog:has(.pptx-partes), dialog:has(.cp-vozes) { max-width: 640px; }
+  .dlg > ul.tracks { max-height: 56vh; overflow-y: auto; overscroll-behavior: contain; margin: 0; }
+}
+@media (min-width: 1100px) { .lista-opcoes { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); } }
