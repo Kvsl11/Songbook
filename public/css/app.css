@@ -75,22 +75,26 @@ img { display: block; }
 /* ============================================================ layout */
 /* --rodape: quanto do pé da tela está ocupado (o menu de baixo e, tocando, o player — a altura dele vem do app em
    --player-h). As barras flutuantes (seleção, montar repertório, botão +, ensaio, avisos) ficam logo acima. */
-:root { --player-h: 0px; --base-rodape: calc(var(--nav-h) + env(safe-area-inset-bottom)); --rodape: var(--base-rodape); --col-esq: 0px; }
+/* a página reserva embaixo o --rodape mais uma folga; as barras que acompanham a rolagem (sticky) contam a partir
+   desse espaço reservado, então usam bottom negativo (8px - folga) para encostar logo acima do menu/player */
+:root { --player-h: 0px; --base-rodape: calc(var(--nav-h) + env(safe-area-inset-bottom)); --rodape: var(--base-rodape); --col-esq: 0px; --folga-pe: 48px; }
 body.com-player { --rodape: calc(var(--base-rodape) + var(--player-h) + 6px); }
 /* computador: o app tem 8 px de margem e o menu lateral à esquerda; as barras ficam alinhadas com a coluna principal */
 @media (min-width: 900px) {
-  :root { --base-rodape: 8px; --col-esq: 316px; }
+  :root { --base-rodape: 8px; --col-esq: 316px; --folga-pe: 40px; }
   .side-collapsed { --col-esq: 92px; }
   main .barra-sel, main .cta-bar { left: calc(var(--col-esq) + var(--gutter)); right: calc(8px + var(--gutter)); }
 }
 /* com uma barra flutuante na tela, a página ganha espaço embaixo para o fim da lista não ficar escondido */
 main:has(.barra-sel:not([hidden]), .cta-bar) { padding-bottom: calc(var(--rodape) + 170px); }
+/* editor e ensaio da partitura: a palheta/o ensaio é o fim da página; sem folga extra, eles encostam no menu/player também no fim */
+main:has(.compor, .partitura) { --folga-pe: 8px; }
 .shell { display: flex; height: 100dvh; }
 .main-col { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
 main {
   --gutter: 16px;
   flex: 1; overflow-y: auto; outline: none; position: relative;
-  padding: 64px var(--gutter) calc(var(--nav-h) + 48px + env(safe-area-inset-bottom));
+  padding: 64px var(--gutter) calc(var(--rodape) + var(--folga-pe));
 }
 /* fundo em degradê no topo de cada página, na cor da capa/tela */
 main::before {
@@ -140,7 +144,7 @@ body.performance .palco-ctrl:hover, body.performance .palco-ctrl:focus-within { 
   /* a margem da página é medida pela largura da coluna principal (cqw), e não em %: assim vale igual em
      qualquer elemento que a use (painel da letra, topo com vídeo, prateleiras) para ir de ponta a ponta */
   .main-col { border-radius: var(--radius); container-type: inline-size; }
-  main { --gutter: max(32px, calc((100cqw - 1680px) / 2)); padding-bottom: 48px; } /* conteúdo bem largo: só uma margem confortável dos lados */
+  main { --gutter: max(32px, calc((100cqw - 1680px) / 2)); } /* conteúdo bem largo: só uma margem confortável dos lados */
   .side { display: flex; flex-direction: column; gap: 8px; width: 300px; flex: none; min-height: 0; }
   /* tela baixa (ou menu recolhido, que fica mais alto): o menu rola e a engrenagem dos Ajustes nunca sai da tela */
   .brand-row { flex: none; }
@@ -840,7 +844,7 @@ button, a.icon-btn, .chip, .swatch { -webkit-touch-callout: none; -webkit-user-s
 /* rolagem automática: barra de velocidade na parte de baixo */
 .rolagem {
   position: fixed; z-index: 40; left: 50%; transform: translateX(-50%);
-  bottom: calc(var(--nav-h) + 12px + env(safe-area-inset-bottom)); width: min(520px, calc(100% - 24px));
+  bottom: calc(var(--rodape) + 12px); width: min(520px, calc(100% - 24px));
   display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 999px;
   background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   box-shadow: var(--shadow-lg); border: 1px solid var(--border);
@@ -865,7 +869,7 @@ body.performance .rolagem { bottom: 92px; }
 /* convite para instalar o app */
 .convite-instalar {
   position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); width: min(520px, calc(100% - 24px));
-  bottom: calc(var(--nav-h) + 12px + env(safe-area-inset-bottom));
+  bottom: calc(var(--rodape) + 12px);
   display: flex; align-items: center; gap: 12px; padding: 12px 10px 12px 12px; border-radius: 16px;
   background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg); animation: pop 0.25s ease-out;
 }
@@ -1081,7 +1085,6 @@ body.performance .convite-instalar { display: none; }
 /* ampliado: o vídeo grande em cima da barra */
 #player.grande { grid-template-areas: "video video video video" "info info play lado" "tempo tempo tempo tempo"; }
 #player.grande .pl-video { width: auto; margin: 8px 8px 0; }
-body.com-player main { padding-bottom: calc(var(--nav-h) + 140px + env(safe-area-inset-bottom)); }
 /* computador e tablet deitado: uma barra no rodapé, de ponta a ponta, como no Spotify — a música à esquerda,
    tocar/pausar e o tempo no centro, ampliar e fechar à direita */
 @media (min-width: 900px) {
@@ -1110,7 +1113,6 @@ body.com-player main { padding-bottom: calc(var(--nav-h) + 140px + env(safe-area
   #player.grande .pl-video { grid-area: auto / auto / auto / auto; position: absolute; right: 16px; left: auto; bottom: calc(100% + 12px); width: 420px; margin: 0; border-radius: 10px; box-shadow: var(--shadow-lg); }
   #player .pl-tmini { display: none; }
   #player.grande .pl-info { margin-left: 0; }
-  body.com-player main { padding-bottom: 120px; }
 }
 body.performance #player { bottom: calc(env(safe-area-inset-bottom) + 70px); }
 
@@ -1552,7 +1554,7 @@ a.source { text-decoration: none; color: inherit; }
 .set-item.piscar { animation: piscar 1.4s ease 1; }
 
 /* ============================================================ ensaio com a partitura (tocar as vozes) */
-.ensaio { position: sticky; z-index: 15; bottom: calc(var(--rodape) + 8px); /* acima do menu e do player */ margin: 12px 0 0; padding: 10px 12px;
+.ensaio { position: sticky; z-index: 15; bottom: calc(8px - var(--folga-pe)); /* logo acima do menu e do player */ margin: 12px 0 0; padding: 10px 12px;
   border-radius: 14px; background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   box-shadow: var(--shadow-lg); display: grid; gap: 8px; }
 .ensaio:empty { display: none; }
@@ -1709,7 +1711,7 @@ dialog.lista-dlg { max-width: 440px; padding: 0; }
 .compor-folha svg { user-select: none; }
 .cp-marca { position: absolute; z-index: 0; border-radius: 8px; background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); pointer-events: none; }
 .compor-folha > svg, .compor-folha > div:not(.cp-marca) { position: relative; z-index: 1; }
-.compor-palheta { position: sticky; bottom: calc(var(--rodape) + 8px); z-index: 15; display: grid; gap: 8px; padding: 10px; border-radius: 16px;
+.compor-palheta { position: sticky; bottom: calc(8px - var(--folga-pe)); z-index: 15; display: grid; gap: 8px; padding: 10px; border-radius: 16px;
   background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: var(--shadow-lg); }
 .cp-cabeca { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .cp-abas { flex: none; }
