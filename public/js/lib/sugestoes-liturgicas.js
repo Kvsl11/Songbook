@@ -124,7 +124,7 @@ export function sugerirParaODia(musicas, lit, { caderno = null, textos = {}, lim
   }
   // o mesmo canto (de outro ano ou outra pasta) uma vez só: fica o que mais combina
   for (const k of Object.keys(porParte)) {
-    porParte[k] = porParte[k].sort((a, b) => b.pontos - a.pontos).filter(({ musica }) => {
+    porParte[k] = porParte[k].sort((a, b) => b.pontos - a.pontos || Number(Boolean(b.musica.caderno)) - Number(Boolean(a.musica.caderno))).filter(({ musica }) => {
       const t = simples(musica.titulo);
       if (vistos.has(k + '|' + t)) return false;
       vistos.add(k + '|' + t);
