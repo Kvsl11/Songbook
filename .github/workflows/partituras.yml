@@ -1,0 +1,65 @@
+# Partituras desenhadas pelo app: lê as partituras em PDF do acervo com o Audiveris (leitura óptica de partitura)
+# e grava o MusicXML de cada canto em public/partituras/ (scripts/partituras-omr.mjs). Demora horas numa máquina
+# só; aqui o trabalho é dividido em 16 fatias que rodam ao mesmo tempo e, no fim, tudo é salvo no repositório e o
+# site é publicado de novo. Rodar à mão (Actions → "Partituras desenhadas" → Run workflow); o que já foi lido é pulado.
+name: Partituras desenhadas
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  ler:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Instalar o Audiveris e os idiomas do reconhecimento de texto
+        run: |
+          curl -sSL -o aud.deb https://github.com/Audiveris/audiveris/releases/download/5.6.2/Audiveris-5.6.2-ubuntu24.04-x86_64.deb
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ./aud.deb poppler-utils zip unzip
+          mkdir -p ~/.config/AudiverisLtd/audiveris/tessdata
+          for l in por eng; do curl -sSL -o ~/.config/AudiverisLtd/audiveris/tessdata/$l.traineddata https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/$l.traineddata; done
+      - name: Ler as partituras desta fatia
+        run: AUDIVERIS=/opt/audiveris/bin/Audiveris node scripts/partituras-omr.mjs --paralelo 3 --parte ${{ matrix.parte }} --de 16
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: partituras-${{ matrix.parte }}
+          path: public/partituras/*.mxl
+          if-no-files-found: ignore
+          retention-days: 3
+
+  juntar:
+    needs: ler
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: partituras-*
+          path: public/partituras
+          merge-multiple: true
+      - name: Salvar no repositório e publicar o site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/partituras/*.mxl
+          if git diff --cached --quiet; then echo "nada novo"; exit 0; fi
+          git commit -m "Partituras desenhadas: $(git diff --cached --name-only | grep -c '\.mxl$') novas (leitura no GitHub Actions)"
+          git push origin HEAD:${{ github.ref_name }}
+          gh workflow run pages.yml --ref ${{ github.ref_name }}

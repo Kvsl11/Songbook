@@ -8,7 +8,8 @@
 // embaixo da página não é letra da pauta), sem título, compositor e créditos (o app mostra os certos).
 //
 // Uso (ferramenta local, demora horas; retoma de onde parou):
-//   AUDIVERIS=/opt/audiveris/bin/Audiveris node scripts/partituras-omr.mjs [--paralelo 3]
+//   AUDIVERIS=/opt/audiveris/bin/Audiveris node scripts/partituras-omr.mjs [--paralelo 3] [--parte 0 --de 16]
+// --parte/--de dividem o trabalho em fatias (o GitHub Actions roda as fatias ao mesmo tempo: .github/workflows/partituras.yml)
 // Precisa do Audiveris 5.6+ com os idiomas por e eng do Tesseract (tessdata completo) e de unzip/zip.
 
 import { execFile } from 'node:child_process';
@@ -23,7 +24,10 @@ const SAIDA = path.join(RAIZ, 'public', 'partituras');
 const CACHE = path.join(RAIZ, '.omr-cache');
 const AUDIVERIS = process.env.AUDIVERIS || 'Audiveris';
 const IDIOMA = ['-constant', 'org.audiveris.omr.text.Language.defaultSpecification=por+eng'];
-const PARALELO = Number((process.argv.indexOf('--paralelo') > 0 && process.argv[process.argv.indexOf('--paralelo') + 1]) || 3);
+const arg = (nome, padrao) => { const i = process.argv.indexOf('--' + nome); return i > 0 ? Number(process.argv[i + 1]) : padrao; };
+const PARALELO = arg('paralelo', 3);
+const PARTE = arg('parte', 0);
+const DE = arg('de', 1);
 const exec = promisify(execFile);
 const existe = (f) => access(f).then(() => true, () => false);
 
@@ -120,9 +124,11 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   for (const cad of JSON.parse(await readFile(path.join(RAIZ, 'public', 'data', 'hinario.json'), 'utf8')).cadernos) {
     for (const c of cad.cantos) { const m = meta(c.chordpro); if (m && m[3]) (cadernos.get(m[1]) || cadernos.set(m[1], new Set()).get(m[1])).add(`${m[2]}-${m[3]}`); }
   }
-  const tarefas = [...acervo.map((id) => () => doAcervo(id).then((r) => `acervo ${id}: ${r}`)),
-    ...[...cadernos].map(([cad, fs]) => () => doCaderno(cad, [...fs]).then((r) => `caderno ${cad}: ${r}`))];
-  console.log(`${acervo.length} partituras do acervo e ${cadernos.size} cadernos do Hinário`);
+  // cada fatia pega uma parte dos cadernos (os mais demorados) e uma parte do acervo
+  const daFatia = (_, i) => i % DE === PARTE;
+  const tarefas = [...[...cadernos].filter(daFatia).map(([cad, fs]) => () => doCaderno(cad, [...fs]).then((r) => `caderno ${cad}: ${r}`)),
+    ...acervo.filter(daFatia).map((id) => () => doAcervo(id).then((r) => `acervo ${id}: ${r}`))];
+  console.log(`fatia ${PARTE + 1} de ${DE}: ${tarefas.length} tarefas (de ${acervo.length} partituras do acervo e ${cadernos.size} cadernos do Hinário)`);
   let feitas = 0;
   const trabalhador = async () => {
     while (tarefas.length) {
