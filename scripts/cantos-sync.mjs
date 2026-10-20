@@ -29,7 +29,8 @@ const simples = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').
 // coletâneas (muitos cantos num PDF só, sem separação legível) e pastas que não são cantos
 const FORA = /HINÁRIO ATUALIZADO|HINÁRIOS LITÚRGICOS OFICIAIS|ÁLBUNS DE LITURGIA|Volumes em PDF|Partes Fixas Compiladas|LIVES E VÍDEOS|^GRADUAL/i;
 // arquivos que não entram no app: livros licenciados (com nome e e-mail do comprador em cada página)
-export const ARQUIVOS_FORA = /^40 CANTOS GREGORIANOS COM CIFRAS/i;
+// e avisos que não são cantos (pedido de doação com CPF e e-mail)
+export const ARQUIVOS_FORA = /^40 CANTOS GREGORIANOS COM CIFRAS|^LEIA AGORA ESTE Aviso importante/i;
 
 export async function baixar(id, destino) {
   for (let t = 1; ; t++) {
