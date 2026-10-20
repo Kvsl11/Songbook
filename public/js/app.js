@@ -50,7 +50,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-142';
+export const APP_VERSAO = '2026.10.20-143';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -4171,52 +4171,91 @@ async function gerarComIA(song, titulo) {
     $('#ia-status').textContent = estado.texto;
   }
 
-  // captura ao vivo: microfone (com ou sem o vídeo) ou som de uma aba
+  // captura ao vivo: microfone (com ou sem o vídeo) ou som de uma aba. Todo microfone aberto aqui fica anotado e
+  // fecha ao pausar, terminar, cancelar ou sair da tela — nada fica ligado depois (o aviso de microfone do celular some)
+  const abertos = new Set();
+  const fecharAbertos = () => { for (const st of abertos) st.getTracks().forEach((t) => t.stop()); abertos.clear(); };
+  aoSair(fecharAbertos);
+  let pedindo = false;
+  const pedirAudio = (tipo) => (tipo === 'aba'
+    ? navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+    : navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }));
   async function capturar(tipo) {
+    if (pedindo || sessao) return; // dois toques em Gravar não abrem dois microfones
+    pedindo = true;
     let stream;
     try {
-      if (tipo === 'aba') {
-        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-        if (!stream.getAudioTracks().length) { stream.getTracks().forEach((t) => t.stop()); toast('Marque “Compartilhar áudio da aba” ao escolher a aba'); return; }
-      } else stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      stream = await pedirAudio(tipo);
     } catch {
       toast(tipo === 'aba' ? 'Captura da aba cancelada' : 'Sem acesso ao microfone: permita nas configurações do navegador');
       return;
-    }
+    } finally { pedindo = false; }
+    // saiu da tela enquanto o navegador pedia a permissão: fecha na hora
+    if (!view.contains(passo)) { stream.getTracks().forEach((t) => t.stop()); return; }
+    if (tipo === 'aba' && !stream.getAudioTracks().length) { stream.getTracks().forEach((t) => t.stop()); toast('Marque “Compartilhar áudio da aba” ao escolher a aba'); return; }
     telaLeitura(tipo);
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const fonte = ctx.createMediaStreamSource(new MediaStream(stream.getAudioTracks()));
-    const proc = ctx.createScriptProcessor(4096, 1, 1);
-    const mudo = ctx.createGain();
-    mudo.gain.value = 0;
-    fonte.connect(proc);
-    proc.connect(mudo).connect(ctx.destination);
-    const reamostrar = reamostrador(ctx.sampleRate);
     const leitor = ligarLeitor();
     // vídeo: os blocos esperam ~1 s numa fila e só entram se o vídeo da música andou nesse meio-tempo
     // (no anúncio, o tempo do vídeo fica parado; pausado também não entra)
     const historico = []; // [{ t (ms), v (tempo do vídeo), tocando }]
-    const fila = [];
+    let fila = [];
     const estado = { nivel: 0, ouvindo: false, texto: 'Preparando…' };
     let pausado = false;
+    let reabrindo = false;
     const tocouEntre = (a, b) => {
       const x = historico.find((h) => h.t >= a);
       const y = [...historico].reverse().find((h) => h.t <= b);
       return x && y && y.tocando && y.v - x.v > (b - a) / 1000 * 0.5;
     };
-    proc.onaudioprocess = (e) => {
-      const bloco = new Float32Array(e.inputBuffer.getChannelData(0));
-      let pico = 0;
-      for (let i = 0; i < bloco.length; i += 16) pico = Math.max(pico, Math.abs(bloco[i]));
-      estado.nivel = Math.min(1, pico * 3);
-      const agora = performance.now();
-      if (tipo !== 'video') { if (!pausado) leitor.alimentar(reamostrar(bloco)); estado.ouvindo = !pausado; return; }
-      fila.push({ t: agora, bloco });
-      while (fila.length && agora - fila[0].t > 1100) {
-        const b = fila.shift();
-        if (tocouEntre(b.t - 300, b.t + 900)) leitor.alimentar(reamostrar(b.bloco));
-      }
+    // a entrada de som (microfone ou aba) ligada ao leitor; desligar fecha o microfone de verdade
+    let entrada = null;
+    const ligar = (st) => {
+      abertos.add(st);
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const fonte = ctx.createMediaStreamSource(new MediaStream(st.getAudioTracks()));
+      const proc = ctx.createScriptProcessor(4096, 1, 1);
+      const mudo = ctx.createGain();
+      mudo.gain.value = 0;
+      fonte.connect(proc);
+      proc.connect(mudo).connect(ctx.destination);
+      const reamostrar = reamostrador(ctx.sampleRate);
+      proc.onaudioprocess = (e) => {
+        const bloco = new Float32Array(e.inputBuffer.getChannelData(0));
+        let pico = 0;
+        for (let i = 0; i < bloco.length; i += 16) pico = Math.max(pico, Math.abs(bloco[i]));
+        estado.nivel = Math.min(1, pico * 3);
+        const agora = performance.now();
+        if (tipo !== 'video') { if (!pausado) leitor.alimentar(reamostrar(bloco)); return; }
+        fila.push({ t: agora, bloco });
+        while (fila.length && agora - fila[0].t > 1100) {
+          const b = fila.shift();
+          if (tocouEntre(b.t - 300, b.t + 900)) leitor.alimentar(reamostrar(b.bloco));
+        }
+      };
+      entrada = { stream: st, ctx, proc };
     };
+    const desligar = () => {
+      if (!entrada) return;
+      const { stream: st, ctx, proc } = entrada;
+      entrada = null;
+      fila = [];
+      estado.nivel = 0;
+      proc.onaudioprocess = null;
+      st.getTracks().forEach((t) => t.stop());
+      abertos.delete(st);
+      ctx.close?.();
+    };
+    // continuar depois de pausar: abre o microfone de novo (a permissão já foi dada; a aba não fecha ao pausar)
+    const religar = async () => {
+      if (entrada || reabrindo || !sessao) return;
+      reabrindo = true;
+      try {
+        const st = await pedirAudio('mic');
+        if (!sessao || pausado) st.getTracks().forEach((t) => t.stop()); else ligar(st);
+      } catch { toast('Não consegui abrir o microfone de novo'); }
+      reabrindo = false;
+    };
+    ligar(stream);
     let quadro = 0;
     const laco = () => {
       if (tipo === 'video') {
@@ -4225,22 +4264,28 @@ async function gerarComIA(song, titulo) {
         while (historico.length > 400) historico.shift();
         const recente = historico.filter((h) => performance.now() - h.t < 1500);
         const anda = recente.length > 2 && recente[recente.length - 1].v - recente[0].v > 0.4;
-        estado.ouvindo = tocando && anda;
+        estado.ouvindo = tocando && anda && !!entrada;
         pausado = player.desta(song.youtube) && player.estado === 'pausado';
+        // música pausada (pelo botão ou pelo player): o microfone fecha; voltou a tocar: abre de novo
+        if (pausado) desligar(); else if (tocando) religar();
         estado.texto = !player.desta(song.youtube) || player.estado === 'parado' ? 'Abrindo o vídeo…'
-          : pausado ? 'Música pausada: a partitura também. Toque em Continuar'
+          : pausado ? 'Música pausada: a partitura e o microfone também. Toque em Continuar'
             : anda ? `Ouvindo a música · ${fmtSeg(player.tempoInformado)}${player.duracao ? ' / ' + fmtSeg(player.duracao) : ''}`
               : 'Esperando a música começar (anúncio ou carregando: não entra na partitura)';
         // a música acabou: termina sozinho
         if (player.duracao && player.tempoInformado >= player.duracao - 0.6 && !anda && leitor.segundos > 5) { terminar(); return; }
-      } else estado.texto = pausado ? 'Pausado: a partitura continua de onde parou ao tocar em Continuar' : tipo === 'aba' ? 'Ouvindo o som da aba' : 'Ouvindo pelo microfone';
+      } else {
+        estado.ouvindo = !pausado && !!entrada;
+        estado.texto = pausado ? `Pausado${tipo === 'mic' ? ' (microfone fechado)' : ''}: a partitura continua de onde parou ao tocar em Continuar`
+          : tipo === 'aba' ? 'Ouvindo o som da aba' : entrada ? 'Ouvindo pelo microfone' : 'Abrindo o microfone…';
+      }
       // o botão mostra o que dá para fazer agora (no vídeo, segue também o pausar/tocar do player)
       const bp = $('#ia-pausa');
       if (bp && bp.dataset.pausado !== String(pausado)) { bp.dataset.pausado = String(pausado); bp.innerHTML = pausado ? `${icon('play', 16)} Continuar` : `${icon('pause', 16)} Pausar`; }
       animar(leitor, estado);
       quadro = requestAnimationFrame(laco);
     };
-    sessao = { stream, ctx, proc, parar: () => cancelAnimationFrame(quadro) };
+    sessao = { parar: () => { cancelAnimationFrame(quadro); desligar(); } };
     if (tipo === 'video') {
       if (player.desta(song.youtube)) player.irPara(0);
       player.tocar(itemDoPlayer(song));
@@ -4248,8 +4293,12 @@ async function gerarComIA(song, titulo) {
     laco();
     $('#ia-cancelar').onclick = () => { pararCaptura(); if (tipo === 'video' && player.estado === 'tocando') player.alternar(); telaFontes(); };
     $('#ia-parar').onclick = terminar;
-    // pausar: no vídeo, pausa (ou continua) o próprio vídeo, e a partitura junto; no microfone/aba, só a gravação
-    $('#ia-pausa').onclick = () => { if (tipo === 'video') player.alternar(); else pausado = !pausado; };
+    // pausar: no vídeo, pausa (ou continua) o próprio vídeo, e a partitura junto; no microfone, fecha o microfone
+    $('#ia-pausa').onclick = () => {
+      if (tipo === 'video') { player.alternar(); return; }
+      pausado = !pausado;
+      if (tipo === 'mic') { if (pausado) desligar(); else religar(); }
+    };
     async function terminar() {
       if (!sessao) return;
       pararCaptura();
@@ -4258,13 +4307,10 @@ async function gerarComIA(song, titulo) {
     }
   }
   function pararCaptura() {
-    if (!sessao) return;
     const s = sessao;
     sessao = null;
-    s.parar();
-    s.proc.onaudioprocess = null;
-    s.stream.getTracks().forEach((t) => t.stop());
-    s.ctx.close?.();
+    s?.parar();
+    fecharAbertos();
   }
   async function lerArquivo(arquivo) {
     telaLeitura('arquivo');
