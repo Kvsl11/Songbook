@@ -45,7 +45,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-133';
+export const APP_VERSAO = '2026.10.20-134';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -3076,7 +3076,6 @@ function viewSong(id, ctx = {}) {
           ${isPreview ? `<button role="menuitem" id="btn-edit-prev">${icon('edit', 18)}<span>Editar cifra</span></button>`
             : `<a role="menuitem" href="#/editar/${song.id}">${icon('edit', 18)}<span>Editar cifra</span></a>`}
           <button role="menuitem" id="btn-pdf">${icon('file', 18)}<span>Exportar PDF</span></button>
-          ${paginasDaPartitura(song.content).length ? `<a role="menuitem" href="#/musica/${isPreview ? 'previa' : song.id}/partitura">${icon('score', 18)}<span>Partitura e ensaio</span></a>` : ''}
         </div>
       </div>
     </div>
