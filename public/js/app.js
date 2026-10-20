@@ -45,7 +45,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-132';
+export const APP_VERSAO = '2026.10.20-133';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -3266,7 +3266,7 @@ function viewSong(id, ctx = {}) {
   const abrirMais = (abre) => {
     menuMais.hidden = !abre;
     btnMais.setAttribute('aria-expanded', String(abre));
-    menuMais.closest('.song-topo')?.classList.toggle('menu-aberto', abre);
+    casaMenu.closest('.song-topo')?.classList.toggle('menu-aberto', abre && !celular.matches); // a folha do celular não precisa subir o topo
     if (abre && celular.matches) {
       fundoMenu = document.createElement('div');
       fundoMenu.className = 'menu-mais-fundo';
