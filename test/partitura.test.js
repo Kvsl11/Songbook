@@ -147,3 +147,25 @@ test('IA: tom pela cifra e pelas notas, andamento e melodia no compasso', async 
   assert.ok(Math.abs(estimarAndamento(ns) - 90) <= 2, `andamento ${estimarAndamento(ns)}`);
   assert.deepEqual(melodiaDasNotas(ns, { bpm: 90, fifths: 2 }).map((e) => e.d), misto.map(([, b]) => b * 8));
 });
+
+test('IA: voz grave na clave de tenor e música que começa no contratempo', async () => {
+  const { claveDaVoz, melodiaDasNotas } = await import('../public/js/lib/partitura.js');
+  const q = 60 / 96;
+  const nota = (p, t, b) => ({ startTimeSeconds: t, durationSeconds: b * q * 0.92, pitchMidi: p, amplitude: 0.7 });
+  // homem cantando entre Lá2 e Ré4: entra (antes, abaixo de Dó3 era cortado) e fica na clave de tenor, na altura real
+  const homem = [[45, 1], [47, 1], [50, 2], [55, 1], [57, 1], [62, 2]];
+  let t = 1;
+  const nh = homem.map(([p, b]) => { const n = nota(p, t, b); t += b * q; return n; });
+  const cv = claveDaVoz(nh, 'voz');
+  assert.deepEqual(cv, { clave: 'G8', centro: 55 });
+  assert.deepEqual(melodiaDasNotas(nh, { bpm: 96, modo: 'voz', centro: cv.centro }).filter((e) => e.a.length).map((e) => e.a[0]), ['A2', 'B2', 'D3', 'G3', 'A3', 'D4']);
+  assert.equal(claveDaVoz(nh, 'mistura').clave, 'G');
+  // tempos em 1,0 s, 1,625 s…; a melodia começa meia batida depois (contratempo): a partitura começa com pausa de colcheia
+  const ct = [[67, 1], [67, 1], [69, 2], [71, 2], [69, 1], [67, 1]];
+  t = 1 + q / 2;
+  const nc = ct.map(([p, b]) => { const n = nota(p, t, b); t += b * q; return n; });
+  // o baixo marca os tempos (fica fora da melodia, mas mostra onde o tempo cai)
+  const baixo = Array.from({ length: 10 }, (_, i) => ({ startTimeSeconds: 1 + i * q, durationSeconds: q * 0.9, pitchMidi: 40, amplitude: 0.8 }));
+  const mel = melodiaDasNotas([...nc, ...baixo], { bpm: 96 });
+  assert.deepEqual(mel[0], { a: [], d: 4, l: [], c: '' });
+});
