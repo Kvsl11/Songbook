@@ -928,6 +928,8 @@ body.performance .convite-instalar { display: none; }
    por trás da capa, do título e dos botões. Depois de 5 s (quando os controles do YouTube já sumiram) o
    vídeo aparece e a capa some, deixando o lugar dela livre para o vídeo. */
 .song-topo { position: relative; isolation: isolate; }
+/* o isolation prende o menu "mais" dentro do topo: com ele aberto, o topo inteiro sobe acima da barra da música */
+.song-topo.menu-aberto { z-index: 25; }
 .canvas-fundo {
   position: absolute; z-index: -1; inset: -64px calc(-1 * var(--gutter)) -90px; overflow: hidden; pointer-events: none;
   container-type: size; background: #000;

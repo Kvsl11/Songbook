@@ -3259,7 +3259,7 @@ function viewSong(id, ctx = {}) {
   }
   $('#btn-palco').onclick = entrarPalco;
   const menuMais = $('#menu-mais');
-  const abrirMais = (abre) => { menuMais.hidden = !abre; $('#btn-mais').setAttribute('aria-expanded', String(abre)); };
+  const abrirMais = (abre) => { menuMais.hidden = !abre; $('#btn-mais').setAttribute('aria-expanded', String(abre)); menuMais.closest('.song-topo')?.classList.toggle('menu-aberto', abre); };
   $('#btn-mais').onclick = (e) => { e.stopPropagation(); abrirMais(menuMais.hidden); };
   menuMais.addEventListener('click', () => abrirMais(false));
   const foraDoMenu = (e) => { if (!menuMais.hidden && !e.target.closest('.mais-wrap')) abrirMais(false); };
