@@ -117,7 +117,8 @@ export function sugerirParaODia(musicas, lit, { caderno = null, textos = {}, lim
     if (!chave) continue;
     let pontos = caderno && m.caderno === caderno ? 20 : combina(m, dia, textos);
     // partes fixas: as opções gerais (sem tempo, domingo ou celebração) também servem
-    if (!pontos && FIXAS.includes(chave) && !tempoDoTexto(`${(m.caminho || []).join(' ')} ${m.arquivo || ''}`) && !numeroEAnos(m).numero) pontos = 0.5;
+    // (as da pasta de partes fixas antes das outras)
+    if (!pontos && FIXAS.includes(chave) && !tempoDoTexto(`${(m.caminho || []).join(' ')} ${m.arquivo || ''}`) && !numeroEAnos(m).numero) pontos = /partes fixas|cantos fixos/i.test((m.caminho || []).join('/')) ? 0.8 : 0.5;
     if (!pontos || (!FIXAS.includes(chave) && pontos < 2)) continue;
     (porParte[chave] ||= []).push({ musica: m, pontos });
   }

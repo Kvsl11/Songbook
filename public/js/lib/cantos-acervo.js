@@ -10,6 +10,16 @@
 import { doEditor, isChord } from '../chordpro.js';
 import { nomeDoCanto } from './acervo.js';
 
+// título limpo: sem link, sem caracteres invisíveis e sem o crédito grudado ("GLÓRIA A DEUS NAS ALTURASLetra: …")
+export const limparTitulo = (t) => String(t || '').replace(/[\u200b-\u200f\ufeff]/g, '').replace(/https?:\/\/\S+|www\.\S+/gi, '')
+  .replace(/\s*(letra e m[uú]sica|letra|m[uú]sica|l\.\s*e\s*m\.|texto|tradu[çc][ãa]o|melodia|refr[ãa]o)\s*:.*$/i, '').replace(/\s+/g, ' ').replace(/^[\s·:.,-]+|[\s·:,-]+$/g, '')
+  .replace(/\p{L}+(?:-\p{L}+){2,}/gu, (w) => w.replace(/-/g, '')) // "co-ra-ção" -> "coração"
+  .replace(/^([\p{Lu}\s,!?.'’-]{6,}\p{Lu})(?=\p{Lu}\p{Ll}).*$/u, '$1') // "CRISTÃOS VINDE TODOSAdeste Fidelis…" (crédito grudado)
+  .replace(/\s*\([^)]*$/, '').replace(/\s*(ATENÇÃO|OBS)\b.*$/i, '')
+  .replace(/^(.{60,}?)\s+-\s+.*$/, '$1').replace(/^(.{70})\S*\s.*$/, '$1…').trim();
+// título que não é nome de canto: nome da parte, "30º DTC", "Partitura inteira", "genérico", crédito
+export const tituloGenerico = (t) => { const x = semAcento(t).replace(/\([^)]*\)|\(.*$/g, '').replace(/^ant\.\s*/, 'antifona ').trim(); return !x || x.length < 3 || /^(\d+\s*[ºo°]?\s*)?(dtc|d\.t\.c|tc)\b|^(antifona|canto|refrao|salmo|aclamacao|comunhao|ofertorio|entrada|abertura|partitura|generico|completa|acompanhamento|orgao|organ|versao|opcao|todas as|melodias? para|s\. paulo|schola|cantorum|https?)\b|^x?\d+\.?\s*antifona|^\d+$/.test(x) && x.split(' ').length <= 6; };
+
 const semAcento = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 // texto de um .docx (word/document.xml): um parágrafo por linha, tabulação vira espaços
@@ -77,6 +87,9 @@ export function cantosDeCifra(texto, nomeArquivo = '') {
     if (!titulo && corpo.length && !linhaDeAcordes(corpo[0]) && !/^\d+\./.test(corpo[0].trim()) && corpo[0].trim().length < 90 && corpo.length > 3 && !b.parte) titulo = corpo.shift().trim();
     const letra = corpo.filter((l) => l.trim() && !linhaDeAcordes(l));
     if (letra.length < 2 || !corpo.some(linhaDeAcordes)) continue; // sem letra com acordes: não é um canto
+    titulo = limparTitulo(titulo);
+    // sem nome de canto ("ANTÍFONA DE COMUNHÃO", "30º DTC"): a primeira linha da letra
+    if (tituloGenerico(titulo)) titulo = limparTitulo(letra.find((l) => !/^\s*(\d+\.|r\.|ref)/i.test(l.trim()) && /\p{L}{3}/u.test(l))?.trim().split(/[*;!?]|,\s(?=\p{Ll})/u)[0].slice(0, 70)) || titulo;
     titulo = titulo || (b.parte ? b.parte.charAt(0) + b.parte.slice(1).toLowerCase() : base);
     if (titulo === titulo.toUpperCase()) titulo = titulo.charAt(0) + titulo.slice(1).toLowerCase();
     const cab = [`{title: ${titulo}}`];
@@ -118,7 +131,7 @@ export function cantoDePartitura(texto, nomeArquivo = '') {
   // título: o pedaço do nome do arquivo que é o nome do canto (não a parte da missa, o tempo, o domingo ou o autor)
   const nome = nomeDoCanto(nomeArquivo).replace(/\.?\s*pdf$/i, '').trim();
   const pedacos = nome.split(/\s*-\s+|\s+-\s*/).map((x) => x.replace(/^\d+[a-z]?\.\s*/i, '').trim()).filter(Boolean);
-  const generico = (x) => /^(antífona|comunhão|salmo|aclamação|entrada|ofertório|oferendas|canto|recessional|partes fixas|weber|delphim|pe\.|frei|fr\.)\b|domingo|quaresma|advento|pentecostes|páscoa|natal|tempo comum|^(ano )?[abc]$/iu.test(x) || /^\p{Lu}[\p{Lu}\s]+$/u.test(x);
+  const generico = (x) => /^(antífona|comunhão|salmo|aclamação|entrada|ofertório|oferendas|canto|recessional|partes fixas|weber|delphim|pe\.|frei|fr\.)\b|domingo|quaresma|advento|pentecostes|páscoa|natal|tempo comum|^(ano )?[abc]$/iu.test(x) || /^\p{Lu}[\p{Lu}\s]+$/u.test(x) || tituloGenerico(x);
   const autorDoNome = pedacos.length > 1 && /delphim|weber|frisina|gelineau|taiz|pe\.|frei|fr\.|ir\.|adenor|ximenes|temme|prim\b/i.test(pedacos[pedacos.length - 1]) ? pedacos.pop() : '';
   let titulo = pedacos.filter((x) => !generico(x)).sort((a, b) => b.length - a.length)[0] || '';
   if (!autor && autorDoNome) autor = autorDoNome;
@@ -137,7 +150,10 @@ export function cantoDePartitura(texto, nomeArquivo = '') {
   if (pendente) versos.push(pendente);
   const doArquivo = Boolean(titulo);
   // nome do arquivo sem o nome do canto ("5.C - Comunhão - 5º Domingo da Quaresma"): o primeiro verso
-  if (!titulo) titulo = (versos.find((v) => !/^[IVXL]+$/.test(v) && v.split(' ').length >= 3) || nome).split(/[*;!?]|,\s(?=\p{Ll})/u)[0].trim().slice(0, 70);
+  if (!titulo) titulo = (versos.find((v) => !/^[IVXL]+$/.test(v) && v.split(' ').length >= 3 && !tituloGenerico(v)) || nome).split(/[*;!?]|,\s(?=\p{Ll})/u)[0].trim().slice(0, 70);
+  titulo = limparTitulo(titulo) || nome;
+  // texto longo e corrido (instrução, documento) não é canto
+  if (versos.length > 70) return null;
   // o título (e o nome do autor) repetidos no alto de cada página não são verso
   const igual = (a, b) => semAcento(a).replace(/[^a-z]/g, '') === semAcento(b).replace(/[^a-z]/g, '');
   for (let i = versos.length - 1; i >= 0; i--) if ((doArquivo && igual(versos[i], titulo)) || (autor && igual(versos[i], autor))) versos.splice(i, 1);

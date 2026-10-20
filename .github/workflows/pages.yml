@@ -64,28 +64,33 @@ jobs:
         timeout-minutes: 25
         run: node scripts/liturgia-sync.mjs --dias 21
       - name: Indexar o acervo litúrgico (pasta do Google Drive)
+        if: github.event_name != 'push' # os dados do acervo ficam salvos no repositório: só na atualização diária
         continue-on-error: true
         timeout-minutes: 20
         run: node scripts/acervo-sync.mjs
       - name: Cache das letras do Hinário Litúrgico da CNBB
+        if: github.event_name != 'push' # os dados do acervo ficam salvos no repositório: só na atualização diária
         uses: actions/cache@v4
         with:
           path: .hinario-cache
           key: hinario-${{ github.run_id }}
           restore-keys: hinario-
       - name: Letras do Hinário Litúrgico da CNBB (cadernos do acervo)
+        if: github.event_name != 'push' # os dados do acervo ficam salvos no repositório: só na atualização diária
         continue-on-error: true
         timeout-minutes: 25
         run: |
           command -v pdftotext || (sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils)
           node scripts/hinario-sync.mjs
       - name: Cache das músicas do acervo
+        if: github.event_name != 'push' # os dados do acervo ficam salvos no repositório: só na atualização diária
         uses: actions/cache@v4
         with:
           path: .acervo-cache
           key: acervo-${{ github.run_id }}
           restore-keys: acervo-
       - name: Músicas e partituras dos arquivos do acervo
+        if: github.event_name != 'push' # os dados do acervo ficam salvos no repositório: só na atualização diária
         continue-on-error: true
         timeout-minutes: 60
         run: |
