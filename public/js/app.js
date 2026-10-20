@@ -45,7 +45,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-125';
+export const APP_VERSAO = '2026.10.20-126';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -3973,7 +3973,8 @@ async function revisarSet(set) {
   const itens = set.items.map((it) => {
     const s = db.song(it.songId) || {};
     const m = ac?.musicas.find((x) => x.fonte === s.source);
-    return { parte: it.label || s.parte || '', titulo: s.title || '(música removida)', letra: s.content || '', origem: m ? `${m.caminho.join('/')} ${m.arquivo || ''}` : '', source: s.source || '', songId: it.songId };
+    const sub = renderSong(s.content || '').meta.subtitle || '';
+    return { parte: it.label || s.parte || '', titulo: s.title || '(música removida)', artista: s.artist || '', letra: s.content || '', origem: `${m ? `${m.caminho.join('/')} ${m.arquivo || ''}` : ''} ${sub}`.trim(), source: s.source || '', songId: it.songId };
   });
   // o mesmo canto em outra missa nas 3 semanas anteriores
   const ini = somaDias(set.date, -21);

@@ -1503,3 +1503,12 @@ a.source { text-decoration: none; color: inherit; }
 .ensaio .vozes .chips { margin: 0; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .ensaio .vozes .chips .chip { flex: none; }
 .ens-so { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+/* barra de seleção no celular: contagem e "selecionar todas" em cima, os botões de ação embaixo, largos */
+.barra-sel #sel-n { white-space: nowrap; }
+.barra-sel .btn { white-space: nowrap; }
+@media (max-width: 600px) {
+  .barra-sel { flex-wrap: wrap; row-gap: 8px; }
+  .barra-sel #sel-n { flex: 1; }
+  .barra-sel .spacer { display: none; }
+  .barra-sel #sel-cancelar, .barra-sel .btn.solid { flex: 1 1 40%; justify-content: center; }
+}
