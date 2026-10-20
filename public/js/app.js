@@ -43,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-106';
+export const APP_VERSAO = '2026.10.20-107';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -1655,11 +1655,30 @@ function buscarCifraNoApp(song) {
 
 // Abre a música da busca já com o vídeo do YouTube (procura por até 3 s antes de abrir, para a página
 // ser desenhada uma vez só); se a busca demorar mais, ela continua com a página aberta
+// vídeo de referência da música. Para os cantos do acervo litúrgico e do Hinário da CNBB (nomes curtos e comuns,
+// como "Santo I" ou "Aleluia"), a busca leva "canto litúrgico" e o vídeo só vale se o título dele tiver as palavras
+// do canto: sem isso, melhor ficar sem vídeo do que com um errado
+const PALAVRAS_VAZIAS = new Set(['que', 'nos', 'vos', 'dos', 'das', 'com', 'para', 'por', 'uma', 'ano', 'missa', 'canto', 'antifona', 'opcao']);
+const palavrasDoTitulo = (t) => normalizar(String(t || '').replace(/\([^)]*\)/g, ' ')).split(' ').filter((p) => p.length >= 3 && !PALAVRAS_VAZIAS.has(p) && !/^\d+$/.test(p));
+function videoCombina(tituloVideo, titulo) {
+  const ps = palavrasDoTitulo(titulo).slice(0, 6);
+  if (!ps.length) return false;
+  const v = ` ${normalizar(tituloVideo)} `;
+  return ps.filter((p) => v.includes(p)).length / ps.length >= 0.6;
+}
+async function videoDaMusica(titulo, artista, source) {
+  if (!/^(acervo|hinario):/.test(source || '')) return (await buscarYoutube([titulo, artista].filter(Boolean).join(' ')))[0] || null;
+  const autor = String(artista || '').replace(/hin[áa]rio lit[úu]rgico cnbb|\b(svd|ofm|ofmcap|sj|pe\.|padre|frei|fr\.|ir\.|d\.r\.)/gi, ' ').replace(/[,.]/g, ' ').trim();
+  const extra = String(source).startsWith('hinario:') ? 'hinário litúrgico CNBB' : 'canto litúrgico';
+  const vs = [...await buscarYoutube(`${titulo} ${autor} ${extra}`).catch(() => []), ...(autor ? await buscarYoutube(`${titulo} ${extra}`).catch(() => []) : [])];
+  return vs.find((v) => videoCombina(v.titulo, titulo)) || null;
+}
+
 async function abrirPrevia(content, source, back, videoJa = null) {
   const novo = { id: 'previa', content, source, transpose: 0, capo: capoDaCifra(content), back }; // capo da cifra (Cifra Club)
   const m = renderSong(content).meta;
   if (!youtubeId(m.youtube) && !String(source || '').startsWith('cnbb:')) {
-    const busca = (videoJa || buscarYoutube([m.title, m.artist].filter(Boolean).join(' '))).then((vs) => vs[0] || null).catch(() => null);
+    const busca = (videoJa ? videoJa.then((vs) => vs[0] || null) : videoDaMusica(m.title, m.artist, source)).catch(() => null);
     const v = await Promise.race([busca, new Promise((r) => setTimeout(() => r(undefined), 3000))]);
     if (v) novo.content = definirMeta(content, 'youtube', v.url);
     else if (v === null) novo.semVideo = true; // procurou e não achou
@@ -2866,13 +2885,30 @@ function viewSong(id, ctx = {}) {
   if (isPreview && !song.youtube && !String(song.source || '').startsWith('cnbb:') && !preview.semVideo && !preview.videoProcurado) {
     const esta = preview;
     esta.videoProcurado = true;
-    buscarYoutube([song.title, song.artist].filter(Boolean).join(' ')).then((vs) => vs[0]).catch(() => null).then((v) => {
+    videoDaMusica(song.title, song.artist, song.source).catch(() => null).then((v) => {
       if (preview !== esta) return; // já saiu desta música
       if (v) esta.content = definirMeta(esta.content, 'youtube', v.url); else esta.semVideo = true;
       if (location.hash === '#/musica/previa') route();
     });
   }
   avisoFalta();
+  // canto do acervo litúrgico salvo antes desta conferência: o vídeo vinculado tem de ter o nome do canto;
+  // se não tiver, procura outro (ou fica sem). Uma vez só por música.
+  if (!isPreview && song.youtube && /^(acervo|hinario):/.test(song.source || '') && !renderSong(song.content).meta.x_video_conferido) {
+    const id = song.id;
+    youtubeOEmbed(`https://www.youtube.com/watch?v=${song.youtube}`).catch(() => null).then(async (info) => {
+      const atual = db.song(id);
+      if (!atual || !info) return; // sem internet: confere na próxima vez
+      let content = definirMeta(atual.content, 'x_video_conferido', '1');
+      if (!videoCombina(info.titulo, atual.title)) {
+        const v = await videoDaMusica(atual.title, atual.artist, atual.source).catch(() => null);
+        content = definirMeta(content, 'youtube', v ? v.url : '');
+        toast(v ? 'Troquei o vídeo de referência por um do mesmo canto' : 'O vídeo de referência não era deste canto: tirei');
+      }
+      db.saveSong({ ...atual, content });
+      if (location.hash.startsWith('#/musica/' + id)) route();
+    });
+  }
 
 
   // topo com os quadros do clipe: a capa sai quando o 1º quadro carrega; o tipo de quadro fica salvo
