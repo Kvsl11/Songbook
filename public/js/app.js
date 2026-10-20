@@ -43,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-118';
+export const APP_VERSAO = '2026.10.20-119';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2312,6 +2312,8 @@ async function viewSetor(k, parte) {
     corpo.innerHTML = `<div class="grade-partes">${PARTES_FIXAS.map((p, i) => cartaoParte(p, ac.fixas.get(p[0])?.length || 0, i)).join('')}</div>`;
     // Missas completas: conta também os cantos da missa de hoje, que aparecem lá dentro
     const arquivos = ac.fixas.get('missas-completas')?.length || 0;
+    const creio = corpo.querySelector('a[href$="/creio"] small');
+    if (creio && !ac.fixas.get('creio')?.length) creio.textContent = `${CREIO_TEXTOS.length} textos para rezar`;
     const card = corpo.querySelector('a[href$="/missas-completas"] small');
     if (card) {
       card.textContent = arquivos ? contagem(arquivos) : 'montando a missa de hoje…';
@@ -2335,6 +2337,12 @@ async function viewSetor(k, parte) {
   corpo.insertAdjacentHTML('beforeend', `<p class="fonte" style="margin-top:18px">Músicas tiradas do acervo litúrgico (hinários e subsídios da CNBB): a letra fiel e, quando o arquivo trazia, a cifra.</p>`);
 }
 
+// o Creio quase sempre é rezado (o acervo não tem Creio cantado): os textos do Missal ficam na tela do Creio
+const CREIO_TEXTOS = [
+  ['credo', 'Símbolo dos Apóstolos', 'Creio em Deus Pai'], ['credo-niceno-constantinopolitano', 'Niceno-Constan\u00adtinopolitano', 'Creio em um só Deus'],
+  ['credo-latim', 'Symbolum Apostolorum', 'Latim'], ['credo-niceno-constantinopolitano-latim', 'Credo Nicænum', 'Latim'],
+];
+
 async function viewParteDoSetor(setor, pk) {
   const lista = setor[0] === 'fixas' ? PARTES_FIXAS : TEMPOS;
   const parte = lista.find((p) => p[0] === pk);
@@ -2346,6 +2354,9 @@ async function viewParteDoSetor(setor, pk) {
   view.innerHTML = `<h2 class="greet">${esc(parte[1])}</h2>
     ${completas ? `<div id="missa-sugerida"><div class="loading-note"><span class="spin"></span>Montando a missa de hoje…</div></div>
       <div class="shelf-head"><h2>Missas completas do acervo</h2></div>` : ''}
+    ${pk === 'creio' ? `<div class="shelf-head"><h2>Rezar o Creio</h2></div><div class="grade-oe">${CREIO_TEXTOS.map(([slug, nome, sub], k) => `<a class="cartao-oe texto" href="#/oracao/${slug}" style="--h:${265 + k * 12}">
+      <small>Profissão de fé</small><b>${esc(nome)}</b><span>${esc(sub)}</span></a>`).join('')}</div>
+      <div class="shelf-head" style="margin-top:18px"><h2>Creio cantado</h2></div>` : ''}
     <label class="field">${icon('search', 20)}<input class="search" type="search" placeholder="Procurar em ${esc(parte[1])}"></label>
     <div id="cantos" style="margin-top:12px"><div class="loading-note"><span class="spin"></span>Carregando as músicas…</div></div>`;
   if (completas) missaCompletaSugerida($('#missa-sugerida'));
