@@ -43,7 +43,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-117';
+export const APP_VERSAO = '2026.10.20-118';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -2362,6 +2362,12 @@ async function viewParteDoSetor(setor, pk) {
   $('.search').oninput = (e) => desenharMusicas(box, itens, { filtro: e.target.value, vazio: 'Nada com esse nome.' });
 }
 
+// o texto do dia de uma parte (leitura, salmo, aclamação, evangelho), inteiro, numa janela
+function lerTextoDoDia(p) {
+  return openDialog(`<h3>${esc(p.nome)}</h3><div class="texto-liturgico ler-dia">${leituraHTML(p.liturgia).replace(' recolhida', '').replace(/<button[^>]*data-expand[\s\S]*?<\/button>/, '')}</div>
+    <div class="acts"><button class="btn primary" data-ok>Fechar</button></div>`, (dlg, done) => { $('[data-ok]', dlg).onclick = () => done(null); });
+}
+
 // "Missas completas": a liturgia de hoje com um canto sugerido para cada momento (a Missa litúrgica da Liturgia)
 // a missa de hoje (Missa litúrgica) e os cantos escolhidos para cada parte
 async function missaDeHojeSugerida() {
@@ -2391,19 +2397,27 @@ async function missaCompletaSugerida(box) {
   document.documentElement.style.setProperty('--lit-cor', cor);
   document.documentElement.style.setProperty('--lit-ink', lit.cor === 'branco' ? '#d8b54a' : `color-mix(in srgb, ${cor} 60%, #fff)`);
   let n = 0;
+  // a Oração Eucarística não tem canto: a linha leva às orações eucarísticas do Missal (depois do Santo)
+  const oe = `<li class="track clickable" data-oe style="grid-template-columns:auto 1fr auto"><span class="step leitura">${icon('book', 18)}</span>
+    <div class="info"><div class="t">Oração Eucarística</div><div class="s">Escolher no Missal Romano (I a V e outras)</div></div>
+    <span class="acts"><button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
+  let oePosta = Boolean(sel.oracao);
   const linhas = missa.partes.map((p) => {
     const v = sel[p.chave];
+    const ref = p.liturgia ? p.liturgia.referenciaCompleta || p.liturgia.referencia || '' : '';
     if (LEITURAS.includes(p.chave)) {
-      const ref = p.liturgia?.referenciaCompleta || p.liturgia?.referencia || '';
-      return ref ? `<li class="track" style="grid-template-columns:auto 1fr"><span class="step leitura">${icon('book', 18)}</span><div class="info"><div class="t">${esc(p.nome)}</div><div class="s">${esc(ref)}</div></div></li>` : '';
+      return ref ? `<li class="track clickable" data-ler="${esc(p.chave)}" style="grid-template-columns:auto 1fr auto"><span class="step leitura">${icon('book', 18)}</span><div class="info"><div class="t">${esc(p.nome)}</div><div class="s">${esc(ref)}</div></div>
+        <span class="acts"><button class="icon-btn" aria-label="Ler">${icon('next', 18)}</button></span></li>` : '';
     }
-    if (!v) return '';
+    if (p.chave === 'oracao' && !v) { if (oePosta) return ''; oePosta = true; return oe; }
+    if (!v) return p.liturgia ? `<li class="track clickable" data-ler="${esc(p.chave)}" style="grid-template-columns:auto 1fr auto"><span class="step leitura">${icon('book', 18)}</span><div class="info"><div class="t">${esc(p.nome)}</div><div class="s">${esc(ref)}</div></div>
+        <span class="acts"><button class="icon-btn" aria-label="Ler">${icon('next', 18)}</button></span></li>` : '';
     const c = p.cantos.find((x) => x.url === v);
     const titulo = v === 'cnbb' ? 'Texto oficial (CNBB)' : c?.titulo || '';
     const fonte = c?.fonte === 'hinario' ? 'Hinário CNBB' : c?.fonte === 'acervo' ? 'Acervo' : '';
     return `<li class="track clickable" data-parte="${esc(p.chave)}" style="grid-template-columns:auto 1fr auto"><span class="step">${++n}</span>
       <div class="info"><div class="t">${esc(titulo)}</div><div class="s">${esc(p.nome)}${fonte ? ` · ${fonte}` : ''}</div></div>
-      <span class="acts"><button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
+      <span class="acts">${p.liturgia ? `<button class="icon-btn" data-ler="${esc(p.chave)}" aria-label="Ler o texto do dia" title="Ler o texto do dia (${esc(ref)})">${icon('book', 17)}</button>` : ''}<button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>${p.chave === 'santo' && !oePosta ? (oePosta = true, oe) : ''}`;
   }).join('');
   box.innerHTML = `
     <section class="hero ${lit.cor === 'branco' ? 'claro' : ''}">
@@ -2421,6 +2435,10 @@ async function missaCompletaSugerida(box) {
   $('#montar', box)?.addEventListener('click', (e) => montarRepertorio(missa, sel, data, { btn: e.currentTarget }));
   $('#montar-pl', box)?.addEventListener('click', (e) => montarRepertorio(missa, sel, data, { btn: e.currentTarget, tipo: 'playlist' }));
   box.addEventListener('click', async (e) => {
+    const ler = e.target.closest('[data-ler]');
+    const pl = ler && missa.partes.find((x) => x.chave === ler.dataset.ler);
+    if (pl?.liturgia) { lerTextoDoDia(pl); return; }
+    if (e.target.closest('[data-oe]')) { sessionStorage.setItem('catOracao', 'oracoes-eucaristicas'); location.hash = '#/oracoes'; return; }
     const li = e.target.closest('li[data-parte]');
     const p = li && missa.partes.find((x) => x.chave === li.dataset.parte);
     if (!p) return;
@@ -3814,6 +3832,8 @@ const ordenarCantos = (cantos, f = fontePreferida()) => [...cantos].sort((a, b) 
 
 function escolhaPadrao(parte) {
   const cantos = ordenarCantos(parte.cantos);
+  // salmo do acervo só vale se for o do dia (tem o refrão do dia ou vem do caderno do Hinário); senão, o texto oficial
+  if (parte.chave === 'salmo' && parte.chordpro && typeof cantos[0]?.pontos === 'number' && cantos[0].pontos < 8) return 'cnbb';
   if (parte.chordpro && parte.chave === 'aclamacao') return cantos[0]?.url || 'cnbb';
   if (parte.chordpro) return cantos.find((c) => !c.sugestao)?.url || cantos[0]?.url || 'cnbb';
   if (!cantos.length || LEITURAS.includes(parte.chave) || parte.chave === 'oracao') return '';
@@ -4071,8 +4091,8 @@ async function missaLiturgica(missa, data) {
   const caderno = cadernoDoDia(cadernos, lit, data);
   const m0 = lit.missas[0] || {};
   const sug = sugerirParaODia(ac.musicas, lit, { caderno: caderno?.caderno.id, textos: { salmo: m0.salmo?.refrao, aclamacao: m0.aclamacao?.versiculo } });
-  const cantosDe = (chave) => (sug[chave] || []).map(({ musica: m }) => ({
-    titulo: m.titulo, url: m.fonte, fonte: m.fonte.startsWith('hinario:') ? 'hinario' : 'acervo', partitura: /x_partitura/.test(m.chordpro),
+  const cantosDe = (chave) => (sug[chave] || []).map(({ musica: m, pontos }) => ({
+    titulo: m.titulo, url: m.fonte, pontos, fonte: m.fonte.startsWith('hinario:') ? 'hinario' : 'acervo', partitura: /x_partitura/.test(m.chordpro),
   }));
   const partes = missa.partes.map((p) => ({ ...p, cantos: cantosDe(p.chave), texto: [] })).filter((p) => !['sinal', 'oracao'].includes(p.chave) || p.cantos.length);
   // o refrão orante do Hinário (antes da entrada) e o Glória, quando o caderno do dia traz
