@@ -50,7 +50,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-140';
+export const APP_VERSAO = '2026.10.20-141';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -4095,7 +4095,7 @@ async function gerarComIA(song, titulo) {
       <canvas class="ia-rolo" id="ia-rolo" aria-label="Notas que a IA está ouvindo"></canvas>
       <div class="ia-numeros"><span><small>Notas</small><b id="ia-n">0</b></span><span><small>Tom provável</small><b id="ia-tom-vivo">—</b></span><span><small>Andamento</small><b id="ia-bpm-vivo">—</b></span></div>
       <div class="ia-nasce"><div class="ia-nasce-cab">${icon('score', 16)} <b>A partitura nascendo</b><small id="ia-analisado"></small></div><div class="osmd-box" id="ia-viva"><p class="muted">As primeiras notas aparecem em alguns segundos…</p></div></div>
-      <div class="row ia-fim"><button class="btn ghost" id="ia-cancelar">Cancelar</button><button class="btn primary" id="ia-parar">${icon('check', 16)} ${tipo === 'arquivo' ? 'Aguarde…' : 'Terminar'}</button></div></div>`;
+      <div class="row ia-fim"><button class="btn ghost" id="ia-cancelar">Cancelar</button>${tipo === 'arquivo' ? '' : `<button class="btn" id="ia-pausa">${icon('pause', 16)} Pausar</button>`}<button class="btn primary" id="ia-parar">${icon('check', 16)} ${tipo === 'arquivo' ? 'Aguarde…' : 'Terminar'}</button></div></div>`;
     if (tipo === 'arquivo') $('#ia-parar').disabled = true;
   }
   let osmdVivo = null;
@@ -4194,6 +4194,7 @@ async function gerarComIA(song, titulo) {
     const historico = []; // [{ t (ms), v (tempo do vídeo), tocando }]
     const fila = [];
     const estado = { nivel: 0, ouvindo: false, texto: 'Preparando…' };
+    let pausado = false;
     const tocouEntre = (a, b) => {
       const x = historico.find((h) => h.t >= a);
       const y = [...historico].reverse().find((h) => h.t <= b);
@@ -4205,7 +4206,7 @@ async function gerarComIA(song, titulo) {
       for (let i = 0; i < bloco.length; i += 16) pico = Math.max(pico, Math.abs(bloco[i]));
       estado.nivel = Math.min(1, pico * 3);
       const agora = performance.now();
-      if (tipo !== 'video') { leitor.alimentar(reamostrar(bloco)); estado.ouvindo = true; return; }
+      if (tipo !== 'video') { if (!pausado) leitor.alimentar(reamostrar(bloco)); estado.ouvindo = !pausado; return; }
       fila.push({ t: agora, bloco });
       while (fila.length && agora - fila[0].t > 1100) {
         const b = fila.shift();
@@ -4221,13 +4222,17 @@ async function gerarComIA(song, titulo) {
         const recente = historico.filter((h) => performance.now() - h.t < 1500);
         const anda = recente.length > 2 && recente[recente.length - 1].v - recente[0].v > 0.4;
         estado.ouvindo = tocando && anda;
+        pausado = player.desta(song.youtube) && player.estado === 'pausado';
         estado.texto = !player.desta(song.youtube) || player.estado === 'parado' ? 'Abrindo o vídeo…'
-          : player.estado !== 'tocando' ? 'Vídeo pausado: toque ▶ no player para continuar'
+          : pausado ? 'Música pausada: a partitura também. Toque em Continuar'
             : anda ? `Ouvindo a música · ${fmtSeg(player.tempoInformado)}${player.duracao ? ' / ' + fmtSeg(player.duracao) : ''}`
               : 'Esperando a música começar (anúncio ou carregando: não entra na partitura)';
         // a música acabou: termina sozinho
         if (player.duracao && player.tempoInformado >= player.duracao - 0.6 && !anda && leitor.segundos > 5) { terminar(); return; }
-      } else estado.texto = tipo === 'aba' ? 'Ouvindo o som da aba' : 'Ouvindo pelo microfone';
+      } else estado.texto = pausado ? 'Pausado: a partitura continua de onde parou ao tocar em Continuar' : tipo === 'aba' ? 'Ouvindo o som da aba' : 'Ouvindo pelo microfone';
+      // o botão mostra o que dá para fazer agora (no vídeo, segue também o pausar/tocar do player)
+      const bp = $('#ia-pausa');
+      if (bp && bp.dataset.pausado !== String(pausado)) { bp.dataset.pausado = String(pausado); bp.innerHTML = pausado ? `${icon('play', 16)} Continuar` : `${icon('pause', 16)} Pausar`; }
       animar(leitor, estado);
       quadro = requestAnimationFrame(laco);
     };
@@ -4239,6 +4244,8 @@ async function gerarComIA(song, titulo) {
     laco();
     $('#ia-cancelar').onclick = () => { pararCaptura(); if (tipo === 'video' && player.estado === 'tocando') player.alternar(); telaFontes(); };
     $('#ia-parar').onclick = terminar;
+    // pausar: no vídeo, pausa (ou continua) o próprio vídeo, e a partitura junto; no microfone/aba, só a gravação
+    $('#ia-pausa').onclick = () => { if (tipo === 'video') player.alternar(); else pausado = !pausado; };
     async function terminar() {
       if (!sessao) return;
       pararCaptura();
