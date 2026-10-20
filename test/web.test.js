@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   cifraTextoParaChordPro, ehCifraClub, simplificarCifra, parseLetras, resultadosLetras, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
 } from '../public/js/lib/web.js';
-import { semIntro, aplicarEstrutura, aplicarLetra, definirMeta, doEditor, letraDe, linhasDaLetra, paraEditor, parseChordPro } from '../public/js/chordpro.js';
+import { organizarPartes, tiposDosBlocos, semIntro, aplicarEstrutura, aplicarLetra, definirMeta, doEditor, letraDe, linhasDaLetra, paraEditor, parseChordPro } from '../public/js/chordpro.js';
 
 test('lê a busca do Cifra Club (JSONP) e monta links e capas', () => {
   const json = lerJsonp('({"response":{"docs":[{"t":"1","m":"Artista","d":"artista"},{"t":"2","m":"Noites Traiçoeiras","a":"Padre Marcelo Rossi","i":"7/6/4/6/abc-tb.jpg","d":"padre-marcelo-rossi","u":"noite-traicoeira"}]}})');
@@ -216,4 +216,27 @@ test('discografia do Cifra Club: álbuns com ano, capa e faixas (só letra conta
     ['Anjos Em Ordem de Batalha', 'https://www.cifraclub.com.br/frei-gilson/anjos/', 'Bm'],
     ['Abertura', '', ''],
   ]);
+});
+
+test('partes automáticas: refrão (mesmo com variações), pré-refrão e ponte', () => {
+  const v1 = ['Deus está aqui', 'neste momento', 'sua presença', 'é real em meu viver'];
+  const v2 = ['E ainda se vier', 'noite traiçoeira', 'se a cruz pesada for', 'Cristo estará contigo'];
+  const pre = ['e eu sei', 'que vai passar'];
+  const c = ['Santo santo santo', 'é o Senhor', 'digno de louvor'];
+  const ponte = ['Aleluia', 'aleluia'];
+  assert.deepEqual(tiposDosBlocos([v1, pre, c, v2, pre, [...c, 'é o Senhor!'], ponte, c]),
+    ['estrofe', 'pre-refrao', 'refrao', 'estrofe', 'pre-refrao', 'refrao', 'ponte', 'refrao']);
+  // nada se repete: não inventa refrão
+  assert.deepEqual(tiposDosBlocos([v1, v2]), ['estrofe', 'estrofe']);
+});
+
+test('cifra sem partes marcadas ganha refrão e estrofes; acordes e letra não mudam', () => {
+  const pro = '{title: T}\n{key: G}\n\n[G]Deus está [D]aqui\nneste momento\n\n[C]Santo santo\né o [G]Senhor\n\nE ainda se vier\nnoite traiçoeira\n\nSanto santo\né o Senhor';
+  const r = organizarPartes(pro);
+  assert.deepEqual(parseChordPro(r).sections.map((x) => `${x.type}:${x.label}`), ['verse:Estrofe 1', 'chorus:', 'verse:Estrofe 2', 'chorus:']);
+  assert.deepEqual(linhasDaLetra(r), linhasDaLetra(pro));
+  assert.match(r, /^\{title: T\}\n\{key: G\}\n/);
+  assert.match(r, /\[G\]Deus está \[D\]aqui/);
+  // já tem refrão marcado: fica como está
+  assert.equal(organizarPartes(r), r);
 });

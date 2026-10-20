@@ -50,6 +50,9 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   capotraste), na **versão simplificada**: sem tablaturas, riffs e solos. Como o site não deixa outros apps lerem a página, o app a lê pelo Jina Reader
   (serviço público); se ele não responder, abre o "Importar da internet": copie a cifra no site e cole
   (botão "Colar copiado"). Serve para cifra ou letra de **qualquer site**.
+  **Partes automáticas**: quando a cifra ou a letra vem sem o refrão marcado, o próprio app (sem IA paga) compara
+  os blocos da letra e marca o refrão (o que mais se repete, mesmo com pequenas diferenças), as estrofes, o
+  pré-refrão e a ponte; músicas já salvas são organizadas ao abrir. Nenhuma palavra ou acorde muda (`organizarPartes`).
   Ao abrir uma música da busca (Cifra Club, letras, cantos), o app procura o vídeo no YouTube sozinho e já
   vincula; se não achar, mostra o aviso com "Escolher vídeo".
 

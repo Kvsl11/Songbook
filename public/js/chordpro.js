@@ -618,9 +618,9 @@ export function aplicarEstrutura(src, partes) {
     const tipo = inicios.get(n);
     if (tipo) {
       // linhas em branco vão antes da marcação; acordes e observações ficam junto do verso
-      const brancas = [];
-      while (pendentes.length && !pendentes[0].trim()) brancas.push(pendentes.shift());
-      out.push(...brancas);
+      // (o que vem antes da última linha em branco, como título e tom, fica fora da parte)
+      const ultimaBranca = pendentes.findLastIndex((x) => !x.trim());
+      out.push(...pendentes.splice(0, ultimaBranca + 1));
       if (out.length && out[out.length - 1].trim()) out.push('');
       out.push(`[${tipo === 'estrofe' ? `Estrofe ${++estrofes}` : NOMES_PARTE[tipo]}]`);
     }
@@ -629,4 +629,68 @@ export function aplicarEstrutura(src, partes) {
   }
   out.push(...pendentes);
   return doEditor(out.join('\n'));
+}
+
+// ---------------------------------------------------------------- partes automáticas (sem IA, no próprio app)
+// Descobre o que é refrão, estrofe, ponte e pré-refrão comparando os blocos da letra (separados por linha
+// em branco): o bloco que mais se repete (mesmo com pequenas diferenças) é o refrão; o que se repete e vem
+// sempre logo antes dele é o pré-refrão; um bloco único depois de dois refrões, de tamanho diferente das
+// estrofes e seguido de refrão (ou no fim), é a ponte. blocos: [[linha, …], …] -> ['estrofe' | 'refrao' | …]
+const linhaComparavel = (l) => String(l).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+export function tiposDosBlocos(blocos) {
+  const conj = blocos.map((b) => b.map(linhaComparavel).filter(Boolean));
+  const parecidos = (a, b) => {
+    if (!a.length || !b.length) return false;
+    const [menor, maior] = a.length <= b.length ? [a, b] : [b, a];
+    const s = new Set(maior);
+    const iguais = menor.filter((l) => s.has(l)).length;
+    return menor.length === 1 ? iguais === 1 && maior.length <= 2 : iguais / menor.length >= 0.6;
+  };
+  // grupos de blocos parecidos
+  const grupo = blocos.map((_, i) => i);
+  const raiz = (i) => (grupo[i] === i ? i : (grupo[i] = raiz(grupo[i])));
+  for (let i = 0; i < blocos.length; i++) for (let j = i + 1; j < blocos.length; j++) if (parecidos(conj[i], conj[j])) grupo[raiz(j)] = raiz(i);
+  const membros = new Map();
+  blocos.forEach((_, i) => { const r = raiz(i); if (!membros.has(r)) membros.set(r, []); membros.get(r).push(i); });
+  const repetidos = [...membros.values()].filter((m) => m.length > 1);
+  const tipos = blocos.map(() => 'estrofe');
+  if (!repetidos.length) return tipos;
+  // refrão: o que mais se repete; empate -> o que aparece mais tarde (a estrofe costuma vir primeiro)
+  repetidos.sort((a, b) => b.length - a.length || b[0] - a[0]);
+  const refrao = repetidos[0];
+  refrao.forEach((i) => (tipos[i] = 'refrao'));
+  for (const m of repetidos.slice(1)) if (m.every((i) => tipos[i + 1] === 'refrao')) m.forEach((i) => (tipos[i] = 'pre-refrao'));
+  // tamanho mais comum das estrofes
+  const tamanhos = new Map();
+  tipos.forEach((t, i) => { if (t === 'estrofe') tamanhos.set(conj[i].length, (tamanhos.get(conj[i].length) || 0) + 1); });
+  const tamEstrofe = [...tamanhos].sort((a, b) => b[1] - a[1])[0]?.[0];
+  let refroes = 0;
+  tipos.forEach((t, i) => {
+    if (t === 'refrao') { refroes++; return; }
+    const unico = membros.get(raiz(i)).length === 1;
+    const depois = tipos.slice(i + 1).find((x) => x !== 'pre-refrao');
+    if (t === 'estrofe' && unico && refroes >= 2 && (depois === 'refrao' || depois === undefined) && conj[i].length !== tamEstrofe && i > 0) tipos[i] = 'ponte';
+  });
+  return tipos;
+}
+
+// Cifra/letra sem refrão marcado: coloca as partes sozinha (refrão, estrofes, ponte…). Só põe marcações:
+// nenhuma palavra ou acorde muda. Se já tem refrão marcado ou não dá para saber, devolve como está.
+export function organizarPartes(src) {
+  const texto = String(src || '');
+  if (/\{\s*(start_of_chorus|soc|chorus|start_of_bridge|sob)\s*[:}]/i.test(texto)) return texto;
+  const blocos = [];
+  let atual = null;
+  let n = 0;
+  for (const l of paraEditor(texto).split('\n')) {
+    if (ehLinhaDeLetra(l)) {
+      n++;
+      if (!atual) blocos.push((atual = { inicio: n, linhas: [] }));
+      atual.linhas.push(semAcordes(l));
+    } else if (!l.trim() || ehCabecalho(l)) atual = null;
+  }
+  if (blocos.length < 2) return texto;
+  const tipos = tiposDosBlocos(blocos.map((b) => b.linhas));
+  if (!tipos.includes('refrao')) return texto;
+  return aplicarEstrutura(texto, blocos.map((b, i) => ({ inicio: b.inicio, tipo: tipos[i] })));
 }

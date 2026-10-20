@@ -10,7 +10,7 @@
 // - YouTube: busca pelo Piped (instâncias públicas, com CORS); o oEmbed confirma um link colado.
 
 import { decodeEntities, normalize } from './html.js';
-import { cifraComCapo, doEditor, isChord, semIntro } from '../chordpro.js';
+import { cifraComCapo, doEditor, isChord, organizarPartes, semIntro, tiposDosBlocos } from '../chordpro.js';
 
 const NO_NAVEGADOR = typeof window !== 'undefined';
 const UA = NO_NAVEGADOR ? {} : { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36', 'Accept-Language': 'pt-BR,pt;q=0.9' };
@@ -119,7 +119,7 @@ export function simplificarCifra(pro) {
     const prox = out.slice(i + 1).find((x) => x.trim());
     return prox !== undefined && !/^\s*\{/.test(prox);
   });
-  return semIntro(limpo.join('\n')).replace(/\n{3,}/g, '\n\n').trim();
+  return organizarPartes(semIntro(limpo.join('\n')).replace(/\n{3,}/g, '\n\n').trim());
 }
 
 // serviços públicos que abrem a página por nós (o 1º que responder com a cifra vence).
@@ -325,25 +325,28 @@ async function buscarLetrasLrclib(q, fetchImpl) {
     .map((r) => ({ id: r.id, titulo: r.trackName, artista: r.artistName, album: r.albumName || '', letra: r.plainLyrics, url: `https://lrclib.net/api/get/${r.id}`, fonte: 'lrclib' }));
 }
 
-// Letra simples -> ChordPro: estrofes separadas por linha em branco; a estrofe que se repete vira refrão.
+// Letra simples -> ChordPro: estrofes separadas por linha em branco; as partes saem sozinhas (tiposDosBlocos):
+// o bloco que mais se repete é o refrão (cópia idêntica vira {chorus}), e também ponte e pré-refrão.
 export function letraParaChordPro({ titulo = '', artista = '', letra = '', fonte = '', compositor = '' } = {}) {
   const estrofes = String(letra).replace(/\r\n?/g, '\n').split(/\n\s*\n/).map((e) => e.split('\n').map((l) => l.trim()).filter(Boolean).join('\n')).filter(Boolean);
-  const conta = new Map();
-  for (const e of estrofes) conta.set(normalize(e), (conta.get(normalize(e)) || 0) + 1);
-  const refrao = [...conta].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const tipos = tiposDosBlocos(estrofes.map((e) => e.split('\n')));
   const cab = [`{title: ${titulo || 'Sem título'}}`];
   if (artista) cab.push(`{artist: ${artista}}`);
   if (compositor) cab.push(`{composer: ${compositor}}`);
   if (fonte) cab.push(`{source: ${fonte}}`);
   const corpo = [];
-  let refraoEscrito = false;
+  let primeiroRefrao = null;
   let n = 0;
-  for (const e of estrofes) {
-    if (refrao && normalize(e) === refrao) {
-      corpo.push(refraoEscrito ? '{chorus}' : `{start_of_chorus: Refrão}\n${e}\n{end_of_chorus}`);
-      refraoEscrito = true;
-    } else corpo.push(`{start_of_verse: Estrofe ${++n}}\n${e}\n{end_of_verse}`);
-  }
+  estrofes.forEach((e, i) => {
+    const t = tipos[i];
+    if (t === 'refrao') {
+      if (primeiroRefrao !== null && normalize(e) === primeiroRefrao) corpo.push('{chorus}');
+      else corpo.push(`{start_of_chorus: Refrão}\n${e}\n{end_of_chorus}`);
+      if (primeiroRefrao === null) primeiroRefrao = normalize(e);
+    } else if (t === 'ponte') corpo.push(`{start_of_bridge: Ponte}\n${e}\n{end_of_bridge}`);
+    else if (t === 'pre-refrao') corpo.push(`{start_of_verse: Pré-refrão}\n${e}\n{end_of_verse}`);
+    else corpo.push(`{start_of_verse: Estrofe ${++n}}\n${e}\n{end_of_verse}`);
+  });
   return cab.join('\n') + '\n\n' + corpo.join('\n\n') + '\n';
 }
 
