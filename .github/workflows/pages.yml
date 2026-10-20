@@ -67,6 +67,18 @@ jobs:
         continue-on-error: true
         timeout-minutes: 20
         run: node scripts/acervo-sync.mjs
+      - name: Cache das letras do Hinário Litúrgico da CNBB
+        uses: actions/cache@v4
+        with:
+          path: .hinario-cache
+          key: hinario-${{ github.run_id }}
+          restore-keys: hinario-
+      - name: Letras do Hinário Litúrgico da CNBB (cadernos do acervo)
+        continue-on-error: true
+        timeout-minutes: 25
+        run: |
+          command -v pdftotext || (sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils)
+          node scripts/hinario-sync.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

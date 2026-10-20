@@ -1300,3 +1300,14 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 .parte-card small { font-size: 12px; opacity: 0.8; }
 .canto-ic { width: 48px; height: 48px; border-radius: 6px; display: grid; place-items: center; }
 .track.canto .acts { gap: 2px; }
+
+/* Liturgia: Missa litúrgica (Hinário da CNBB) ou Missa popular (Cindy Ferrarezi e Músicas para Missa) */
+.tipo-missa { display: flex; gap: 8px; margin: 16px 0 12px; flex-wrap: wrap; }
+.tipo-missa .chip { display: inline-flex; align-items: center; gap: 6px; }
+#lit.modo-liturgica .so-popular, #lit:not(.modo-liturgica) .so-liturgica { display: none; }
+#lit.modo-liturgica #partes .parte:not(.parte-leitura) { display: none; }
+#lit.modo-liturgica #partes::before { content: 'Leituras do dia'; display: block; font-weight: 800; font-size: 18px; margin: 22px 0 8px; }
+.hinario-lista { margin-top: 10px; }
+.h-marca { display: grid; place-items: center; width: 28px; height: 48px; cursor: pointer; }
+.h-marca input { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; }
+a.source { text-decoration: none; color: inherit; }

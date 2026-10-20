@@ -10,6 +10,14 @@ ofertório, comunhão etc.).
 Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em degradê e player embutido:
 
 - **Início**: saudação, atalhos, a liturgia de hoje, seus repertórios, tocadas e adicionadas recentemente.
+- **Missa litúrgica ou Missa popular** (na Liturgia): a **Missa litúrgica** traz os cantos do **Hinário Litúrgico
+  da CNBB** ("Igreja em Oração") para a celebração do dia — refrão orante, abertura, salmo, aclamação, oferendas,
+  comunhão, saudação à Mãe do Senhor —, cada um com a **letra fiel** tirada do caderno da CNBB, o áudio de referência
+  e o caderno com as partituras; dá para escolher os cantos e montar o repertório. A **Missa popular** são as
+  sugestões da Cindy Ferrarezi e do Músicas para Missa (cifradas). Sem caderno para o dia (dias de semana), aparece a
+  popular. As letras vêm de `scripts/hinario-sync.mjs` (baixa os cadernos do acervo, tira o texto com o `pdftotext`
+  e separa título, parte, autoria e letra com `js/lib/hinario.js`) e ficam salvas em `data/hinario.json` no
+  repositório; os cantos do Hinário também aparecem na Busca (filtro Acervo litúrgico).
 - **Busca por setor** (sugestão do Junior Música Católica): na Busca, cartões levam a
   **Missa litúrgica** (Hinário Litúrgico da CNBB domingo a domingo, hinários oficiais, Álbuns de Liturgia,
   antífonas de entrada, cantos de comunhão, salmos responsoriais, Gradual Simples, cifras do Prof. Agnaldo Armindo),
@@ -210,6 +218,7 @@ public/
   js/lib/cnbb.js  cliente/parser da Liturgia Diária da CNBB          (navegador e Node)
   js/lib/cindy.js cliente do WordPress da Cindy: busca, repertório, cifras -> ChordPro (navegador e Node)
   js/lib/missa.js junta CNBB + Cindy na estrutura de partes da missa
+  js/lib/hinario.js letras do Hinário Litúrgico da CNBB (cadernos em PDF -> título, parte, autoria e letra)
   js/lib/acervo.js acervo litúrgico do Google Drive: leitura das pastas, setores, partes fixas e tempos
   js/lib/web.js   Cifra Club (busca e página -> ChordPro), Letras.mus.br (letras), vídeos do YouTube (Piped)
   js/acordes.js   desenho dos acordes no violão

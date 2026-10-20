@@ -139,6 +139,16 @@ export const indiceOracoes = () => dadosLocais('pt-oracoes', 'data/pt/oracoes.js
 export const getOracao = (slug) => dadosLocais('pt-oracao:' + slug, `data/pt/oracoes/${encodeURIComponent(slug)}.json`);
 export const diretorioJunior = () => dadosLocais('junior', 'data/junior.json');
 
+// letras do Hinário Litúrgico da CNBB por celebração (scripts/hinario-sync.mjs)
+let hinarioCarregado = null;
+export function carregarHinario() {
+  if (!hinarioCarregado) {
+    hinarioCarregado = fetch(new URL('data/hinario.json', document.baseURI)).then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.cadernos || []).catch(() => { hinarioCarregado = null; return []; });
+  }
+  return hinarioCarregado;
+}
+
 // acervo litúrgico (pasta do Google Drive indexada pelo GitHub Actions: scripts/acervo-sync.mjs).
 // É grande para o armazenamento do aparelho: fica na memória enquanto o app está aberto (o service worker guarda o arquivo)
 let acervoCarregado = null;
