@@ -2974,7 +2974,7 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
       }
     }
     passos.push({ t, notas });
-    cur.next();
+    cur.Iterator.moveToNextVisibleVoiceEntry(false); // sem cur.next(): ele redesenha o cursor a cada passo
   }
   cur.reset();
   if (!passos.some((p) => p.notas.length)) return null;
@@ -2983,12 +2983,22 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
     const c = osmd.cursor;
     try { c.CursorOptions = { ...c.CursorOptions, color: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#06b6d4', alpha: 0.45, follow: false }; } catch { /* versão sem a opção */ }
     c.show();
+    // o desenho do cursor compara as opções com uma cópia delas e, por isso, refaz a imagem do cursor (canvas →
+    // PNG) a cada nota: pesado no celular, travava o som. Marcando as opções como já desenhadas, ele só se move
+    try { c.cursorOptionsRendered = c.cursorOptions; } catch { /* versão diferente */ }
   };
   // nomes das pautas só quando cada uma tem o seu (a leitura automática chama todas de "Voice", "Piano"…)
   const genericos = /^(voice|voz|part|parte|piano|instrument|staff|p\d+|music|melodia)\b/i;
   const vozes = nomearVozes(passos, { nomes: new Map([...nomesDasPautas].filter(([, n]) => n && !genericos.test(n))) });
   const grupoDe = new Map(vozes.flatMap((g) => g.membros.map((m) => [m, g.voz])));
   const fim = duracaoTotal(passos);
+  // quantas notas soam juntas, no máximo (todas as vozes, ou só a escolhida quando ela toca sozinha)
+  const maxJuntas = new Map();
+  const juntas = () => {
+    const chave = escolhida && so ? escolhida : '';
+    if (!maxJuntas.has(chave)) maxJuntas.set(chave, Math.max(1, ...passos.map((p) => p.notas.filter((n) => !chave || grupoDe.get(n.voz) === chave).length)));
+    return maxJuntas.get(chave);
+  };
   let bpm = Math.round(osmd.Sheet.SourceMeasures[0]?.TempoInBPM || osmd.Sheet.DefaultStartTempoInBpm || 90);
   let escolhida = '';
   let so = true; // escolher uma voz toca só ela; as outras de fundo só se pedir
@@ -3025,28 +3035,29 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
   let timbre = null;
   let saida = null; // entrada da cadeia final (filtro → limitador, com a sala em paralelo)
   const montarAudio = () => {
-    audio = new (window.AudioContext || window.webkitAudioContext)();
+    // "playback": o sistema usa um buffer de áudio maior (no celular, o padrão curto chia e corta quando a tela pesa)
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    try { audio = new Ctx({ latencyHint: 'playback' }); } catch { audio = new Ctx(); }
     const harm = [0, 1, 0.42, 0.2, 0.11, 0.06, 0.035, 0.02];
     timbre = audio.createPeriodicWave(new Float32Array(harm.length), new Float32Array(harm));
     const limitador = audio.createDynamicsCompressor();
-    limitador.threshold.value = -14;
-    limitador.knee.value = 10;
-    limitador.ratio.value = 6;
-    limitador.attack.value = 0.005;
-    limitador.release.value = 0.2;
+    limitador.threshold.value = -6;
+    limitador.knee.value = 6;
+    limitador.ratio.value = 8;
+    limitador.attack.value = 0.003;
+    limitador.release.value = 0.25;
     limitador.connect(audio.destination);
     saida = audio.createBiquadFilter();
     saida.type = 'lowpass';
     saida.frequency.value = 3200;
     saida.Q.value = 0.5;
     saida.connect(limitador);
-    // sala: ruído que se apaga em ~1,4 s, misturado baixinho
-    const dur = 1.4;
-    const ir = audio.createBuffer(2, Math.round(audio.sampleRate * dur), audio.sampleRate);
-    for (let c = 0; c < 2; c++) {
-      const d = ir.getChannelData(c);
-      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 3;
-    }
+    // sala: ruído que se apaga em ~1 s, misturado baixinho. Um canal só e curto: a reverberação é a parte mais
+    // pesada do som e, longa e em estéreo, fazia o celular chiar e cortar (o áudio não dava conta a tempo)
+    const dur = 1;
+    const ir = audio.createBuffer(1, Math.round(audio.sampleRate * dur), audio.sampleRate);
+    const d = ir.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 3;
     const sala = audio.createConvolver();
     sala.buffer = ir;
     const nivelSala = audio.createGain();
@@ -3062,7 +3073,8 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
     if (vol <= 0) return;
     const f = freq * 2 ** (tomAtual() / 12);
     // as graves soam mais fracas ao ouvido (e no alto-falante do celular): ganham um pouco de volume
-    const pico = 0.2 * vol * Math.min(1.6, Math.max(1, (330 / f) ** 0.35));
+    // várias vozes juntas dividem o volume (antes somavam e o limitador apertava tudo: o som "chiava")
+    const pico = (0.24 / Math.sqrt(juntas())) * vol * Math.min(1.6, Math.max(1, (330 / f) ** 0.35));
     const g = audio.createGain();
     g.connect(mestre);
     const solta = quando + Math.max(0.1, dur - 0.02);
@@ -3091,7 +3103,7 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
   };
   const agendar = () => {
     const spw = segundosPorSemibreve(bpm);
-    const ate = tAgora() + 0.25 / spw * 1; // 250 ms adiante
+    const ate = tAgora() + 0.6 / spw; // 600 ms adiante: uma travada da tela não deixa buraco no som
     while (proximo < passos.length && passos[proximo].t <= ate) {
       const p = passos[proximo];
       const quando = inicioAudio + (p.t - inicioT) * spw;
@@ -3104,7 +3116,9 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
   const moverCursor = (i) => {
     if (i === mostrado) return;
     if (i < mostrado || mostrado < 0) { osmd.cursor.reset(); mostrado = 0; }
-    while (mostrado < i && !osmd.cursor.Iterator.EndReached) { osmd.cursor.next(); mostrado++; }
+    let andou = false;
+    while (mostrado < i && !osmd.cursor.Iterator.EndReached) { osmd.cursor.Iterator.moveToNextVisibleVoiceEntry(false); mostrado++; andou = true; }
+    if (andou) osmd.cursor.update();
     const el = osmd.cursor.cursorElement;
     if (el) {
       const r = el.getBoundingClientRect();
@@ -3127,7 +3141,7 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
     proximo = passoNoTempo(passos, inicioT);
     if (passos[proximo] && passos[proximo].t < inicioT) inicioT = passos[proximo].t;
     agendar();
-    timer = setInterval(agendar, 40);
+    timer = setInterval(agendar, 60);
     acompanhar();
     desenharBarra();
   };

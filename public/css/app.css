@@ -1463,6 +1463,9 @@ a.source { text-decoration: none; color: inherit; }
 .osmd-box { margin: 0 -6px 18px; padding: 6px 0 24px; border-radius: 12px; overflow-x: auto; }
 .osmd-box.pb { background: #fff; padding: 14px 6px 28px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.35); }
 .osmd-box svg { max-width: none; }
+/* o cursor do ensaio numa camada própria: ao andar, a folha (SVG grande) não é repintada a cada nota */
+.osmd-box svg { will-change: transform; }
+.osmd-box img[id^="cursorImg"] { will-change: transform; pointer-events: none; }
 
 /* modo claro: o painel da letra surge e some do fundo branco numa curva suave (mistura com o fundo, sem passar
    pelo cinza do "transparente"); a letra começa já sobre a cor cheia */
