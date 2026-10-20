@@ -45,7 +45,7 @@ document.addEventListener('error', (e) => {
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-128';
+export const APP_VERSAO = '2026.10.20-129';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -3062,28 +3062,39 @@ function viewSong(id, ctx = {}) {
     <section class="page-hero song-hero">${capa(song)}
       <div>${ctx.set ? `<button class="kind kind-btn" id="btn-parte" title="Trocar a parte da missa desta música no repertório">${esc(ctx.set.items[ctx.index]?.label || 'Definir a parte da missa')} ${icon('edit', 12)}</button>` : `<div class="kind">${esc(kind)}</div>`}<h2 id="song-title">${esc(song.title)}</h2>
         <div class="meta" id="song-meta"></div></div></section>
-    <div class="actions-row">
+    <div class="actions-row acoes-musica">
       <button class="play-big ${song.youtube ? '' : 'off'}" id="btn-play" aria-label="${song.youtube ? 'Tocar' : 'Escolher vídeo'}" title="${song.youtube ? 'Tocar (continua tocando no player enquanto você navega)' : 'Sem vídeo: escolher um no YouTube'}">${icon(song.youtube ? (player.tocandoAgora(song.youtube) ? 'pause' : 'play') : 'youtube', 24)}</button>
       <button class="salvar-btn${isPreview ? '' : ' salva'}" id="btn-biblio" data-salvar aria-pressed="${!isPreview}" aria-label="${isPreview ? 'Salvar na biblioteca' : 'Na biblioteca (tocar para tirar)'}" title="${isPreview ? 'Salvar na biblioteca' : 'Na sua biblioteca — tocar para tirar'}">${icon(isPreview ? 'plus' : 'check', 18)}</button>
       <button class="icon-btn" id="btn-add" aria-label="Adicionar a repertório" title="Adicionar a um repertório">${icon('list', 22)}</button>
-      ${paginasDaPartitura(song.content).length ? `<a class="partitura-btn" id="btn-partitura" href="#/musica/${isPreview ? 'previa' : song.id}/partitura" title="Ver a partitura (na desenhada, dá para ensaiar ouvindo cada voz)">${icon('score', 18)} Partitura</a>` : ''}
-      ${isPreview ? `<button class="icon-btn" id="btn-edit-prev" aria-label="Editar cifra" title="Salvar e editar a cifra">${icon('edit', 22)}</button>`
-        : `<a class="icon-btn" href="#/editar/${song.id}" aria-label="Editar" title="Editar cifra">${icon('edit', 22)}</a>`}
-      <button class="icon-btn" id="btn-palco" aria-label="Só a letra (tela cheia)" title="Só a letra, tela cheia">${icon('expand', 22)}</button>
-      <button class="icon-btn" id="btn-pdf" aria-label="Exportar PDF" title="Exportar em PDF (com ou sem cifra)">${icon('file', 22)}</button>
       ${ctx.set ? `<button class="icon-btn" id="btn-fila" aria-label="Fila do repertório" title="Fila: próximas músicas">${icon('queue', 24)}</button>` : ''}
-      ${semCifra ? '<div class="seg-tabs"><span class="chip sm" title="Esta música não tem acordes">Só letra</span></div>' : ''}
+      <span class="spacer"></span>
+      <button class="icon-btn" id="btn-palco" aria-label="Tela cheia (só a letra)" title="Tela cheia: só a letra, grande">${icon('expand', 22)}</button>
+      <div class="mais-wrap">
+        <button class="icon-btn" id="btn-mais" aria-haspopup="menu" aria-expanded="false" aria-label="Mais opções" title="Mais opções">${icon('more', 22)}</button>
+        <div class="menu-mais" id="menu-mais" role="menu" hidden>
+          ${isPreview ? `<button role="menuitem" id="btn-edit-prev">${icon('edit', 18)}<span>Editar cifra</span></button>`
+            : `<a role="menuitem" href="#/editar/${song.id}">${icon('edit', 18)}<span>Editar cifra</span></a>`}
+          <button role="menuitem" id="btn-pdf">${icon('file', 18)}<span>Exportar PDF</span></button>
+          ${paginasDaPartitura(song.content).length ? `<a role="menuitem" href="#/musica/${isPreview ? 'previa' : song.id}/partitura">${icon('score', 18)}<span>Partitura e ensaio</span></a>` : ''}
+        </div>
+      </div>
     </div>
     ${canvas ? '</div>' : ''}
     <div id="aviso-cifra"></div>
     <div id="aviso-video"></div>
     <div class="song-toolbar ${comCifra ? '' : 'sem-cifra'}" id="tools">
-      <div class="seg so-cifra"><button class="tom-btn" data-act="tom" aria-label="Escolher o tom" title="Escolher o tom"><span class="val" id="key"></span>${icon('down', 14)}</button></div>
-      <div class="seg so-cifra" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
-      <div class="seg"><button data-act="scroll" aria-pressed="false" aria-label="Rolagem automática" title="Rolagem automática (ajuste a velocidade na barra)" id="btn-scroll">${icon('gauge', 18)}</button></div>
-      <div class="seg"><button data-act="f-" aria-label="Diminuir letra" title="Diminuir letra">A−</button><button data-act="f+" aria-label="Aumentar letra" title="Aumentar letra">A+</button></div>
-      ${semCifra ? '' : `<div class="seg"><button data-act="chords" aria-pressed="${comCifra}" title="Cifra: ligado mostra os acordes; desligado, só a letra" aria-label="Mostrar cifra">${icon('chord', 17)}</button></div>`}
-      <div class="seg so-largo"><button data-act="cols" aria-pressed="${prefs.columns !== false}" title="Letra em duas colunas (telas largas)" aria-label="Duas colunas">${icon('columns', 17)}</button></div>
+      <div class="seg modos" role="group" aria-label="Ver a música como">
+        ${semCifra ? '' : `<button data-act="modo" data-modo="cifra" aria-pressed="${comCifra}" title="Letra com os acordes">${icon('chord', 15)}<span>Cifra</span></button>`}
+        <button data-act="modo" data-modo="letra" aria-pressed="${!comCifra}" title="${semCifra ? 'Esta música só tem a letra' : 'Só a letra, sem os acordes'}">${icon('text', 15)}<span>Letra</span></button>
+        ${paginasDaPartitura(song.content).length ? `<a class="seg-link" id="btn-partitura" href="#/musica/${isPreview ? 'previa' : song.id}/partitura" title="Ver a partitura (na desenhada, dá para ensaiar ouvindo cada voz)">${icon('score', 15)}<span>Partitura</span></a>` : ''}
+      </div>
+      <div class="ferramentas">
+        <div class="seg so-cifra"><button class="tom-btn" data-act="tom" aria-label="Escolher o tom" title="Escolher o tom"><span class="val" id="key"></span>${icon('down', 14)}</button></div>
+        <div class="seg so-cifra" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
+        <div class="seg"><button data-act="f-" aria-label="Diminuir letra" title="Diminuir letra">A−</button><button data-act="f+" aria-label="Aumentar letra" title="Aumentar letra">A+</button></div>
+        <div class="seg"><button data-act="scroll" aria-pressed="false" aria-label="Rolagem automática" title="Rolagem automática (ajuste a velocidade na barra)" id="btn-scroll">${icon('gauge', 18)}</button></div>
+        <div class="seg so-largo"><button data-act="cols" aria-pressed="${prefs.columns !== false}" title="Letra em duas colunas (telas largas)" aria-label="Duas colunas">${icon('columns', 17)}</button></div>
+      </div>
     </div>
     <div class="acordes-musica" id="acordes-musica" hidden></div>
     <div class="song" id="song"></div>
@@ -3247,6 +3258,13 @@ function viewSong(id, ctx = {}) {
     songEl.scrollIntoView({ block: 'start' });
   }
   $('#btn-palco').onclick = entrarPalco;
+  const menuMais = $('#menu-mais');
+  const abrirMais = (abre) => { menuMais.hidden = !abre; $('#btn-mais').setAttribute('aria-expanded', String(abre)); };
+  $('#btn-mais').onclick = (e) => { e.stopPropagation(); abrirMais(menuMais.hidden); };
+  menuMais.addEventListener('click', () => abrirMais(false));
+  const foraDoMenu = (e) => { if (!menuMais.hidden && !e.target.closest('.mais-wrap')) abrirMais(false); };
+  document.addEventListener('click', foraDoMenu);
+  aoSair(() => document.removeEventListener('click', foraDoMenu));
   $('#btn-pdf').onclick = () => exportarMusicaPdf({ ...song, transpose, capo });
   $('#palco-ctrl').addEventListener('click', (e) => {
     const b = e.target.closest('[data-palco]');
@@ -3255,7 +3273,7 @@ function viewSong(id, ctx = {}) {
     if (b.dataset.palco === 'sair') sairPalco();
     if (b.dataset.palco === 'f-') { db.setPref('fontScale', Math.max(0.6, +(p.fontScale - 0.1).toFixed(2))); applyTheme(); }
     if (b.dataset.palco === 'f+') { db.setPref('fontScale', Math.min(2.5, +(p.fontScale + 0.1).toFixed(2))); applyTheme(); }
-    if (b.dataset.palco === 'cifra') view.querySelector('[data-act="chords"]')?.click();
+    if (b.dataset.palco === 'cifra') view.querySelector(`#tools [data-modo="${comCifra ? 'letra' : 'cifra'}"]`)?.click();
     if (b.dataset.palco === 'fila') verFila();
   });
   if (sessionStorage.getItem('palco') === '1') entrarPalco(); // continua em tela cheia ao trocar de música
@@ -3454,10 +3472,10 @@ function viewSong(id, ctx = {}) {
       case 'c+': capo = Math.min(11, capo + 1); save(); break;
       case 'f-': db.setPref('fontScale', Math.max(0.6, +(p.fontScale - 0.1).toFixed(2))); applyTheme(); break;
       case 'f+': db.setPref('fontScale', Math.min(2.5, +(p.fontScale + 0.1).toFixed(2))); applyTheme(); break;
-      case 'chords':
-        comCifra = !comCifra;
+      case 'modo':
+        comCifra = b.dataset.modo === 'cifra' && !semCifra;
         db.setPref('modo', comCifra ? 'cifra' : 'letra');
-        b.setAttribute('aria-pressed', String(comCifra));
+        view.querySelectorAll('#tools [data-modo]').forEach((x) => x.setAttribute('aria-pressed', String((x.dataset.modo === 'cifra') === comCifra)));
         break;
       case 'cols': {
         // prefs() devolve o próprio objeto salvo: guarda o novo valor antes de gravar
