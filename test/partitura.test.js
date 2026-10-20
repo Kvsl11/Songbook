@@ -189,3 +189,23 @@ test('IA: coral a 4 vozes separa as notas em Soprano, Contralto, Tenor e Baixo s
   const tam = pautas.map((p) => p.ev.reduce((a, e) => a + e.d, 0));
   assert.ok(tam.every((x) => x === tam[0]));
 });
+
+test('letra automática: sílabas do português e a letra em todas as vozes', async () => {
+  const { separarSilabas, letraEmSilabas, colocarLetra, temLetra } = await import('../public/js/lib/partitura.js');
+  const casos = {
+    Maria: 'Ma-ri-a', filho: 'fi-lho', palavra: 'pa-la-vra', carro: 'car-ro', nascer: 'nas-cer', inspirar: 'ins-pi-rar',
+    pai: 'pai', 'mãe': 'mãe', 'coração': 'co-ra-ção', 'saúde': 'sa-ú-de', quando: 'quan-do', guerra: 'guer-ra',
+    'água': 'á-gua', 'Senhor,': 'Se-nhor,', muito: 'mui-to', sair: 'sa-ir', rainha: 'ra-i-nha', 'obstáculo': 'obs-tá-cu-lo',
+  };
+  for (const [w, esperado] of Object.entries(casos)) assert.equal(separarSilabas(w).join('-'), esperado, w);
+  assert.equal(letraEmSilabas('Santo, santo\nSenhor'), 'San-to, san-to Se-nhor');
+  const m = novaPartitura({ tipo: 'duas' });
+  m.pautas[0].ev = [n('C4', 8), n(null, 8), n('D4', 8, { lig: true }), n('D4', 8), n('E4', 8)];
+  m.pautas[1].ev = [n('A3', 16), n('B3', 16)];
+  assert.equal(temLetra(m), false);
+  const sobrou = colocarLetra(m, letraEmSilabas('San-to Deus'));
+  assert.deepEqual(m.pautas[0].ev.map((e) => e.l[0] || ''), ['San-', '', 'to', '', 'Deus']);
+  assert.deepEqual(m.pautas[1].ev.map((e) => e.l[0] || ''), ['San-', 'to']);
+  assert.equal(sobrou, 1);
+  assert.equal(temLetra(m), true);
+});

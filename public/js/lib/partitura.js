@@ -412,6 +412,78 @@ export function distribuirLetra(pauta, texto, { inicio = 0, estrofe = 0 } = {}) 
   return { ultimo, sobrou: silabas.length - k };
 }
 
+// ---- sílabas: a letra da música (sem hífens) separada em sílabas, para cair nota por nota. Regras do português:
+// a consoante entre vogais vai com a seguinte (ca-sa); ch, lh, nh e os encontros com l/r (pr, bl, tr…) não se
+// separam (fi-lho, pa-la-vra); as outras consoantes juntas se separam (car-ro, nas-cer, ad-vo-ga-do; a última fica
+// com a vogal seguinte: ins-pi-rar); a vogal + i/u sem acento é ditongo (pai, céu, mãe, pão), as outras vogais
+// juntas se separam (Ma-ri-a, sa-ú-de); o u de qu/gu antes de vogal faz parte da consoante (que, guer-ra, quan-do).
+const VOGAIS = 'aeiouáéíóúâêôãõàüy';
+const ehVogal = (c) => VOGAIS.includes(c);
+const ENCONTROS = new Set(['bl', 'br', 'cl', 'cr', 'dr', 'fl', 'fr', 'gl', 'gr', 'pl', 'pr', 'tr', 'vr', 'tl', 'ch', 'lh', 'nh', 'gn', 'ps', 'pn']);
+const ditongo = (a, b) => ('aeoáéóâêô'.includes(a) && 'iu'.includes(b)) || ('ãõ'.includes(a) && 'eoi'.includes(b))
+  || (a === 'u' && b === 'i') || (a === 'i' && b === 'u');
+export function separarSilabas(palavra) {
+  const m = /^([^\p{L}]*)([\p{L}]+(?:[-'’][\p{L}]+)*)([^\p{L}]*)$/u.exec(palavra);
+  if (!m) return [palavra];
+  const [, antes, miolo, depois] = m;
+  // palavras com hífen (dá-me, guarda-chuva): cada pedaço separado
+  if (/[-]/.test(miolo)) {
+    const partes = miolo.split('-').map((x) => separarSilabas(x));
+    const out = partes.flat();
+    out[0] = antes + out[0];
+    out[out.length - 1] += depois;
+    return out;
+  }
+  const w = miolo.toLowerCase();
+  // o que é vogal (núcleo) em cada letra
+  const vog = [...w].map((c, i) => ehVogal(c) && !(c === 'u' && i > 0 && 'qg'.includes(w[i - 1]) && ehVogal(w[i + 1] || '')) && !(c === 'y' && ehVogal(w[i + 1] || '')));
+  // núcleos: [início, fim] de cada sílaba (vogal sozinha ou ditongo)
+  const nucleos = [];
+  for (let i = 0; i < w.length; i++) {
+    if (!vog[i]) continue;
+    const ult = nucleos[nucleos.length - 1];
+    if (ult && ult[1] === i - 1 && ult[1] === ult[0] && ditongo(w[i - 1], w[i])
+      // "ai", "ui"… seguidos de nh, ou de consoante que fecha a palavra (sa-ir, ra-iz), não são ditongo
+      && !('iu'.includes(w[i]) && (w.slice(i + 1, i + 3) === 'nh' || (i + 2 === w.length && 'rlz'.includes(w[i + 1]))))) ult[1] = i;
+    else nucleos.push([i, i]);
+  }
+  if (nucleos.length < 2) return [palavra];
+  // corte entre um núcleo e o seguinte: as consoantes do meio se dividem
+  const cortes = [];
+  for (let k = 1; k < nucleos.length; k++) {
+    const ini = nucleos[k - 1][1] + 1;
+    const fim = nucleos[k][0]; // primeira letra do próximo núcleo
+    const cons = w.slice(ini, fim);
+    // quantas consoantes vão com a vogal seguinte: uma, ou duas (qu/gu, ch/lh/nh e os encontros com l/r)
+    let vai = cons.length ? 1 : 0;
+    if (cons.length >= 2 && (/^[qg]u$/.test(cons.slice(-2)) || ENCONTROS.has(cons.slice(-2)))) vai = 2;
+    cortes.push(fim - vai);
+  }
+  const out = [];
+  let de = 0;
+  for (const c of cortes) { out.push(miolo.slice(de, c)); de = c; }
+  out.push(miolo.slice(de));
+  out[0] = antes + out[0];
+  out[out.length - 1] += depois;
+  return out;
+}
+// texto inteiro com as sílabas separadas por hífen (o formato que distribuirLetra lê)
+export const letraEmSilabas = (texto) => String(texto || '').split(/\s+/).filter(Boolean).map((p) => separarSilabas(p).join('-')).join(' ');
+
+// a letra em todas as vozes (cada uma canta o texto inteiro, do começo), numa estrofe; tira a letra que havia nela.
+// Devolve quantas sílabas sobraram (na voz que mais faltou nota)
+export function colocarLetra(modelo, texto, { estrofe = 0 } = {}) {
+  let sobrou = 0;
+  for (const p of modelo.pautas) {
+    if (!p.ev.some((e) => e.a?.length)) continue;
+    for (const e of p.ev) if (e.l?.[estrofe]) { e.l = [...e.l]; e.l[estrofe] = ''; while (e.l.length && !e.l[e.l.length - 1]) e.l.pop(); }
+    sobrou = Math.max(sobrou, distribuirLetra(p, texto, { estrofe }).sobrou);
+  }
+  return sobrou;
+}
+const temLetra = (modelo) => modelo.pautas.some((p) => p.ev.some((e) => e.l?.some(Boolean)));
+export { temLetra };
+
 // ---- rascunho automático (IA): das notas ouvidas (Basic Pitch: { startTimeSeconds, durationSeconds, pitchMidi,
 // amplitude }) para a partitura. A IA ouve tudo (voz e instrumentos); a melodia é uma linha só (em cada momento, a
 // nota mais forte dentro da extensão de voz) e o coral separa as notas em Soprano, Contralto, Tenor e Baixo, já no

@@ -12,7 +12,7 @@ import { duracaoTotal, nomearVozes, passoNoTempo, segundosPorSemibreve, volumeDa
 import {
   acordesDoTom as acordesDaArmadura, alterar, alturaPeloNome, CLAVES, COMPASSOS, deMusicXML, distribuirLetra, DURACOES, emCompassos, frequenciaDa, midiDa, moverGrau,
   mudarOitava, NOMES_NOTA, nomeDaAltura, nomeDoTom, nomeDuracao, novaPartitura, paraMusicXML, tiquesDoCompasso,
-  claveDaVoz, estimarAndamento, estimarTom, faixaDoModo, juntarPedaco, melodiaDasNotas, tomDaCifra, vozesDasNotas,
+  claveDaVoz, estimarAndamento, estimarTom, faixaDoModo, juntarPedaco, melodiaDasNotas, tomDaCifra, vozesDasNotas, colocarLetra, letraEmSilabas, temLetra,
 } from './lib/partitura.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
@@ -2896,7 +2896,7 @@ const CIFRA_NO_TEXTO = /^[A-G][#b♯♭]?(m|maj|min|dim|aug|sus|add|°|º|ø|M)?
 
 // Ensaio: toca a partitura desenhada (todas as vozes, só a voz escolhida ou ela com as outras baixinho), com o cursor
 // andando sobre as notas, no andamento escolhido e no tom da tela. Som feito no próprio navegador (Web Audio).
-function criarEnsaio(osmd, barra, tomAtual) {
+function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
   if (!barra) return null;
   // as notas de cada momento da partitura (o cursor do desenho percorre tudo, já com as repetições)
   const passos = [];
@@ -2959,6 +2959,7 @@ function criarEnsaio(osmd, barra, tomAtual) {
     ${vozes2 ? `<div class="ensaio-linha vozes"><div class="chips" id="ens-vozes"><button class="chip" data-voz="">Todas</button>${vozes.map((v) => `<button class="chip" data-voz="${esc(v.voz)}">${esc(v.nome)}</button>`).join('')}</div>
       <label class="ens-so" title="Ligado: a voz escolhida em destaque e as outras bem baixinho, de fundo"><input type="checkbox" class="switch" id="ens-so"><span>Outras vozes de fundo</span></label></div>` : ''}`;
   const desenharBarra = () => {
+    aoMudar?.(tocando);
     barra.querySelector('[data-e="play"]').innerHTML = icon(tocando ? 'pause' : 'play', 22);
     barra.querySelector('[data-e="play"]').setAttribute('aria-label', tocando ? 'Pausar' : 'Tocar');
     $('#ens-bpm', barra).innerHTML = `<small>♩ =</small>${bpm}`;
@@ -3109,10 +3110,41 @@ function criarEnsaio(osmd, barra, tomAtual) {
     if (acao === 'lento' || acao === 'rapido') { bpm = Math.max(30, Math.min(200, bpm + (acao === 'rapido' ? 5 : -5))); reajustar(); }
   });
   $('#ens-so', barra)?.addEventListener('change', (e) => { so = !e.target.checked; reajustar(); });
+  // tocar a partir de onde a pessoa tocou na partitura: a nota (ou pausa) desenhada mais perto do toque
+  const momentoNoToque = (x, y) => {
+    let melhor = null;
+    for (const linha of osmd.GraphicSheet?.MeasureList || []) for (const gm of linha || []) for (const se of gm?.staffEntries || []) {
+      let el = null;
+      try { el = se.graphicalVoiceEntries?.[0]?.notes?.[0]?.getSVGGElement?.() || null; } catch { /* versão sem o método */ }
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0;
+      const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
+      const dist = dx + dy * 3;
+      if (!melhor || dist < melhor.dist) {
+        const ini = gm.parentSourceMeasure?.AbsoluteTimestamp?.RealValue ?? 0;
+        melhor = { dist, t: ini + (se.relInMeasureTimestamp?.RealValue ?? 0) };
+      }
+    }
+    if (!melhor || melhor.dist > 120) return null;
+    // o primeiro passo que começa ali (com repetições, a primeira vez)
+    const i = passos.findIndex((p) => p.t >= melhor.t - 1e-6);
+    return i < 0 ? null : passos[i].t;
+  };
   desenharBarra();
   return {
     parar() { pausar(); audio?.close?.(); },
     pausar,
+    tocar,
+    get tocando() { return tocando; },
+    // toque na partitura: vai para aquele ponto e toca dali (devolve false se o toque não foi perto de nenhuma nota)
+    tocarDe(x, y) {
+      const t = momentoNoToque(x, y);
+      if (t === null) return false;
+      irPara(t);
+      if (!tocando) tocar();
+      return true;
+    },
     // a partitura foi desenhada de novo (zoom, cores, tom): o cursor volta ao ponto em que estava
     redesenhou() { const t = tAgora(); mostrado = -1; if (inicioT || tocando) { mostrarCursor(); moverCursor(passoNoTempo(passos, t)); } },
   };
@@ -3161,10 +3193,8 @@ function somNota(alturas) {
   } catch { /* sem áudio */ }
 }
 
-// letra da cifra, sem acordes nem marcações (para distribuir pelas notas)
-const letraSemCifra = (content) => String(content || '').split('\n')
-  .filter((l) => !/^\s*\{/.test(l) && !/^\s*#/.test(l))
-  .map((l) => l.replace(/\[[^\]]*\]/g, '').trim()).filter(Boolean).join('\n');
+// letra da música (só as linhas cantadas, sem acordes nem marcações), já separada em sílabas para cair nota por nota
+const letraParaPartitura = (content) => letraEmSilabas(linhasDaLetra(content).join('\n'));
 
 // lê um arquivo MusicXML (.musicxml/.xml ou o compactado .mxl) e devolve o texto do XML
 async function textoDoMusicXML(arquivoOuUrl) {
@@ -3418,6 +3448,7 @@ function editorPartitura(song, titulo) {
     if (!ensaio) return;
     ensaio.parar();
     ensaio = null;
+    botaoOuvir(false);
     $('#cp-ensaio').hidden = true;
     $('#cp-palheta').hidden = false;
   };
@@ -3481,6 +3512,8 @@ function editorPartitura(song, titulo) {
     }
   }
   folha.addEventListener('click', (e) => {
+    // ouvindo: o toque leva a música para aquele ponto
+    if (ensaio) { ensaio.tocarDe(e.clientX, e.clientY); return; }
     if (!alvos.length) return;
     const x = e.clientX;
     const y = e.clientY;
@@ -3666,7 +3699,7 @@ function editorPartitura(song, titulo) {
       <button class="btn small ghost" data-usar style="justify-self:start">${icon('text', 15)} Usar a letra da música</button>
       <div class="acts"><button class="btn ghost" data-no>Cancelar</button><button class="btn primary" data-ok>Distribuir</button></div>`,
     (dlg, done) => {
-      $('[data-usar]', dlg).onclick = () => { $('textarea', dlg).value = letraSemCifra(song.content); $('textarea', dlg).focus(); };
+      $('[data-usar]', dlg).onclick = () => { $('textarea', dlg).value = letraParaPartitura(song.content); $('textarea', dlg).focus(); };
       $('[data-no]', dlg).onclick = () => done(null);
       $('[data-ok]', dlg).onclick = () => done($('textarea', dlg).value);
     });
@@ -3677,12 +3710,21 @@ function editorPartitura(song, titulo) {
   }
 
   // ---- ouvir, ajustes e mais opções
+  // o ▶ do topo vira ⏸ enquanto toca
+  function botaoOuvir(tocando) {
+    const b = actionsEl.querySelector('[data-ouvir]');
+    if (!b) return;
+    b.innerHTML = icon(tocando ? 'pause' : 'play', 18);
+    b.title = tocando ? 'Pausar' : 'Ouvir a partitura';
+    b.setAttribute('aria-label', b.title);
+  }
+  actionsEl.querySelector('[aria-label="Ouvir a partitura"]')?.setAttribute('data-ouvir', '');
   function ouvir() {
     if (!osmd) return;
-    if (ensaio) { pararDeOuvir(); return; }
+    if (ensaio) { if (ensaio.tocando) ensaio.pausar(); else ensaio.tocar(); return; }
     if (!m.pautas.some((p) => p.ev.some((e) => e.a.length))) { toast('Escreva algumas notas para ouvir'); return; }
     const barra = $('#cp-ensaio');
-    ensaio = criarEnsaio(osmd, barra, () => 0);
+    ensaio = criarEnsaio(osmd, barra, () => 0, { aoMudar: botaoOuvir });
     if (!ensaio) return;
     // enquanto ouve, o painel do ensaio fica no lugar da palheta
     $('#cp-palheta').hidden = true;
@@ -3750,6 +3792,7 @@ function editorPartitura(song, titulo) {
       opcoes: [
         { valor: 'ver', rotulo: 'Ver a partitura', sub: 'Do jeito que fica para cantar e ensaiar', ic: 'score' },
         { valor: 'ajustes', rotulo: 'Ajustes', sub: 'Título, compasso, tom, andamento e vozes', ic: 'settings' },
+        { valor: 'letra', rotulo: 'Colocar a letra da música', sub: `Nas notas de todas as vozes, estrofe ${estrofe + 1}, sílaba por sílaba`, ic: 'text' },
         { valor: 'pdf', rotulo: 'Imprimir ou salvar em PDF', sub: 'Em preto e branco', ic: 'file' },
         { valor: 'xml', rotulo: 'Exportar MusicXML', sub: 'Abre no MuseScore, Finale, Sibelius…', ic: 'download' },
         { valor: 'importar', rotulo: 'Importar MusicXML', sub: 'Troca esta partitura pela do arquivo', ic: 'upload' },
@@ -3758,6 +3801,15 @@ function editorPartitura(song, titulo) {
     });
     if (v === 'ver') verPartitura();
     if (v === 'ajustes') ajustes();
+    if (v === 'letra') {
+      const texto = letraParaPartitura(song.content);
+      if (!texto) { toast('Esta música não tem letra para colocar'); return; }
+      if (!m.pautas.some((p) => p.ev.some((e) => e.a.length))) { toast('Escreva as notas primeiro'); return; }
+      if (temLetra(m) && !(await ask({ title: 'Trocar a letra?', text: `A letra da estrofe ${estrofe + 1} sai e entra a letra da música, do começo.`, ok: 'Trocar' }))) return;
+      let sobrou = 0;
+      mudar(() => { sobrou = colocarLetra(m, texto, { estrofe }); m.letraAuto = true; });
+      toast(sobrou ? `Letra colocada; faltaram notas para ${sobrou} sílaba(s)` : 'Letra colocada: corrija na aba Letra se precisar');
+    }
     if (v === 'xml') download(`${nomeArquivo(m.titulo || titulo)}.musicxml`, paraMusicXML(m), 'application/vnd.recordare.musicxml+xml');
     if (v === 'pdf') imprimirPartitura(m, m.titulo || titulo);
     if (v === 'importar') {
@@ -3829,7 +3881,13 @@ function editorPartitura(song, titulo) {
   };
   document.addEventListener('keydown', teclas);
   aoSair(() => document.removeEventListener('keydown', teclas));
-  desenhar();
+  // a letra vem sozinha: partitura com notas e sem letra nenhuma recebe a letra da música (uma vez; dá para desfazer
+  // e corrigir sílaba por sílaba na aba Letra)
+  const letraAuto = letraParaPartitura(song.content);
+  if (letraAuto && !m.letraAuto && !temLetra(m) && m.pautas.some((p) => p.ev.some((e) => e.a.length))) {
+    mudar(() => { colocarLetra(m, letraAuto); m.letraAuto = true; });
+    toast('Letra colocada automaticamente: confira e corrija na aba Letra');
+  } else desenhar();
 }
 
 // impressão em preto e branco: a partitura desenhada numa folha à parte (iframe) e o "imprimir" do navegador
@@ -4465,17 +4523,22 @@ async function gerarComIA(song, titulo) {
     let oitava = 0;
     let meioTempo = false;
     let coral = false; // separar em Soprano, Contralto, Tenor e Baixo
+    const textoLetra = letraParaPartitura(song.content);
+    let comLetra = !!textoLetra; // a letra da música já nas notas
     let osmd = null;
     const montar = () => {
+      let m;
       if (coral) {
-        const m = novaPartitura({ titulo, compasso, fifths, modo, bpm, tipo: 'satb' });
+        m = novaPartitura({ titulo, compasso, fifths, modo, bpm, tipo: 'satb' });
         m.pautas = vozesDasNotas(notas, { bpm, fifths, oitava, meioTempo });
-        return m;
+      } else {
+        m = novaPartitura({ titulo, compasso, fifths, modo, bpm });
+        m.pautas[0].clave = clave;
+        m.pautas[0].nome = modoIA === 'voz' ? 'Voz' : 'Melodia';
+        m.pautas[0].ev = melodiaDasNotas(notas, { bpm, fifths, oitava, modo: modoIA, centro, meioTempo });
       }
-      const m = novaPartitura({ titulo, compasso, fifths, modo, bpm });
-      m.pautas[0].clave = clave;
-      m.pautas[0].nome = modoIA === 'voz' ? 'Voz' : 'Melodia';
-      m.pautas[0].ev = melodiaDasNotas(notas, { bpm, fifths, oitava, modo: modoIA, centro, meioTempo });
+      if (comLetra) colocarLetra(m, textoLetra);
+      m.letraAuto = true; // não coloca de novo ao abrir no editor (se a pessoa desligou, fica sem)
       return m;
     };
     passo.innerHTML = `<div class="section-title">Rascunho pronto</div>
@@ -4487,6 +4550,7 @@ async function gerarComIA(song, titulo) {
         <div class="setting"><span class="ico">${icon('music', 18)}</span><div class="grow"><div class="t">Tom</div><div class="s">${tomCifra ? 'Pela cifra da música' : 'Pelo que a IA ouviu'}</div></div><button class="btn small" id="ia-tom">${nomeDoTom(fifths, modo)}</button></div>
         <div class="setting wrap"><span class="ico">${icon('clock', 18)}</span><div class="grow"><div class="t">Compasso</div></div>
           <div class="chips" id="ia-compasso">${[[2, 4], [3, 4], [4, 4], [6, 8]].map(([a, b]) => `<button class="chip" data-c="${a}/${b}" aria-pressed="${a === 4 && b === 4}">${a}/${b}</button>`).join('')}</div></div>
+        ${textoLetra ? `<label class="setting"><span class="ico">${icon('text', 18)}</span><div class="grow"><div class="t">Letra da música</div><div class="s">Uma sílaba em cada nota; confira e corrija na aba Letra do editor</div></div><input type="checkbox" class="switch" id="ia-letra" checked></label>` : ''}
         <label class="setting"><span class="ico">${icon('clock', 18)}</span><div class="grow"><div class="t">Começa no contratempo</div><div class="s">Se as notas ficaram deslocadas meio tempo (comum com a voz sozinha), ligue</div></div><input type="checkbox" class="switch" id="ia-meio"></label>
         <div class="setting"><span class="ico">${icon('up', 18)}</span><div class="grow"><div class="t">Oitava</div></div>
           <div class="seg"><button data-oit="-1">8ª↓</button><span class="val" id="ia-oit">0</span><button data-oit="1">8ª↑</button></div></div>
@@ -4526,7 +4590,10 @@ async function gerarComIA(song, titulo) {
         location.hash = `#/musica/${id}/compor`;
       }
     };
-    passo.onchange = (e) => { if (e.target.id === 'ia-meio') { meioTempo = e.target.checked; previa(); } };
+    passo.onchange = (e) => {
+      if (e.target.id === 'ia-meio') { meioTempo = e.target.checked; previa(); }
+      if (e.target.id === 'ia-letra') { comLetra = e.target.checked; previa(); }
+    };
     previa();
   }
   telaFontes();
@@ -4544,6 +4611,11 @@ async function viewPartitura(id) {
   view.innerHTML = `<div class="partitura"><div class="loading-note"><span class="spin"></span>Preparando a partitura…</div></div>`;
   // a partitura feita no app (Compor) vale mais que a desenhada por leitura automática da original
   const propria = song.partitura?.pautas?.some((p) => p.ev?.length);
+  // partitura feita no app ainda sem letra: a letra da música entra sozinha (uma vez; corrige-se no editor)
+  if (propria && id !== 'previa' && !song.partitura.letraAuto && !temLetra(song.partitura)) {
+    const texto = letraParaPartitura(song.content);
+    if (texto) { const m = JSON.parse(JSON.stringify(song.partitura)); colocarLetra(m, texto); m.letraAuto = true; db.updateSong(id, { partitura: m }); }
+  }
   const temDesenho = propria || (mxl ? await fetch(mxl, { method: 'HEAD' }).then((r) => r.ok).catch(() => false) : false);
   if (!view.querySelector('.partitura')) return;
   const prefs = db.prefs();
@@ -4599,7 +4671,11 @@ async function viewPartitura(id) {
       osmd.render();
       // cifras na cor de destaque (o desenho não tem cor própria para elas)
       caixa.querySelectorAll('svg text').forEach((t) => { if (CIFRA_NO_TEXTO.test(t.textContent.trim())) { t.setAttribute('fill', c.cifra); t.style.fontWeight = '700'; } });
-      if (!ensaio) ensaio = criarEnsaio(osmd, $('#ensaio'), () => tom);
+      if (!ensaio) {
+        ensaio = criarEnsaio(osmd, $('#ensaio'), () => tom);
+        caixa.addEventListener('click', (e) => ensaio?.tocarDe(e.clientX, e.clientY));
+        caixa.title = 'Toque numa nota para ouvir a partir dela';
+      }
       else ensaio.redesenhou();
       $('#part-aviso').textContent = propria ? 'Partitura feita no app. Toque em “Editar” para mudar notas, letra ou cifras.' : 'Partitura desenhada a partir do arquivo original por leitura automática: confira em “Original” se algo parecer estranho, ou toque em “Criar no app” para corrigir.';
     } catch (e) {
