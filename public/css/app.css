@@ -738,6 +738,97 @@ dialog { max-height: calc(100dvh - 24px); overflow-y: auto; overflow-x: hidden; 
 .editor.cheio .editor-split textarea { flex: 1; min-height: 0; height: 100%; resize: none; }
 .editor.cheio .editor-prev { flex: 1; overflow: auto; }
 body.editando-cheio .nav, body.editando-cheio #player { display: none !important; }
+
+/* ============================================================ editor de música (nova / editar cifra), repaginado */
+.ed2 { gap: 14px; padding-bottom: 8px; }
+.ed-topo { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 16px; align-items: center; margin-top: 4px; }
+.ed-capa .cover { width: 96px; height: 96px; border-radius: 14px; box-shadow: var(--shadow-lg); }
+.ed-ident { display: grid; gap: 2px; min-width: 0; }
+.ed-ident .kind { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-ink); }
+.ed-titulo, .ed-artista { width: 100%; min-width: 0; padding: 4px 0; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--text);
+  font: inherit; outline: none; transition: border-color 0.2s; }
+.ed-titulo { font-size: clamp(22px, 5.5vw, 34px); font-weight: 900; letter-spacing: -0.02em; line-height: 1.15; }
+.ed-artista { font-size: 15px; color: var(--muted); }
+.ed-titulo:focus, .ed-artista:focus { border-bottom-color: var(--accent); }
+.ed-titulo::placeholder, .ed-artista::placeholder { color: color-mix(in srgb, var(--muted) 70%, transparent); }
+.ed-resumo { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ed-resumo span { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--surface-2); color: var(--muted); }
+.ed-resumo .ic { color: var(--accent-ink); }
+@media (max-width: 600px) { .ed-topo { grid-template-columns: 72px minmax(0, 1fr); gap: 12px; } .ed-capa .cover { width: 72px; height: 72px; } }
+
+.ed-trazer { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 16px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, var(--surface-2)), var(--surface-2) 75%); color: var(--text); font: inherit; text-align: start; cursor: pointer; }
+.ed-trazer:hover { border-color: var(--accent); }
+.ed-trazer > span:nth-child(2) { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.ed-trazer b { font-size: 15px; }
+.ed-trazer small { color: var(--muted); font-size: 13px; line-height: 1.35; }
+.ed-trazer-ic { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 12px; color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.ed-rascunho { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--accent-soft); }
+.ed-rascunho[hidden] { display: none; }
+.ed-rascunho > .ic { color: var(--accent-ink); }
+.ed-rascunho > span { display: grid; flex: 1 1 200px; min-width: 0; }
+.ed-rascunho small { color: var(--muted); font-size: 12.5px; }
+
+.ed-detalhes { border-radius: 16px; background: var(--surface-2); overflow: hidden; }
+.ed-detalhes summary { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; list-style: none; }
+.ed-detalhes summary::-webkit-details-marker { display: none; }
+.ed-detalhes summary > span { display: grid; flex: 1; min-width: 0; }
+.ed-detalhes summary small { color: var(--muted); font-size: 12.5px; }
+.ed-detalhes summary > .ic:first-child { color: var(--accent-ink); }
+.ed-detalhes summary > .ic:last-child { transition: transform 0.2s; }
+.ed-detalhes[open] summary > .ic:last-child { transform: rotate(180deg); }
+.ed-detalhes .campos { padding: 4px 16px 16px; }
+.ed-detalhes .campos .input { background: var(--surface); }
+@media (max-width: 600px) { .ed-detalhes .campos { grid-template-columns: 1fr; } }
+
+.ed-card { display: grid; gap: 10px; padding: 10px; border-radius: 18px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
+.ed-barra { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 4px; padding: 6px; margin: -4px -4px 0;
+  border-radius: 14px; background: color-mix(in srgb, var(--surface-2) 96%, #000); box-shadow: 0 6px 16px rgb(0 0 0 / 0.18); }
+.ed-barra .seg { height: 38px; }
+.ed-barra .seg button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; }
+.ed-barra .seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+.ed-barra .icon-btn { width: 38px; height: 38px; }
+.ed-barra .icon-btn:disabled { opacity: 0.35; }
+@media (max-width: 600px) {
+  .ed-modos button span { display: none; } /* no celular, só o ícone de cada jeito de editar */
+  .ed-modos button { padding: 0 10px !important; }
+  .ed-barra { gap: 2px; }
+  .ed-barra .icon-btn { width: 34px; height: 34px; }
+}
+.ed-linha { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; padding: 2px 0; mask-image: linear-gradient(90deg, #000 92%, transparent); }
+.ed-linha::-webkit-scrollbar { display: none; }
+.ed-linha > * { flex: none; }
+.ed2 .chord-pal, .ed-estrutura { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+.ed2 .chord-pal::-webkit-scrollbar, .ed-estrutura::-webkit-scrollbar { display: none; }
+.ed2 .chord-pal > *, .ed-estrutura > * { flex: none; }
+.ed2 .chord-pal small, .ed-estrutura small { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 2px 0 4px; }
+.ed2 .chord-pal .chip { min-width: 40px; justify-content: center; }
+.ed2 .chord-pal .chip.outro { color: var(--text); }
+.ed2 .chord-pal .chip.mais { color: var(--muted); font-family: var(--sans); font-weight: 700; }
+.ed-estrutura:empty { display: none; }
+.ed-estrutura .chip { background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); font-weight: 700; }
+.ed2 .editor-split textarea { min-height: max(50vh, 320px); border-radius: 12px; background: var(--bg-elev); font-size: 15px; line-height: 1.75; caret-color: var(--accent); tab-size: 4; }
+.ed2 .editor-prev { border-radius: 12px; }
+.ed2 .editor-split:not(.so-previa) .editor-prev, .ed2 .editor-split.so-previa textarea { display: none; }
+.ed-status { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 0 4px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.ed-salvo { color: var(--accent-ink); }
+.ed-dica { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); color: var(--muted); font-size: 13px; line-height: 1.5; }
+.ed-dica code { font-size: 12px; }
+.ed-rodape { position: sticky; bottom: calc(8px - var(--folga-pe)); z-index: 6; display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 97%, #000); box-shadow: var(--shadow-lg); }
+.ed-rodape .btn.primary { min-width: 140px; justify-content: center; }
+/* computador: a prévia ao lado do texto, sempre ao vivo */
+@media (min-width: 1000px) {
+  .ed2 .editor-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .ed2 .editor-split .editor-prev, .ed2 .editor-split textarea { display: block !important; }
+  .ed2 .editor-prev { position: sticky; top: 64px; max-height: calc(100dvh - 220px); overflow: auto; }
+  .ed2 .ed-abas { display: none; }
+}
+/* tela cheia: só a barra, as partes, os acordes, o texto e o rodapé */
+.ed2.cheio > .ed-topo, .ed2.cheio > .ed-trazer, .ed2.cheio > .ed-rascunho, .ed2.cheio > .ed-detalhes, .ed2.cheio .ed-dica, .ed2.cheio .ed-estrutura { display: none; }
+.ed2.cheio > .ed-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ed2.cheio .ed-barra { position: static; margin: 0; }
+.ed2.cheio .ed-rodape { position: static; }
 @media (max-width: 600px) { .editor .campos { grid-template-columns: 1fr; } }
 
 /* ============================================================ cores / tema */

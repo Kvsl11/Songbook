@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-170';
+export const APP_VERSAO = '2026.10.21-171';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -5636,44 +5636,62 @@ function viewEditor(id, setId) {
     } });
   }
   const voltar = setDestino ? '#/repertorio/' + setDestino.id : isNew ? '#/biblioteca/musicas' : '#/musica/' + id;
-  setHeader(isNew ? 'Nova música' : 'Editar cifra', { back: voltar, actions, eyebrow: setDestino ? 'Para: ' + setDestino.name : isNew ? '' : song.title });
+  setHeader(isNew ? 'Nova música' : 'Editar cifra', { back: () => sair(), actions, eyebrow: setDestino ? 'Para: ' + setDestino.name : isNew ? '' : song.title });
+  const partes = [['Refrão', 'plus', 'Daqui para baixo é o refrão (até a próxima parte)'], ['Estrofe', 'plus', 'Daqui para baixo é uma estrofe (até a próxima parte)'],
+    ['Ponte', 'plus', 'Daqui para baixo é a ponte'], ['Intro', 'plus', 'Linha da introdução (acordes)'], ['Repetir refrão', 'refresh', 'Canta o refrão de novo aqui']];
   view.innerHTML = `
-    <h2 class="greet">${isNew ? 'Nova música' : 'Editar cifra'}</h2>
-    <div class="editor">
+    <div class="editor ed2">
+      <section class="ed-topo">
+        <div class="ed-capa" id="ed-capa"></div>
+        <div class="ed-ident">
+          <div class="kind">${setDestino ? 'Nova música para ' + esc(setDestino.name) : isNew ? 'Nova música' : 'Editar cifra'}</div>
+          <input class="ed-titulo" id="f-title" value="${esc(meta.title)}" placeholder="Nome do canto" aria-label="Título" autocomplete="off">
+          <input class="ed-artista" id="f-artist" value="${esc(meta.artist)}" placeholder="Autor ou intérprete" aria-label="Autor ou intérprete" autocomplete="off">
+          <div class="ed-resumo" id="ed-resumo"></div>
+        </div>
+      </section>
+      ${isNew ? `<button class="ed-trazer" id="trazer"><span class="ed-trazer-ic">${icon('download', 22)}</span>
+        <span><b>Trazer da internet</b><small>Busque no Cifra Club ou cole a cifra ou a letra de qualquer site: ela entra aqui organizada.</small></span>${icon('next', 18)}</button>` : ''}
+      <div class="ed-rascunho" id="ed-rascunho" hidden></div>
+      <details class="ed-detalhes" ${isNew ? 'open' : ''}><summary>${icon('settings', 18)}<span><b>Detalhes da música</b><small>Tom, composição, vídeo de referência e parte da missa</small></span>${icon('down', 18)}</summary>
       <div class="campos">
-        <label>Título<input class="input" id="f-title" value="${esc(meta.title)}" placeholder="Nome do canto"></label>
-        <label>Autor / intérprete<input class="input" id="f-artist" value="${esc(meta.artist)}" placeholder="Ex.: Pe. Zezinho"></label>
-        <label>Tom<input class="input" id="f-key" value="${esc(meta.key)}" placeholder="Ex.: G, Em, Bb"></label>
+        <label>Tom<input class="input" id="f-key" value="${esc(meta.key)}" placeholder="Ex.: G, Em, Bb" autocomplete="off"></label>
         <label>Composição<input class="input" id="f-composer" value="${esc(meta.composer)}" placeholder="Quem compôs (opcional)"></label>
-        <label>Vídeo de referência (YouTube)<span class="input-btn"><input class="input" id="f-yt" value="${esc(meta.youtube)}" placeholder="https://www.youtube.com/watch?v=…"><button class="btn small" type="button" id="f-yt-buscar" title="Procurar o vídeo no YouTube">${icon('search', 15)} Procurar</button></span></label>
-        <label>Parte da missa (para que momento é)<select class="input" id="f-parte">
+        <label class="full">Vídeo de referência (YouTube)<span class="input-btn"><input class="input" id="f-yt" value="${esc(meta.youtube)}" placeholder="https://www.youtube.com/watch?v=…"><button class="btn small" type="button" id="f-yt-buscar" title="Procurar o vídeo no YouTube">${icon('search', 15)} Procurar</button></span></label>
+        <label class="full">Parte da missa (para que momento é)<select class="input" id="f-parte">
           <option value="">(nenhuma)</option>${[...new Set([...PARTES_MISSA.filter((n) => n !== 'Outro'), meta.parte].filter(Boolean))].map((n) => `<option ${n === meta.parte ? 'selected' : ''}>${esc(n)}</option>`).join('')}<option value="__outra">Outra…</option></select></label>
-      </div>
-      <div class="barra">
-        <div class="seg"><button class="tom-btn" id="ed-tom" aria-label="Escolher o tom" title="Mudar o tom da cifra inteira (altera o texto)"><span class="val" id="ed-tom-val"></span>${icon('down', 14)}</button></div>
-        <button class="chip parte" data-parte-ed="Refrão" title="Daqui para baixo é o refrão (até a próxima parte)">${icon('plus', 14)} Refrão</button>
-        <button class="chip parte" data-parte-ed="Estrofe" title="Daqui para baixo é uma estrofe (até a próxima parte)">${icon('plus', 14)} Estrofe</button>
-        <button class="chip parte" data-parte-ed="Ponte" title="Daqui para baixo é a ponte">${icon('plus', 14)} Ponte</button>
-        <button class="chip parte" data-parte-ed="Intro" title="Linha da introdução (acordes)">${icon('plus', 14)} Intro</button>
-        <button class="chip parte" data-parte-ed="Repetir refrão" title="Canta o refrão de novo aqui">${icon('refresh', 14)} Repetir refrão</button>
-        <button class="chip" data-parte-ed="(" title="Uma observação, ex.: (2x) ou (só vozes)">Observação</button>
-        <button class="chip" id="completar" title="Repete a sequência de acordes da estrofe cifrada nas estrofes que estão sem acordes">${icon('sparkles', 14)} Completar cifra</button>
-        <button class="chip" id="conv" title="Organiza cifra colada de outro site (acordes numa linha, letra na outra)">${icon('sparkles', 14)} Organizar cifra colada</button>
-        <button class="chip" id="trazer" title="Buscar no Cifra Club ou colar cifra/letra de qualquer site">${icon('download', 14)} Trazer da internet</button>
-      </div>
-      <div class="row" style="gap:6px"><span class="muted" style="font-size:12px;font-weight:700">Editar:</span>
-        <button class="chip" data-formato="acima" aria-pressed="${formato === 'acima'}">${icon('chord', 14)} Cifra (acordes em cima)</button>
-        <button class="chip" data-formato="colchetes" aria-pressed="${formato === 'colchetes'}">Cifra em [colchetes]</button>
-        <button class="chip" data-formato="letra" aria-pressed="${formato === 'letra'}" title="Corrija só o texto: os acordes continuam nas mesmas sílabas">${icon('text', 14)} Só a letra</button></div>
-      <div class="chord-pal" id="pal"></div>
-      <div class="tabs-ed"><button class="chip" data-aba="editar" aria-pressed="true">${icon('edit', 14)} Editar</button><button class="chip" data-aba="previa" aria-pressed="false">${icon('eye', 14)} Ver prévia</button>
-        <span class="spacer"></span><button class="chip" id="ed-cheio" title="Usar a tela toda para editar">${icon('expand', 14)} <span>Tela cheia</span></button></div>
-      <div class="editor-split">
+      </div></details>
+      <section class="ed-card">
+        <div class="ed-barra">
+          <div class="seg ed-modos" role="group" aria-label="Como editar">
+            <button data-formato="acima" aria-pressed="${formato === 'acima'}" title="Acordes na linha de cima, alinhados com a sílaba">${icon('chord', 15)}<span>Cifra</span></button>
+            <button data-formato="colchetes" aria-pressed="${formato === 'colchetes'}" title="Acordes entre [colchetes] no meio da letra">[ ]<span>Colchetes</span></button>
+            <button data-formato="letra" aria-pressed="${formato === 'letra'}" title="Corrija só o texto: os acordes continuam nas mesmas sílabas">${icon('text', 15)}<span>Só letra</span></button>
+          </div>
+          <span class="spacer"></span>
+          <button class="icon-btn" id="ed-desfazer" aria-label="Desfazer" title="Desfazer (Ctrl+Z)">${icon('undo', 18)}</button>
+          <button class="icon-btn" id="ed-refazer" aria-label="Refazer" title="Refazer (Ctrl+Shift+Z)">${icon('redo', 18)}</button>
+          <div class="seg ed-abas"><button data-aba="editar" aria-pressed="true" title="Editar o texto">${icon('edit', 15)}</button><button data-aba="previa" aria-pressed="false" title="Ver como fica">${icon('eye', 15)}</button></div>
+          <button class="icon-btn" id="ed-cheio" aria-label="Tela cheia" title="Usar a tela toda para editar">${icon('expand', 18)}</button>
+        </div>
+        <div class="ed-linha barra" aria-label="Partes e ferramentas">
+          <div class="seg"><button class="tom-btn" id="ed-tom" aria-label="Mudar o tom da cifra" title="Mudar o tom da cifra inteira (altera o texto)"><span class="val" id="ed-tom-val"></span>${icon('down', 14)}</button></div>
+          ${partes.map(([n, ic, t]) => `<button class="chip parte" data-parte-ed="${n}" title="${t}">${icon(ic, 14)} ${n}</button>`).join('')}
+          <button class="chip" data-parte-ed="(" title="Uma observação, ex.: (2x) ou (só vozes)">${icon('info', 14)} Observação</button>
+          <button class="chip" id="completar" title="Repete a sequência de acordes da estrofe cifrada nas estrofes que estão sem acordes">${icon('sparkles', 14)} Completar cifra</button>
+          <button class="chip" id="conv" title="Organiza cifra colada de outro site (acordes numa linha, letra na outra)">${icon('sparkles', 14)} Organizar colada</button>
+          ${isNew ? '' : `<button class="chip" id="trazer" title="Buscar no Cifra Club ou colar cifra/letra de qualquer site">${icon('download', 14)} Trazer da internet</button>`}
+        </div>
+        <div class="chord-pal" id="pal"></div>
+        <div class="ed-estrutura" id="ed-estrutura"></div>
+        <div class="editor-split">
         <textarea id="content" spellcheck="false" aria-label="Letra e acordes" wrap="off">${esc(formato === 'acima' ? chordProToChordsOverLyrics(paraEditor(corpo)) : formato === 'letra' ? letraDe(paraEditor(corpo)) : paraEditor(corpo))}</textarea>
-        <div class="editor-prev" id="prev" hidden><div class="song" id="prev-song"></div></div>
-      </div>
-      <p class="muted" style="font-size:13px;margin:0" id="dica"></p>
-      <div class="row"><a class="btn ghost" href="${voltar}">Cancelar</a><span class="spacer"></span><button class="btn primary" id="save">${icon('check', 18)} Salvar</button></div>
+          <div class="editor-prev" id="prev"><div class="song" id="prev-song"></div></div>
+        </div>
+        <div class="ed-status"><span id="ed-status"></span><span class="ed-salvo" id="ed-salvo"></span></div>
+        <p class="ed-dica" id="dica"></p>
+      </section>
+      <div class="ed-rodape"><button class="btn ghost" id="ed-cancelar">Cancelar</button><span class="spacer"></span><button class="btn primary" id="save">${icon('check', 18)} Salvar</button></div>
     </div>`;
   const ta = $('#content');
   const campo = (k) => $('#f-' + k);
@@ -5709,20 +5727,144 @@ function viewEditor(id, setId) {
     view.querySelectorAll('[data-formato]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     dica();
     atualizar();
+    zerarHist(); // cada jeito de editar mostra o texto de outra forma: o histórico recomeça
   }));
+  // acordes que já estão na cifra (para a paleta) e as partes do texto (o mapa da estrutura)
+  const acordesDaCifra = () => [...new Set([...corpoPro().matchAll(/\[([^\]]+)\]/g)].map((m) => m[1].trim()).filter((c) => CIFRA_NO_TEXTO.test(c)))];
+  const partesDoTexto = () => ta.value.split('\n').map((l, i) => {
+    const m = /^\s*\[([^\]]+)\]\s*$/.exec(l);
+    return m && !CIFRA_NO_TEXTO.test(m[1].trim()) ? { nome: m[1].trim(), linha: i } : null;
+  }).filter(Boolean);
   let t;
   const atualizar = () => {
     clearTimeout(t);
-    t = setTimeout(() => { if (ta.isConnected) $('#prev-song').innerHTML = renderSong(montar()).html; }, 120);
-    $('#pal').innerHTML = `<small>Acordes do tom${campo('key').value ? ' ' + esc(campo('key').value) : ''}:</small>` +
-      acordesDoTom(campo('key').value.trim()).map((c) => `<button class="chip" data-acorde="${esc(c)}">${esc(c)}</button>`).join('');
+    t = setTimeout(() => {
+      if (!ta.isConnected) return;
+      $('#prev-song').innerHTML = renderSong(montar()).html;
+      // status: linhas, partes e acordes; e o rascunho guardado no aparelho
+      const nAcordes = acordesDaCifra().length;
+      const nPartes = partesDoTexto().length;
+      const nLinhas = ta.value.split('\n').filter((l) => l.trim()).length;
+      $('#ed-status').textContent = `${nLinhas} linha${nLinhas === 1 ? '' : 's'} · ${nPartes} parte${nPartes === 1 ? '' : 's'} · ${nAcordes} acorde${nAcordes === 1 ? '' : 's'} diferente${nAcordes === 1 ? '' : 's'}`;
+      guardarRascunho();
+    }, 150);
+    const tom = campo('key').value.trim();
+    const doTom = acordesDoTom(tom);
+    const extras = formato === 'letra' ? [] : acordesDaCifra().filter((c) => !doTom.includes(c)).slice(0, 12);
+    $('#pal').innerHTML = `<small>${tom ? 'Tom ' + esc(tom) : 'Acordes'}</small>` + doTom.map((c) => `<button class="chip" data-acorde="${esc(c)}">${esc(c)}</button>`).join('')
+      + (extras.length ? `<small>Na cifra</small>${extras.map((c) => `<button class="chip outro" data-acorde="${esc(c)}">${esc(c)}</button>`).join('')}` : '')
+      + `<button class="chip mais" data-outro-acorde title="Escrever qualquer acorde">${icon('plus', 13)} Outro</button>`;
+    // mapa da estrutura: um toque leva até a parte
+    const ps = partesDoTexto();
+    $('#ed-estrutura').innerHTML = ps.length ? `<small>${icon('list', 14)} Estrutura</small>${ps.map((x) => `<button class="chip" data-linha="${x.linha}">${esc(x.nome)}</button>`).join('')}` : '';
+    // cabeçalho: capa, resumo
+    const yt = youtubeId(campo('yt').value);
+    $('#ed-capa').innerHTML = capa({ title: campo('title').value.trim() || 'Nova música', youtube: yt });
+    const parteMissa = campo('parte').value === '__outra' ? '' : campo('parte').value;
+    $('#ed-resumo').innerHTML = [
+      tomDoEditor() && `<span>${icon('music', 13)} Tom ${esc(tomDoEditor())}</span>`,
+      parteMissa && `<span>${icon('book', 13)} ${esc(parteMissa)}</span>`,
+      yt && `<span>${icon('youtube', 13)} Vídeo</span>`,
+      `<span>${icon('score', 13)} ${ps.length} parte${ps.length === 1 ? '' : 's'}</span>`,
+    ].filter(Boolean).join('');
+    marcarMudanca();
+    agendarFoto();
   };
-  atualizar();
   view.querySelector('.editor').addEventListener('input', atualizar);
+  view.querySelector('.editor').addEventListener('change', atualizar);
+  $('#ed-estrutura').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-linha]');
+    if (!b) return;
+    const n = Number(b.dataset.linha);
+    const linhas = ta.value.split('\n');
+    const pos = linhas.slice(0, n).reduce((a, l) => a + l.length + 1, 0);
+    if (view.querySelector('.editor-split').classList.contains('so-previa')) view.querySelector('[data-aba="editar"]').click();
+    ta.focus();
+    ta.setSelectionRange(pos, pos + linhas[n].length);
+    ta.scrollTop = Math.max(0, n * (parseFloat(getComputedStyle(ta).lineHeight) || 22) - 40);
+    ta.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+
+  // desfazer/refazer: o histórico do próprio app (o do navegador se perde quando o app troca o texto)
+  let hist = [ta.value];
+  let posHist = 0;
+  let fotoT;
+  const foto = () => {
+    clearTimeout(fotoT);
+    if (!ta.isConnected || ta.value === hist[posHist]) return;
+    hist = hist.slice(0, posHist + 1);
+    hist.push(ta.value);
+    if (hist.length > 200) hist.shift();
+    posHist = hist.length - 1;
+    botoesHist();
+  };
+  function agendarFoto() { clearTimeout(fotoT); fotoT = setTimeout(foto, 400); }
+  const botoesHist = () => { $('#ed-desfazer').disabled = posHist <= 0 && ta.value === hist[0]; $('#ed-refazer').disabled = posHist >= hist.length - 1; };
+  const irNoHist = (d) => {
+    foto();
+    const novo = posHist + d;
+    if (novo < 0 || novo >= hist.length) return;
+    posHist = novo;
+    ta.value = hist[posHist];
+    clearTimeout(fotoT);
+    atualizar();
+    clearTimeout(fotoT);
+    botoesHist();
+  };
+  const zerarHist = () => { hist = [ta.value]; posHist = 0; botoesHist(); };
+  aoSair(() => { clearTimeout(fotoT); clearTimeout(t); });
+  $('#ed-desfazer').onclick = () => irNoHist(-1);
+  $('#ed-refazer').onclick = () => irNoHist(1);
+
+  // rascunho: guardado no aparelho enquanto escreve (não se perde ao sair, fechar ou recarregar)
+  const chaveRascunho = `rascunho-musica:${isNew ? (setId ? 'novo:' + setId : 'novo') : id}`;
+  let inicial = null; // o conteúdo como abriu (para saber se mudou)
+  let mudou = false;
+  function marcarMudanca() {
+    if (inicial === null) return;
+    mudou = montar() !== inicial;
+    $('#ed-salvo').textContent = mudou ? 'Rascunho guardado neste aparelho' : '';
+  }
+  function guardarRascunho() {
+    if (inicial === null) return;
+    try {
+      if (mudou) localStorage.setItem(chaveRascunho, JSON.stringify({ content: montar(), t: Date.now() }));
+      else localStorage.removeItem(chaveRascunho);
+    } catch { /* sem armazenamento */ }
+  }
+  const apagarRascunho = () => { try { localStorage.removeItem(chaveRascunho); } catch { /* sem armazenamento */ } };
+  const voltarPara = (conteudo) => {
+    const { meta: m, corpo: c } = separarMeta(conteudo);
+    campo('title').value = m.title || '';
+    campo('artist').value = m.artist || '';
+    campo('key').value = m.key || '';
+    campo('composer').value = m.composer || '';
+    campo('yt').value = m.youtube || '';
+    ta.value = exibir(c);
+    atualizar();
+    mostrarTom();
+  };
+  // sair: se mudou algo, confirma (o rascunho fica guardado e volta na próxima vez)
+  async function sair() {
+    foto();
+    if (mudou && !(await ask({ title: 'Sair sem salvar?', text: 'O que você escreveu fica guardado como rascunho neste aparelho e volta quando abrir de novo.', ok: 'Sair' }))) return;
+    location.hash = voltar;
+  }
 
   const inserir = (txt) => { ta.focus(); ta.setRangeText(txt, ta.selectionStart, ta.selectionEnd, 'end'); atualizar(); };
   $('#pal').addEventListener('mousedown', (e) => e.preventDefault()); // mantém o cursor no texto
-  $('#pal').addEventListener('click', (e) => { const b = e.target.closest('[data-acorde]'); if (b) inserir(formato === 'acima' ? `${b.dataset.acorde} ` : `[${b.dataset.acorde}]`); });
+  $('#pal').addEventListener('click', async (e) => {
+    if (e.target.closest('[data-outro-acorde]')) {
+      const pos = [ta.selectionStart, ta.selectionEnd];
+      const c = (await ask({ title: 'Outro acorde', text: 'Escreva o acorde (ex.: F#m7, Bb/D, Gsus4)', value: '', ok: 'Inserir' }) || '').trim();
+      if (!c) return;
+      ta.setSelectionRange(...pos);
+      inserir(formato === 'acima' ? `${c} ` : `[${c}]`);
+      return;
+    }
+    const b = e.target.closest('[data-acorde]');
+    if (b) inserir(formato === 'acima' ? `${b.dataset.acorde} ` : `[${b.dataset.acorde}]`);
+  });
   // parte nova: o nome entra numa linha própria, no começo da linha onde está o cursor
   const inserirParte = (nome) => {
     const v = ta.value;
@@ -5792,8 +5934,8 @@ function viewEditor(id, setId) {
   view.querySelectorAll('[data-aba]').forEach((b) => (b.onclick = () => {
     const prev = b.dataset.aba === 'previa';
     if (prev) $('#prev-song').innerHTML = renderSong(montar()).html;
-    $('#prev').hidden = !prev;
-    ta.hidden = prev;
+    // no celular, um ou outro; no computador, os dois lado a lado (CSS)
+    view.querySelector('.editor-split').classList.toggle('so-previa', prev);
     view.querySelectorAll('[data-aba]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   }));
   // tela cheia: só o texto, a barra de partes e os botões (prévia, sair, salvar)
@@ -5801,7 +5943,8 @@ function viewEditor(id, setId) {
   const alternarCheio = (ligar = !editorEl.classList.contains('cheio')) => {
     editorEl.classList.toggle('cheio', ligar);
     document.body.classList.toggle('editando-cheio', ligar);
-    $('#ed-cheio').innerHTML = `${icon(ligar ? 'shrink' : 'expand', 14)} <span>${ligar ? 'Sair da tela cheia' : 'Tela cheia'}</span>`;
+    $('#ed-cheio').innerHTML = icon(ligar ? 'shrink' : 'expand', 18);
+    $('#ed-cheio').title = ligar ? 'Sair da tela cheia' : 'Usar a tela toda para editar';
     if (ligar) ta.focus();
   };
   $('#ed-cheio').onclick = () => alternarCheio();
@@ -5816,10 +5959,41 @@ function viewEditor(id, setId) {
     e.target.insertBefore(opt, e.target.querySelector('[value="__outra"]'));
     e.target.value = nome;
   });
+  $('#ed-cancelar').onclick = () => sair();
+  // atalhos: Ctrl+S salva, Ctrl+Z desfaz, Ctrl+Shift+Z ou Ctrl+Y refaz
+  view.querySelector('.editor').addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const k = e.key.toLowerCase();
+    if (k === 's') { e.preventDefault(); $('#save').click(); }
+    if (e.target === ta && k === 'z') { e.preventDefault(); irNoHist(e.shiftKey ? 1 : -1); }
+    if (e.target === ta && k === 'y') { e.preventDefault(); irNoHist(1); }
+  });
+  // começo: o estado inicial, e o rascunho de antes (se houver e for diferente)
+  atualizar();
+  inicial = montar();
+  zerarHist();
+  try {
+    const r = JSON.parse(localStorage.getItem(chaveRascunho) || 'null');
+    if (r?.content && r.content !== inicial) {
+      const quando = new Date(r.t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      const box = $('#ed-rascunho');
+      box.hidden = false;
+      box.innerHTML = `${icon('info', 18)}<span><b>Você tem um rascunho não salvo</b><small>De ${quando}. Quer continuar de onde parou?</small></span>
+        <button class="btn small ghost" data-rasc="descartar">Descartar</button><button class="btn small primary" data-rasc="usar">Continuar</button>`;
+      box.onclick = (e) => {
+        const b = e.target.closest('[data-rasc]');
+        if (!b) return;
+        if (b.dataset.rasc === 'usar') { voltarPara(r.content); toast('Rascunho recuperado'); } else apagarRascunho();
+        box.hidden = true;
+      };
+    }
+  } catch { /* sem armazenamento */ }
   $('#save').onclick = () => {
     if (!campo('title').value.trim()) { toast('Dê um título à música'); campo('title').focus(); return; }
     const parte = campo('parte').value === '__outra' ? '' : campo('parte').value;
     const saved = db.saveSong({ ...song, content: montar() });
+    apagarRascunho();
+    mudou = false;
     // a parte nova vale também nos repertórios onde a música estava sem parte ou com a parte antiga
     if (!isNew && parte !== (meta.parte || '')) {
       for (const set of db.sets()) {
