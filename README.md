@@ -60,6 +60,9 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   clientes diferentes (mweb, web, TV, incorporado, VR) até um passar. Se ainda bloquear, cole o conteúdo de um
   `cookies.txt` de uma conta do YouTube em `YTDLP_COOKIES` (ou um proxy residencial em `YTDLP_PROXY`) no Render; se
   parar de baixar depois de uma mudança do YouTube, *Manual Deploy → Clear build cache & deploy* traz as versões novas.
+- **Piano de verdade no ensaio**: ouvir a partitura (e tocar numa nota no editor) usa o **Salamander Grand Piano**,
+  um piano de cauda Yamaha C5 gravado nota por nota (Alexander Holm, CC-BY 3.0), pelo jsDelivr numa versão fixa
+  (`lib/piano.js`): só as gravações das notas da música são baixadas, uma vez; sem internet, o som sintetizado.
 - **Partituras** (menu do app): as partituras feitas no app e as prontas (acervo/Hinário) das músicas da biblioteca, com
   **Nova partitura** (escolhendo a música) e **Gerar com IA**: um toque só — o servidor do app baixa o áudio do
   vídeo da música (yt-dlp, `server/audio.js`; se falhar, dá para escolher um arquivo de áudio) e o modelo **Basic Pitch** (Spotify, código

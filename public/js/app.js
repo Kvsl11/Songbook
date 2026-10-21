@@ -15,6 +15,7 @@ import {
   claveDaVoz, estimarAndamento, estimarTom, faixaDoModo, juntarPedaco, melodiaDasNotas, tomDaCifra, vozesDasNotas, colocarLetra, letraEmSilabas, temLetra, silabasDaLetra, temCifra as temCifraNaPartitura,
 } from './lib/partitura.js';
 import { corCss, corDominante } from './lib/cores.js';
+import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
 import { duracaoDoAviso, partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { SERVIDOR_AUDIO } from './config.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
@@ -52,7 +53,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-160';
+export const APP_VERSAO = '2026.10.21-161';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -3111,9 +3112,11 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
     mestre.gain.value = 0.9;
     mestre.connect(saida);
   };
+  let piano = false; // as gravações do piano chegaram (senão, o som sintetizado de antes)
   const nota = (freq, quando, dur, vol) => {
     if (vol <= 0) return;
     const f = freq * 2 ** (tomAtual() / 12);
+    if (piano && notaDePiano(audio, mestre, midiDaFrequencia(f), quando, dur, (1.4 / Math.sqrt(juntas())) * vol)) return;
     // as graves soam mais fracas ao ouvido (e no alto-falante do celular): ganham um pouco de volume
     // várias vozes juntas dividem o volume (antes somavam e o limitador apertava tudo: o som "chiava")
     const pico = (0.24 / Math.sqrt(juntas())) * vol * Math.min(1.6, Math.max(1, (330 / f) ** 0.35));
@@ -3176,9 +3179,20 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
     moverCursor(passoNoTempo(passos, tAgora()));
     quadro = requestAnimationFrame(acompanhar);
   };
+  // as gravações do piano para as notas desta partitura (no tom em que está): baixadas uma vez, na primeira vez que toca
+  const carregarAsDoPiano = async () => {
+    const midis = new Set(passos.flatMap((p) => p.notas.map((n) => midiDaFrequencia(n.freq * 2 ** (tomAtual() / 12)))));
+    if ([...midis].every(pianoPronto)) return true;
+    $('#ens-pos', barra).textContent = 'Preparando o piano…';
+    // sem internet ou demorando: toca com o som sintetizado (as gravações que faltam chegam para a próxima vez)
+    return Promise.race([carregarPiano(audio, midis), new Promise((r) => setTimeout(() => r(false), 8000))]);
+  };
   const tocar = async () => {
     if (!audio) { montarAudio(); novoMestre(); }
     if (audio.state === 'suspended') await audio.resume();
+    piano = await carregarAsDoPiano();
+    // o piano soa aberto (o filtro que tirava o chiado do som sintetizado abafaria o brilho das cordas)
+    saida.frequency.value = piano ? 14000 : 3200;
     mostrarCursor();
     tocando = true;
     inicioAudio = audio.currentTime + 0.08;
@@ -3280,12 +3294,22 @@ const notaSvg = (k, t = 22) => `<svg class="ic" width="${t}" height="${t}" viewB
 
 // som curto de uma nota (ao escrever ou tocar numa nota)
 let somCtx = null;
+// o piano das notas desta partitura já vai sendo baixado ao abrir o editor (o primeiro toque já sai no piano)
+function prepararPianoDoEditor(modelo) {
+  try {
+    somCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+    const midis = modelo.pautas.flatMap((p) => p.ev.flatMap((e) => e.a.map(midiDa)));
+    carregarPiano(somCtx, midis.length ? midis : [55, 60, 64, 67, 72]);
+  } catch { /* sem áudio */ }
+}
 function somNota(alturas) {
   try {
     somCtx ||= new (window.AudioContext || window.webkitAudioContext)();
     if (somCtx.state === 'suspended') somCtx.resume();
     const t = somCtx.currentTime + 0.01;
     for (const a of [].concat(alturas)) {
+      // no piano, se a gravação já chegou (senão o som sintetizado, e a gravação vem para a próxima vez)
+      if (notaDePiano(somCtx, somCtx.destination, midiDa(a), t, 0.55, 1.2)) continue;
       const g = somCtx.createGain();
       g.connect(somCtx.destination);
       g.gain.setValueAtTime(0, t);
@@ -3459,6 +3483,7 @@ function editorPartitura(song, titulo) {
   const id = song.id;
   let m = JSON.parse(JSON.stringify(song.partitura));
   m.pautas.forEach((p, i) => { p.id ||= 'p' + i; p.ev ||= []; });
+  prepararPianoDoEditor(m);
   let sel = { p: 0, i: m.pautas[0].ev.length - 1 };
   let porToque = false; // a seleção veio de um toque/seta (aí as durações mudam a nota); depois de escrever, não
   let dur = 8;
