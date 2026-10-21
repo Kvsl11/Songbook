@@ -53,7 +53,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-163';
+export const APP_VERSAO = '2026.10.21-164';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4219,7 +4219,7 @@ function viewPartituras() {
         <div class="part-passos">
           <span class="escreva">${icon('edit', 16)}<b>Escreva</b><small>nota por nota</small></span>
           <span class="ensaie">${icon('play', 16)}<b>Ensaie</b><small>ouvindo cada voz</small></span>
-          <span class="ia">${icon('sparkles', 16)}<b>Gere com IA</b><small>a partir do vídeo</small></span>
+          <span class="ia">${icon('sparkles', 16)}<b>Gere com IA</b><small>ouvindo a música</small></span>
         </div>
         <div class="part-numeros"><span><b>${proprias.length}</b> sua${proprias.length === 1 ? '' : 's'}</span><span><b>${prontas.length}</b> pronta${prontas.length === 1 ? '' : 's'} no app</span></div></div>
       <div class="part-palco" aria-hidden="true">
@@ -4239,9 +4239,9 @@ function viewPartituras() {
       <button class="part-acao ia" id="part-ia">
         <span class="part-acao-brilho" aria-hidden="true"></span>
         <span class="part-acao-topo"><span class="part-acao-ic">${icon('sparkles', 20)}</span><span class="part-acao-rot">Inteligência artificial</span></span>
-        <b>Gerar com IA</b><span class="part-acao-desc">O app ouve o vídeo da música e escreve a melodia para você conferir.</span>
+        <b>Gerar com IA</b><span class="part-acao-desc">O app ouve a música (o áudio dela) e escreve a melodia para você conferir.</span>
         <span class="part-ia-fluxo" aria-hidden="true">
-          <span class="part-ia-passo">${icon('youtube', 18)}<small>Vídeo</small></span>
+          <span class="part-ia-passo">${icon('music', 18)}<small>Música</small></span>
           <span class="part-ia-onda">${Array.from({ length: 18 }, (_, i) => `<i style="--i:${i};--a:${(0.35 + Math.abs(Math.sin(i * 1.7)) * 0.65).toFixed(2)}"></i>`).join('')}</span>
           <span class="part-ia-passo">${icon('sparkles', 18)}<small>IA</small></span>
           <span class="part-ia-seta">${icon('next', 14)}</span>
