@@ -1946,6 +1946,18 @@ a.pptx-tipo { text-decoration: none; }
 .ia-numeros span, .ia-nasce { border: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
 .ia-leitura .ia-fim { justify-content: center; }
 
+.ia-solte { display: grid; justify-items: center; gap: 8px; width: 100%; margin-top: 12px; padding: 28px 18px; text-align: center; color: var(--text);
+  font: inherit; cursor: pointer; border-radius: 18px; border: 2px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, var(--surface-2)), var(--surface-2) 75%); transition: border-color 0.2s, transform 0.2s; }
+.ia-solte:hover, .ia-solte.sobre { border-color: var(--accent); }
+.ia-solte.sobre { transform: scale(1.01); }
+.ia-solte b { font-size: 18px; font-weight: 900; }
+.ia-solte small { max-width: 380px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.ia-solte .btn { margin-top: 6px; pointer-events: none; }
+.ia-solte-ic { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%; color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.ia-dica-compartilhar { display: flex; gap: 10px; align-items: flex-start; margin: 12px 2px 16px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.ia-dica-compartilhar .ic { margin-top: 1px; color: var(--accent-ink); }
 .ia-pronto { display: grid; gap: 12px; margin-top: 12px; }
 .ia-pronto-cab { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 18px;
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 24%, var(--surface-2)), var(--surface-2) 72%); animation: ia-surge 0.4s ease; }

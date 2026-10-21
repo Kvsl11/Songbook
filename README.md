@@ -52,8 +52,9 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   toca; na partitura e no editor (ouvindo), tocar numa nota leva a música para ali e toca a partir dela.
   Partitura grande no editor: só um trecho de compassos em volta da nota escolhida é desenhado (8 com 4 vozes, até
   16 com uma), com ‹ › para andar; ouvir toca a partitura inteira.
-- **Servidor do app (Render)**: o GitHub Pages só serve as páginas; o áudio dos vídeos para a IA vem de um servidor
-  Node com o yt-dlp (`Dockerfile`, `render.yaml`). Para criar: render.com → *New* → *Blueprint* → este repositório (plano
+- **Servidor do app (Render)**: *não é mais usado pelo app* — a IA agora só recebe o arquivo de áudio escolhido ou
+  compartilhado (o `/api/audio` ficou no servidor, sem uso). Antes: o GitHub Pages só serve as páginas; o áudio dos
+  vídeos para a IA vinha de um servidor Node com o yt-dlp (`Dockerfile`, `render.yaml`). Para criar: render.com → *New* → *Blueprint* → este repositório (plano
   grátis; dorme sem uso e o primeiro pedido do dia demora ~1 min). O endereço fica em `public/js/config.js`
   (`https://songbook-audio.onrender.com`). O YouTube desconfia de servidores ("confirme que não é um robô"): o servidor
   gera a prova de origem (PO Token, complemento bgutil), resolve os desafios do YouTube com o Node e tenta como
@@ -64,8 +65,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   um piano de cauda Yamaha C5 gravado nota por nota (Alexander Holm, CC-BY 3.0), pelo jsDelivr numa versão fixa
   (`lib/piano.js`): só as gravações das notas da música são baixadas, uma vez; sem internet, o som sintetizado.
 - **Partituras** (menu do app): as partituras feitas no app e as prontas (acervo/Hinário) das músicas da biblioteca, com
-  **Nova partitura** (escolhendo a música) e **Gerar com IA**: um toque só — o servidor do app baixa o áudio do
-  vídeo da música (yt-dlp, `server/audio.js`; se falhar, dá para escolher um arquivo de áudio) e o modelo **Basic Pitch** (Spotify, código
+  **Nova partitura** (escolhendo a música) e **Gerar com IA**: escolha o arquivo de áudio da música (ou arraste, no
+  computador) e o modelo **Basic Pitch** (Spotify, código
   aberto, roda no próprio aparelho) transforma o som em notas; o app escolhe a melodia, acha tom (pela cifra ou pelo
   que ouviu) e andamento e põe no compasso. No fim, a partitura pronta já toca ali mesmo (o mesmo ensaio do editor,
   e tocar numa nota ouve dali), com os ajustes recolhidos e os botões **Salvar partitura**, **Editar** e

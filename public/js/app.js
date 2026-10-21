@@ -17,7 +17,6 @@ import {
 import { corCss, corDominante } from './lib/cores.js';
 import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
 import { duracaoDoAviso, partesDoAviso, tipoDoAviso } from './lib/avisos.js';
-import { SERVIDOR_AUDIO } from './config.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -3435,7 +3434,7 @@ async function comecarPartitura(song, titulo) {
     </div>
     <div class="section-title">Ou comece de forma automática</div>
     <div class="cp-tipos">
-      <a class="pptx-tipo" href="#/musica/${song.id}/compor/ia"><b>${icon('sparkles', 16)} Gerar com IA</b><span>Um toque: o app baixa o áudio do vídeo da música e escreve a partitura para você conferir</span></a>
+      <a class="pptx-tipo" href="#/musica/${song.id}/compor/ia"><b>${icon('sparkles', 16)} Gerar com IA</b><span>Escolha o áudio da música e a IA escreve a partitura para você ouvir, conferir e salvar</span></a>
       ${mxl ? `<button class="pptx-tipo" id="ini-desenhada" hidden><b>${icon('score', 16)} Da partitura desenhada pelo app</b><span>Copia as notas lidas da partitura original para você corrigir e completar</span></button>` : ''}
       <button class="pptx-tipo" id="ini-arquivo"><b>${icon('upload', 16)} De um arquivo MusicXML</b><span>.musicxml, .xml ou .mxl (exportado do MuseScore, Finale, Sibelius…)</span></button>
     </div></div>`;
@@ -4185,7 +4184,7 @@ function viewPartituras() {
     </section>
     <div class="part-acoes">
       <button class="part-acao" id="part-nova">${ARTE_PAUTA}<span class="part-acao-ic">${icon('score', 22)}</span><b>Nova partitura</b><span>Escolha a música e escreva nota por nota, com letra, cifras e várias vozes</span><em>Começar ${icon('next', 14)}</em></button>
-      <button class="part-acao ia" id="part-ia">${ARTE_IA}<span class="part-acao-ic">${icon('sparkles', 22)}</span><b>Gerar com IA</b><span>Um toque: o app baixa o áudio do vídeo da música e escreve a partitura para você conferir</span><em>Escolher a música ${icon('next', 14)}</em></button>
+      <button class="part-acao ia" id="part-ia">${ARTE_IA}<span class="part-acao-ic">${icon('sparkles', 22)}</span><b>Gerar com IA</b><span>Escolha o áudio da música e a IA escreve a partitura para você ouvir, conferir e salvar</span><em>Escolher a música ${icon('next', 14)}</em></button>
     </div>
     <div class="shelf-head"><h2>Suas partituras</h2>${proprias.length ? `<span class="muted part-conta">${proprias.length}</span>` : ''}</div>
     ${proprias.length ? `<div class="part-grade">${proprias.map(cartao).join('')}</div>`
@@ -4232,7 +4231,7 @@ function escolherMusica(titulo) {
 }
 
 // ---------------------------------------------------------------- Gerar a partitura com IA
-// O som vem do vídeo da música (o servidor do app baixa o áudio: audioDoVideo) ou de um arquivo de áudio. O modelo
+// O som vem de um arquivo de áudio da música (escolhido aqui ou trazido pelo "Compartilhar" do celular). O modelo
 // Basic Pitch (Spotify, código aberto) roda no próprio aparelho e transforma o som em notas; o app escolhe a
 // melodia, acha tom e andamento e põe no compasso. Sai um rascunho para conferir e corrigir no editor.
 const BASIC_PITCH = 'https://cdn.jsdelivr.net/npm/@spotify/basic-pitch@1.0.1';
@@ -4287,29 +4286,6 @@ async function audioParaModelo(arrayBuffer) {
   src.connect(off.destination);
   src.start();
   return { amostras: (await off.startRendering()).getChannelData(0), cortado: buf.duration > 360 };
-}
-// o áudio do vídeo do YouTube, baixado pelo servidor do app (yt-dlp; ver server/audio.js e render.yaml). Servido pelo
-// próprio servidor (Node), usa o endereço do app; no GitHub Pages, o do servidor no Render (config.js). O plano grátis
-// do Render dorme sem uso: o primeiro pedido do dia pode levar ~1 min para "acordar"
-async function audioDoVideo(id, formato = 'm4a') {
-  const servidores = [...new Set([...(/github\.io$/.test(location.hostname) ? [] : ['']), SERVIDOR_AUDIO].filter((x) => x !== undefined))];
-  let erro = new Error('nenhum servidor configurado');
-  for (const base of servidores) {
-    const ctrl = new AbortController();
-    const limite = setTimeout(() => ctrl.abort(), 240e3); // o servidor dormindo (~1 min) + as tentativas dele
-    try {
-      const r = await fetch(`${base}/api/audio?v=${encodeURIComponent(id)}&f=${formato}`, { signal: ctrl.signal });
-      const tipo = r.headers.get('content-type') || '';
-      if (r.ok && tipo.startsWith('audio/')) return await r.blob();
-      // 404 com a página do app: não há servidor neste endereço
-      erro = new Error(tipo.includes('json') ? (await r.json()).erro || `erro ${r.status}` : 'servidor não encontrado');
-    } catch (e) {
-      erro = e.name === 'AbortError' ? new Error('o servidor demorou demais') : new Error('sem conexão com o servidor');
-    } finally {
-      clearTimeout(limite);
-    }
-  }
-  throw erro;
 }
 // A IA ouvindo aos poucos: o áudio chega em pedaços e é analisado a cada 5 s (com 1 s de contexto antes, para não
 // perder a nota que atravessa o corte). As notas vão aparecendo enquanto a música toca.
@@ -4398,55 +4374,33 @@ function desenharRolo(canvas, notas, agora, { janela = 10 } = {}) {
 async function gerarComIA(song, titulo) {
   const id = song.id;
   setHeader(titulo, { back: '#/partituras', eyebrow: 'Gerar partitura com IA' });
-  const modoIA = 'mistura'; // a música inteira (voz e instrumentos), do vídeo ou de um arquivo
+  const modoIA = 'mistura'; // a música inteira (voz e instrumentos), do arquivo de áudio
   view.innerHTML = `<div class="ia">
     <section class="ia-topo">${capa(song)}<div><div class="kind ia-selo">${icon('sparkles', 14)} Gerar com IA</div><h2>${esc(titulo)}</h2>
       <p class="muted">A IA ouve o áudio e escreve a <b>melodia</b> — ou as <b>4 vozes do coral</b> — no tom e no andamento. No fim, ouça ali mesmo e salve se ficou bom.</p></div></section>
     <div id="ia-passo"></div></div>`;
   const passo = $('#ia-passo');
 
-  // um toque só: o servidor do app baixa o áudio do vídeo da música (sem microfone, sem anúncio) e a IA ouve
-  const FALHOU_IA = 'Não consegui gerar a partitura deste vídeo agora. Tente de novo daqui a pouco ou use um arquivo de áudio da música.';
-  async function automatico() {
-    if (!song.youtube) { telaFontes('Esta música ainda não tem vídeo. Escolha um na página da música (em Referências) ou use um arquivo de áudio.'); return; }
-    passo.onclick = null;
-    // tudo acontece por trás: na tela, só "Gerando a partitura"
-    passo.innerHTML = `<div class="ia-auto"><span class="spin"></span><div><b>Gerando a partitura…</b>
-      <small>Isso leva cerca de um minuto. Pode deixar a tela aberta.</small></div></div>`;
-    let arquivo;
-    try {
-      arquivo = await audioDoVideo(song.youtube);
-    } catch (e) {
-      console.warn('áudio do vídeo:', e.message);
-      if (view.contains(passo)) telaFontes(FALHOU_IA);
-      return;
-    }
-    if (!view.contains(passo)) return;
-    // aparelho que não abre o m4a (AAC): pede o mesmo áudio em webm (Opus)
-    lerArquivo(arquivo, {
-      seNaoAbrir: async () => {
-        try { lerArquivo(await audioDoVideo(song.youtube, 'webm')); } catch (e) { console.warn('áudio do vídeo:', e.message); telaFontes(FALHOU_IA); }
-      },
-    });
-  }
-  // reserva (o automático falhou, ou a música não tem vídeo): tentar de novo ou escolher um arquivo de áudio
+  const FALHOU_IA = 'Não consegui gerar a partitura deste áudio. Tente de novo ou use outro arquivo da música.';
+  // o começo: escolher o arquivo de áudio da música (ou arrastar para cá, no computador)
   function telaFontes(motivo = '') {
     passo.onclick = null;
     passo.innerHTML = `${motivo ? `<div class="aviso">${icon('info', 18)}<span>${esc(motivo)}</span></div>` : ''}
-      <div class="ia-fontes">
-        ${song.youtube ? `<div class="ia-fonte destaque"><div class="ia-fonte-cab"><span class="part-acao-ic">${icon('youtube', 22)}</span><div><b>Do vídeo da música</b><small>O app baixa o áudio do vídeo e escreve a partitura.</small></div></div>
-          <div class="ia-fonte-acts"><button class="btn small primary" id="ia-video">${icon('sparkles', 15)} Gerar partitura</button></div></div>` : ''}
-        <div class="ia-fonte"><div class="ia-fonte-cab"><span class="part-acao-ic">${icon('upload', 22)}</span><div><b>Arquivo de áudio</b><small>MP3, M4A, WAV… da música (ou só da melodia). Até 6 minutos.</small></div></div>
-          <div class="ia-fonte-acts"><button class="btn small" id="ia-arquivo">${icon('upload', 15)} Escolher arquivo</button></div></div>
-      </div>`;
-    $('#ia-video')?.addEventListener('click', automatico);
-    $('#ia-arquivo').onclick = () => {
+      <button class="ia-solte" id="ia-arquivo"><span class="ia-solte-ic">${icon('upload', 28)}</span>
+        <b>Escolher o áudio da música</b><small>MP3, M4A, WAV, OGG… até 6 minutos. Fica melhor com voz e violão do que com banda completa.</small>
+        <span class="btn primary">${icon('upload', 16)} Escolher arquivo</span></button>
+      <p class="ia-dica-compartilhar">${icon('info', 16)}<span>No Android, dá para baixar o áudio em outro app e tocar em <b>Compartilhar → Songbook</b>: ele já chega aqui.</span></p>`;
+    const solte = $('#ia-arquivo');
+    solte.onclick = () => {
       const inp = document.createElement('input');
       inp.type = 'file';
-      inp.accept = 'audio/*,video/mp4,.mp3,.m4a,.wav,.ogg,.webm,.aac,.flac';
+      inp.accept = 'audio/*,video/mp4,.mp3,.m4a,.wav,.ogg,.opus,.webm,.aac,.flac';
       inp.onchange = () => { if (inp.files[0]) lerArquivo(inp.files[0]); };
       inp.click();
     };
+    solte.ondragover = (e) => { e.preventDefault(); solte.classList.add('sobre'); };
+    solte.ondragleave = () => solte.classList.remove('sobre');
+    solte.ondrop = (e) => { e.preventDefault(); solte.classList.remove('sobre'); const f = e.dataTransfer.files[0]; if (f) lerArquivo(f); };
   }
 
   // a tela da leitura: o rolo com as notas chegando, o que a IA já sabe (tom, andamento) e a partitura nascendo
@@ -4542,7 +4496,7 @@ async function gerarComIA(song, titulo) {
     $('#ia-status').textContent = estado.texto;
   }
 
-  async function lerArquivo(arquivo, { seNaoAbrir = null } = {}) {
+  async function lerArquivo(arquivo) {
     telaLeitura();
     $('#ia-status').textContent = 'Gerando a partitura…';
     let leitor;
@@ -4565,8 +4519,7 @@ async function gerarComIA(song, titulo) {
       if (leitor) await concluir(leitor);
     } catch (e) {
       console.error(e);
-      if (seNaoAbrir && e.name === 'EncodingError') { seNaoAbrir(); return; }
-      telaFontes(FALHOU_IA);
+      telaFontes(e.name === 'EncodingError' ? 'Este aparelho não conseguiu abrir esse arquivo. Tente em MP3 ou WAV.' : FALHOU_IA);
     }
   }
   let notas = null;
@@ -4627,7 +4580,7 @@ async function gerarComIA(song, titulo) {
     // pronto: a partitura com o player logo abaixo (ouvir ali mesmo), os ajustes recolhidos e salvar ou descartar
     passo.innerHTML = `<div class="ia-pronto">
       <section class="ia-pronto-cab"><span class="ia-pronto-ic">${icon('check', 22)}</span>
-        <div><b>Partitura pronta</b><small>Ouça, confira e salve. Não ficou boa? Descarte e gere de novo.</small></div></section>
+        <div><b>Partitura pronta</b><small>Ouça, confira e salve. Não ficou boa? Descarte e tente com outro áudio.</small></div></section>
       <div class="ia-resumo" id="ia-resumo"></div>
       <div class="osmd-box ia-previa" id="ia-previa"><div class="loading-note"><span class="spin"></span>Desenhando…</div></div>
       <div class="ensaio" id="ia-ensaio" hidden></div>
@@ -4695,7 +4648,7 @@ async function gerarComIA(song, titulo) {
       if (b.dataset.c) { compasso = b.dataset.c.split('/').map(Number); $('#ia-compasso').querySelectorAll('[data-c]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); previa(); }
       if (b.id === 'ia-tom') { const v = await escolherTomPartitura(fifths, modo); if (v) { [fifths, modo] = v; previa(); } }
       if (b.id === 'ia-denovo') {
-        if (!(await ask({ title: 'Descartar esta partitura?', text: 'O rascunho não é salvo. Depois é só gerar de novo, do vídeo ou de outro arquivo de áudio.', ok: 'Descartar', danger: true }))) return;
+        if (!(await ask({ title: 'Descartar esta partitura?', text: 'O rascunho não é salvo. Depois é só escolher o áudio de novo (ou outro arquivo).', ok: 'Descartar', danger: true }))) return;
         pararEnsaio();
         passo.onchange = null;
         telaFontes();
@@ -4717,7 +4670,7 @@ async function gerarComIA(song, titulo) {
     previa();
   }
   // áudio que chegou pelo "Compartilhar" do celular: vai direto para a IA
-  if (audioCompartilhado) { const a = audioCompartilhado; audioCompartilhado = null; lerArquivo(a); } else automatico();
+  if (audioCompartilhado) { const a = audioCompartilhado; audioCompartilhado = null; lerArquivo(a); } else telaFontes();
 }
 
 // "Compartilhar → Songbook" no Android: o service worker guarda o áudio (cache COMPARTILHADO do sw.js) e abre
