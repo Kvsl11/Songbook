@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-181';
+export const APP_VERSAO = '2026.10.21-182';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -6643,7 +6643,9 @@ async function viewLiturgia(data) {
       <button class="chip" data-fonte="cindy" aria-pressed="${fontePreferida() === 'cindy'}" title="Escolher primeiro as sugestões da Cindy Ferrarezi">Cindy Ferrarezi</button>
       <button class="chip" data-fonte="mpm" aria-pressed="${fontePreferida() === 'mpm'}" title="Escolher primeiro as sugestões do Músicas para Missa">Músicas para Missa</button>
       <small>Abra cada parte para ver todas as opções das duas fontes.</small></div>` : ''}
-    ${missa.avisos.map((a) => `<div class="alert">${icon('info', 18)}<span>${esc(a)}</span></div>`).join('')}
+    ${missa.avisos.length ? `<div class="alert lit-falha">${icon('info', 18)}<div><b>Algumas sugestões não chegaram</b>
+      <ul>${missa.avisos.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>
+      <button class="btn small" id="lit-tentar">${icon('refresh', 15)} Tentar de novo</button></div></div>` : ''}
     <div id="partes">${missa.partes.map((p) => `
       <details class="parte" data-chave="${p.chave}" ${['salmo', 'aclamacao'].includes(p.chave) ? 'open' : ''}>
         <summary>
@@ -6712,6 +6714,8 @@ async function viewLiturgia(data) {
   $('#montar').onclick = () => montarRepertorio(missa, sel, data);
   $('#montar-pl').onclick = (e) => montarRepertorio(missa, sel, data, { btn: e.currentTarget, tipo: 'playlist' });
   desenharMissalDoDia(data);
+  // alguma fonte não respondeu: busca a missa de novo (as escolhas já feitas continuam)
+  $('#lit-tentar')?.addEventListener('click', () => { missaCache.delete(data); recarregar = true; viewLiturgia(data); });
   $('#lit').querySelectorAll('[data-tipo]').forEach((b) => (b.onclick = () => {
     if (b.dataset.tipo === tipoMissa()) return;
     db.setPref('tipoMissa', b.dataset.tipo);
@@ -6759,7 +6763,8 @@ async function missaLiturgica(missa, data) {
   if (!partes.some((p) => p.chave === 'gloria') && sug.gloria?.some((x) => x.pontos >= 20)) {
     partes.splice(partes.findIndex((p) => p.chave === 'ato') + 1 || 1, 0, { chave: 'gloria', nome: 'Glória', cantos: cantosDe('gloria'), texto: [] });
   }
-  return { ...missa, partes, repertorio: null, mpm: null, caderno };
+  // os cantos aqui vêm do acervo e do Hinário: os avisos da Cindy (Missa popular) não valem
+  return { ...missa, partes, repertorio: null, mpm: null, caderno, avisos: [] };
 }
 
 async function songFromChoice(parte, valor, lit) {
