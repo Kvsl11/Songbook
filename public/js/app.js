@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-160';
+export const APP_VERSAO = '2026.10.21-161';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4129,6 +4129,36 @@ const ARTE_IA = `<svg class="part-arte" viewBox="0 0 220 120" aria-hidden="true"
   <path d="M157 68V36M181 56V26M205 62V30" stroke-width="2"/><path d="M181 26l24 4" stroke-width="4.5"/>
   <path d="M120 22l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="currentColor" stroke="none" opacity=".9"/>
 </svg>`;
+// começo de uma pauta desenhado em SVG (para os cartões de Partituras): cabeças de nota na altura certa, hastes e barras
+function miniPauta(pauta, compasso) {
+  const base = { G: 30, G8: 23, F: 18 }[pauta.clave] ?? 30; // índice diatônico da linha de baixo (Mi4 na clave de Sol)
+  const grau = (s) => { const m = /^([A-G])[#b]*(-?\d)$/.exec(s || ''); return m ? Number(m[2]) * 7 + 'CDEFGAB'.indexOf(m[1]) : null; };
+  const cheio = tiquesDoCompasso(compasso);
+  const Y0 = 58; const ESP = 4.5; // linha de baixo e meio espaço
+  let x = 34; let t = 0; let sv = '';
+  for (const ev of (pauta.ev || []).slice(0, 16)) {
+    if (x > 300) break;
+    const d = Math.max(1, ev.d || 8);
+    const gs = (ev.a || []).map(grau).filter((g) => g !== null);
+    if (gs.length) {
+      for (const g of gs) {
+        const k = Math.max(-6, Math.min(14, g - base));
+        const y = Y0 - k * ESP;
+        for (let l = -2; l >= k; l -= 2) sv += `<path d="M${x - 7} ${Y0 - l * ESP}h14" class="sup"/>`;
+        for (let l = 10; l <= k; l += 2) sv += `<path d="M${x - 7} ${Y0 - l * ESP}h14" class="sup"/>`;
+        sv += `<ellipse cx="${x}" cy="${y}" rx="5" ry="3.6" transform="rotate(-20 ${x} ${y})" class="${d >= 16 ? 'vazia' : ''}"/>`;
+      }
+      const k = Math.max(...gs) - base;
+      if (d < 32) sv += k >= 4 ? `<path d="M${x - 4.6} ${Y0 - (Math.min(...gs) - base) * ESP + 1}v26" class="haste"/>` : `<path d="M${x + 4.6} ${Y0 - k * ESP - 1}v-26" class="haste"/>`;
+    } else sv += `<rect x="${x - 3}" y="${Y0 - 5 * ESP}" width="6" height="${ESP * 1.2}" rx="1"/>`;
+    x += 12 + Math.sqrt(d) * 4;
+    t += d;
+    if (t % cheio === 0) { sv += `<path d="M${x - 4} ${Y0}V${Y0 - 8 * ESP}" class="barra"/>`; x += 6; }
+  }
+  const linhas = [0, 2, 4, 6, 8].map((l) => `<path d="M6 ${Y0 - l * ESP}H314"/>`).join('');
+  return `<svg class="mini-pauta" viewBox="0 0 320 84" preserveAspectRatio="xMinYMid slice" aria-hidden="true"><g class="linhas">${linhas}</g>
+    <text x="12" y="${Y0 - 6 * ESP + 4.5}" class="comp">${compasso[0]}</text><text x="12" y="${Y0 - 2 * ESP + 4.5}" class="comp">${compasso[1]}</text><g class="notas">${sv}</g></svg>`;
+}
 function viewPartituras() {
   setTab('partituras');
   setTint('#24474d');
@@ -4136,21 +4166,32 @@ function viewPartituras() {
   const songs = db.songs();
   const proprias = songs.filter((s) => s.partitura?.pautas?.length);
   const prontas = songs.filter((s) => !s.partitura?.pautas?.length && (mxlDaPartitura(s.content) || paginasDaPartitura(s.content).length));
-  // cartão de uma partitura feita no app: capa, nome, e o que ela tem (vozes, compasso, tom, compassos, letra/cifra)
+  // cartão de uma partitura feita no app: uma "folha" com o começo da melodia desenhado de verdade, e o que ela tem
   const cartao = (s) => {
     const p = s.partitura;
     const evs = p.pautas.flatMap((x) => x.ev);
     const temLetra = evs.some((e) => e.l?.some(Boolean));
     const temCifra = evs.some((e) => e.c);
     const total = emCompassos(p).total;
+    const vozes = p.pautas.length > 1 ? `${p.pautas.length} vozes` : p.pautas[0].nome;
     return `<article class="part-cartao" data-abrir-part="${s.id}">
-      <div class="part-cartao-capa">${capa(s)}<span class="part-cartao-pauta" aria-hidden="true"></span></div>
-      <div class="part-cartao-txt"><b>${esc(s.title)}</b><small>${esc(s.artist || 'Feita no app')}</small>
-        <div class="part-tags"><span>${p.pautas.length > 1 ? `${p.pautas.length} vozes` : esc(p.pautas[0].nome)}</span><span>${p.compasso.join('/')}</span><span>${esc(nomeDoTom(p.fifths, p.modo))}</span><span>${total} comp.</span>${temLetra ? '<span class="sim">letra</span>' : ''}${temCifra ? '<span class="sim">cifra</span>' : ''}</div></div>
-      <div class="part-cartao-acts"><a class="btn small" href="#/musica/${s.id}/partitura">${icon('play', 14)} Ensaiar</a><a class="btn small primary" href="#/musica/${s.id}/compor">${icon('edit', 14)} Editar</a></div>
+      <div class="part-folha"><div class="part-folha-cab"><b>${esc(s.title)}</b><small>${esc(nomeDoTom(p.fifths, p.modo))}</small></div>
+        ${miniPauta(p.pautas[0], p.compasso)}</div>
+      <div class="part-cartao-pe"><div class="part-cartao-txt"><b>${esc(s.title)}</b>
+        <small>${esc(s.artist || 'Feita no app')} · ${esc(vozes)} · ${total} compasso${total === 1 ? '' : 's'}</small>
+        ${temLetra || temCifra ? `<div class="part-tags">${temLetra ? `<span>${icon('text', 12)} letra</span>` : ''}${temCifra ? `<span>${icon('chord', 12)} cifra</span>` : ''}</div>` : ''}</div>
+        <div class="part-cartao-acts"><a class="part-ensaiar" href="#/musica/${s.id}/partitura" aria-label="Ensaiar" title="Ensaiar">${icon('play', 18)}</a><a class="icon-btn" href="#/musica/${s.id}/compor" aria-label="Editar" title="Editar">${icon('edit', 18)}</a></div></div>
     </article>`;
   };
-  const pronta = (s) => `<a class="part-pronta" href="#/musica/${s.id}/partitura">${capa(s)}<b>${esc(s.title)}</b><small>${mxlDaPartitura(s.content) ? 'Pronta · dá para editar' : 'Em imagem'}</small></a>`;
+  // partitura pronta (acervo/Hinário): uma página de partitura em miniatura, com melodia inventada a partir do título
+  const pronta = (s) => {
+    let h = 0;
+    for (const ch of s.title) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const ev = Array.from({ length: 14 }, (_, i) => { h = (h * 1103515245 + 12345) >>> 0; return { a: [`${'CDEFGAB'[h % 7]}${4 + ((h >> 8) % 3 === 0 ? 1 : 0)}`], d: [4, 8, 8, 16][(h >> 4) % 4] }; });
+    return `<a class="part-pronta" href="#/musica/${s.id}/partitura"><div class="part-pagina"><b>${esc(s.title)}</b><small>${esc(s.artist || '')}</small>
+      ${miniPauta({ clave: 'G', ev }, [4, 4])}<span class="part-pagina-linhas"></span><span class="part-pagina-selo">${mxlDaPartitura(s.content) ? 'Editável' : 'Imagem'}</span></div>
+      <b>${esc(s.title)}</b><small>${mxlDaPartitura(s.content) ? 'Pronta · dá para editar' : 'Em imagem'}</small></a>`;
+  };
   view.innerHTML = `
     <section class="part-hero">
       ${ARTE_PAUTA}
