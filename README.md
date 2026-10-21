@@ -52,15 +52,6 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   toca; na partitura e no editor (ouvindo), tocar numa nota leva a música para ali e toca a partir dela.
   Partitura grande no editor: só um trecho de compassos em volta da nota escolhida é desenhado (8 com 4 vozes, até
   16 com uma), com ‹ › para andar; ouvir toca a partitura inteira.
-- **Servidor do app (Render)**: *não é mais usado pelo app* — a IA agora só recebe o arquivo de áudio escolhido ou
-  compartilhado (o `/api/audio` ficou no servidor, sem uso). Antes: o GitHub Pages só serve as páginas; o áudio dos
-  vídeos para a IA vinha de um servidor Node com o yt-dlp (`Dockerfile`, `render.yaml`). Para criar: render.com → *New* → *Blueprint* → este repositório (plano
-  grátis; dorme sem uso e o primeiro pedido do dia demora ~1 min). O endereço fica em `public/js/config.js`
-  (`https://songbook-audio.onrender.com`). O YouTube desconfia de servidores ("confirme que não é um robô"): o servidor
-  gera a prova de origem (PO Token, complemento bgutil), resolve os desafios do YouTube com o Node e tenta como
-  clientes diferentes (mweb, web, TV, incorporado, VR) até um passar. Se ainda bloquear, cole o conteúdo de um
-  `cookies.txt` de uma conta do YouTube em `YTDLP_COOKIES` (ou um proxy residencial em `YTDLP_PROXY`) no Render; se
-  parar de baixar depois de uma mudança do YouTube, *Manual Deploy → Clear build cache & deploy* traz as versões novas.
 - **Piano de verdade no ensaio**: ouvir a partitura (e tocar numa nota no editor) usa o **Salamander Grand Piano**,
   um piano de cauda Yamaha C5 gravado nota por nota (Alexander Holm, CC-BY 3.0), pelo jsDelivr numa versão fixa
   (`lib/piano.js`): só as gravações das notas da música são baixadas, uma vez; sem internet, o som sintetizado.
