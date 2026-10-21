@@ -3125,8 +3125,10 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
       if (r.top < 90 || r.bottom > innerHeight - 160) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
     const compasso = osmd.cursor.Iterator.CurrentMeasureIndex;
-    $('#ens-pos', barra).textContent = `${tocando ? 'Tocando' : 'Pausado'} · compasso ${(compasso ?? 0) + 1}`;
+    const pos = `${tocando ? 'Tocando' : 'Pausado'} · compasso ${(compasso ?? 0) + 1}`;
+    if (pos !== textoPos) { textoPos = pos; $('#ens-pos', barra).textContent = pos; } // só quando muda (evita refazer o layout)
   };
+  let textoPos = '';
   const acompanhar = () => {
     if (!tocando) return;
     moverCursor(passoNoTempo(passos, tAgora()));
@@ -3445,6 +3447,7 @@ function editorPartitura(song, titulo) {
       <div class="chips" id="cp-pautas"></div>
       <button class="chip cp-ajustes" id="cp-ajustes" title="Título, compasso, tom, andamento e vozes">${icon('settings', 15)}<span id="cp-resumo"></span></button>
     </div>
+    <div class="cp-janela" id="cp-janela" hidden></div>
     <div class="osmd-box compor-folha" id="cp-folha"><div class="loading-note"><span class="spin"></span>Preparando o editor…</div></div>
     <div class="ensaio" id="cp-ensaio" hidden></div>
     <div class="compor-palheta" id="cp-palheta">
@@ -3527,16 +3530,56 @@ function editorPartitura(song, titulo) {
   const corDestaque = () => getComputedStyle(document.documentElement).getPropertyValue('--accent-ink').trim() || '#06b6d4';
   let desenhando = null;
   let deNovo = false;
-  const pararDeOuvir = () => {
+  // partitura grande: o editor desenha só um trecho de compassos em volta da nota escolhida (redesenhar tudo a cada
+  // nota levava segundos no celular). Para ouvir, desenha a partitura inteira
+  // o tamanho do trecho depende de quantas vozes há (o custo é por compasso de cada pauta): 4 vozes → 8 compassos
+  let JANELA = 12;
+  let LIMITE = 16; // até aqui, desenha tudo
+  let janelaDe = 0;
+  let janela = { de: 0, ate: Infinity, total: 0 };
+  let inteira = false;
+  const pararDeOuvir = (redesenhar = true) => {
     if (!ensaio) return;
     ensaio.parar();
     ensaio = null;
     botaoOuvir(false);
     $('#cp-ensaio').hidden = true;
     $('#cp-palheta').hidden = false;
+    if (inteira) { inteira = false; if (redesenhar) desenhar(); }
   };
+  function calcularJanela() {
+    JANELA = Math.max(6, Math.min(16, Math.round(32 / m.pautas.length)));
+    LIMITE = JANELA + 4;
+    const { porPauta, total } = emCompassos(m);
+    if (inteira || total <= LIMITE) { janela = { de: 0, ate: total, total }; return; }
+    const c = porPauta[sel.p]?.onde[sel.i]?.compasso ?? total - 1;
+    if (c < janelaDe || c >= janelaDe + JANELA) janelaDe = c - 2;
+    janelaDe = Math.max(0, Math.min(janelaDe, total - JANELA));
+    janela = { de: janelaDe, ate: janelaDe + JANELA, total };
+  }
+  function mostrarJanela() {
+    const el = $('#cp-janela');
+    const parcial = janela.de > 0 || janela.ate < janela.total;
+    el.hidden = !parcial;
+    if (parcial) {
+      el.innerHTML = `<button class="icon-btn" data-janela="-1" aria-label="Compassos anteriores" ${janela.de ? '' : 'disabled'}>${icon('back', 18)}</button>
+        <span>Compassos <b>${janela.de + 1}–${Math.min(janela.ate, janela.total)}</b> de ${janela.total}</span>
+        <button class="icon-btn" data-janela="1" aria-label="Próximos compassos" ${janela.ate < janela.total ? '' : 'disabled'}>${icon('next', 18)}</button>`;
+    }
+  }
+  $('#cp-janela').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-janela]');
+    if (!b) return;
+    // anda um trecho e escolhe a primeira nota dele (na voz atual)
+    const { porPauta, total } = emCompassos(m);
+    const novo = Math.max(0, Math.min(janelaDe + Number(b.dataset.janela) * (JANELA - 2), total - JANELA));
+    const i = porPauta[sel.p].onde.findIndex((o) => o && o.compasso >= novo);
+    janelaDe = novo;
+    if (i >= 0) { sel.i = i; selecionouPorToque(); }
+    desenhar();
+  });
   async function desenhar() {
-    pararDeOuvir();
+    pararDeOuvir(false);
     atualizarPalheta();
     if (desenhando) { deNovo = true; return; }
     desenhando = (async () => {
@@ -3553,7 +3596,9 @@ function editorPartitura(song, titulo) {
         const css = getComputedStyle(document.documentElement);
         const cor = css.getPropertyValue('--text').trim() || '#f2f2f2';
         osmd.setOptions({ drawPartNames: m.pautas.length > 1, defaultColorMusic: cor, defaultColorNotehead: cor, defaultColorStem: cor, defaultColorRest: cor, defaultColorLabel: cor, defaultColorTitle: cor });
-        await osmd.load(paraMusicXML(m, { marcar: evSel() ? { pauta: sel.p, i: sel.i } : null, cor: corDestaque() }));
+        calcularJanela();
+        mostrarJanela();
+        await osmd.load(paraMusicXML(m, { marcar: evSel() ? { pauta: sel.p, i: sel.i } : null, cor: corDestaque(), de: janela.de, ate: janela.ate }));
         osmd.zoom = innerWidth < 640 ? 0.8 : 1;
         osmd.render();
         folha.querySelectorAll('svg text').forEach((t) => { if (CIFRA_NO_TEXTO.test(t.textContent.trim())) { t.setAttribute('fill', corDestaque()); t.style.fontWeight = '700'; } });
@@ -3573,7 +3618,8 @@ function editorPartitura(song, titulo) {
     const { porPauta } = emCompassos(m);
     const lista = osmd.GraphicSheet?.MeasureList || [];
     porPauta.forEach((pp, pi) => pp.onde.forEach((o, i) => {
-      const gm = lista[o.compasso]?.[pi];
+      if (o.compasso < janela.de || o.compasso >= janela.ate) return; // fora do trecho desenhado
+      const gm = lista[o.compasso - janela.de]?.[pi];
       const se = gm?.staffEntries?.[o.figura];
       const nota = se?.graphicalVoiceEntries?.[0]?.notes?.[0];
       let el = null;
@@ -3802,10 +3848,19 @@ function editorPartitura(song, titulo) {
     b.setAttribute('aria-label', b.title);
   }
   actionsEl.querySelector('[aria-label="Ouvir a partitura"]')?.setAttribute('data-ouvir', '');
-  function ouvir() {
+  async function ouvir() {
     if (!osmd) return;
     if (ensaio) { if (ensaio.tocando) ensaio.pausar(); else ensaio.tocar(); return; }
     if (!m.pautas.some((p) => p.ev.some((e) => e.a.length))) { toast('Escreva algumas notas para ouvir'); return; }
+    // só um trecho desenhado: para ouvir, a partitura inteira
+    if (janela.de > 0 || janela.ate < janela.total) {
+      toast('Preparando a partitura inteira para ouvir…');
+      while (desenhando) await desenhando;
+      inteira = true;
+      await desenhar();
+      while (desenhando) await desenhando;
+      if (!folha.isConnected || ensaio) return;
+    }
     const barra = $('#cp-ensaio');
     ensaio = criarEnsaio(osmd, barra, () => 0, { aoMudar: botaoOuvir });
     if (!ensaio) return;
@@ -4763,7 +4818,9 @@ async function viewPartitura(id) {
         await carregarScript(OSMD_JS);
         caixa.innerHTML = '';
         osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(caixa, {
-          autoResize: true, backend: 'svg', drawTitle: false, drawSubtitle: false, drawComposer: false, drawLyricist: false,
+          // sem o redesenho automático da biblioteca: ele refazia a partitura inteira a cada mudança de ALTURA da
+          // janela (no celular, a barra do navegador aparecendo/sumindo ao rolar), travando a tela por segundos
+          autoResize: false, backend: 'svg', drawTitle: false, drawSubtitle: false, drawComposer: false, drawLyricist: false,
           drawCredits: false, drawPartNames: false, defaultFontFamily: 'Figtree, sans-serif',
         });
         await osmd.load(propria ? paraMusicXML(song.partitura) : mxl);
@@ -4789,6 +4846,16 @@ async function viewPartitura(id) {
       caixa.innerHTML = `<div class="alert">${icon('info', 18)}<span>Não consegui desenhar a partitura agora (${esc(e.message)}). Veja a original.</span></div>`;
     }
   };
+  // redesenha só quando a largura muda (girar o celular, janela do computador), depois que parar de mudar
+  let largura = innerWidth;
+  let timerLargura = 0;
+  const aoRedimensionar = () => {
+    if (innerWidth === largura) return;
+    clearTimeout(timerLargura);
+    timerLargura = setTimeout(() => { largura = innerWidth; if (osmd && view.contains(caixa)) desenhar(); }, 350);
+  };
+  addEventListener('resize', aoRedimensionar);
+  aoSair(() => { removeEventListener('resize', aoRedimensionar); clearTimeout(timerLargura); });
   const aplicar = () => {
     view.querySelectorAll('[data-modo]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.modo === modo)));
     view.querySelectorAll('[data-cor]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cor === cores)));

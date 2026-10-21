@@ -191,18 +191,21 @@ const CLAVE_XML = {
   F: '<clef><sign>F</sign><line>4</line></clef>',
 };
 
-// MusicXML da partitura; "marcar" pinta um evento (a seleção do editor) com a cor dada
-export function paraMusicXML(modelo, { marcar = null, cor = '#06b6d4' } = {}) {
+// MusicXML da partitura; "marcar" pinta um evento (a seleção do editor) com a cor dada. "de"/"ate": só os compassos
+// desse trecho (índices a partir de 0; o editor desenha um pedaço da partitura grande, que é bem mais rápido)
+export function paraMusicXML(modelo, { marcar = null, cor = '#06b6d4', de = 0, ate = Infinity } = {}) {
   const { porPauta, total } = emCompassos(modelo);
   const [tempos, unidade] = modelo.compasso;
   const partes = modelo.pautas.map((pauta, pi) => {
     const { compassos } = porPauta[pi];
-    const medidas = compassos.slice(0, total).map((figs, mi) => {
+    const ini = Math.max(0, Math.min(de, total - 1));
+    const medidas = compassos.slice(ini, Math.min(total, ate)).map((figs, k) => {
+      const mi = ini + k;
       let attrs = '';
-      if (mi === 0) {
+      if (mi === ini) {
         attrs = `<attributes><divisions>${TPQ}</divisions><key><fifths>${modelo.fifths || 0}</fifths><mode>${modelo.modo === 'minor' ? 'minor' : 'major'}</mode></key>`
           + `<time><beats>${tempos}</beats><beat-type>${unidade}</beat-type></time>${CLAVE_XML[pauta.clave] || CLAVE_XML.G}</attributes>`;
-        if (pi === 0 && modelo.bpm) attrs += `<direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${Math.round(modelo.bpm)}</per-minute></metronome></direction-type><sound tempo="${Math.round(modelo.bpm)}"/></direction>`;
+        if (pi === 0 && modelo.bpm && mi === 0) attrs += `<direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${Math.round(modelo.bpm)}</per-minute></metronome></direction-type><sound tempo="${Math.round(modelo.bpm)}"/></direction>`;
       }
       const notas = figs.map((f) => {
         const tipo = TIPO_DE.get(f.d) || TIPO_DE.get(f.d / 1.5);

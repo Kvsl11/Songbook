@@ -1465,6 +1465,8 @@ a.source { text-decoration: none; color: inherit; }
 .osmd-box svg { max-width: none; }
 /* o cursor do ensaio numa camada própria: ao andar, a folha (SVG grande) não é repintada a cada nota */
 .osmd-box svg { will-change: transform; }
+/* o que muda durante o ensaio (cursor, compasso, botões) não obriga o navegador a refazer o layout da página toda */
+.osmd-box, .ensaio { contain: layout paint; }
 .osmd-box img[id^="cursorImg"] { will-change: transform; pointer-events: none; }
 
 /* modo claro: o painel da letra surge e some do fundo branco numa curva suave (mistura com o fundo, sem passar
@@ -1558,7 +1560,8 @@ a.source { text-decoration: none; color: inherit; }
 
 /* ============================================================ ensaio com a partitura (tocar as vozes) */
 .ensaio { position: sticky; z-index: 15; bottom: calc(8px - var(--folga-pe)); /* logo acima do menu e do player */ margin: 12px 0 0; padding: 10px 12px;
-  border-radius: 14px; background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  /* fundo sólido, sem desfoque: desfocar a partitura atrás a cada quadro (rolar, cursor andando) pesava no celular */
+  border-radius: 14px; background: color-mix(in srgb, var(--surface) 97%, #000);
   box-shadow: var(--shadow-lg); display: grid; gap: 8px; }
 .ensaio:empty { display: none; }
 .ensaio-linha { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -1710,6 +1713,12 @@ dialog.lista-dlg { max-width: 440px; padding: 0; }
 .compor-topo .chips { flex: 1; min-width: 0; padding: 2px 0; }
 .compor-topo .cp-uma { font-weight: 800; color: var(--muted); font-size: 14px; }
 .cp-ajustes { flex: none; display: inline-flex; align-items: center; gap: 6px; }
+/* trecho da partitura grande no editor: fica à vista, logo abaixo do cabeçalho, ao rolar */
+.cp-janela { position: sticky; top: calc(66px + env(safe-area-inset-top)); z-index: 14; display: flex; align-items: center; justify-content: center;
+  gap: 10px; width: fit-content; margin: 0 auto 6px; padding: 2px 6px; border-radius: 999px; font-size: 13.5px; color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 96%, #000); box-shadow: var(--shadow-lg); }
+.cp-janela b { color: var(--text); }
+.cp-janela[hidden] { display: none; }
 .compor-folha { position: relative; flex: 1; min-height: 240px; margin: 0 -6px 12px; cursor: pointer; }
 .compor-folha svg { user-select: none; }
 .cp-marca { position: absolute; z-index: 0; border-radius: 8px; background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); pointer-events: none; }

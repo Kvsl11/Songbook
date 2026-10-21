@@ -50,6 +50,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   cifra da música vai para a nota da sílaba onde ele cai (`silabasDaLetra`), na primeira voz (rascunho da IA, partitura
   sem cifra e ⋯ → *Colocar a cifra da música*); corrige-se na aba **Cifra**. No editor, o ▶ do topo vira ⏸ enquanto
   toca; na partitura e no editor (ouvindo), tocar numa nota leva a música para ali e toca a partir dela.
+  Partitura grande no editor: só um trecho de compassos em volta da nota escolhida é desenhado (8 com 4 vozes, até
+  16 com uma), com ‹ › para andar; ouvir toca a partitura inteira.
 - **Partituras** (menu do app): as partituras feitas no app e as prontas (acervo/Hinário) das músicas da biblioteca, com
   **Nova partitura** (escolhendo a música) e **Gerar com IA**: o app ouve a música pelo microfone (com o vídeo
   tocando), pelo som de uma aba (computador) ou de um arquivo de áudio, e o modelo **Basic Pitch** (Spotify, código
