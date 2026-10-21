@@ -59,6 +59,15 @@ html, body { margin: 0; height: 100%; }
 body { background: var(--black); color: var(--text); font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
 a { color: inherit; }
 button, input, select, textarea { font: inherit; color: inherit; }
+
+/* textos justificados em todo o app, com hifenização em português (o <html lang="pt-BR"> diz o idioma): as palavras
+   compridas se quebram com hífen e a linha não abre buracos entre as palavras. A última linha fica à esquerda;
+   o que é centralizado continua centralizado (o text-align do próprio bloco vale mais que o herdado daqui) */
+body { text-align: justify; hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; text-wrap: pretty; }
+/* ficam como estavam: títulos, campos de digitar, a cifra/letra das músicas (versos são linhas de poesia), código
+   e o que é tabular (números, acordes) */
+h1, h2, h3, h4, input, select, textarea, .song, .song *, .chord, pre, code, .tab, svg text, [contenteditable] {
+  text-align: start; hyphens: manual; -webkit-hyphens: manual; }
 /* sem o retângulo azul do Android ao tocar: o retorno do toque segue o formato de cada elemento */
 * { -webkit-tap-highlight-color: transparent; }
 :focus:not(:focus-visible) { outline: none; }
