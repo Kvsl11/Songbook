@@ -8,7 +8,7 @@ import { apagarModelo, carregarJSZip, gerarPowerPoint, gerarPowerPointSimples, l
 import { COLECOES_LITURGICAS, parteFixa, PARTES_FIXAS, tempoDe, TEMPOS } from './lib/acervo.js';
 import { sugerirParaODia } from './lib/sugestoes-liturgicas.js';
 import { revisarRepertorio, NOME_PARTE } from './lib/revisor.js';
-import { comPedal, destacarVoz, duracaoTotal, FUNDO, nomearVozes, notasDoAcorde, passoNoTempo, segundosPorSemibreve, volumesPeloNome } from './lib/ensaio.js';
+import { comPedal, destacarVoz, voltaDaSala, duracaoTotal, FUNDO, nomearVozes, notasDoAcorde, passoNoTempo, segundosPorSemibreve, volumesPeloNome } from './lib/ensaio.js';
 import {
   acordesDoTom as acordesDaArmadura, alterar, alturaPeloNome, CLAVES, COMPASSOS, deMusicXML, distribuirLetra, DURACOES, emCompassos, frequenciaDa, midiDa, moverGrau,
   mudarOitava, NOMES_NOTA, nomeDaAltura, nomeDoTom, nomeDuracao, novaPartitura, paraMusicXML, tiquesDoCompasso,
@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-175';
+export const APP_VERSAO = '2026.10.21-176';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -3154,7 +3154,9 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null, chave = '', bpm: b
     saida.Q.value = 0.5;
     saida.connect(limitador);
     // sala: ecos que voltam e vão se apagando (4 linhas de atraso com retorno, cada uma mais abafada a cada volta),
-    // uns 1,8 s de cauda. Leve para o celular: a reverberação por convolução, longa, fazia o som chiar e cortar
+    // uns 1,8 s de cauda. Leve para o celular: a reverberação por convolução, longa, fazia o som chiar e cortar.
+    // O abafador do retorno é de um polo só (nunca aumenta nenhuma frequência): o passa-baixa comum tem um pico
+    // perto do corte e, dentro do retorno, o som crescia sozinho até virar microfonia
     nivelSala = audio.createGain();
     nivelSala.gain.value = 0.14;
     nivelSala.connect(limitador);
@@ -3165,11 +3167,11 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null, chave = '', bpm: b
     for (const atraso of [0.0297, 0.0371, 0.0411, 0.0437]) {
       const linha = audio.createDelay(0.1);
       linha.delayTime.value = atraso;
-      const abafa = audio.createBiquadFilter();
-      abafa.type = 'lowpass';
-      abafa.frequency.value = 3800;
+      const a = Math.exp((-2 * Math.PI * 3800) / audio.sampleRate);
+      let abafa;
+      try { abafa = audio.createIIRFilter([1 - a], [1, -a]); } catch { abafa = audio.createGain(); } // (sem o filtro: só o eco)
       const volta = audio.createGain();
-      volta.gain.value = 10 ** ((-3 * atraso) / cauda);
+      volta.gain.value = voltaDaSala(atraso, cauda);
       preAtraso.connect(linha);
       linha.connect(abafa).connect(volta).connect(linha);
       abafa.connect(nivelSala);

@@ -57,7 +57,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   (`lib/piano.js`): só as gravações das notas da música são baixadas, uma vez; sem internet, o som sintetizado.
   O piano soa cheio, não seco: **meio pedal** (cada nota continua um pouco além do escrito, até um tempo, sem passar
   da barra do compasso, e se apaga devagar: `comPedal`), **sala** com uns 1,8 s de cauda (linhas de atraso com
-  retorno, leves para o celular) e, quando a partitura tem cifra, **acompanhamento**: em cada acorde, o baixo e o
+  retorno e um abafador que nunca aumenta nenhuma frequência, para o eco não crescer sozinho: `voltaDaSala`, leves
+  para o celular) e, quando a partitura tem cifra, **acompanhamento**: em cada acorde, o baixo e o
   acorde fechado logo abaixo do canto, as notas abrindo uma depois da outra, de novo a cada compasso e perto do acorde
   anterior (`notasDoAcorde`); ele tem o seu canal no mixer (*Acompanhamento*, começa em 70%). O som segue o andamento
   exato da partitura (o da IA vem em décimos; o metrônomo escrito e a tela mostram inteiro).
