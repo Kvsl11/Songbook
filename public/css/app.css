@@ -2094,6 +2094,17 @@ a.pptx-tipo { text-decoration: none; }
 .ia-ajustar summary > .ic:last-child { transition: transform 0.2s; }
 .ia-ajustar[open] summary > .ic:last-child { transform: rotate(180deg); }
 .ia-ajustar .settings-group { margin: 0; border-radius: 0; background: transparent; border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
+.ia-ajustes .setting { align-items: center; padding: 14px 12px; }
+.ia-ajustes .s { line-height: 1.4; }
+/* as escolhas (vozes, compasso) e o andamento descem para a linha de baixo, alinhados com o texto (depois do ícone),
+   como um seletor segmentado que ocupa a largura toda */
+.ia-ajustes .setting.wrap > .chips, .ia-ajustes .setting.wrap > .seg { flex: 1 1 100%; margin-left: 54px; }
+.ia-ajustes .chips { gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface-3); overflow: visible; }
+.ia-ajustes .seg { background: var(--surface-3); }
+.ia-ajustes .chips .chip { flex: 1; justify-content: center; border: 0; background: transparent; }
+.ia-ajustes .chips .chip[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.ia-ajustes .setting.wrap > .seg { justify-content: space-between; max-width: 260px; }
+@media (min-width: 601px) { .ia-ajustes .setting.wrap > .chips, .ia-ajustes .setting.wrap > .seg { flex: 0 1 auto; margin-left: auto; } }
 .ia-acoes { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 16px; }
 .ia-acoes-dir { display: flex; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 600px) {
