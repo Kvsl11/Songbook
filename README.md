@@ -67,7 +67,10 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   **Nova partitura** (escolhendo a música) e **Gerar com IA**: um toque só — o servidor do app baixa o áudio do
   vídeo da música (yt-dlp, `server/audio.js`; se falhar, dá para escolher um arquivo de áudio) e o modelo **Basic Pitch** (Spotify, código
   aberto, roda no próprio aparelho) transforma o som em notas; o app escolhe a melodia, acha tom (pela cifra ou pelo
-  que ouviu) e andamento, põe no compasso e mostra a prévia para ajustar antes de abrir no editor. Em **Vozes**, *Coral
+  que ouviu) e andamento e põe no compasso. No fim, a partitura pronta já toca ali mesmo (o mesmo ensaio do editor,
+  e tocar numa nota ouve dali), com os ajustes recolhidos e os botões **Salvar partitura**, **Editar** e
+  **Descartar e gerar de novo**. O áudio também pode vir de outro app do Android: **Compartilhar → Songbook**
+  (`share_target` do manifesto; o service worker guarda o arquivo e o app pergunta de qual música ele é). Em **Vozes**, *Coral
   a 4 vozes* separa as notas que soam juntas em **Soprano, Contralto, Tenor e Baixo** (cada uma na sua pauta e clave,
   sem cruzar as vozes e seguindo a linha de cada uma: `vozesDasNotas`). É um rascunho: funciona melhor com voz e
   violão (ou o coral sozinho) do que com banda completa. Com mais de uma voz, a partitura mostra o nome de cada pauta
