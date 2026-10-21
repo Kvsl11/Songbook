@@ -65,7 +65,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 - **Partituras** (menu do app): as partituras feitas no app e as prontas (acervo/Hinário) das músicas da biblioteca, com
   **Nova partitura** (escolhendo a música) e **Gerar com IA**: escolha o arquivo de áudio da música (ou arraste, no
   computador) e o modelo **Basic Pitch** (Spotify, código
-  aberto, roda no próprio aparelho) transforma o som em notas; o app escolhe a melodia, acha tom (pela cifra ou pelo
+  aberto, roda no próprio aparelho) transforma o som em notas (com o começo de nota no padrão do modelo, 0,5: mais
+  sensível, o vibrato da voz virava "começos" e cada nota cantada longa saía partida em pedaços repetidos); o app escolhe a melodia, acha tom (pela cifra ou pelo
   que ouviu) e andamento e põe no compasso. O andamento (`estimarAndamento`) sai dos intervalos entre as notas e é
   afinado em décimos com todas elas (baixo e acordes inclusive): com bpm inteiro, a grade já escorregava um tempo no
   fim de uma música longa; e o tempo dividido em 3 (6/8) é escrito pela semínima, não pela semínima pontuada. A
@@ -87,7 +88,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   duas notas da mesma voz viram a nota de antes ligada. O **compasso também vem do áudio** (`estimarCompasso`): a IA
   vê em que tamanho de compasso (4/4, 3/4 ou 6/8) o primeiro tempo sai mais forte que os outros (é onde costumam cair o
   baixo, a troca de acorde e as notas longas) e onde ele começa, com a anacruse. O 2/4 não dá para separar do 4/4 pelo
-  áudio: fica para escolher. Em *Ajustar o rascunho* dá para trocar por *Só a melodia* ou escolher outro compasso (e
+  áudio: fica para escolher. Em *Ajustar o rascunho* dá para pôr o andamento na **metade** ou no **dobro** (a balada lenta que a IA escreveu a
+  ♩ = 130, tudo em colcheias, volta a ♩ = 65 com as figuras dobradas), trocar por *Só a melodia* ou escolher outro compasso (e
   voltar para o *Automático*). É um rascunho: funciona melhor com voz e violão (ou o coral sozinho) do que com banda
   completa.
 - **Mixer das vozes no ensaio** (na partitura salva, no editor e no fim da IA): cada voz com o seu volume e um botão
