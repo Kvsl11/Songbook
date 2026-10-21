@@ -7,6 +7,8 @@
 //   estrofe; terminada em "-" quando a palavra continua], c (cifra) }
 // Tiques: 8 por semínima (a menor nota é a fusa, 1 tique).
 
+import { alinharSilabas, notasCantaveis } from './alinhamento.js';
+
 export const TPQ = 8;
 export const DURACOES = [
   { d: 32, tipo: 'whole', nome: 'Semibreve' },
@@ -480,7 +482,7 @@ export function separarSilabas(palavra) {
 }
 // sílabas da letra com a cifra de cada uma: as linhas vêm com os acordes no lugar ("[G]San[D]to, santo"); o acorde
 // fica na sílaba onde ele cai (o que cai num espaço ou no fim da linha vai para a próxima sílaba).
-// Devolve [{ s: sílaba (com "-" se a palavra continua), c: cifra ou '' }]
+// Devolve [{ s: sílaba (com "-" se a palavra continua), c: cifra ou '', fim: true na última sílaba de cada linha }]
 export function silabasDaLetra(linhas) {
   const out = [];
   let pendente = '';
@@ -505,33 +507,63 @@ export function silabasDaLetra(linhas) {
       const alvo = silabas.find((x) => a.at < x.fim);
       if (alvo) alvo.c = a.c; else pendente = a.c;
     }
-    for (const x of silabas) out.push({ s: x.s, c: x.c });
+    // fim: a última sílaba da linha (o fim da frase cantada, para casar a letra com as frases da melodia)
+    silabas.forEach((x, i) => out.push(i === silabas.length - 1 ? { s: x.s, c: x.c, fim: true } : { s: x.s, c: x.c }));
   }
   return out;
 }
 
-// texto inteiro com as sílabas separadas por hífen (o formato que distribuirLetra lê)
-export const letraEmSilabas = (texto) => String(texto || '').split(/\s+/).filter(Boolean).map((p) => separarSilabas(p).join('-')).join(' ');
+// texto inteiro com as sílabas separadas por hífen (o formato que distribuirLetra lê), uma linha por verso
+export const letraEmSilabas = (texto) => String(texto || '').split('\n')
+  .map((l) => l.split(/\s+/).filter(Boolean).map((p) => separarSilabas(p).join('-')).join(' ')).filter(Boolean).join('\n');
 
-// a letra em todas as vozes (cada uma canta o texto inteiro, do começo), numa estrofe; tira a letra que havia nela.
-// "letra": o texto com hífens ou as sílabas de silabasDaLetra. Com "cifras" (e as sílabas trazendo a cifra), os
-// acordes da música vão para as notas da primeira voz com notas (as cifras que ela tinha saem); com letra: false,
-// só a cifra entra. Devolve quantas sílabas sobraram (na voz que mais faltou nota)
+// a letra em todas as vozes, numa estrofe; tira a letra que havia nela. "letra": o texto com hífens ou as sílabas de
+// silabasDaLetra. A primeira voz com notas recebe a letra casada com as frases da melodia (alinharSilabas: cada linha
+// começa numa frase, a introdução e os interlúdios ficam sem letra, uma sílaba pode se estender por várias notas); as
+// outras vozes cantam a mesma sílaba no mesmo momento (coral) ou, com ritmo próprio, são casadas do mesmo jeito.
+// Com "cifras" (e as sílabas trazendo a cifra), os acordes da música vão para a primeira voz, na nota da sílaba deles
+// (as cifras que ela tinha saem); com letra: false, só a cifra entra. Devolve quantas sílabas sobraram (na voz que mais
+// faltou nota)
 export function colocarLetra(modelo, letra, { estrofe = 0, cifras = false, comLetra = true } = {}) {
   const silabas = typeof letra === 'string'
-    ? letra.trim().split(/\s+/).filter(Boolean).flatMap((w) => { const ps = w.split('-').filter(Boolean); return ps.map((s, i) => ({ s: s + (i < ps.length - 1 ? '-' : ''), c: '' })); })
+    ? String(letra).split('\n').flatMap((linha) => {
+      const ss = linha.trim().split(/\s+/).filter(Boolean).flatMap((w) => { const ps = w.split('-').filter(Boolean); return ps.map((s, i) => ({ s: s + (i < ps.length - 1 ? '-' : ''), c: '' })); });
+      if (ss.length) ss[ss.length - 1].fim = true;
+      return ss;
+    })
     : letra;
   let sobrou = 0;
-  let primeira = true;
+  let guia = null; // tique → sílaba da primeira voz
   for (const p of modelo.pautas) {
     if (!p.ev.some((e) => e.a?.length)) continue;
-    const comCifra = cifras && primeira;
-    primeira = false;
-    if (!comLetra && !comCifra) continue;
+    const comCifra = cifras && !guia;
+    if (!comLetra && !comCifra) { guia ||= new Map(); continue; }
     const antes = p.ev.map((e) => e.l);
     if (comCifra) for (const e of p.ev) e.c = '';
     for (const e of p.ev) if (e.l?.[estrofe]) { e.l = [...e.l]; e.l[estrofe] = ''; while (e.l.length && !e.l[e.l.length - 1]) e.l.pop(); }
-    sobrou = Math.max(sobrou, distribuirSilabas(p, silabas, { estrofe, cifras: comCifra }).sobrou);
+    const notas = notasCantaveis(p);
+    const porLetra = (ev, s) => { ev.l = [...(ev.l || [])]; ev.l[estrofe] = s; };
+    // coral: a voz canta a sílaba da primeira voz que começa junto com a nota dela (quase todas as notas juntas)
+    const juntas = guia?.size ? notas.filter((n) => guia.has(n.t)).length : 0;
+    if (guia?.size && juntas >= Math.min(notas.length, guia.size) * 0.7) {
+      for (const n of notas) if (guia.has(n.t)) porLetra(p.ev[n.i], guia.get(n.t));
+      sobrou = Math.max(sobrou, [...guia.keys()].filter((t) => !notas.some((n) => n.t === t)).length);
+    } else {
+      const onde = alinharSilabas(notas, silabas);
+      const primeiraVoz = !guia;
+      if (primeiraVoz) guia = new Map();
+      let pendente = ''; // cifra de uma sílaba que ficou sem nota: vai para a próxima
+      onde.forEach((j, k) => {
+        const c = silabas[k].c || pendente;
+        if (j < 0) { pendente = c; return; }
+        pendente = '';
+        const ev = p.ev[notas[j].i];
+        porLetra(ev, silabas[k].s);
+        if (comCifra && c) ev.c = c;
+        if (primeiraVoz) guia.set(notas[j].t, silabas[k].s);
+      });
+      sobrou = Math.max(sobrou, onde.filter((j) => j < 0).length);
+    }
     if (!comLetra) p.ev.forEach((e, i) => { e.l = antes[i] || []; }); // só a cifra: a letra que havia fica
   }
   return sobrou;
@@ -876,6 +908,16 @@ function notasDoCanto(validas, raio = 3, fracao = 0.55) {
   for (const [n, nivel] of canto) if (n.pitchMidi < meio - 9 && (n.amplitude ?? 1) < nivel * 0.85) canto.delete(n);
   return canto;
 }
+// a região do canto (a altura do meio das notas fortes da extensão da melodia) e a força de cada nota para ser a
+// melodia: a mais forte, mas perdendo força quanto mais longe da região do canto (o baixo do piano, forte e
+// grave, roubava a melodia quando batia junto com a sílaba)
+function regiaoDoCanto(notas, [lo, hi]) {
+  const fortes = notas.filter((n) => n.pitchMidi >= lo && n.pitchMidi <= hi).sort((a, b) => (b.amplitude ?? 1) - (a.amplitude ?? 1));
+  const metade = fortes.slice(0, Math.max(1, Math.ceil(fortes.length / 2))).map((n) => n.pitchMidi).sort((a, b) => a - b);
+  return metade[Math.floor(metade.length / 2)] ?? 67;
+}
+const forcaDoCanto = (n, regiao) => (n.amplitude ?? 1) + n.pitchMidi / 1000 - 0.03 * Math.max(0, Math.abs(n.pitchMidi - regiao) - 9);
+
 // a nota cantada que a IA cortou antes da hora: o buraco até a próxima (menos de um tempo e curto perto da própria
 // nota) vira a nota, ligada. Um buraco grande perto da nota (a pausa da respiração) fica
 function ligarFinsCortados(grade) {
@@ -894,20 +936,31 @@ function ligarFinsCortados(grade) {
   return grade;
 }
 
+// o instante (em segundos, no áudio) de cada tique da partitura que a IA montou com estas mesmas opções: a grade
+// segue o cantor (acelera e segura), então o tique não é proporcional ao tempo. Serve para pôr a cifra pelo áudio
+export function tempoDaGrade(notas, { bpm = 80, faixa = faixaDoModo('mistura'), minAmp = 0.2, meioTempo = false } = {}) {
+  const passoS = 60 / bpm / 4;
+  const validas = notas.filter((n) => n.pitchMidi >= faixa[0] && n.pitchMidi <= faixa[1] && (n.amplitude ?? 1) >= minAmp && n.durationSeconds > passoS * 0.6);
+  if (!validas.length) return null;
+  const { tempoDo } = gradeDasNotas(notas, validas, { bpm, minAmp, meioTempo });
+  return (tique) => tempoDo(tique / 2);
+}
+
 export function melodiaDasNotas(notas, { bpm = 80, fifths = 0, modo = 'mistura', faixa = faixaDoModo(modo), oitava = 0, minAmp = 0.2, centro = 67, meioTempo = false } = {}) {
   const passoS = 60 / bpm / 4;
   const validas = notas.filter((n) => n.pitchMidi >= faixa[0] && n.pitchMidi <= faixa[1] && (n.amplitude ?? 1) >= minAmp && n.durationSeconds > passoS * 0.6);
   if (!validas.length) return [];
   const { passo, nPassos, tempoDo } = gradeDasNotas(notas, validas, { bpm, minAmp, meioTempo });
   const canto = notasDoCanto(validas);
-  // em cada semicolcheia, a nota mais forte que soa (desempate: a mais aguda, que costuma ser a voz)
+  const regiao = regiaoDoCanto([...canto.keys()], faixa);
+  // em cada semicolcheia, a nota mais forte que soa (desempate: a mais aguda, que costuma ser a voz), perto do canto
   const grade = new Array(nPassos).fill(null);
   for (let k = 0; k < nPassos; k++) {
     const t = tempoDo(k + 0.5);
     let melhor = null;
     for (const n of validas) {
       if (!canto.has(n) || !soaEm(n, t)) continue;
-      const forca = (n.amplitude ?? 1) + n.pitchMidi / 1000;
+      const forca = forcaDoCanto(n, regiao);
       if (!melhor || forca > melhor.forca) melhor = { n, forca };
     }
     grade[k] = melhor?.n || null;
@@ -964,6 +1017,7 @@ export function vozesDasNotas(notas, { bpm = 80, fifths = 0, oitava = 0, minAmp 
   if (!validas.length) return vazias();
   const { passo, nPassos, tempoDo } = gradeDasNotas(notas, validas, { bpm, minAmp, meioTempo });
   const [melLo, melHi] = faixaDoModo('mistura');
+  const regiao = regiaoDoCanto(validas, [melLo, melHi]);
   const grades = vozes.map(() => new Array(nPassos).fill(null));
   const ultima = vozes.map((v) => v.centro); // altura recente de cada voz (para seguir a linha dela)
   const anterior = vozes.map(() => null); // a nota que cada voz cantava no passo anterior
@@ -988,7 +1042,7 @@ export function vozesDasNotas(notas, { bpm = 80, fifths = 0, oitava = 0, minAmp 
     let mel = null;
     for (const n of soando) {
       if (n.pitchMidi < melLo || n.pitchMidi > melHi) continue;
-      const forca = (n.amplitude ?? 1) + n.pitchMidi / 1000;
+      const forca = forcaDoCanto(n, regiao);
       if (!mel || forca > mel.forca) mel = { n, forca };
     }
     const segue = melAtual && t - (melAtual.startTimeSeconds + melAtual.durationSeconds) < passo * 4;

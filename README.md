@@ -66,6 +66,19 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   acorde fechado logo abaixo do canto, as notas abrindo uma depois da outra, de novo a cada compasso e perto do acorde
   anterior (`notasDoAcorde`); ele tem o seu canal no mixer (*Acompanhamento*, começa em 70%). O som segue o andamento
   exato da partitura (o da IA vem em décimos; o metrônomo escrito e a tela mostram inteiro).
+- **Letra e cifra pelo áudio** (`lib/alinhamento.js`): a letra entra na ordem em que se canta (o refrão repetido
+  entra de novo, `linhasCantadas`) e é casada com as frases da melodia por programação dinâmica (`alinharSilabas`):
+  cada linha tende a começar numa frase (depois de uma respiração), a introdução e os interlúdios ficam sem letra e
+  uma sílaba pode se estender por várias notas (melisma); no coral, as outras vozes cantam a sílaba que começa junto.
+  A cifra da partitura da IA vem da **harmonia que se ouve** (as notas da banda que a IA escuta, tempo a tempo,
+  `harmoniaDosTempos` + `cifraDaHarmonia`, um Viterbi que prefere mudar no primeiro tempo e as passagens da cifra),
+  com os nomes dos acordes da cifra da música; só a voz, sem banda, fica a cifra da sílaba. Numa música de teste
+  (introdução de piano + 4 versos), a letra na nota certa foi de 0 para 24 de 26 sílabas e a cifra certa de 7 para
+  32 de 32 tempos. Na melodia, a nota longe da região do canto (o baixo do piano) perde força.
+- **Som do ensaio mais limpo**: o pedal não emenda mais uma nota na próxima da mesma voz (com 4 vozes soavam 6 notas
+  e segundas que não estão escritas em 78% do tempo; agora 4,6 e 29%), o acorde do acompanhamento fica abaixo do canto
+  (antes subia por cima da melodia) e, com o app em segundo plano, o som é agendado com mais folga (as notas saíam
+  atrasadas).
 - **Partituras** (menu do app): as partituras feitas no app e as prontas (acervo/Hinário) das músicas da biblioteca, com
   **Nova partitura** (escolhendo a música) e **Gerar com IA**: escolha o arquivo de áudio da música (ou arraste, no
   computador) e o modelo **Basic Pitch** (Spotify, código

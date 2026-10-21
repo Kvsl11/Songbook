@@ -1,6 +1,6 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
-import { definirMeta, semInvisiveis, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasDaLetraComCifra, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
+import { definirMeta, semInvisiveis, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasCantadas, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
 import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
@@ -12,10 +12,11 @@ import { comPedal, destacarVoz, voltaDaSala, duracaoTotal, FUNDO, nomearVozes, n
 import {
   acordesDoTom as acordesDaArmadura, alterar, alturaPeloNome, CLAVES, COMPASSOS, deMusicXML, distribuirLetra, DURACOES, emCompassos, frequenciaDa, midiDa, moverGrau,
   mudarOitava, NOMES_NOTA, nomeDaAltura, nomeDoTom, nomeDuracao, novaPartitura, paraMusicXML, tiquesDoCompasso,
-  claveDaVoz, estimarAndamento, estimarCompasso, estimarTom, faixaDoModo, FAIXA_CORAL, juntarPedaco, melodiaDasNotas, tomDaCifra, vozesDasNotas, colocarLetra, letraEmSilabas, temLetra, silabasDaLetra, temCifra as temCifraNaPartitura,
+  claveDaVoz, estimarAndamento, estimarCompasso, estimarTom, faixaDoModo, FAIXA_CORAL, juntarPedaco, melodiaDasNotas, tempoDaGrade, tomDaCifra, vozesDasNotas, colocarLetra, letraEmSilabas, temLetra, silabasDaLetra, temCifra as temCifraNaPartitura,
 } from './lib/partitura.js';
 import { corCss, corDominante } from './lib/cores.js';
 import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
+import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } from './lib/alinhamento.js';
 import { duracaoDoAviso, partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
@@ -52,7 +53,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-182';
+export const APP_VERSAO = '2026.10.21-183';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -3035,6 +3036,18 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null, chave = '', bpm: b
   }
   cur.reset();
   if (!passos.some((p) => p.notas.length)) return null;
+  // até onde cada nota pode soar: não passa do começo da próxima nota da mesma voz (com o pedal, uma nota emendava
+  // na outra e as vozes se atropelavam). E o canto mais grave enquanto cada cifra dura: o acorde fica abaixo dele
+  const proxNaVoz = new Map();
+  for (let i = passos.length - 1; i >= 0; i--) {
+    for (const n of passos[i].notas) n.ate = proxNaVoz.get(n.voz) ?? Infinity;
+    for (const n of passos[i].notas) proxNaVoz.set(n.voz, passos[i].t);
+  }
+  acordes.forEach((c, i) => {
+    const ate = acordes[i + 1]?.t ?? Infinity;
+    const midis = passos.filter((p) => p.t >= c.t - 1e-9 && p.t < ate - 1e-9).flatMap((p) => p.notas.map((n) => midiDaFrequencia(n.freq)));
+    c.canto = midis.length ? Math.round(Math.min(...midis)) : Infinity;
+  });
   // o cursor na cor de destaque do app (o desenho volta à cor padrão a cada vez que é refeito)
   const mostrarCursor = () => {
     const c = osmd.cursor;
@@ -3232,7 +3245,7 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null, chave = '', bpm: b
   const tocarAcorde = (i, spw) => {
     const c = acordes[i];
     const fimAcorde = acordes[i + 1]?.t ?? fim;
-    const { baixo, acorde } = notasDoAcorde({ ...c, raiz: c.raiz + tomAtual(), baixo: c.baixo == null ? null : c.baixo + tomAtual() }, acordeAntes);
+    const { baixo, acorde } = notasDoAcorde({ ...c, raiz: c.raiz + tomAtual(), baixo: c.baixo == null ? null : c.baixo + tomAtual() }, acordeAntes, c.canto + tomAtual());
     acordeAntes = acorde;
     const destino = ganhos.get('acomp');
     const ataques = [Math.max(c.t, inicioT), ...barras.filter((b) => b > Math.max(c.t, inicioT) + 1e-9 && b < fimAcorde - 1e-9)];
@@ -3243,14 +3256,23 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null, chave = '', bpm: b
       acorde.forEach((m, j) => notaDePiano(audio, destino, m, quando + 0.025 * (j + 1), dura - 0.025 * (j + 1), 0.3, 0.35));
     });
   };
+  let folga = 0.6; // segundos agendados adiante
+  let ultimaVolta = null; // quando o relógio chamou da última vez
   const agendar = () => {
     const spw = segundosPorSemibreve(bpm);
-    const ate = tAgora() + 0.6 / spw; // 600 ms adiante: uma travada da tela não deixa buraco no som
+    // 600 ms adiante: uma travada da tela não deixa buraco no som. Com o app em segundo plano (ou o aparelho
+    // ocupado) o navegador chama o relógio bem mais devagar, até uma vez por segundo: a folga cresce com o atraso
+    // que ele mostrar (antes, as notas saíam atrasadas ou emboladas)
+    const agora = audio.currentTime;
+    if (ultimaVolta !== null) folga = Math.min(3, Math.max(0.6, folga * 0.9, (agora - ultimaVolta) * 2.5));
+    ultimaVolta = agora;
+    const ate = tAgora() + (document.hidden ? 3 : folga) / spw;
     while (proximo < passos.length && passos[proximo].t <= ate) {
       const p = passos[proximo];
       const quando = inicioAudio + (p.t - inicioT) * spw;
-      // no piano, meio pedal: a nota soa um pouco além do escrito e se apaga devagar (antes, abafava seca no fim)
-      for (const n of p.notas) nota(n.freq, Math.max(audio.currentTime, quando), (piano ? comPedal(p.t, n.dur, barras) : n.dur) * spw, n.voz, piano ? 0.3 : undefined);
+      // no piano, um pedal curto: a nota soa um pouquinho além do escrito (uma semicolcheia) e se apaga devagar, mas
+      // nunca por cima da próxima nota da mesma voz
+      for (const n of p.notas) nota(n.freq, Math.max(audio.currentTime, quando), (piano ? comPedal(p.t, n.dur, barras, { extra: 0.0625, ate: n.ate }) : n.dur) * spw, n.voz, piano ? 0.15 : undefined);
       proximo++;
     }
     while (piano && proxAcorde < acordes.length && acordes[proxAcorde].t <= ate) tocarAcorde(proxAcorde++, spw);
@@ -3307,11 +3329,15 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null, chave = '', bpm: b
     // o acorde que já soava no ponto de onde começa entra junto
     proxAcorde = Math.max(0, acordes.findLastIndex((a) => a.t <= inicioT + 1e-9));
     acordeAntes = null;
+    ultimaVolta = null;
     agendar();
     timer = setInterval(agendar, 60);
     acompanhar();
     desenharBarra();
   };
+  // o app foi para o segundo plano (ou voltou): agenda na hora, já com a folga certa
+  const aoMudarVisibilidade = () => { if (tocando) agendar(); };
+  document.addEventListener('visibilitychange', aoMudarVisibilidade);
   function pausar() {
     if (!tocando) return;
     inicioT = tAgora();
@@ -3393,7 +3419,7 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null, chave = '', bpm: b
   };
   desenharBarra();
   return {
-    parar() { pausar(); audio?.close?.(); },
+    parar() { pausar(); audio?.close?.(); document.removeEventListener('visibilitychange', aoMudarVisibilidade); },
     pausar,
     tocar,
     get tocando() { return tocando; },
@@ -3465,8 +3491,9 @@ function somNota(alturas) {
 
 // letra da música (só as linhas cantadas, sem acordes nem marcações), já separada em sílabas para cair nota por nota
 const letraParaPartitura = (content) => letraEmSilabas(linhasDaLetra(content).join('\n'));
-// letra e cifra da música, sílaba por sílaba ([{ s, c }]): cada acorde na sílaba onde ele cai na cifra
-const silabasDaMusica = (content) => silabasDaLetra(linhasDaLetraComCifra(content));
+// letra e cifra da música, sílaba por sílaba ([{ s, c, fim }]), na ordem em que se canta (o refrão repetido entra de
+// novo): cada acorde na sílaba onde ele cai na cifra
+const silabasDaMusica = (content) => silabasDaLetra(linhasCantadas(content));
 // o que entra sozinho numa partitura com notas: a letra (se ela não tem nenhuma) e a cifra (se não tem nenhuma), uma
 // vez só (m.letraAuto / m.cifraAuto: se a pessoa apagar, não volta). Devolve { letra, cifra } (o que vai entrar)
 function letraECifraAutomaticas(m, silabas) {
@@ -4786,6 +4813,20 @@ async function gerarComIA(song, titulo) {
       }
       m.anacruse = anacruse;
       if (comLetra || comCifra) colocarLetra(m, silabasMusica, { comLetra, cifras: comCifra });
+      // a cifra pela harmonia que se ouve no áudio (as notas da banda), com os nomes da cifra da música: o acorde entra
+      // onde ele muda no som, e não na sílaba onde estava escrito. Só a voz, sem banda: fica a da sílaba
+      if (comCifra) {
+        const guia = m.pautas.find((p) => p.ev.some((e) => e.a?.length));
+        const quando = tempoDaGrade(notas, { bpm, faixa: coral ? FAIXA_CORAL : faixaDoModo(modoIA), meioTempo });
+        if (guia && quando) {
+          const nTempos = Math.ceil(guia.ev.reduce((a, e) => a + e.d, 0) / 8);
+          const sequencia = silabasMusica.map((x) => x.c).filter(Boolean);
+          const cheio = tiquesDoCompasso(compasso);
+          const cifras = cifraDaHarmonia(harmoniaDosTempos(notas, (b) => quando(b * 8), nTempos), sequencia.length ? sequencia : acordesDoCampo(fifths, modo),
+            { sequencia, tempoForte: (b) => (((b * 8 - anacruse) % cheio) + cheio) % cheio === 0 });
+          if (cifras) colocarCifras(guia, cifras.map((x) => ({ tique: x.tempo * 8, cifra: x.cifra })));
+        }
+      }
       // não coloca de novo ao abrir no editor (se a pessoa desligou, fica sem)
       m.letraAuto = true;
       m.cifraAuto = true;
