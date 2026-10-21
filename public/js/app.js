@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-162';
+export const APP_VERSAO = '2026.10.21-165';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4145,14 +4145,36 @@ const ARTE_PAUTA = `<svg class="part-arte" viewBox="0 0 220 120" aria-hidden="tr
   <ellipse cx="138" cy="51" rx="7" ry="5" transform="rotate(-20 138 51)"/><ellipse cx="172" cy="72" rx="7" ry="5" transform="rotate(-20 172 72)"/><ellipse cx="196" cy="58" rx="7" ry="5" transform="rotate(-20 196 58)"/></g>
   <path d="M84 77V36M114 63V22M144 49V12" stroke-width="2.2"/><path d="M114 22l30-10" stroke-width="5"/><path d="M178 70V30l24-6v32" stroke-width="2.2"/><path d="M178 30l24-6" stroke-width="5"/>
 </svg>`;
-const ARTE_IA = `<svg class="part-arte" viewBox="0 0 220 120" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round">
-  <path d="M6 60${Array.from({ length: 22 }, (_, i) => ` L${10 + i * 4} ${60 + Math.round(Math.sin(i * 1.3) * (6 + (i % 5) * 4))}`).join('')}" stroke-width="2" opacity=".8"/>
-  <path d="M104 60h16" stroke-width="2" stroke-dasharray="2 5" opacity=".7"/><path d="M118 54l8 6-8 6" stroke-width="2"/>
-  ${[40, 50, 60, 70, 80].map((y) => `<path d="M134 ${y}H214" stroke-width="1.3" opacity=".35"/>`).join('')}
-  <g fill="currentColor" stroke="none"><ellipse cx="152" cy="70" rx="6" ry="4.4" transform="rotate(-20 152 70)"/><ellipse cx="176" cy="58" rx="6" ry="4.4" transform="rotate(-20 176 58)"/><ellipse cx="200" cy="64" rx="6" ry="4.4" transform="rotate(-20 200 64)"/></g>
-  <path d="M157 68V36M181 56V26M205 62V30" stroke-width="2"/><path d="M181 26l24 4" stroke-width="4.5"/>
-  <path d="M120 22l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="currentColor" stroke="none" opacity=".9"/>
-</svg>`;
+// começo de uma pauta desenhado em SVG (para os cartões de Partituras): cabeças de nota na altura certa, hastes e barras
+function miniPauta(pauta, compasso) {
+  const base = { G: 30, G8: 23, F: 18 }[pauta.clave] ?? 30; // índice diatônico da linha de baixo (Mi4 na clave de Sol)
+  const grau = (s) => { const m = /^([A-G])[#b]*(-?\d)$/.exec(s || ''); return m ? Number(m[2]) * 7 + 'CDEFGAB'.indexOf(m[1]) : null; };
+  const cheio = tiquesDoCompasso(compasso);
+  const Y0 = 58; const ESP = 4.5; // linha de baixo e meio espaço
+  let x = 34; let t = 0; let sv = '';
+  for (const ev of (pauta.ev || []).slice(0, 16)) {
+    if (x > 300) break;
+    const d = Math.max(1, ev.d || 8);
+    const gs = (ev.a || []).map(grau).filter((g) => g !== null);
+    if (gs.length) {
+      for (const g of gs) {
+        const k = Math.max(-6, Math.min(14, g - base));
+        const y = Y0 - k * ESP;
+        for (let l = -2; l >= k; l -= 2) sv += `<path d="M${x - 7} ${Y0 - l * ESP}h14" class="sup"/>`;
+        for (let l = 10; l <= k; l += 2) sv += `<path d="M${x - 7} ${Y0 - l * ESP}h14" class="sup"/>`;
+        sv += `<ellipse cx="${x}" cy="${y}" rx="5" ry="3.6" transform="rotate(-20 ${x} ${y})" class="${d >= 16 ? 'vazia' : ''}"/>`;
+      }
+      const k = Math.max(...gs) - base;
+      if (d < 32) sv += k >= 4 ? `<path d="M${x - 4.6} ${Y0 - (Math.min(...gs) - base) * ESP + 1}v26" class="haste"/>` : `<path d="M${x + 4.6} ${Y0 - k * ESP - 1}v-26" class="haste"/>`;
+    } else sv += `<rect x="${x - 3}" y="${Y0 - 5 * ESP}" width="6" height="${ESP * 1.2}" rx="1"/>`;
+    x += 12 + Math.sqrt(d) * 4;
+    t += d;
+    if (t % cheio === 0) { sv += `<path d="M${x - 4} ${Y0}V${Y0 - 8 * ESP}" class="barra"/>`; x += 6; }
+  }
+  const linhas = [0, 2, 4, 6, 8].map((l) => `<path d="M6 ${Y0 - l * ESP}H314"/>`).join('');
+  return `<svg class="mini-pauta" viewBox="0 0 320 84" preserveAspectRatio="xMinYMid slice" aria-hidden="true"><g class="linhas">${linhas}</g>
+    <text x="12" y="${Y0 - 6 * ESP + 4.5}" class="comp">${compasso[0]}</text><text x="12" y="${Y0 - 2 * ESP + 4.5}" class="comp">${compasso[1]}</text><g class="notas">${sv}</g></svg>`;
+}
 function viewPartituras() {
   setTab('partituras');
   setTint('#24474d');
@@ -4160,31 +4182,71 @@ function viewPartituras() {
   const songs = db.songs();
   const proprias = songs.filter((s) => s.partitura?.pautas?.length);
   const prontas = songs.filter((s) => !s.partitura?.pautas?.length && (mxlDaPartitura(s.content) || paginasDaPartitura(s.content).length));
-  // cartão de uma partitura feita no app: capa, nome, e o que ela tem (vozes, compasso, tom, compassos, letra/cifra)
+  // cartão de uma partitura feita no app: uma "folha" com o começo da melodia desenhado de verdade, e o que ela tem
   const cartao = (s) => {
     const p = s.partitura;
     const evs = p.pautas.flatMap((x) => x.ev);
     const temLetra = evs.some((e) => e.l?.some(Boolean));
     const temCifra = evs.some((e) => e.c);
     const total = emCompassos(p).total;
-    return `<article class="part-cartao" data-abrir-part="${s.id}">
-      <div class="part-cartao-capa">${capa(s)}<span class="part-cartao-pauta" aria-hidden="true"></span></div>
-      <div class="part-cartao-txt"><b>${esc(s.title)}</b><small>${esc(s.artist || 'Feita no app')}</small>
-        <div class="part-tags"><span>${p.pautas.length > 1 ? `${p.pautas.length} vozes` : esc(p.pautas[0].nome)}</span><span>${p.compasso.join('/')}</span><span>${esc(nomeDoTom(p.fifths, p.modo))}</span><span>${total} comp.</span>${temLetra ? '<span class="sim">letra</span>' : ''}${temCifra ? '<span class="sim">cifra</span>' : ''}</div></div>
-      <div class="part-cartao-acts"><a class="btn small" href="#/musica/${s.id}/partitura">${icon('play', 14)} Ensaiar</a><a class="btn small primary" href="#/musica/${s.id}/compor">${icon('edit', 14)} Editar</a></div>
+    const vozes = p.pautas.length > 1 ? `${p.pautas.length} vozes` : p.pautas[0].nome;
+    return `<article class="part-cartao" data-abrir-part="${s.id}" style="--cor:${corDe(s)}">
+      <div class="part-cartao-arte"><div class="part-cartao-fundo">${capa(s)}</div>
+        <div class="part-cartao-capa">${capa(s)}</div>
+        <div class="part-folha"><div class="part-folha-cab"><b>${esc(s.title)}</b><small>${esc(nomeDoTom(p.fifths, p.modo))}</small></div>
+          ${miniPauta(p.pautas[0], p.compasso)}</div></div>
+      <div class="part-cartao-pe"><div class="part-cartao-txt"><b>${esc(s.title)}</b>
+        <small>${esc(s.artist || 'Feita no app')} · ${esc(vozes)} · ${total} compasso${total === 1 ? '' : 's'}</small>
+        ${temLetra || temCifra ? `<div class="part-tags">${temLetra ? `<span>${icon('text', 12)} letra</span>` : ''}${temCifra ? `<span>${icon('chord', 12)} cifra</span>` : ''}</div>` : ''}</div>
+        <div class="part-cartao-acts"><a class="part-ensaiar" href="#/musica/${s.id}/partitura" aria-label="Ensaiar" title="Ensaiar">${icon('play', 18)}</a><a class="icon-btn" href="#/musica/${s.id}/compor" aria-label="Editar" title="Editar">${icon('edit', 18)}</a></div></div>
     </article>`;
   };
-  const pronta = (s) => `<a class="part-pronta" href="#/musica/${s.id}/partitura">${capa(s)}<b>${esc(s.title)}</b><small>${mxlDaPartitura(s.content) ? 'Pronta · dá para editar' : 'Em imagem'}</small></a>`;
+  // partitura pronta (acervo/Hinário): uma página de partitura em miniatura, com melodia inventada a partir do título
+  const pronta = (s) => {
+    let h = 0;
+    for (const ch of s.title) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const ev = Array.from({ length: 14 }, (_, i) => { h = (h * 1103515245 + 12345) >>> 0; return { a: [`${'CDEFGAB'[h % 7]}${4 + ((h >> 8) % 3 === 0 ? 1 : 0)}`], d: [4, 8, 8, 16][(h >> 4) % 4] }; });
+    return `<a class="part-pronta" href="#/musica/${s.id}/partitura"><div class="part-pagina"><b>${esc(s.title)}</b><small>${esc(s.artist || '')}</small>
+      ${miniPauta({ clave: 'G', ev }, [4, 4])}<span class="part-pagina-linhas"></span><span class="part-pagina-selo">${mxlDaPartitura(s.content) ? 'Editável' : 'Imagem'}</span></div>
+      <b>${esc(s.title)}</b><small>${mxlDaPartitura(s.content) ? 'Pronta · dá para editar' : 'Em imagem'}</small></a>`;
+  };
   view.innerHTML = `
     <section class="part-hero">
-      ${ARTE_PAUTA}
-      <div class="part-hero-txt"><div class="kind">Partituras</div><h2>Escreva, ensaie e gere com IA</h2>
+      <div class="part-hero-txt"><div class="kind">Partituras</div>
+        <h2><span class="h-escreva">Escreva,</span> <span class="h-ensaie">ensaie</span> e <span class="h-ia">gere com IA</span></h2>
         <p>Partitura de qualquer música da sua biblioteca: nota por nota, com letra, cifras e vozes — ou deixe a IA ouvir e escrever a melodia.</p>
+        <div class="part-passos">
+          <span class="escreva">${icon('edit', 16)}<b>Escreva</b><small>nota por nota</small></span>
+          <span class="ensaie">${icon('play', 16)}<b>Ensaie</b><small>ouvindo cada voz</small></span>
+          <span class="ia">${icon('sparkles', 16)}<b>Gere com IA</b><small>ouvindo a música</small></span>
+        </div>
         <div class="part-numeros"><span><b>${proprias.length}</b> sua${proprias.length === 1 ? '' : 's'}</span><span><b>${prontas.length}</b> pronta${prontas.length === 1 ? '' : 's'} no app</span></div></div>
+      <div class="part-palco" aria-hidden="true">
+        <div class="part-palco-folha atras">${miniPauta({ clave: 'F', ev: [['C3', 16], ['G2', 16], ['A2', 16], ['E2', 16], ['F2', 16], ['C3', 16]].map(([n, d]) => ({ a: [n], d })) }, [4, 4])}</div>
+        <div class="part-palco-folha"><b>Ave Maria</b><small>Soprano</small>${miniPauta({ clave: 'G', ev: [['G4', 8], ['G4', 8], ['A4', 16], ['G4', 8], ['C5', 8], ['B4', 16], ['G4', 8], ['G4', 8], ['D5', 16], ['C5', 8]].map(([n, d]) => ({ a: [n], d })) }, [4, 4])}${miniPauta({ clave: 'G', ev: [['E4', 16], ['F4', 8], ['G4', 8], ['E4', 16], ['D4', 16], ['C4', 32]].map(([n, d]) => ({ a: [n], d })) }, [4, 4])}</div>
+        <div class="part-palco-vozes">${['S', 'C', 'T', 'B'].map((v, i) => `<span><i style="--i:${i}"></i><b>${v}</b></span>`).join('')}</div>
+        <div class="part-palco-ia">${icon('sparkles', 18)}</div>
+      </div>
     </section>
     <div class="part-acoes">
-      <button class="part-acao" id="part-nova">${ARTE_PAUTA}<span class="part-acao-ic">${icon('score', 22)}</span><b>Nova partitura</b><span>Escolha a música e escreva nota por nota, com letra, cifras e várias vozes</span><em>Começar ${icon('next', 14)}</em></button>
-      <button class="part-acao ia" id="part-ia">${ARTE_IA}<span class="part-acao-ic">${icon('sparkles', 22)}</span><b>Gerar com IA</b><span>Escolha o áudio da música e a IA escreve a partitura para você ouvir, conferir e salvar</span><em>Escolher a música ${icon('next', 14)}</em></button>
+      <button class="part-acao nova" id="part-nova">
+        <span class="part-acao-topo"><span class="part-acao-ic">${icon('edit', 20)}</span><span class="part-acao-rot">Do zero</span></span>
+        <b>Nova partitura</b><span class="part-acao-desc">Escolha a música e escreva nota por nota, como no papel.</span>
+        <span class="part-acao-folha">${miniPauta({ clave: 'G', ev: [['E4', 8], ['G4', 8], ['C5', 16], ['B4', 8], ['A4', 8], ['G4', 16], ['A4', 8], ['F4', 8], ['E4', 16]].map(([n, d]) => ({ a: [n], d })) }, [4, 4])}<span class="part-acao-lapis">${icon('edit', 18)}</span></span>
+        <span class="part-acao-chips"><span>Notas</span><span>Letra</span><span>Cifras</span><span>Até 4 vozes</span></span>
+        <em>Começar ${icon('next', 14)}</em></button>
+      <button class="part-acao ia" id="part-ia">
+        <span class="part-acao-brilho" aria-hidden="true"></span>
+        <span class="part-acao-topo"><span class="part-acao-ic">${icon('sparkles', 20)}</span><span class="part-acao-rot">Inteligência artificial</span></span>
+        <b>Gerar com IA</b><span class="part-acao-desc">Escolha o áudio da música e a IA escreve a melodia para você ouvir, conferir e salvar.</span>
+        <span class="part-ia-fluxo" aria-hidden="true">
+          <span class="part-ia-passo">${icon('music', 18)}<small>Música</small></span>
+          <span class="part-ia-onda">${Array.from({ length: 18 }, (_, i) => `<i style="--i:${i};--a:${(0.35 + Math.abs(Math.sin(i * 1.7)) * 0.65).toFixed(2)}"></i>`).join('')}</span>
+          <span class="part-ia-passo">${icon('sparkles', 18)}<small>IA</small></span>
+          <span class="part-ia-seta">${icon('next', 14)}</span>
+          <span class="part-ia-passo papel">${icon('score', 18)}<small>Partitura</small></span>
+        </span>
+        <em>Escolher a música ${icon('next', 14)}</em></button>
     </div>
     <div class="shelf-head"><h2>Suas partituras</h2>${proprias.length ? `<span class="muted part-conta">${proprias.length}</span>` : ''}</div>
     ${proprias.length ? `<div class="part-grade">${proprias.map(cartao).join('')}</div>`
@@ -4193,6 +4255,7 @@ function viewPartituras() {
       <p class="muted part-sub">Do acervo litúrgico e do Hinário, nas músicas da sua biblioteca: abra para ensaiar ouvindo cada voz, ou edite para corrigir.</p>
       <div class="shelf part-shelf">${prontas.map(pronta).join('')}</div>` : ''}
     <a class="part-acervo" href="#/acervo"><span class="part-acao-ic">${icon('book', 20)}</span><span><b>Mais partituras no acervo litúrgico</b><small>Hinários e subsídios da CNBB com partitura: salve na biblioteca e ela aparece aqui</small></span>${icon('next', 18)}</a>`;
+  view.querySelectorAll('.part-cartao').forEach((el) => { const m = db.song(el.dataset.abrirPart); if (m) corDaCapa(m).then((c) => { if (c) el.style.setProperty('--cor', c); }); });
   $('#part-nova').onclick = async () => { const s = await escolherMusica('Partitura de qual música?'); if (s) location.hash = `#/musica/${s.id}/compor`; };
   $('#part-ia').onclick = async () => { const s = await escolherMusica('Gerar a partitura de qual música?'); if (s) location.hash = `#/musica/${s.id}/compor/ia`; };
   view.querySelectorAll('[data-abrir-part]').forEach((el) => el.addEventListener('click', (e) => { if (!e.target.closest('a, button')) location.hash = `#/musica/${el.dataset.abrirPart}/partitura`; }));
