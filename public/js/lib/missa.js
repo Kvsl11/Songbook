@@ -128,14 +128,16 @@ export async function getMissa(date, fetchImpl) {
   const lit = await getLiturgia(date, fetchImpl);
   const missa = lit.missas[0] || {};
   const avisos = [];
+  // "Failed to fetch" / "Load failed" (sem rede, site fora do ar ou bloqueando): uma frase só, em português
+  const motivo = (e) => (/fetch|network|load failed|abort/i.test(e?.message || '') ? 'o site da Cindy Ferrarezi não respondeu agora' : e?.message || 'erro');
 
   const [rep, salmo, acl, mpm] = await Promise.all([
     buscarRepertorio(lit, fetchImpl).then(async (busca) => {
       if (!busca.candidatos.length) return { busca, repertorio: null };
       return { busca, repertorio: await getRepertorio(busca.candidatos[0].url, fetchImpl) };
-    }).catch((e) => (avisos.push('Repertório (Cindy): ' + e.message), { busca: null, repertorio: null })),
-    missa.salmo ? buscarPorTexto(missa.salmo.refrao, 'salmo', fetchImpl).catch((e) => (avisos.push('Salmo (Cindy): ' + e.message), [])) : [],
-    missa.aclamacao ? buscarPorTexto(missa.aclamacao.versiculo, 'aclamacao', fetchImpl).catch((e) => (avisos.push('Aclamação (Cindy): ' + e.message), [])) : [],
+    }).catch((e) => (avisos.push('Repertório (Cindy): ' + motivo(e)), { busca: null, repertorio: null })),
+    missa.salmo ? buscarPorTexto(missa.salmo.refrao, 'salmo', fetchImpl).catch((e) => (avisos.push('Salmo (Cindy): ' + motivo(e)), [])) : [],
+    missa.aclamacao ? buscarPorTexto(missa.aclamacao.versiculo, 'aclamacao', fetchImpl).catch((e) => (avisos.push('Aclamação (Cindy): ' + motivo(e)), [])) : [],
     sugestoesDoDia(date, fetchImpl).catch(() => null),
   ]);
 

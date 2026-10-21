@@ -25,9 +25,10 @@ function lerCache(chave) {
   }
 }
 
-function gravarCache(chave, v) {
+// provisorio: guarda só como reserva para o modo offline (já vencido), para a próxima abertura buscar de novo
+function gravarCache(chave, v, { provisorio = false } = {}) {
   try {
-    localStorage.setItem(PREFIXO + chave, JSON.stringify({ t: Date.now(), v }));
+    localStorage.setItem(PREFIXO + chave, JSON.stringify({ t: provisorio ? 0 : Date.now(), v }));
     const chaves = Object.keys(localStorage).filter((k) => k.startsWith(PREFIXO));
     if (chaves.length > MAX_ITENS) {
       chaves.map((k) => [k, JSON.parse(localStorage.getItem(k)).t]).sort((a, b) => a[1] - b[1])
@@ -50,7 +51,7 @@ async function viaServidor(caminho) {
   return data;
 }
 
-async function obter(chave, direto, caminhoServidor, { forcar = false } = {}) {
+async function obter(chave, direto, caminhoServidor, { forcar = false, incompleto = () => false } = {}) {
   if (!forcar) {
     const c = lerCache(chave);
     if (c) return c;
@@ -58,7 +59,7 @@ async function obter(chave, direto, caminhoServidor, { forcar = false } = {}) {
   let erroDireto;
   try {
     const v = await direto();
-    gravarCache(chave, v);
+    gravarCache(chave, v, { provisorio: incompleto(v) });
     return v;
   } catch (e) {
     erroDireto = e;
@@ -95,8 +96,9 @@ export function prepararOffline(datas) {
   return baixando;
 }
 
+// missa com alguma fonte fora do ar (avisos): não fica guardada por dias; ao abrir de novo, busca outra vez
 export function getMissa(data, opts) {
-  return obter('missa:' + data, () => getMissaDireto(data), 'api/missa?data=' + data, opts);
+  return obter('missa:' + data, () => getMissaDireto(data), 'api/missa?data=' + data, { ...opts, incompleto: (m) => Boolean(m?.avisos?.length) });
 }
 
 export function getCanto(url) {

@@ -553,6 +553,9 @@ label.setting { cursor: pointer; }
 .source .ico { width: 36px; height: 36px; border-radius: 6px; display: grid; place-items: center; background: var(--surface-2); color: var(--accent); flex: none; }
 .source a { color: var(--text); font-weight: 700; }
 .alert { display: flex; gap: 10px; align-items: flex-start; background: var(--danger-soft); color: var(--danger); border-radius: var(--radius); padding: 12px 14px; margin: 10px 0; font-size: 14px; }
+.lit-falha b { display: block; margin-bottom: 4px; }
+.lit-falha ul { margin: 0 0 10px; padding-left: 18px; line-height: 1.45; }
+.lit-falha .btn { color: var(--text); }
 
 .parte { margin: 0 0 8px; background: var(--bg-elev); border-radius: var(--radius); transition: background 0.15s; }
 .parte[open] { background: var(--surface); }
