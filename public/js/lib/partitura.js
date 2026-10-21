@@ -591,7 +591,8 @@ export function estimarTom(notas) {
   return tomDaCifra(SUST[melhor.raiz] + (melhor.modo === 'minor' ? 'm' : '')) || { fifths: 0, modo: 'major' };
 }
 
-// andamento pelos intervalos entre os começos das notas: o que melhor encaixa os intervalos em meios tempos
+// andamento pelos intervalos entre os começos das notas: o que melhor encaixa os intervalos em meios tempos (depois,
+// afinado em décimos com todas as notas e conferido se o tempo é dividido em 3: afinarAndamento)
 export function estimarAndamento(notas, { min = 60, max = 140, faixa = [48, 84] } = {}) {
   // só a melodia (sem os graves do acompanhamento nem os pedacinhos que a IA acha no ataque das notas)
   const da = notas.filter((n) => n.pitchMidi >= faixa[0] && n.pitchMidi <= faixa[1] && n.durationSeconds >= 0.2);
@@ -611,7 +612,55 @@ export function estimarAndamento(notas, { min = 60, max = 140, faixa = [48, 84] 
     s *= 1 - Math.abs(bpm - 85) / 400;
     if (s > melhor.s) melhor = { s, bpm };
   }
-  return melhor.bpm;
+  return afinarAndamento(notas, melhor.bpm);
+}
+
+// o quanto os começos das notas (com peso: as fortes, longas e graves contam mais) caem juntos numa grade de período
+// "periodo" (1 = todos no mesmo ponto da grade, 0 = espalhados)
+function coerencia(ataques, periodo) {
+  let sx = 0, sy = 0, sw = 0;
+  for (const [t, w] of ataques) { const ang = (2 * Math.PI * t) / periodo; sx += w * Math.cos(ang); sy += w * Math.sin(ang); sw += w; }
+  return sw ? Math.hypot(sx, sy) / sw : 0;
+}
+// o andamento acima é de bpm inteiro e pelos intervalos de nota a nota: meio bpm de erro, numa música de 3 minutos,
+// já desloca a grade mais de um tempo no fim. Aqui ele é afinado (em décimos) com todas as notas de uma vez: o que
+// faz os começos caírem mais juntos nos tempos e nas colcheias, perto (±4%) do achado. E o tempo dividido em 3 (6/8,
+// "um-dois-três, um-dois-três"): a semínima da partitura é 2 colcheias, ou seja, 2/3 desse tempo
+function afinarAndamento(notas, bpm0) {
+  const ataques = notas.filter((n) => (n.amplitude ?? 1) >= 0.2 && n.durationSeconds >= 0.1)
+    .map((n) => [n.startTimeSeconds, (n.amplitude ?? 1) * Math.min(1, n.durationSeconds / 0.4) * (n.pitchMidi < 55 ? 1.5 : 1), n.durationSeconds]);
+  if (ataques.length < 8) return bpm0;
+  const nota = (bpm) => coerencia(ataques, 60 / bpm) + 0.5 * coerencia(ataques, 30 / bpm);
+  let melhor = { s: -1, bpm: bpm0 };
+  for (let bpm = bpm0 * 0.96; bpm <= bpm0 * 1.04; bpm += 0.05) {
+    const s = nota(bpm);
+    if (s > melhor.s) melhor = { s, bpm };
+  }
+  let bpm = melhor.bpm;
+  // as notas entre os tempos: no meio (tempo em 2) ou a 1/3 e 2/3 dele (tempo em 3)? Onde o tempo cai é visto em
+  // volta de cada nota (4 tempos para cada lado): a música que acelera um pouco não espalha as notas pela grade
+  const tempo = 60 / bpm;
+  ataques.sort((x, y) => x[0] - y[0]);
+  let em2 = 0, em3 = 0, total = 0, n3 = 0;
+  let ini = 0;
+  for (const [t, w, d] of ataques) {
+    while (ataques[ini][0] < t - tempo * 4) ini++;
+    // os pedacinhos (bem mais curtos que uma colcheia de 3) não contam
+    if (d < tempo / 6) continue;
+    let sx = 0, sy = 0;
+    for (let j = ini; j < ataques.length && ataques[j][0] <= t + tempo * 4; j++) {
+      const ang = (2 * Math.PI * ataques[j][0]) / tempo;
+      sx += ataques[j][1] * Math.cos(ang);
+      sy += ataques[j][1] * Math.sin(ang);
+    }
+    const f = (((t / tempo - Math.atan2(sy, sx) / (2 * Math.PI)) % 1) + 1) % 1;
+    total += w;
+    if (Math.abs(f - 0.5) < 0.07) em2 += w;
+    else if (Math.abs(f - 1 / 3) < 0.07 || Math.abs(f - 2 / 3) < 0.07) { em3 += w; n3++; }
+  }
+  // tempo em 3 só com bastante nota nos terços e quase nada no meio (os pedacinhos soltos caem em qualquer lugar)
+  if (bpm * 1.5 <= 160 && n3 >= 12 && em3 >= total * 0.07 && em2 <= em3 / 4) bpm *= 1.5;
+  return Math.round(bpm * 10) / 10;
 }
 
 // faixa de alturas que entra na melodia: a voz cantando sozinha pode ser bem grave (homem: até Mi2); numa música

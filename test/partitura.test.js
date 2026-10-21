@@ -148,6 +148,36 @@ test('IA: tom pela cifra e pelas notas, andamento e melodia no compasso', async 
   assert.deepEqual(melodiaDasNotas(ns, { bpm: 90, fifths: 2 }).map((e) => e.d), misto.map(([, b]) => b * 8));
 });
 
+test('IA: andamento exato (em décimos) numa música longa e o 6/8 pela semínima', async () => {
+  const { estimarAndamento, melodiaDasNotas } = await import('../public/js/lib/partitura.js');
+  // 64 compassos de 4/4 a 84,6: baixo no 1 e no 3, acorde em cada tempo, melodia em semínimas e colcheias
+  const banda = (bpm, compassos, colPorCompasso, tempo) => {
+    const col = 30 / bpm;
+    const notas = [];
+    const nota = (k, len, p, amp) => notas.push({ startTimeSeconds: 1 + k * col, durationSeconds: len * col * 0.85, pitchMidi: p, amplitude: amp });
+    const ritmo = tempo === 3 ? [2, 1, 3] : [2, 1, 1, 2, 2];
+    for (let b = 0; b < compassos; b++) {
+      const ini = b * colPorCompasso;
+      let k = 0;
+      for (let i = 0; k < colPorCompasso; i++) { const len = Math.min(ritmo[i % ritmo.length], colPorCompasso - k); nota(ini + k, len, 67 + ((b + i) % 5), 0.8); k += len; }
+      for (let k2 = 0; k2 < colPorCompasso; k2 += tempo) for (const p of [55, 59, 62]) nota(ini + k2, tempo, p, k2 ? 0.35 : 0.5);
+      nota(ini, tempo * 2, 43, 0.7);
+    }
+    return notas;
+  };
+  const notas = banda(84.6, 64, 8, 2);
+  const bpm = estimarAndamento(notas);
+  assert.ok(Math.abs(bpm - 84.6) <= 0.2, `andamento ${bpm}`);
+  // com ele, a última nota (4º tempo do compasso 64) cai no lugar; com 85 inteiro, cairia um tempo depois
+  const ondeCai = (b) => { const mel = melodiaDasNotas(notas, { bpm: b }); return mel.slice(0, -1).reduce((a, e) => a + e.d, 0); };
+  assert.equal(ondeCai(bpm), 63 * 32 + 24);
+  assert.equal(ondeCai(85), 63 * 32 + 32);
+  // 6/8 (colcheia a 0,25 s: "um-dois-três" a 80 por minuto): a semínima da partitura é 2 colcheias = 120
+  assert.ok(Math.abs(estimarAndamento(banda(120, 24, 6, 3)) - 120) <= 1, `6/8: ${estimarAndamento(banda(120, 24, 6, 3))}`);
+  // 3/4 com colcheias (tempo em 2) não vira 6/8
+  assert.ok(Math.abs(estimarAndamento(banda(96, 24, 6, 2)) - 96) <= 1, `3/4: ${estimarAndamento(banda(96, 24, 6, 2))}`);
+});
+
 test('IA: voz grave na clave de tenor e música que começa no contratempo', async () => {
   const { claveDaVoz, melodiaDasNotas } = await import('../public/js/lib/partitura.js');
   const q = 60 / 96;

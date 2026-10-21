@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-173';
+export const APP_VERSAO = '2026.10.21-174';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4577,9 +4577,9 @@ async function gerarComIA(song, titulo) {
     const bpm = estimarAndamento(notas, { faixa: faixaDoModo(modoIA) });
     const { clave, centro } = claveDaVoz(notas, modoIA);
     $('#ia-tom-vivo') && ($('#ia-tom-vivo').textContent = nomeDoTom(fifths, modo));
-    $('#ia-bpm-vivo') && ($('#ia-bpm-vivo').textContent = `♩ ${bpm}`);
+    $('#ia-bpm-vivo') && ($('#ia-bpm-vivo').textContent = `♩ ${Math.round(bpm)}`);
     const { compasso, anacruse } = estimarCompasso(notas, { bpm, faixa: faixaDoModo(modoIA) });
-    const m = novaPartitura({ titulo, fifths, modo, bpm, compasso });
+    const m = novaPartitura({ titulo, fifths, modo, bpm: Math.round(bpm), compasso });
     m.pautas[0].clave = clave;
     m.pautas[0].nome = modoIA === 'voz' ? 'Voz' : 'Melodia';
     m.pautas[0].ev = melodiaDasNotas(notas, { bpm, fifths, modo: modoIA, centro });
@@ -4695,6 +4695,7 @@ async function gerarComIA(song, titulo) {
   function resultado() {
     const tomCifra = tomDaCifra(renderSong(song.content).key || song.key);
     let [fifths, modo] = tomCifra ? [tomCifra.fifths, tomCifra.modo] : (({ fifths: f, modo: m }) => [f, m])(estimarTom(notas));
+    // o andamento vem em décimos (a grade das notas precisa dele exato); na tela e na partitura, inteiro
     let bpm = estimarAndamento(notas, { faixa: faixaDoModo(modoIA) });
     const { clave, centro } = claveDaVoz(notas, modoIA);
     let oitava = 0;
@@ -4719,10 +4720,10 @@ async function gerarComIA(song, titulo) {
     const montar = () => {
       let m;
       if (coral) {
-        m = novaPartitura({ titulo, compasso, fifths, modo, bpm, tipo: 'satb' });
+        m = novaPartitura({ titulo, compasso, fifths, modo, bpm: Math.round(bpm), tipo: 'satb' });
         m.pautas = vozesDasNotas(notas, { bpm, fifths, oitava, meioTempo, faixa: FAIXA_CORAL });
       } else {
-        m = novaPartitura({ titulo, compasso, fifths, modo, bpm });
+        m = novaPartitura({ titulo, compasso, fifths, modo, bpm: Math.round(bpm) });
         m.pautas[0].clave = clave;
         m.pautas[0].nome = modoIA === 'voz' ? 'Voz' : 'Melodia';
         m.pautas[0].ev = melodiaDasNotas(notas, { bpm, fifths, oitava, modo: modoIA, centro, meioTempo });
@@ -4746,7 +4747,7 @@ async function gerarComIA(song, titulo) {
         <div class="setting wrap"><span class="ico">${icon('score', 18)}</span><div class="grow"><div class="t">Vozes</div><div class="s">Coral: a IA separa as notas que soam juntas em soprano, contralto, tenor e baixo, cada voz na sua pauta</div></div>
           <div class="chips" id="ia-vozes"><button class="chip" data-vozes="4" aria-pressed="true">Coral a 4 vozes</button><button class="chip" data-vozes="1" aria-pressed="false">Só a melodia</button></div></div>
         <div class="setting wrap"><span class="ico">${icon('gauge', 18)}</span><div class="grow"><div class="t">Andamento</div><div class="s">Se as notas ficaram picadas ou longas demais, ajuste aqui</div></div>
-          <div class="seg"><button data-bpm="-4" aria-label="Mais devagar">${icon('minus', 15)}</button><span class="val" id="ia-bpm">${bpm}</span><button data-bpm="4" aria-label="Mais rápido">${icon('plus', 15)}</button></div></div>
+          <div class="seg"><button data-bpm="-4" aria-label="Mais devagar">${icon('minus', 15)}</button><span class="val" id="ia-bpm">${Math.round(bpm)}</span><button data-bpm="4" aria-label="Mais rápido">${icon('plus', 15)}</button></div></div>
         <div class="setting"><span class="ico">${icon('music', 18)}</span><div class="grow"><div class="t">Tom</div><div class="s">${tomCifra ? 'Pela cifra da música' : 'Pelo que a IA ouviu'}</div></div><button class="btn small" id="ia-tom">${nomeDoTom(fifths, modo)}</button></div>
         <div class="setting wrap"><span class="ico">${icon('clock', 18)}</span><div class="grow"><div class="t">Compasso</div><div class="s" id="ia-compasso-s"></div></div>
           <div class="chips" id="ia-compasso"><button class="chip" data-c="auto">Automático</button>${[[2, 4], [3, 4], [4, 4], [6, 8]].map(([a, b]) => `<button class="chip" data-c="${a}/${b}">${a}/${b}</button>`).join('')}</div></div>
@@ -4764,14 +4765,14 @@ async function gerarComIA(song, titulo) {
     aoSair(() => ensaio?.parar());
     const pararEnsaio = () => { ensaio?.parar(); ensaio = null; };
     const previa = async () => {
-      $('#ia-bpm').textContent = bpm;
+      $('#ia-bpm').textContent = Math.round(bpm);
       $('#ia-oit').textContent = oitava > 0 ? '+' + oitava : oitava;
       $('#ia-tom').textContent = nomeDoTom(fifths, modo);
       acertarCompasso();
       $('#ia-compasso').querySelectorAll('[data-c]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.c === (compassoAuto ? 'auto' : compasso.join('/')))));
       $('#ia-compasso-s').textContent = `${compassoAuto ? `Pelo que a IA ouviu: ${compasso.join('/')}` : 'Escolhido por você'}${anacruse ? ` · começa com anacruse de ${anacruse % 8 || compasso[1] === 8 ? `${anacruse / 4} colcheia${anacruse > 4 ? 's' : ''}` : `${anacruse / 8} tempo${anacruse > 8 ? 's' : ''}`}` : ''}`;
       $('#ia-resumo').innerHTML = [
-        [icon('music', 15), nomeDoTom(fifths, modo)], [icon('gauge', 15), `♩ ${bpm}`], [icon('clock', 15), compasso.join('/')],
+        [icon('music', 15), nomeDoTom(fifths, modo)], [icon('gauge', 15), `♩ ${Math.round(bpm)}`], [icon('clock', 15), compasso.join('/')],
         [icon('score', 15), coral ? '4 vozes' : 'Melodia'], [icon('sparkles', 15), `${notas.length} notas`],
       ].map(([ic, t]) => `<span>${ic}${esc(String(t))}</span>`).join('');
       pararEnsaio(); // mudou o rascunho: o player recomeça com as notas novas
