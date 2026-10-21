@@ -53,7 +53,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-184';
+export const APP_VERSAO = '2026.10.21-185';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4515,11 +4515,12 @@ async function audioParaModelo(arrayBuffer) {
   src.start();
   return { amostras: (await off.startRendering()).getChannelData(0), cortado: buf.duration > 360 };
 }
-// A IA ouvindo aos poucos: o áudio chega em pedaços e é analisado a cada 5 s (com 1 s de contexto antes, para não
-// perder a nota que atravessa o corte). As notas vão aparecendo enquanto a música toca.
+// A IA ouvindo aos poucos: o áudio chega em pedaços e é analisado a cada 5 s (com 2 s de contexto antes, para não
+// perder nem cortar a nota que atravessa o corte: um pouco mais lento, mais completo). As notas vão aparecendo
+// enquanto a música toca.
 function criarLeitor(aoAtualizar) {
   const PEDACO = 5 * SR_IA;
-  const ANTES = 1 * SR_IA;
+  const ANTES = 2 * SR_IA;
   let audio = new Float32Array(SR_IA * 60);
   let total = 0;
   let analisado = 0;

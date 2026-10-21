@@ -1039,11 +1039,25 @@ export function vozesDasNotas(notas, { bpm = 80, fifths = 0, oitava = 0, minAmp 
     // (um enfeite do teclado) fica de fora. A IA corta as notas cantadas antes da hora: até a próxima nota começar
     // (por até um tempo), a melodia continua na mesma, e não passa para uma nota do acompanhamento que já soava nem
     // para uma bem mais fraca que ela (um acorde do violão no meio da nota cantada)
+    // no coral, o Soprano é a voz mais AGUDA que canta de verdade, não a mais forte (o baixo, forte, ficava com a
+    // melodia e as 4 vozes saíam emboladas): a nota mais aguda forte o bastante e que não é só o harmônico (oitava,
+    // décima segunda) de uma nota mais grave, bem mais forte, que soa junto. Sem nenhuma assim, a mais forte perto do canto
+    const amp = (n) => n.amplitude ?? 1;
+    // forte o bastante: perto da mais forte candidata a melodia (o piano mais agudo e mais fraco que a voz não conta)
+    const forte = Math.max(0, ...soando.filter((n) => n.pitchMidi >= melLo && n.pitchMidi <= melHi).map(amp));
+    const harmonico = (n) => soando.some((x) => x !== n && [12, 19, 24].includes(Math.round(n.pitchMidi - x.pitchMidi)) && amp(x) >= amp(n) * 1.5);
     let mel = null;
     for (const n of soando) {
-      if (n.pitchMidi < melLo || n.pitchMidi > melHi) continue;
-      const forca = forcaDoCanto(n, regiao);
-      if (!mel || forca > mel.forca) mel = { n, forca };
+      if (n.pitchMidi < melLo || n.pitchMidi > melHi || amp(n) < forte * 0.8 || harmonico(n)) continue;
+      mel = { n, forca: forcaDoCanto(n, regiao) };
+      break;
+    }
+    if (!mel) {
+      for (const n of soando) {
+        if (n.pitchMidi < melLo || n.pitchMidi > melHi) continue;
+        const forca = forcaDoCanto(n, regiao);
+        if (!mel || forca > mel.forca) mel = { n, forca };
+      }
     }
     const segue = melAtual && t - (melAtual.startTimeSeconds + melAtual.durationSeconds) < passo * 4;
     const fraca = (n) => (n.amplitude ?? 1) < (melAtual.amplitude ?? 1) * 0.5;
