@@ -51,9 +51,11 @@ document.addEventListener('error', (e) => {
   img.replaceWith(document.createRange().createContextualFragment(icon('music', 24)));
 }, true);
 
+// a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
+export const APP_VERSAO = '2026.10.21-159';
+
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-149';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
