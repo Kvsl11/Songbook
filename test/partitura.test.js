@@ -190,6 +190,66 @@ test('IA: coral a 4 vozes separa as notas em Soprano, Contralto, Tenor e Baixo s
   assert.ok(tam.every((x) => x === tam[0]));
 });
 
+test('IA: coral sem buracos: melodia no Soprano, acorde dobrado e notas curtas da IA ligadas', async () => {
+  const { vozesDasNotas } = await import('../public/js/lib/partitura.js');
+  const q = 60 / 80;
+  // a IA encurta as notas (sobram buracos de quase um tempo) e só ouve 3 notas: melodia, um acorde de 2 notas e o baixo
+  const nota = (p, t, b, amp) => ({ startTimeSeconds: t * q, durationSeconds: b * q - Math.min(0.8, b * 0.4) * q, pitchMidi: p, amplitude: amp });
+  const melodia = [[67, 0, 1], [69, 1, 1], [71, 2, 2], [72, 4, 1], [71, 5, 1], [69, 6, 2], [67, 8, 2]].map(([p, t, b]) => nota(p, t, b, 0.9));
+  const acorde = [nota(62, 0, 4, 0.4), nota(59, 0, 4, 0.4), nota(60, 4, 4, 0.4), nota(57, 4, 4, 0.4)];
+  // um enfeite agudo do teclado, mais fraco que a voz: não tira a melodia do Soprano
+  const enfeite = nota(79, 2, 1, 0.3);
+  const baixo = [nota(43, 0, 4, 0.7), nota(45, 4, 4, 0.7), nota(43, 8, 2, 0.7)];
+  // no último tempo só a melodia e o baixo: Contralto e Tenor dobram um Sol (o acorde que soa), sem cruzar
+  const pautas = vozesDasNotas([...melodia, ...acorde, enfeite, ...baixo], { bpm: 80, fifths: 1 });
+  const alturas = (p) => p.ev.filter((e) => e.a.length).map((e) => e.a[0]);
+  assert.deepEqual(alturas(pautas[0]), ['G4', 'A4', 'B4', 'C5', 'B4', 'A4', 'G4']);
+  assert.deepEqual(alturas(pautas[3]), ['G2', 'A2', 'G2']);
+  assert.equal(alturas(pautas[1]).at(-1).replace(/\d/, ''), 'G');
+  assert.equal(alturas(pautas[2]).at(-1).replace(/\d/, ''), 'G');
+  // nenhuma voz fica em pausa no meio da música (a última nota pode acabar um pouco antes)
+  for (const p of pautas) {
+    const meio = p.ev.slice(0, -1);
+    assert.ok(meio.every((e) => e.a.length), `${p.nome}: ${p.ev.map((e) => (e.a[0] || '-') + '/' + e.d).join(' ')}`);
+  }
+});
+
+test('IA: compasso pelo áudio (4/4, 3/4 e 6/8) e onde ele começa (anacruse)', async () => {
+  const { estimarCompasso } = await import('../public/js/lib/partitura.js');
+  // música com banda: baixo e acorde mais forte no 1º tempo, acorde nos outros tempos, melodia por cima com a nota
+  // longa no começo do compasso; "pickup": colcheias antes do primeiro compasso
+  const musica = ({ bpm, tempos, unidade, pickup = 0, compassos = 10 }) => {
+    const col = 30 / bpm;
+    const L = unidade === 8 ? tempos : tempos * 2; // colcheias por compasso
+    const tempo = unidade === 8 ? 3 : 2;
+    const notas = [];
+    const nota = (t, d, p, amp) => notas.push({ startTimeSeconds: 1 + t * col, durationSeconds: d * col, pitchMidi: p, amplitude: amp });
+    for (let i = 0; i < pickup; i++) nota(i, 0.8, 64, 0.6);
+    for (let b = 0; b < compassos; b++) {
+      const ini = pickup + b * L;
+      nota(ini, tempo * 1.6, 67 + (b % 3), 0.8);
+      for (let k = tempo; k < L; k += 1) nota(ini + k, 0.8, 72 - (k % 3), 0.6);
+      nota(ini, tempo * 1.5, 43 + (b % 2) * 2, 0.7);
+      for (let k = 0; k < L; k += tempo) for (const p of [55, 59, 62]) nota(ini + k, 0.9, p, k ? 0.35 : 0.5);
+    }
+    return notas;
+  };
+  const casos = [
+    [{ bpm: 84, tempos: 4, unidade: 4 }, [4, 4], 0],
+    [{ bpm: 84, tempos: 4, unidade: 4, pickup: 2 }, [4, 4], 8],
+    [{ bpm: 96, tempos: 3, unidade: 4 }, [3, 4], 0],
+    [{ bpm: 96, tempos: 3, unidade: 4, pickup: 2 }, [3, 4], 8],
+    [{ bpm: 80, tempos: 6, unidade: 8 }, [6, 8], 0],
+  ];
+  for (const [cfg, compasso, anacruse] of casos) {
+    assert.deepEqual(estimarCompasso(musica(cfg), { bpm: cfg.bpm }), { compasso, anacruse }, JSON.stringify(cfg));
+  }
+  // compasso escolhido pela pessoa: só acha onde ele começa
+  assert.deepEqual(estimarCompasso(musica({ bpm: 84, tempos: 4, unidade: 4, pickup: 2 }), { bpm: 84, compasso: [2, 4] }), { compasso: [2, 4], anacruse: 8 });
+  // poucas notas: fica o 4/4
+  assert.deepEqual(estimarCompasso(musica({ bpm: 96, tempos: 3, unidade: 4, compassos: 1 }), { bpm: 96 }), { compasso: [4, 4], anacruse: 0 });
+});
+
 test('letra automática: sílabas do português e a letra em todas as vozes', async () => {
   const { separarSilabas, letraEmSilabas, colocarLetra, temLetra } = await import('../public/js/lib/partitura.js');
   const casos = {
