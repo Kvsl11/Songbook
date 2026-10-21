@@ -190,6 +190,10 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 - **Funciona sem internet**: repertórios e músicas ficam no aparelho; a Início mostra a liturgia de hoje sozinha e
   o app já deixa guardadas a liturgia e as sugestões de hoje, do próximo domingo e das datas dos repertórios futuros.
   Capas, fontes e bibliotecas também ficam guardadas; com sinal fraco, o app abre com a cópia guardada em poucos segundos.
+- **Ajustes repaginados**: topo com o app, a versão e os números (músicas, repertórios, com vídeo), atalhos para cada
+  seção (Aparência, Cifras, Música, PowerPoint, Dados, Sobre), o modelo do PowerPoint como um cartão (nome, tamanho e
+  as partes em etiquetas), Exportar e Importar lado a lado e Apagar tudo à parte, em vermelho. No celular, os botões
+  de uma linha descem para baixo do texto em vez de espremer o título e a descrição (vale para as outras telas também).
 - **Atualização automática**: o app busca sempre a versão mais nova e recarrega sozinho; a versão aparece em Ajustes.
 - **PowerPoint da missa**: envie uma vez em Ajustes o modelo "cru" do PowerPoint do grupo (fica só no aparelho).
   No repertório, "PowerPoint" escolhe o canto de cada parte do modelo (Entrada, Oferendas, Comunhão, Saída…) e gera o

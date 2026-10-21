@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-179';
+export const APP_VERSAO = '2026.10.21-180';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -6834,68 +6834,84 @@ function viewSettings() {
   const p = db.prefs();
   const accent = p.accent || COR_PADRAO;
   const personalizada = /^#/.test(accent) && !CORES_DESTAQUE.some(([c]) => c === accent);
+  const nMusicas = db.songs().length;
+  const nRepertorios = db.sets().length;
+  const nVideos = db.songs().filter((s) => s.youtube).length;
+  // seção com título, ícone e uma linha explicando; o atalho do topo leva até ela
+  const SECOES = [['aparencia', 'palette', 'Aparência'], ['cifras', 'chord', 'Cifras'], ['musica', 'music', 'Música'], ['pptx', 'grid', 'PowerPoint'], ['dados', 'database', 'Dados'], ['sobre', 'info', 'Sobre']];
+  const secao = (id, sub, corpo) => {
+    const [, ic, nome] = SECOES.find(([k]) => k === id);
+    return `<section class="aj-sec" id="aj-${id}"><h3 class="aj-titulo"><span class="aj-titulo-ic">${icon(ic, 16)}</span>${nome}</h3>${sub ? `<p class="aj-sub">${sub}</p>` : ''}${corpo}</section>`;
+  };
   view.innerHTML = `
-    <h2 class="greet">Ajustes</h2>
-    <div class="stats">
-      <div class="stat"><b>${db.songs().length}</b><span>Músicas</span></div>
-      <div class="stat"><b>${db.sets().length}</b><span>Repertórios</span></div>
-      <div class="stat"><b>${db.songs().filter((s) => s.youtube).length}</b><span>Com vídeo</span></div>
-    </div>
-
-    <div class="section-title">Modo</div>
-    <div class="theme-cards" id="theme">
-      ${[['dark', 'Escuro'], ['light', 'Claro'], ['auto', 'Automático']].map(([v, l]) => `
-        <button class="theme-card ${v}" data-v="${v}" aria-pressed="${(p.theme || 'dark') === v}"><div class="prev"><i></i><b></b></div>${l}</button>`).join('')}
-    </div>
-
-    <div class="section-title">Cor do site</div>
-    <div class="settings-group"><div class="setting" style="display:block">
-      <div class="swatches" id="cores">
-        ${CORES_DESTAQUE.map(([c, n]) => `<button class="swatch" style="--c:${c}" data-c="${c}" aria-pressed="${accent === c}" title="${n}" aria-label="${n}"></button>`).join('')}
-        <button class="swatch lit" data-c="liturgico" aria-pressed="${accent === 'liturgico'}" title="Cor litúrgica do dia" aria-label="Cor litúrgica do dia"></button>
-        <label class="swatch custom" style="--c:${personalizada ? accent : '#888'}" aria-pressed="${personalizada}" title="Escolher outra cor">
-          <input type="color" id="cor-livre" value="${personalizada ? accent : COR_PADRAO}" aria-label="Escolher outra cor"></label>
+    <div class="ajustes">
+    <section class="aj-topo">
+      <span class="aj-logo">${logo(52)}</span>
+      <div class="aj-ident"><div class="kind">Songbook Litúrgico</div><h2>Ajustes</h2><span class="aj-versao">versão ${APP_VERSAO}</span></div>
+      <div class="aj-stats">
+        <div><b>${nMusicas}</b><span>música${nMusicas === 1 ? '' : 's'}</span></div>
+        <div><b>${nRepertorios}</b><span>repertório${nRepertorios === 1 ? '' : 's'}</span></div>
+        <div><b>${nVideos}</b><span>com vídeo</span></div>
       </div>
-      <p class="swatch-label" id="cor-nome" style="margin:10px 0 0"></p>
-    </div></div>
+    </section>
+    <nav class="aj-atalhos" aria-label="Ir para">${SECOES.map(([k, ic, n]) => `<button class="chip" data-ir="${k}">${icon(ic, 14)} ${n}</button>`).join('')}</nav>
 
-    <div class="section-title">Cifras</div>
+    ${secao('aparencia', 'Modo claro ou escuro e a cor de destaque do app', `
+    <div class="settings-group aj-aparencia">
+      <div class="aj-bloco"><div class="aj-rotulo">Modo</div>
+        <div class="theme-cards" id="theme">
+          ${[['dark', 'Escuro'], ['light', 'Claro'], ['auto', 'Automático']].map(([v, l]) => `
+            <button class="theme-card ${v}" data-v="${v}" aria-pressed="${(p.theme || 'dark') === v}"><div class="prev"><i></i><b></b></div>${l}</button>`).join('')}
+        </div></div>
+      <div class="aj-bloco"><div class="aj-rotulo">Cor do site</div>
+        <div class="swatches" id="cores">
+          ${CORES_DESTAQUE.map(([c, n]) => `<button class="swatch" style="--c:${c}" data-c="${c}" aria-pressed="${accent === c}" title="${n}" aria-label="${n}"></button>`).join('')}
+          <button class="swatch lit" data-c="liturgico" aria-pressed="${accent === 'liturgico'}" title="Cor litúrgica do dia" aria-label="Cor litúrgica do dia"></button>
+          <label class="swatch custom" style="--c:${personalizada ? accent : '#888'}" aria-pressed="${personalizada}" title="Escolher outra cor">
+            <input type="color" id="cor-livre" value="${personalizada ? accent : COR_PADRAO}" aria-label="Escolher outra cor"></label>
+        </div>
+        <p class="swatch-label" id="cor-nome" style="margin:10px 0 0"></p></div>
+    </div>`)}
+
+    ${secao('cifras', 'Como os acordes aparecem nas músicas', `
     <div class="settings-group">
       <label class="setting"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Mostrar acordes</div><div class="s">Desligue para usar só a letra (coral, telão)</div></div><input type="checkbox" class="switch" id="chords" ${p.modo !== 'letra' && p.showChords !== false ? 'checked' : ''}></label>
-      <label class="setting"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Desenho dos acordes</div><div class="s">Mostra como montar cada acorde no violão (tabela no início da música e ao tocar num acorde)</div></div><input type="checkbox" class="switch" id="diagramas" ${p.diagramas ? 'checked' : ''}></label>
+      <label class="setting"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Desenho dos acordes</div><div class="s">Como montar cada acorde no violão: tabela no início da música e ao tocar num acorde</div></div><input type="checkbox" class="switch" id="diagramas" ${p.diagramas ? 'checked' : ''}></label>
       <label class="setting"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns !== false ? 'checked' : ''}></label>
       <div class="setting wrap"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div><div class="s">Tamanho, cor e fundo dos acordes sobre a letra</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
-    </div>
+    </div>`)}
 
-    <div class="section-title">Página da música</div>
+    ${secao('musica', 'A página de cada música', `
     <div class="settings-group">
       <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo no topo da música</div><div class="s">Um trecho do clipe passa sem som atrás do título, como no Spotify. Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
     </div>
+    ${jaInstalado() ? '' : `<div class="settings-group">
+      <div class="setting acao"><span class="ico" style="background:none">${logo(36)}</span><div class="grow"><div class="t">Instalar o Songbook</div><div class="s">Ícone na tela inicial, abre em tela cheia e funciona sem internet</div></div><div class="setting-acoes"><button class="btn small primary" id="instalar">Instalar</button></div></div>
+    </div>`}`)}
 
-    ${jaInstalado() ? '' : `<div class="section-title">App</div>
-    <div class="settings-group">
-      <div class="setting"><span class="ico" style="background:none">${logo(36)}</span><div class="grow"><div class="t">Instalar o Songbook</div><div class="s">Ícone na tela inicial, abre em tela cheia e funciona sem internet</div></div><button class="btn small primary" id="instalar">Instalar</button></div>
-    </div>`}
+    ${secao('pptx', 'O arquivo do seu grupo: no repertório, “PowerPoint” gera os slides com as letras', `
+    <div class="settings-group"><div class="aj-pptx" id="pptx"><div class="aj-pptx-vazio muted">Verificando…</div></div></div>`)}
 
-    <div class="section-title">PowerPoint da missa</div>
-    <div class="settings-group">
-      <div class="setting"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Modelo do grupo</div><div class="s" id="pptx-info">Verificando…</div></div>
-        <button class="btn small" id="pptx-enviar">Enviar</button><button class="btn small danger" id="pptx-apagar" hidden>Remover</button></div>
+    ${secao('dados', 'Tudo fica guardado neste aparelho. Faça um backup de vez em quando', `
+    <div class="aj-dados">
+      <button class="aj-dado" id="exp"><span class="ico">${icon('download', 20)}</span><b>Exportar backup</b><small>Todas as músicas e repertórios num arquivo .json</small></button>
+      <button class="aj-dado" id="imp"><span class="ico">${icon('upload', 20)}</span><b>Importar</b><small>Backup .json, ChordPro (.cho, .pro) ou texto</small></button>
     </div>
+    <div class="settings-group aj-perigo">
+      <div class="setting acao"><span class="ico">${icon('trash', 18)}</span><div class="grow"><div class="t">Apagar tudo</div><div class="s">Remove as músicas, os repertórios e os ajustes deste aparelho</div></div><div class="setting-acoes"><button class="btn small danger" id="clr">Apagar tudo</button></div></div>
+    </div>`)}
 
-    <div class="section-title">Dados</div>
-    <div class="settings-group">
-      <div class="setting"><span class="ico">${icon('download', 18)}</span><div class="grow"><div class="t">Exportar backup</div><div class="s">Todas as músicas e repertórios em .json</div></div><button class="btn small" id="exp">Exportar</button></div>
-      <div class="setting"><span class="ico">${icon('upload', 18)}</span><div class="grow"><div class="t">Importar</div><div class="s">Backup .json, ChordPro (.cho, .pro) ou texto</div></div><button class="btn small" id="imp">Importar</button></div>
-      <div class="setting"><span class="ico">${icon('trash', 18)}</span><div class="grow"><div class="t">Apagar tudo</div><div class="s">Remove os dados deste aparelho</div></div><button class="btn small danger" id="clr">Apagar</button></div>
-    </div>
-
-    <div class="section-title">Sobre</div>
-    <div class="settings-group">
-      <div class="setting"><span class="ico" style="background:none">${logo(40)}</span><div class="grow"><div class="t">Songbook Litúrgico <span class="chip sm" style="margin-left:6px">versão ${APP_VERSAO}</span></div>
-        <div class="s">Cifras e letras com transposição, capotraste, rolagem automática, repertórios e vídeos do YouTube, integrado à Liturgia Diária da CNBB, aos cantos de cindyferrarezi.com e do Músicas para Missa e às cifras do Cifra Club.</div></div></div>
+    ${secao('sobre', '', `
+    <div class="settings-group aj-sobre">
+      <div class="aj-sobre-cab"><span class="aj-logo">${logo(40)}</span><div><b>Songbook Litúrgico</b><span class="chip sm">versão ${APP_VERSAO}</span></div></div>
+      <p>Cifras e letras com transposição, capotraste, rolagem automática, repertórios e vídeos do YouTube, integrado à Liturgia Diária da CNBB, aos cantos de cindyferrarezi.com e do Músicas para Missa e às cifras do Cifra Club.</p>
+    </div>`)}
     </div>`;
+  view.querySelector('.aj-atalhos').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ir]');
+    if (b) $('#aj-' + b.dataset.ir).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
   const nomeCor = () => {
     const a = db.prefs().accent || COR_PADRAO;
     const txt = a === 'liturgico'
@@ -6922,19 +6938,24 @@ function viewSettings() {
     applyTheme();
     $('#theme').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   };
+  // modelo do PowerPoint: o arquivo (nome, tamanho) e as partes que ele tem, em etiquetas
   const infoModelo = async () => {
     const m = await lerModelo();
-    const el = $('#pptx-info');
+    const el = $('#pptx');
     if (!el) return;
-    el.textContent = m ? `${m.nome} · ${(m.tamanho / 1048576).toFixed(1)} MB · partes: ${m.partes.map((x) => x.nome).join(', ')}`
-      : 'Envie o arquivo "cru" do PowerPoint da missa. Depois, no repertório, toque em "PowerPoint" para gerar com as letras.';
-    $('#pptx-enviar').textContent = m ? 'Trocar' : 'Enviar';
-    $('#pptx-apagar').hidden = !m;
+    el.innerHTML = m ? `
+      <div class="aj-pptx-arq"><span class="ico">${icon('file', 20)}</span><div class="grow"><b>${esc(m.nome.replace(/\.pptx$/i, ''))}</b>
+        <small>PowerPoint · ${(m.tamanho / 1048576).toFixed(1)} MB · ${m.partes.length} parte${m.partes.length === 1 ? '' : 's'}</small></div></div>
+      ${m.partes.length ? `<div class="aj-rotulo">Partes do modelo</div><div class="aj-pptx-partes">${m.partes.map((x) => `<span class="chip sm">${esc(x.nome)}</span>`).join('')}</div>` : ''}
+      <div class="aj-pptx-acoes"><button class="btn small" id="pptx-enviar">${icon('refresh', 15)} Trocar</button><button class="btn small danger" id="pptx-apagar">${icon('trash', 15)} Remover</button></div>`
+      : `<div class="setting acao"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Modelo do grupo</div><div class="s">Envie o arquivo “cru” do PowerPoint da missa. Depois, no repertório, toque em “PowerPoint” para gerar com as letras</div></div>
+        <div class="setting-acoes"><button class="btn small primary" id="pptx-enviar">${icon('upload', 15)} Enviar modelo</button></div></div>`;
+    $('#pptx-enviar').onclick = async () => { if (await enviarModeloPptx()) infoModelo(); };
+    const apagar = $('#pptx-apagar');
+    if (apagar) apagar.onclick = async () => { if (await ask({ title: 'Remover o modelo?', text: 'O arquivo sai deste aparelho; os repertórios continuam.', ok: 'Remover', danger: true })) { await apagarModelo(); infoModelo(); } };
   };
   infoModelo();
   $('#instalar')?.addEventListener('click', instalarApp);
-  $('#pptx-enviar').onclick = async () => { if (await enviarModeloPptx()) infoModelo(); };
-  $('#pptx-apagar').onclick = async () => { if (await ask({ title: 'Remover o modelo?', text: 'O arquivo sai deste aparelho; os repertórios continuam.', ok: 'Remover', danger: true })) { await apagarModelo(); infoModelo(); } };
   $('#chords').onchange = (e) => { db.setPref('modo', e.target.checked ? 'cifra' : 'letra'); db.setPref('showChords', true); };
   $('#cols').onchange = (e) => db.setPref('columns', e.target.checked);
   $('#diagramas').onchange = (e) => { db.setPref('diagramas', e.target.checked); toast(e.target.checked ? 'Desenho dos acordes ligado' : 'Desenho dos acordes desligado'); };
