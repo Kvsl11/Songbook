@@ -64,7 +64,10 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   **Descartar e gerar de novo**. O áudio também pode vir de outro app do Android: **Compartilhar → Songbook**
   (`share_target` do manifesto; o service worker guarda o arquivo e o app pergunta de qual música ele é). Por padrão a IA
   escreve o **coral a 4 vozes**: separa as notas que soam juntas em **Soprano, Contralto, Tenor e Baixo** (cada uma na
-  sua pauta e clave, sem cruzar as vozes e seguindo a linha de cada uma: `vozesDasNotas`); em *Ajustar o rascunho* dá
+  sua pauta e clave, sem cruzar as vozes e seguindo a linha de cada uma: `vozesDasNotas`). O Soprano leva a melodia
+  ouvida (a mesma do *Só a melodia*) e o Baixo, o baixo da música; quando soam menos notas que vozes, a voz que sobra
+  dobra uma nota do acorde (na extensão dela) em vez de ficar em pausa, e os buraquinhos de menos de um tempo entre
+  duas notas da mesma voz viram a nota de antes ligada. Em *Ajustar o rascunho* dá
   para trocar por *Só a melodia*. É um rascunho: funciona melhor com voz e violão (ou o coral sozinho) do que com banda
   completa.
 - **Mixer das vozes no ensaio** (na partitura salva, no editor e no fim da IA): cada voz com o seu volume e um botão

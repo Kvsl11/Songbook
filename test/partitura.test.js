@@ -190,6 +190,30 @@ test('IA: coral a 4 vozes separa as notas em Soprano, Contralto, Tenor e Baixo s
   assert.ok(tam.every((x) => x === tam[0]));
 });
 
+test('IA: coral sem buracos: melodia no Soprano, acorde dobrado e notas curtas da IA ligadas', async () => {
+  const { vozesDasNotas } = await import('../public/js/lib/partitura.js');
+  const q = 60 / 80;
+  // a IA encurta as notas (sobram buracos de quase um tempo) e só ouve 3 notas: melodia, um acorde de 2 notas e o baixo
+  const nota = (p, t, b, amp) => ({ startTimeSeconds: t * q, durationSeconds: b * q - Math.min(0.8, b * 0.4) * q, pitchMidi: p, amplitude: amp });
+  const melodia = [[67, 0, 1], [69, 1, 1], [71, 2, 2], [72, 4, 1], [71, 5, 1], [69, 6, 2], [67, 8, 2]].map(([p, t, b]) => nota(p, t, b, 0.9));
+  const acorde = [nota(62, 0, 4, 0.4), nota(59, 0, 4, 0.4), nota(60, 4, 4, 0.4), nota(57, 4, 4, 0.4)];
+  // um enfeite agudo do teclado, mais fraco que a voz: não tira a melodia do Soprano
+  const enfeite = nota(79, 2, 1, 0.3);
+  const baixo = [nota(43, 0, 4, 0.7), nota(45, 4, 4, 0.7), nota(43, 8, 2, 0.7)];
+  // no último tempo só a melodia e o baixo: Contralto e Tenor dobram um Sol (o acorde que soa), sem cruzar
+  const pautas = vozesDasNotas([...melodia, ...acorde, enfeite, ...baixo], { bpm: 80, fifths: 1 });
+  const alturas = (p) => p.ev.filter((e) => e.a.length).map((e) => e.a[0]);
+  assert.deepEqual(alturas(pautas[0]), ['G4', 'A4', 'B4', 'C5', 'B4', 'A4', 'G4']);
+  assert.deepEqual(alturas(pautas[3]), ['G2', 'A2', 'G2']);
+  assert.equal(alturas(pautas[1]).at(-1).replace(/\d/, ''), 'G');
+  assert.equal(alturas(pautas[2]).at(-1).replace(/\d/, ''), 'G');
+  // nenhuma voz fica em pausa no meio da música (a última nota pode acabar um pouco antes)
+  for (const p of pautas) {
+    const meio = p.ev.slice(0, -1);
+    assert.ok(meio.every((e) => e.a.length), `${p.nome}: ${p.ev.map((e) => (e.a[0] || '-') + '/' + e.d).join(' ')}`);
+  }
+});
+
 test('letra automática: sílabas do português e a letra em todas as vozes', async () => {
   const { separarSilabas, letraEmSilabas, colocarLetra, temLetra } = await import('../public/js/lib/partitura.js');
   const casos = {
