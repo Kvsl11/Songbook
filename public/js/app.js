@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-177';
+export const APP_VERSAO = '2026.10.21-178';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -3568,7 +3568,8 @@ async function comecarPartitura(song, titulo) {
         <div class="chips" id="ini-compasso">${[[2, 4], [3, 4], [4, 4], [6, 8]].map(([a, b]) => `<button class="chip" data-c="${a}/${b}" aria-pressed="${a === 4 && b === 4}">${a}/${b}</button>`).join('')}</div></div>
     </div>
     <div class="cp-tipos">${tipos.map(([k, n, d]) => `<button class="pptx-tipo" data-tipo="${k}"><b>${n}</b><span>${d}</span></button>`).join('')}</div>
-    <p class="muted cp-ini-dica">Andamento, outros compassos e vozes ficam nos ajustes do editor (${icon('settings', 13)}). Tem a partitura no MuseScore, Finale ou Sibelius? <button class="link-btn" id="ini-arquivo">Abra o arquivo MusicXML</button>.</p>
+    <p class="muted cp-ini-dica">Andamento e outros ajustes ficam na engrenagem do editor.</p>
+    <button class="btn small ghost cp-ini-arquivo" id="ini-arquivo">${icon('upload', 15)} Abrir arquivo MusicXML (MuseScore, Finale…)</button>
     </div>`;
   if (mxl) fetch(mxl, { method: 'HEAD' }).then((r) => { if (r.ok && $('#ini-desenhada')) $('#ini-desenhada').hidden = false; }).catch(() => {});
   const guardar = (modelo) => {

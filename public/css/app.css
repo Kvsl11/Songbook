@@ -1868,8 +1868,8 @@ dialog.lista-dlg { max-width: 440px; padding: 0; }
 .compor-inicio .pptx-tipo b { display: inline-flex; align-items: center; gap: 8px; }
 .cp-ini-ajustes .chips { padding: 0; flex-wrap: wrap; justify-content: flex-end; }
 .compor-inicio .cp-ini-ajustes { margin-bottom: 12px; }
-.cp-ini-dica { margin-top: 16px; font-size: 13px; line-height: 1.5; }
-.cp-ini-dica svg { vertical-align: -2px; }
+.cp-ini-dica { margin: 18px 0 10px; font-size: 13px; line-height: 1.5; hyphens: none; }
+.cp-ini-arquivo { justify-self: start; }
 .cp-editar { margin-left: auto; }
 .compor { display: flex; flex-direction: column; min-height: 100%; }
 .compor-topo { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; min-width: 0; }
