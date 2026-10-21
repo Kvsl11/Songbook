@@ -339,7 +339,7 @@ test('letra automática: sílabas do português e a letra em todas as vozes', as
     'água': 'á-gua', 'Senhor,': 'Se-nhor,', muito: 'mui-to', sair: 'sa-ir', rainha: 'ra-i-nha', 'obstáculo': 'obs-tá-cu-lo',
   };
   for (const [w, esperado] of Object.entries(casos)) assert.equal(separarSilabas(w).join('-'), esperado, w);
-  assert.equal(letraEmSilabas('Santo, santo\nSenhor'), 'San-to, san-to Se-nhor');
+  assert.equal(letraEmSilabas('Santo, santo\nSenhor'), 'San-to, san-to\nSe-nhor');
   const m = novaPartitura({ tipo: 'duas' });
   m.pautas[0].ev = [n('C4', 8), n(null, 8), n('D4', 8, { lig: true }), n('D4', 8), n('E4', 8)];
   m.pautas[1].ev = [n('A3', 16), n('B3', 16)];

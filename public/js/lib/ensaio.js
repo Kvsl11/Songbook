@@ -68,12 +68,15 @@ export const duracaoTotal = (passos) => passos.reduce((m, p) => Math.max(m, p.t 
 
 // ---- piano mais cheio: meio pedal e acompanhamento pela cifra
 
-// meio pedal: a nota continua soando depois do fim escrito, até um tempo (semínima) a mais, sem passar da barra do
-// compasso (onde o pianista troca o pedal). t e dur em semibreves; barras: começos dos compassos, em ordem
-export function comPedal(t, dur, barras = []) {
+// meio pedal: a nota continua soando depois do fim escrito, até "extra" a mais (uma semínima no acompanhamento), sem
+// passar da barra do compasso (onde o pianista troca o pedal) nem do começo da próxima nota da mesma voz ("ate": o
+// pedal emendava uma nota na outra e as vozes se atropelavam, com segundas soando que não estão escritas).
+// t, dur, extra e ate em semibreves; barras: começos dos compassos, em ordem
+export function comPedal(t, dur, barras = [], { extra = 0.25, ate = Infinity } = {}) {
   const fim = t + dur;
   const barra = barras.find((b) => b > t + 1e-9) ?? Infinity;
-  return Math.max(dur, Math.min(fim + 0.25, Math.max(fim, barra)) - t);
+  const comPedal = Math.max(dur, Math.min(fim + extra, Math.max(fim, barra)) - t);
+  return Math.max(Math.min(dur, ate - t), Math.min(comPedal, ate - t));
 }
 
 // intervalos de cada tipo de acorde, pelo número do tipo na leitura da partitura (ChordSymbolEnum do
@@ -85,24 +88,33 @@ const INTERVALOS = {
   19: [0, 4, 10, 21], 20: [0, 4, 11, 21], 21: [0, 3, 10, 21], 22: [0, 2, 7], 23: [0, 5, 7], 29: [0, 7],
 };
 // as notas do acompanhamento de um acorde (raiz e baixo: classe da nota, 0 = Dó): o baixo na região do Mi2 ao Ré#3 e o
-// acorde fechado logo abaixo do canto (do Mi3 ao Mi4), perto do acorde anterior para não pular. Devolve midis
-export function notasDoAcorde({ raiz, tipo = 0, baixo = null }, anterior = null) {
+// acorde fechado logo abaixo do canto (do Mi3 ao Mi4), perto do acorde anterior para não pular. "teto": a nota mais
+// grave cantada enquanto o acorde dura; o acorde fica abaixo dela (antes ele subia por cima da melodia ou ficava a um
+// semitom dela, e o acompanhamento brigava com o canto), descendo até o Si2 se for preciso. Devolve midis
+export function notasDoAcorde({ raiz, tipo = 0, baixo = null }, anterior = null, teto = Infinity) {
   const iv = INTERVALOS[tipo] || INTERVALOS[0];
   const pcBaixo = (((baixo ?? raiz) % 12) + 12) % 12;
   const grave = 40 + ((pcBaixo - 40 % 12 + 12) % 12); // Mi2 (40) a Ré#3 (51)
   // todas as inversões na região e fica a de notas mais perto do acorde anterior (ou do meio da região)
   const classes = iv.map((i) => (raiz + i) % 12);
   const centro = anterior?.length ? anterior.reduce((a, b) => a + b, 0) / anterior.length : 58;
+  const limite = Number.isFinite(teto) ? teto - 3 : Infinity; // ao menos uma terça abaixo do canto
   let melhor = null;
-  for (let ini = 52; ini <= 63; ini++) {
+  for (let ini = 47; ini <= 63; ini++) {
     if (!classes.includes(ini % 12)) continue;
     const notas = [];
     for (let p = ini; notas.length < classes.length && p < ini + 24; p++) if (classes.includes(p % 12) && !notas.some((x) => x % 12 === p % 12)) notas.push(p);
     const media = notas.reduce((a, b) => a + b, 0) / notas.length;
-    const custo = Math.abs(media - centro) + (notas[notas.length - 1] > 67 ? 4 : 0);
+    const topo = notas[notas.length - 1];
+    const custo = Math.abs(media - centro) + (topo > 67 ? 4 : 0) + (ini < 52 ? 6 : 0) + (topo > limite ? 40 + (topo - limite) * 4 : 0);
     if (!melhor || custo < melhor.custo) melhor = { custo, notas };
   }
-  return { baixo: grave, acorde: melhor.notas };
+  // canto muito grave: o que ainda passaria do limite sai (o baixo continua dando o acorde)
+  const acorde = melhor.notas.filter((m, i) => m <= limite || i === 0);
+  // e o baixo uma oitava abaixo quando o canto desce até perto dele
+  let b = grave;
+  while (b > teto - 7 && b - 12 >= 28) b -= 12;
+  return { baixo: b, acorde };
 }
 
 // sala do ensaio: quanto do eco volta a cada passada numa linha de atraso (segundos) para ele cair 60 dB em "cauda"

@@ -648,6 +648,28 @@ export function linhasDaLetraComCifra(src) {
   return paraEditor(src).split('\n').filter(ehLinhaDeLetra).map((l) => l.replace(/\s+/g, ' ').trim());
 }
 
+// as linhas cantadas na ordem em que se canta (com os acordes no lugar): o refrão repetido ({chorus}, "[Repeat Chorus]")
+// entra de novo com as linhas dele, como a música soa (a partitura pelo áudio precisa da letra inteira, na ordem)
+export function linhasCantadas(src) {
+  const out = [];
+  let refrao = null; // as linhas do último refrão
+  let noRefrao = false;
+  for (const l of paraEditor(src).split('\n')) {
+    const cab = ehCabecalho(l);
+    if (cab) {
+      if (/^(repetir|repeat)\b/i.test(cab.nome)) { if (refrao) out.push(...refrao); noRefrao = false; continue; }
+      noRefrao = tipoDaParte(cab.nome) === 'chorus';
+      if (noRefrao) refrao = [];
+      continue;
+    }
+    if (!ehLinhaDeLetra(l)) continue;
+    const linha = l.replace(/\s+/g, ' ').trim();
+    out.push(linha);
+    if (noRefrao) refrao.push(linha);
+  }
+  return out;
+}
+
 // partes: [{ inicio: nº da linha (1 = primeira), tipo: 'refrao' | 'estrofe' | 'ponte' | 'pre-refrao' | 'intro' | 'final' }]
 export function aplicarEstrutura(src, partes) {
   const inicios = new Map((partes || []).filter((p) => Number.isInteger(p.inicio) && NOMES_PARTE[p.tipo]).map((p) => [p.inicio, p.tipo]));
