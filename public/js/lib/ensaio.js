@@ -104,3 +104,7 @@ export function notasDoAcorde({ raiz, tipo = 0, baixo = null }, anterior = null)
   }
   return { baixo: grave, acorde: melhor.notas };
 }
+
+// sala do ensaio: quanto do eco volta a cada passada numa linha de atraso (segundos) para ele cair 60 dB em "cauda"
+// segundos. Sempre abaixo de 1 (com folga): acima disso o eco cresce sozinho e vira microfonia
+export const voltaDaSala = (atraso, cauda = 1.8) => Math.min(0.95, 10 ** ((-3 * atraso) / Math.max(0.1, cauda)));

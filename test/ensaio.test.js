@@ -69,3 +69,16 @@ test('piano mais cheio: meio pedal até a barra e o acompanhamento pela cifra', 
   const media = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
   assert.ok(Math.abs(media(g.acorde) - media(d.acorde)) <= 3);
 });
+
+test('sala do ensaio: o eco sempre diminui a cada volta (sem microfonia)', async () => {
+  const { voltaDaSala } = await import('../public/js/lib/ensaio.js');
+  for (const atraso of [0.0297, 0.0371, 0.0411, 0.0437, 0.09]) {
+    for (const cauda of [0.5, 1.8, 5, 60]) {
+      const g = voltaDaSala(atraso, cauda);
+      assert.ok(g > 0 && g < 1, `${atraso}/${cauda}: ${g}`);
+    }
+  }
+  // 1,8 s de cauda: depois de 1,8 s de voltas, o eco caiu 60 dB (1000 vezes)
+  const g = voltaDaSala(0.0297, 1.8);
+  assert.ok(Math.abs(g ** (1.8 / 0.0297) - 0.001) < 1e-4);
+});
