@@ -168,10 +168,12 @@ test('IA: andamento exato (em décimos) numa música longa e o 6/8 pela semínim
   const notas = banda(84.6, 64, 8, 2);
   const bpm = estimarAndamento(notas);
   assert.ok(Math.abs(bpm - 84.6) <= 0.2, `andamento ${bpm}`);
-  // com ele, a última nota (4º tempo do compasso 64) cai no lugar; com 85 inteiro, cairia um tempo depois
+  // a última nota (4º tempo do compasso 64) cai no lugar; e mesmo com o andamento um pouco errado (85, ou 83,5), a
+  // grade segue os tempos da música e ela não escorrega (antes, com 85, caía um tempo depois)
   const ondeCai = (b) => { const mel = melodiaDasNotas(notas, { bpm: b }); return mel.slice(0, -1).reduce((a, e) => a + e.d, 0); };
   assert.equal(ondeCai(bpm), 63 * 32 + 24);
-  assert.equal(ondeCai(85), 63 * 32 + 32);
+  assert.equal(ondeCai(85), 63 * 32 + 24);
+  assert.equal(ondeCai(83.5), 63 * 32 + 24);
   // 6/8 (colcheia a 0,25 s: "um-dois-três" a 80 por minuto): a semínima da partitura é 2 colcheias = 120
   assert.ok(Math.abs(estimarAndamento(banda(120, 24, 6, 3)) - 120) <= 1, `6/8: ${estimarAndamento(banda(120, 24, 6, 3))}`);
   // 3/4 com colcheias (tempo em 2) não vira 6/8
@@ -200,6 +202,31 @@ test('IA: balada com sílabas rápidas (semicolcheias) e notas repetidas: nenhum
   // e cada uma no seu lugar, com a sua figura (em semicolcheias: tique 2)
   const figuras = mel.filter((e) => e.a.length).map((e) => e.d / 2);
   assert.deepEqual(figuras.slice(0, 11), frase.map(([, len]) => len));
+});
+
+test('IA: a grade segue o cantor que acelera e segura (rubato): as sílabas rápidas continuam no lugar', async () => {
+  const { melodiaDasNotas } = await import('../public/js/lib/partitura.js');
+  // 16 compassos a ~70 bpm; o cantor vai acelerando até 8% e segura o fim de cada frase de 4 compassos (até 15% mais
+  // lento); a frase tem semicolcheias. Com um andamento só, o meio e o fim saíam da grade
+  const frase = [[62, 2], [64, 1], [66, 1], [67, 4], [69, 2], [67, 1], [66, 1], [64, 4]]; // 16 semicolcheias
+  const notas = [];
+  let t = 1;
+  let k = 0;
+  const alturas = [];
+  for (let c = 0; c < 16; c++) {
+    for (const [p, len] of frase) {
+      const ritmo = 1 - 0.08 * (k / 256) + ((k % 64) >= 48 ? 0.15 * (((k % 64) - 48) / 16) : 0);
+      const dur = len * (15 / 70) * ritmo;
+      notas.push({ startTimeSeconds: t, durationSeconds: dur * 0.8, pitchMidi: p, amplitude: 0.75 });
+      alturas.push(p);
+      t += dur;
+      k += len;
+    }
+  }
+  const mel = melodiaDasNotas(notas, { bpm: 70 }).filter((e) => e.a.length);
+  assert.equal(mel.length, alturas.length);
+  // e as figuras certas (em semicolcheias), do começo ao fim
+  assert.deepEqual(mel.map((e) => e.d / 2), alturas.map((_, i) => frase[i % frase.length][1]));
 });
 
 test('IA: voz grave na clave de tenor e música que começa no contratempo', async () => {

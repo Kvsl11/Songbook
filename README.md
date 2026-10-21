@@ -68,10 +68,14 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   que ouviu) e andamento e põe no compasso. O andamento (`estimarAndamento`) sai dos intervalos entre as notas e é
   afinado em décimos com todas elas (baixo e acordes inclusive): com bpm inteiro, a grade já escorregava um tempo no
   fim de uma música longa; e o tempo dividido em 3 (6/8) é escrito pela semínima, não pela semínima pontuada. A
-  grade das notas é acertada na semicolcheia (onde quase toda nota cai) e só depois no tempo: as sílabas rápidas
-  depois do tempo puxavam a grade para a frente e as notas eram lidas tarde. As sílabas rápidas (semicolcheias) e as
-  notas repetidas na mesma altura (com o respiro da consoante entre elas) ficam na partitura, em vez de sumirem dentro
-  da vizinha. No fim, a partitura pronta já toca ali mesmo (o mesmo ensaio do editor,
+  **grade segue o cantor** (`gradeDasNotas`): a cada tempo, as notas em volta dizem se ele veio um pouco antes ou
+  depois do previsto e a grade vai junto (correções de menos de meia semicolcheia, que nunca pulam uma nota), então o
+  rubato e a frase que segura no fim não tiram as sílabas rápidas do lugar; onde ela começa, decide a primeira nota
+  forte e qual das 4 semicolcheias põe mais notas fortes nos tempos. Na melodia só entram as notas quase tão fortes
+  quanto o canto daquele trecho (`notasDoCanto`: o dedilhado do violão e o baixo da banda entravam quando a nota
+  cantada acabava antes da hora), e o buraco que a IA deixa no fim da nota cantada vira a nota ligada (a pausa da
+  respiração fica). As sílabas rápidas (semicolcheias) e as notas repetidas na mesma altura (com o respiro da
+  consoante entre elas) ficam na partitura, em vez de sumirem dentro da vizinha. No fim, a partitura pronta já toca ali mesmo (o mesmo ensaio do editor,
   e tocar numa nota ouve dali), com os ajustes recolhidos e os botões **Salvar partitura**, **Editar** e
   **Descartar e gerar de novo**. O áudio também pode vir de outro app do Android: **Compartilhar → Songbook**
   (`share_target` do manifesto; o service worker guarda o arquivo e o app pergunta de qual música ele é). Por padrão a IA
