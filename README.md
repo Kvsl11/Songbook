@@ -59,7 +59,9 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   **Nova partitura** (escolhendo a música) e **Gerar com IA**: escolha o arquivo de áudio da música (ou arraste, no
   computador) e o modelo **Basic Pitch** (Spotify, código
   aberto, roda no próprio aparelho) transforma o som em notas; o app escolhe a melodia, acha tom (pela cifra ou pelo
-  que ouviu) e andamento e põe no compasso. No fim, a partitura pronta já toca ali mesmo (o mesmo ensaio do editor,
+  que ouviu) e andamento e põe no compasso. O andamento (`estimarAndamento`) sai dos intervalos entre as notas e é
+  afinado em décimos com todas elas (baixo e acordes inclusive): com bpm inteiro, a grade já escorregava um tempo no
+  fim de uma música longa; e o tempo dividido em 3 (6/8) é escrito pela semínima, não pela semínima pontuada. No fim, a partitura pronta já toca ali mesmo (o mesmo ensaio do editor,
   e tocar numa nota ouve dali), com os ajustes recolhidos e os botões **Salvar partitura**, **Editar** e
   **Descartar e gerar de novo**. O áudio também pode vir de outro app do Android: **Compartilhar → Songbook**
   (`share_target` do manifesto; o service worker guarda o arquivo e o app pergunta de qual música ele é). Por padrão a IA
