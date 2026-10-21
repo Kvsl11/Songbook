@@ -45,6 +45,8 @@ const P = {
   refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>',
   play: '<path d="M6 4l14 8-14 8z" fill="currentColor"/>',
   pause: '<path d="M7 4h3v16H7zM14 4h3v16h-3z" fill="currentColor"/>',
+  som: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19.5 5.5a9 9 0 0 1 0 13"/>',
+  mudo: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9.5l5 5M22 9.5l-5 5"/>',
   columns: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/>',
   chord: '<path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"/>',
   text: '<path d="M4 7V4h16v3M9 20h6M12 4v16"/>',

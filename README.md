@@ -62,11 +62,15 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   que ouviu) e andamento e põe no compasso. No fim, a partitura pronta já toca ali mesmo (o mesmo ensaio do editor,
   e tocar numa nota ouve dali), com os ajustes recolhidos e os botões **Salvar partitura**, **Editar** e
   **Descartar e gerar de novo**. O áudio também pode vir de outro app do Android: **Compartilhar → Songbook**
-  (`share_target` do manifesto; o service worker guarda o arquivo e o app pergunta de qual música ele é). Em **Vozes**, *Coral
-  a 4 vozes* separa as notas que soam juntas em **Soprano, Contralto, Tenor e Baixo** (cada uma na sua pauta e clave,
-  sem cruzar as vozes e seguindo a linha de cada uma: `vozesDasNotas`). É um rascunho: funciona melhor com voz e
-  violão (ou o coral sozinho) do que com banda completa. Com mais de uma voz, a partitura mostra o nome de cada pauta
-  e o ensaio usa esses nomes para tocar uma voz só.
+  (`share_target` do manifesto; o service worker guarda o arquivo e o app pergunta de qual música ele é). Por padrão a IA
+  escreve o **coral a 4 vozes**: separa as notas que soam juntas em **Soprano, Contralto, Tenor e Baixo** (cada uma na
+  sua pauta e clave, sem cruzar as vozes e seguindo a linha de cada uma: `vozesDasNotas`); em *Ajustar o rascunho* dá
+  para trocar por *Só a melodia*. É um rascunho: funciona melhor com voz e violão (ou o coral sozinho) do que com banda
+  completa.
+- **Mixer das vozes no ensaio** (na partitura salva, no editor e no fim da IA): cada voz com o seu volume e um botão
+  de silenciar; tocar no nome **destaca** a voz e deixa as outras baixinho, de fundo (`destacarVoz`), para a pessoa se
+  localizar. O volume muda na hora, tocando (cada voz tem o seu controle de volume no Web Audio), e fica guardado por
+  música e pelo nome da voz (`volumesPeloNome`). O mixer recolhe numa linha só.
 - **Buscar (qualquer música)**: digite música, artista ou trecho e aparece uma lista só de **Músicas** (resultados do
   Cifra Club e do Letras juntos) e os **Vídeos** do YouTube. Tocar numa música já traz tudo junto: a **cifra** (Cifra
   Club, que já tem a letra; sem cifra, a letra do Letras), o **vídeo** do YouTube e o compositor. Um vídeo tocado
