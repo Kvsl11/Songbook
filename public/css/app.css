@@ -65,8 +65,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
    e o justificado abria espaços desiguais entre as palavras */
 body { hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; text-wrap: pretty; }
 /* sem hífen: títulos, campos de digitar, a cifra/letra das músicas, código e o que é tabular */
-h1, h2, h3, h4, input, select, textarea, .song, .song *, .chord, pre, code, .tab, svg text, [contenteditable] {
+h1, h2, h3, h4, input, select, textarea, .chord, pre, code, .tab, svg text, [contenteditable] {
   text-align: start; hyphens: manual; -webkit-hyphens: manual; }
+/* a letra da música também não quebra palavra com hífen, mas o alinhamento fica com ela (centralizada no painel) */
+.song, .song * { hyphens: manual; -webkit-hyphens: manual; }
 /* sem o retângulo azul do Android ao tocar: o retorno do toque segue o formato de cada elemento */
 * { -webkit-tap-highlight-color: transparent; }
 :focus:not(:focus-visible) { outline: none; }
@@ -403,8 +405,10 @@ a.chip.sm { cursor: pointer; }
 .song.lyrics-mode.with-chords .line { display: flex; flex-wrap: wrap; align-items: flex-end; margin-bottom: 0.25em; }
 .song.lyrics-mode.with-chords .lyrics-only .chord { display: none; }
 .song.lyrics-mode.with-chords .section:not(.chorus) { color: #fff; }
-/* letra centralizada (cifra e letra, normal e tela cheia) */
-.song.lyrics-mode { text-align: center; }
+/* letra centralizada (cifra e letra, normal e tela cheia): as linhas, os nomes das partes e as observações;
+   dentro de cada trecho o acorde continua no começo da sílaba */
+.song.lyrics-mode, .song.lyrics-mode .section, .song.lyrics-mode .line { text-align: center; }
+.song.lyrics-mode.with-chords .chunk { text-align: start; }
 .song.lyrics-mode.with-chords .line { justify-content: center; }
 .song.lyrics-mode .section-label, .song.lyrics-mode .comment { text-align: center; }
 /* duas colunas: só em telas largas (tablet deitado/computador); no celular o botão some */
