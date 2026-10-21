@@ -61,13 +61,9 @@ a { color: inherit; }
 button, input, select, textarea { font: inherit; color: inherit; }
 
 /* hifenização em português em todo o app (o <html lang="pt-BR"> diz o idioma): só quebra a palavra com hífen
-   quando ela não cabe no fim da linha, separando pelas sílabas */
+   quando ela não cabe no fim da linha, separando pelas sílabas. Sem justificar: na tela do celular a linha é curta
+   e o justificado abria espaços desiguais entre as palavras */
 body { hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; text-wrap: pretty; }
-/* justificado só nos parágrafos de leitura, que têm largura para isso. Em coisa estreita (avisos, notificações,
-   botões, cartões, descrições curtas), justificar abria buracos enormes entre as palavras: lá fica à esquerda */
-:where(p, .leitura, .texto-liturgico, .texto-extra) { text-align: justify; }
-/* parágrafos dentro de blocos centralizados continuam centralizados */
-:where(.page-hero, .empty, .part-vazia, .ia-gravando, .ia-analisando, .ia-solte, .versiculo, .loading-note) p { text-align: inherit; }
 /* sem hífen: títulos, campos de digitar, a cifra/letra das músicas, código e o que é tabular */
 h1, h2, h3, h4, input, select, textarea, .song, .song *, .chord, pre, code, .tab, svg text, [contenteditable] {
   text-align: start; hyphens: manual; -webkit-hyphens: manual; }
