@@ -52,9 +52,15 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   toca; na partitura e no editor (ouvindo), tocar numa nota leva a música para ali e toca a partir dela.
   Partitura grande no editor: só um trecho de compassos em volta da nota escolhida é desenhado (8 com 4 vozes, até
   16 com uma), com ‹ › para andar; ouvir toca a partitura inteira.
+- **Servidor do app (Render)**: o GitHub Pages só serve as páginas; o áudio dos vídeos para a IA vem de um servidor
+  Node com o yt-dlp (`Dockerfile`, `render.yaml`). Para criar: render.com → *New* → *Blueprint* → este repositório (plano
+  grátis; dorme sem uso e o primeiro pedido do dia demora ~1 min). O endereço fica em `public/js/config.js`
+  (`https://songbook-audio.onrender.com`). Se o YouTube bloquear o servidor ("confirme que não é um robô"), cole o
+  conteúdo de um `cookies.txt` de uma conta do YouTube na variável `YTDLP_COOKIES` do serviço no Render; se parar de
+  baixar depois de uma mudança do YouTube, *Manual Deploy → Clear build cache & deploy* traz o yt-dlp mais novo.
 - **Partituras** (menu do app): as partituras feitas no app e as prontas (acervo/Hinário) das músicas da biblioteca, com
-  **Nova partitura** (escolhendo a música) e **Gerar com IA**: o app ouve a música pelo microfone (com o vídeo
-  tocando), pelo som de uma aba (computador) ou de um arquivo de áudio, e o modelo **Basic Pitch** (Spotify, código
+  **Nova partitura** (escolhendo a música) e **Gerar com IA**: um toque só — o servidor do app baixa o áudio do
+  vídeo da música (yt-dlp, `server/audio.js`; se falhar, dá para escolher um arquivo de áudio) e o modelo **Basic Pitch** (Spotify, código
   aberto, roda no próprio aparelho) transforma o som em notas; o app escolhe a melodia, acha tom (pela cifra ou pelo
   que ouviu) e andamento, põe no compasso e mostra a prévia para ajustar antes de abrir no editor. Em **Vozes**, *Coral
   a 4 vozes* separa as notas que soam juntas em **Soprano, Contralto, Tenor e Baixo** (cada uma na sua pauta e clave,
