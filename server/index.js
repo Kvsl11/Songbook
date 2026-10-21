@@ -113,6 +113,8 @@ export function createServer() {
         return send(res, e.status || 502, JSON.stringify({ erro: e.message }));
       }
     }
+    // "Compartilhar → Songbook" antes de o service worker estar ativo (ele é quem guarda o arquivo): só abre o app
+    if (req.method === 'POST' && url.pathname === '/compartilhar') return send(res, 303, '', 'text/plain', { Location: '/#/compartilhado' });
     const route = routes[url.pathname];
     if (!route) return serveStatic(req, res, url.pathname);
     try {

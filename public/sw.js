@@ -5,7 +5,7 @@
 //   (a anterior continua) e tenta de novo depois;
 // - dados (liturgia, músicas, partituras, API): "rede primeiro", com a cópia local como reserva offline;
 // - ao publicar uma versão nova, mude VERSION: o app baixa o pacote novo e recarrega sozinho com ele.
-const VERSION = 'songbook-v161';
+const VERSION = 'songbook-v162';
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/store.js', 'js/render.js', 'js/chordpro.js', 'js/icons.js', 'js/pdf.js', 'js/powerpoint.js', 'js/lib/pptx-missa.js', 'js/lib/pptx-simples.js', 'js/fonte.js', 'js/lib/html.js', 'js/lib/cnbb.js', 'js/lib/cindy.js', 'js/lib/missa.js', 'js/lib/mpm.js', 'js/lib/pocket.js', 'js/lib/web.js', 'js/lib/acervo.js', 'js/lib/hinario.js', 'js/lib/sugestoes-liturgicas.js', 'js/lib/revisor.js', 'js/lib/ensaio.js', 'js/lib/partitura.js', 'js/lib/cores.js', 'js/lib/avisos.js', 'js/lib/piano.js', 'js/config.js', 'js/acordes.js', 'icon.svg', 'icon-192-v7.png', 'icon-512-v7.png', 'apple-touch-icon-v7.png', 'manifest.webmanifest'];
 
 // caminhos (absolutos) dos arquivos do pacote, para reconhecer as requisições
@@ -25,10 +25,11 @@ self.addEventListener('install', (e) => {
 // caches que sobrevivem às versões do app (capas, fontes e bibliotecas de terceiros)
 const IMAGENS = 'songbook-imagens';
 const EXTRAS = 'songbook-extras';
+const COMPARTILHADO = 'songbook-compartilhado'; // o áudio que chegou pelo "Compartilhar" do celular
 const MAX_IMAGENS = 400;
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => !k.startsWith(VERSION) && k !== IMAGENS && k !== EXTRAS).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => !k.startsWith(VERSION) && k !== IMAGENS && k !== EXTRAS && k !== COMPARTILHADO).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
 // rede primeiro; se a rede demorar (sinal fraco) e houver cópia guardada, usa a cópia
@@ -53,8 +54,30 @@ async function limitar(nome, max) {
   for (const k of chaves.slice(0, Math.max(0, chaves.length - max))) await c.delete(k);
 }
 
+// "Compartilhar → Songbook" (share_target do manifesto): o Android manda o áudio por POST. O arquivo fica guardado
+// e o app abre na tela que pergunta de qual música ele é, para a IA escrever a partitura.
+async function receberCompartilhado(req) {
+  try {
+    const dados = await req.formData();
+    const arquivo = dados.getAll('audio').find((f) => f && typeof f !== 'string' && f.size);
+    const c = await caches.open(COMPARTILHADO);
+    await Promise.all((await c.keys()).map((k) => c.delete(k)));
+    if (arquivo) {
+      await c.put('audio', new Response(arquivo, { headers: {
+        'Content-Type': arquivo.type || 'application/octet-stream',
+        'X-Nome': encodeURIComponent(arquivo.name || 'audio'),
+      } }));
+    }
+  } catch { /* sem o arquivo, o app avisa */ }
+  return Response.redirect(new URL('./#/compartilhado', self.registration.scope).href, 303);
+}
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
+  if (req.method === 'POST' && new URL(req.url).pathname === new URL('compartilhar', self.registration.scope).pathname) {
+    e.respondWith(receberCompartilhado(req));
+    return;
+  }
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 

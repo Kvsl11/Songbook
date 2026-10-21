@@ -53,7 +53,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-161';
+export const APP_VERSAO = '2026.10.21-162';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4673,7 +4673,48 @@ async function gerarComIA(song, titulo) {
     };
     previa();
   }
-  automatico();
+  // áudio que chegou pelo "Compartilhar" do celular: vai direto para a IA
+  if (audioCompartilhado) { const a = audioCompartilhado; audioCompartilhado = null; lerArquivo(a); } else automatico();
+}
+
+// "Compartilhar → Songbook" no Android: o service worker guarda o áudio (cache COMPARTILHADO do sw.js) e abre
+// esta tela, que pergunta de qual música ele é e manda para a IA escrever a partitura. Assim dá para baixar o áudio
+// em outro app e trazer para cá com um toque, sem procurar o arquivo.
+const CACHE_COMPARTILHADO = 'songbook-compartilhado';
+let audioCompartilhado = null; // o arquivo escolhido, à espera da tela da IA
+async function viewCompartilhado() {
+  setTab('partituras');
+  setTint('#2c3b3d');
+  setHeader('Áudio recebido', { back: '#/partituras', eyebrow: 'Gerar partitura com IA' });
+  view.innerHTML = `<div class="loading-note"><span class="spin"></span>Abrindo o áudio…</div>`;
+  let arquivo = null;
+  try {
+    const r = await (await caches.open(CACHE_COMPARTILHADO)).match('audio');
+    if (r) {
+      const nome = decodeURIComponent(r.headers.get('X-Nome') || 'audio');
+      const blob = await r.blob();
+      arquivo = new File([blob], nome, { type: blob.type || r.headers.get('Content-Type') || '' });
+    }
+  } catch { /* sem cache: o arquivo não chegou */ }
+  if (location.hash !== '#/compartilhado') return;
+  if (!arquivo) {
+    view.innerHTML = `<div class="ia"><div class="aviso">${icon('info', 18)}<span>O áudio não chegou. Compartilhe de novo pelo app onde ele está (Compartilhar → Songbook) ou escolha o arquivo em Partituras → Gerar com IA.</span></div>
+      <div class="row"><a class="btn primary" href="#/partituras">${icon('score', 16)} Ir para Partituras</a></div></div>`;
+    return;
+  }
+  const mb = (arquivo.size / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+  view.innerHTML = `<div class="ia"><div class="ia-fontes"><div class="ia-fonte destaque">
+      <div class="ia-fonte-cab"><span class="part-acao-ic">${icon('upload', 22)}</span><div><b>${esc(arquivo.name)}</b><small>${mb} MB · a IA ouve e escreve a partitura da música que você escolher</small></div></div>
+      <div class="ia-fonte-acts"><button class="btn small primary" id="comp-escolher">${icon('sparkles', 15)} Escolher a música</button></div></div></div></div>`;
+  const escolher = async () => {
+    const s = await escolherMusica('Este áudio é de qual música?');
+    if (!s || location.hash !== '#/compartilhado') return;
+    audioCompartilhado = arquivo;
+    caches.open(CACHE_COMPARTILHADO).then((c) => c.delete('audio')).catch(() => {});
+    location.hash = `#/musica/${s.id}/compor/ia`;
+  };
+  $('#comp-escolher').onclick = escolher;
+  escolher();
 }
 
 async function viewPartitura(id) {
@@ -6852,6 +6893,7 @@ function route() {
     case 'liturgia': return viewLiturgia(b);
     case 'ajustes': return viewSettings();
     case 'partituras': return viewPartituras();
+    case 'compartilhado': return viewCompartilhado();
     case 'oracoes': return viewOracoes();
     case 'oracao': return viewOracao(b);
     case 'fontes': return viewFontes();
