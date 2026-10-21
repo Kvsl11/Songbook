@@ -7,7 +7,7 @@ import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, carregarJSZip, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
 import { COLECOES_LITURGICAS, parteFixa, PARTES_FIXAS, tempoDe, TEMPOS } from './lib/acervo.js';
 import { sugerirParaODia } from './lib/sugestoes-liturgicas.js';
-import { revisarRepertorio } from './lib/revisor.js';
+import { revisarRepertorio, NOME_PARTE } from './lib/revisor.js';
 import { duracaoTotal, nomearVozes, passoNoTempo, segundosPorSemibreve, volumeDa } from './lib/ensaio.js';
 import {
   acordesDoTom as acordesDaArmadura, alterar, alturaPeloNome, CLAVES, COMPASSOS, deMusicXML, distribuirLetra, DURACOES, emCompassos, frequenciaDa, midiDa, moverGrau,
@@ -5802,11 +5802,20 @@ async function revisarSet(set) {
       ${o.fonte !== 'cnbb' && !o.popular ? `<button class="icon-btn" data-ver-sug="${k}:${j}" aria-label="Ver" title="Ver a música">${icon('next', 16)}</button>` : ''}<button class="btn small" data-trocar="${k}:${j}">Trocar</button></div>`).join('')}</div>`;
   };
   const n = (nv) => avisos.filter((a) => a.nivel === nv).length;
-  const resumo = avisos.length ? [n('erro') && `${n('erro')} ${n('erro') > 1 ? 'erros' : 'erro'}`, n('atencao') && `${n('atencao')} ${n('atencao') > 1 ? 'atenções' : 'atenção'}`, n('info') && `${n('info')} ${n('info') > 1 ? 'observações' : 'observação'}`].filter(Boolean).join(' · ') : 'Tudo certo';
-  const ic = { erro: 'x', atencao: 'info', info: 'check' };
-  box.innerHTML = `<details class="revisao ${n('erro') ? 'com-erro' : n('atencao') ? 'com-atencao' : 'ok'}" ${n('erro') || n('atencao') ? 'open' : ''}>
-    <summary>${icon(avisos.length ? 'cross' : 'check', 18)}<span><b>Revisão litúrgica</b><small>${esc(lit.celebracao || '')}</small><em class="rev-resumo">${resumo}</em></span><span class="chip sm">${resumo}</span>${avisos.length ? icon('down', 18) : ''}</summary>
-    ${avisos.length ? `<ul>${avisos.map((a, k) => `<li class="${a.nivel}"><div class="rev-aviso" ${a.i !== undefined ? `data-ir="${a.i}"` : ''}>${icon(ic[a.nivel], 15)}<span>${esc(a.texto)}</span></div>${sugestoesHTML(a, k)}</li>`).join('')}</ul>`
+  const ic = { erro: 'x', atencao: 'alerta', info: 'info' };
+  const rotulo = { erro: ['erro', 'erros'], atencao: ['atenção', 'atenções'], info: ['observação', 'observações'] };
+  const contas = avisos.length
+    ? ['erro', 'atencao', 'info'].filter(n).map((nv) => `<span class="rev-n ${nv}">${icon(ic[nv], 12)}${n(nv)} ${rotulo[nv][n(nv) > 1 ? 1 : 0]}</span>`).join('')
+    : `<span class="rev-n ok">${icon('check', 12)}Tudo certo com a liturgia</span>`;
+  const estado = n('erro') ? 'com-erro' : n('atencao') ? 'com-atencao' : avisos.length ? 'com-info' : 'ok';
+  const cor = corLiturgica(lit);
+  const dot = cor.cor ? `<span class="dot" style="background:${cor.cor === 'branco' ? '#fff' : CORES[cor.cor] || 'currentColor'}" title="Cor ${esc(cor.nome)}"></span>` : '';
+  const etiqueta = { erro: 'Erro', atencao: 'Atenção', info: 'Observação' };
+  box.innerHTML = `<details class="revisao ${estado}" ${n('erro') || n('atencao') ? 'open' : ''}>
+    <summary><span class="rev-selo">${icon(n('erro') ? 'x' : n('atencao') ? 'alerta' : 'check', 18)}</span>
+      <span class="rev-tit"><b>Revisão litúrgica</b><small>${dot}${esc(lit.celebracao || '')}</small><span class="rev-contas">${contas}</span></span>${avisos.length ? icon('down', 18) : ''}</summary>
+    ${avisos.length ? `<ul>${avisos.map((a, k) => `<li class="${a.nivel}"><div class="rev-aviso" ${a.i !== undefined ? `data-ir="${a.i}"` : ''}><span class="rev-ic">${icon(ic[a.nivel], 14)}</span>
+      <span class="rev-txt"><span class="rev-tag">${etiqueta[a.nivel]}${a.parte && NOME_PARTE[a.parte] ? `<i>${esc(NOME_PARTE[a.parte])}</i>` : ''}</span>${esc(a.texto)}</span></div>${sugestoesHTML(a, k)}</li>`).join('')}</ul>`
     : ''}</details>`;
   if (!avisos.length) $('summary', box).addEventListener('click', (e) => e.preventDefault());
   // trocar a música do aviso por uma sugestão (a parte da missa continua a mesma) ou tirá-la do repertório

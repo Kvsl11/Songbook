@@ -64,7 +64,7 @@ test('qualquer música: tempo pelo endereço ou pela letra, canto não religioso
   const t = textos(avisos);
   assert.match(t, /“Vem, Senhor” é do Advento; esta missa é da Quaresma/);
   assert.match(t, /A letra de “Pão do céu” fala da Páscoa/);
-  assert.match(t, /“Evidências” não parece um canto religioso/);
+  assert.match(t, /“Evidências” não é um canto religioso/);
   assert.match(t, /Gabriela Rocha, artista evangélico/);
 });
 
@@ -73,7 +73,7 @@ test('fontes católicas e letras de Páscoa no Tempo Comum não geram alarme fal
     it('Comunhão', 'Ele vive', { letra: 'Cristo ressuscitou, ele vive entre nós, aleluia' }),
     it('Entrada', 'DR', { source: 'acervo:x:0', letra: 'la la la la la la la la la la la la la la la la la la la la la la la la la la la la' }),
   ]);
-  assert.doesNotMatch(textos(avisos), /fala da Páscoa|não parece um canto religioso/);
+  assert.doesNotMatch(textos(avisos), /fala da Páscoa|não é um canto religioso/);
 });
 
 test('cada aviso de música diz o que fazer: trocar (com a parte) ou tirar', () => {

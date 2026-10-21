@@ -1526,24 +1526,40 @@ a.source { text-decoration: none; color: inherit; }
 .sentido p { margin: 0; font-family: var(--serif); font-size: 16px; line-height: 1.55; }
 
 /* ============================================================ revisão litúrgica do repertório */
-.revisao { margin: 0 0 14px; border-radius: 12px; background: var(--surface); overflow: hidden; }
+.revisao { --rev: var(--muted); --rev-soft: rgb(127 127 127 / 0.12); margin: 0 0 14px; border-radius: 14px; background: var(--surface); overflow: hidden; border: 1px solid var(--border); border-left: 4px solid var(--rev); }
+.revisao.ok { --rev: #1ed760; --rev-soft: rgb(30 215 96 / 0.14); }
+.revisao.com-atencao { --rev: #e3b341; --rev-soft: rgb(227 179 65 / 0.16); }
+.revisao.com-erro { --rev: var(--danger); --rev-soft: var(--danger-soft); }
 .revisao.carregando { display: flex; align-items: center; gap: 10px; padding: 12px 14px; color: var(--muted); font-size: 14px; }
-.revisao summary { display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; list-style: none; }
+.revisao.carregando svg { animation: rev-pulsa 1.2s ease-in-out infinite; color: var(--accent); }
+@keyframes rev-pulsa { 50% { opacity: 0.35; transform: scale(0.9); } }
+.revisao summary { display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; list-style: none; background: linear-gradient(90deg, var(--rev-soft), transparent 70%); }
 .revisao summary::-webkit-details-marker { display: none; }
-.revisao summary > span:first-of-type { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.revisao summary small { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.revisao summary > svg:first-child { flex: none; }
-.revisao.ok summary > svg:first-child { color: #1ed760; }
-.revisao.com-atencao summary > svg:first-child { color: #e3b341; }
-.revisao.com-erro summary > svg:first-child { color: var(--danger); }
+.revisao .rev-selo { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: var(--rev-soft); color: var(--rev); }
+.revisao .rev-tit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.revisao .rev-tit b { font-size: 15px; }
+.revisao summary small { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.revisao summary small .dot { flex: none; width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 1px rgb(127 127 127 / 0.5); }
+.revisao .rev-contas { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.revisao .rev-n { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 6px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: var(--surface-2); color: var(--muted); }
+.revisao .rev-n.erro { background: var(--danger-soft); color: var(--danger); }
+.revisao .rev-n.atencao { background: rgb(227 179 65 / 0.16); color: #c9951c; }
+.revisao .rev-n.ok { background: rgb(30 215 96 / 0.14); color: #17a84b; }
+.revisao summary > svg:last-child { flex: none; color: var(--muted); transition: transform 0.2s; }
 .revisao[open] summary > svg:last-child { transform: rotate(180deg); }
-.revisao ul { list-style: none; margin: 0; padding: 0 10px 10px; display: grid; gap: 4px; }
-.revisao li { padding: 8px 10px; border-radius: 8px; font-size: 14px; line-height: 1.45; }
+.revisao ul { list-style: none; margin: 0; padding: 4px 10px 10px; display: grid; gap: 6px; }
+.revisao li { --nv: var(--muted); padding: 10px 12px; border-radius: 10px; font-size: 14px; line-height: 1.45; background: var(--bg-elev); border-left: 3px solid var(--nv); }
+.revisao li.erro { --nv: var(--danger); background: var(--danger-soft); }
+.revisao li.atencao { --nv: #e3b341; }
 .revisao .rev-aviso { display: flex; gap: 10px; align-items: flex-start; }
-.revisao .rev-aviso svg { flex: none; margin-top: 2px; }
+.revisao .rev-ic { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: var(--nv); background: color-mix(in srgb, var(--nv) 16%, transparent); }
+.revisao .rev-txt { min-width: 0; }
+.revisao .rev-tag { display: flex; align-items: center; gap: 6px; margin-bottom: 1px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nv); }
+.revisao .rev-tag i { font-style: normal; font-weight: 700; letter-spacing: 0.02em; color: var(--muted); }
+.revisao .rev-tag i::before { content: '·'; margin-right: 6px; }
 .revisao .rev-aviso[data-ir] { cursor: pointer; }
-.revisao .rev-aviso[data-ir]:hover span { text-decoration: underline; text-decoration-color: var(--subtle); }
-.revisao .sugestoes { display: grid; gap: 6px; margin: 8px 0 2px 25px; }
+.revisao .rev-aviso[data-ir]:hover .rev-txt { text-decoration: underline; text-decoration-color: var(--subtle); }
+.revisao .sugestoes { display: grid; gap: 6px; margin: 8px 0 2px 36px; }
 .revisao .sug { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border-radius: 8px; background: var(--surface-2); }
 .revisao .sug > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .revisao .sug b { font-weight: 700; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -1551,10 +1567,6 @@ a.source { text-decoration: none; color: inherit; }
 .revisao .sug .icon-btn { flex: none; width: 32px; height: 32px; }
 .revisao .sug .btn { flex: none; }
 .revisao .sugestoes > .btn { justify-self: start; }
-.revisao li.erro { background: var(--danger-soft); }
-.revisao li.erro .rev-aviso svg { color: var(--danger); }
-.revisao li.atencao .rev-aviso svg { color: #e3b341; }
-.revisao li.info .rev-aviso svg { color: var(--muted); }
 @keyframes piscar { 0%, 100% { background: transparent; } 30% { background: var(--accent-soft); } }
 .set-item.piscar { animation: piscar 1.4s ease 1; }
 
@@ -1596,10 +1608,6 @@ label.check input[type="checkbox"]:focus-visible { outline: 2px solid var(--text
   .barra-sel #sel-cancelar, .barra-sel .btn.solid { flex: 1 1 40%; justify-content: center; }
 }
 
-/* revisão no celular: a contagem vai para baixo do título (ao lado, espremia o título) */
-.revisao summary b { white-space: nowrap; }
-.revisao .rev-resumo { display: none; font-style: normal; font-size: 12.5px; font-weight: 700; color: var(--text); }
-@media (max-width: 600px) { .revisao summary > .chip { display: none; } .revisao .rev-resumo { display: block; } }
 /* botão mostrando o progresso ("3/9 Salmo"): mesmo tamanho, texto cortado com reticências */
 .btn.progresso { overflow: hidden; justify-content: flex-start; }
 .btn.progresso .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
