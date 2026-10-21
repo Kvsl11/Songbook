@@ -1,6 +1,6 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
-import { definirMeta, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasDaLetraComCifra, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
+import { definirMeta, semInvisiveis, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasDaLetraComCifra, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
 import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
@@ -17,7 +17,7 @@ import {
 import { corCss, corDominante } from './lib/cores.js';
 import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
 import { duracaoDoAviso, partesDoAviso, tipoDoAviso } from './lib/avisos.js';
-import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-178';
+export const APP_VERSAO = '2026.10.21-180';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1950,7 +1950,7 @@ async function trazerLetra(item) {
 
 // texto colado (cifra de qualquer site, letra pura ou ChordPro) -> ChordPro com título e autor
 function textoParaChordPro(texto, { titulo = '', artista = '', url = '' } = {}) {
-  const t = String(texto || '').replace(/\r\n?/g, '\n').trim();
+  const t = semInvisiveis(texto).replace(/\r\n?/g, '\n').trim();
   let corpo;
   if (looksLikeChordPro(t) && !/^\s*\[[^\]]*[a-z]{3,}[^\]]*\]\s*$/m.test(t)) corpo = t;
   else if (t.split('\n').some(isChordOnlyLine)) corpo = cifraTextoParaChordPro(t);
@@ -5073,6 +5073,12 @@ function viewSong(id, ctx = {}) {
     else db.saveSong({ ...song, content: capoAntigo.content, capo: Math.min(11, (song.capo || 0) + capoAntigo.capo) });
     return viewSong(id, ctx);
   }
+  // cifra trazida com os caracteres invisíveis do Cifra Club (acordes que viraram texto): refaz uma vez
+  const reparada = repararCifraInvisivel(song.content);
+  if (reparada !== song.content) {
+    if (isPreview) preview.content = reparada; else db.saveSong({ ...song, content: reparada });
+    return viewSong(id, ctx);
+  }
   // sem refrão marcado: o app separa sozinho refrão, estrofes e ponte (uma vez; depois fica guardado)
   if (!String(song.source || '').startsWith('cnbb:')) {
     const organizada = organizarPartes(song.content);
@@ -5632,17 +5638,17 @@ async function dialogoTons(tomBase, transpose = 0, { titulo = 'Escolher o tom', 
 // ------------------------------------------------------------- editor
 
 // estrutura inicial de uma música nova (o usuário troca pelo próprio texto)
-const TEMPLATE_CORPO = `{start_of_chorus: Refrão}
+const TEMPLATE_CORPO = `{start_of_chorus}
 [C]Escreva aqui o re[G]frão
 {end_of_chorus}
 
-{start_of_verse: Estrofe 1}
+{start_of_verse: Verse 1}
 [C]Primeira estrofe, com os a[Am]cordes
 {end_of_verse}
 
 {chorus}
 
-{start_of_verse: Estrofe 2}
+{start_of_verse: Verse 2}
 Segunda estrofe (use "Completar cifra" para repetir os acordes)
 {end_of_verse}
 
@@ -5700,7 +5706,8 @@ function viewEditor(id, setId) {
   setTint(corDe({ ...song, title: song.title || 'nova' }));
   const { meta, corpo } = separarMeta(song.content);
   // formato do texto: acordes na linha de cima, entre [colchetes] ou só a letra (acordes preservados)
-  let formato = ['colchetes', 'letra'].includes(db.prefs().formatoEditor) ? db.prefs().formatoEditor : 'acima';
+  // "Só letra" não fica guardado: o editor sempre volta a abrir mostrando os acordes
+  let formato = db.prefs().formatoEditor === 'colchetes' ? 'colchetes' : 'acima';
   if (/^#\/editar\/[^/]+\/letra/.test(location.hash)) formato = 'letra';
   let baseLetra = paraEditor(corpo); // no modo "só a letra", os acordes vêm desta versão
   const actions = [];
@@ -5714,8 +5721,10 @@ function viewEditor(id, setId) {
   }
   const voltar = setDestino ? '#/repertorio/' + setDestino.id : isNew ? '#/biblioteca/musicas' : '#/musica/' + id;
   setHeader(isNew ? 'Nova música' : 'Editar cifra', { back: () => sair(), actions, eyebrow: setDestino ? 'Para: ' + setDestino.name : isNew ? '' : song.title });
-  const partes = [['Refrão', 'plus', 'Daqui para baixo é o refrão (até a próxima parte)'], ['Estrofe', 'plus', 'Daqui para baixo é uma estrofe (até a próxima parte)'],
-    ['Ponte', 'plus', 'Daqui para baixo é a ponte'], ['Intro', 'plus', 'Linha da introdução (acordes)'], ['Repetir refrão', 'refresh', 'Canta o refrão de novo aqui']];
+  // partes com os nomes em inglês (Chorus, Verse, Bridge…), como ficam na cifra
+  const partes = [['Chorus', 'plus', 'Refrão: daqui para baixo é o refrão (até a próxima parte)'], ['Verse', 'plus', 'Estrofe: daqui para baixo é uma estrofe (até a próxima parte)'],
+    ['Pre-Chorus', 'plus', 'Pré-refrão: a parte que vem logo antes do refrão'], ['Bridge', 'plus', 'Ponte: daqui para baixo é a ponte'], ['Intro', 'plus', 'Linha da introdução (acordes)'],
+    ['Repeat Chorus', 'refresh', 'Canta o refrão de novo aqui']];
   view.innerHTML = `
     <div class="editor ed2">
       <section class="ed-topo">
@@ -5773,7 +5782,7 @@ function viewEditor(id, setId) {
   const ta = $('#content');
   const campo = (k) => $('#f-' + k);
   // nos dois formatos o texto é normalizado para ChordPro ao salvar (linhas só de acordes viram [acordes])
-  // o texto do editor tem as partes como [Refrão], [Estrofe 2]…; ao salvar vira ChordPro
+  // o texto do editor tem as partes como [Chorus], [Verse 2]…; ao salvar vira ChordPro
   const corpoPro = () => doEditor(formato === 'letra' ? aplicarLetra(baseLetra, ta.value) : ta.value);
   const exibir = (pro) => {
     const simples = paraEditor(pro);
@@ -5786,8 +5795,8 @@ function viewEditor(id, setId) {
     composer: campo('composer').value.trim(), parte: campo('parte').value === '__outra' ? '' : campo('parte').value, extras: meta.extras,
   }, corpoPro());
   const DICAS = {
-    acima: 'Toque em <b>Refrão</b>, <b>Estrofe</b> ou <b>Ponte</b> na linha onde a parte começa: tudo dali para baixo pertence a ela, até a próxima. Escreva os acordes na linha de cima, alinhados com a sílaba:<br><code>[Refrão]<br>Am        G<br>Senhor, tende piedade</code>',
-    colchetes: 'Partes numa linha só: <code>[Refrão]</code>, <code>[Estrofe 2]</code>… Os acordes vão entre colchetes antes da sílaba: <code>[G]Senhor, tende pie[D]dade</code>.',
+    acima: 'Toque em <b>Chorus</b> (refrão), <b>Verse</b> (estrofe) ou <b>Bridge</b> (ponte) na linha onde a parte começa: tudo dali para baixo pertence a ela, até a próxima. Escreva os acordes na linha de cima, alinhados com a sílaba:<br><code>[Chorus]<br>Am        G<br>Senhor, tende piedade</code>',
+    colchetes: 'Partes numa linha só: <code>[Chorus]</code>, <code>[Verse 2]</code>… Os acordes vão entre colchetes antes da sílaba: <code>[G]Senhor, tende pie[D]dade</code>.',
     letra: 'Corrija ou reescreva só o texto, sem se preocupar com os acordes: ao salvar, cada acorde volta para a mesma sílaba. Linhas novas entram sem acordes.',
   };
   const dica = () => {
@@ -5799,7 +5808,7 @@ function viewEditor(id, setId) {
     if (b.dataset.formato === formato) return;
     const pro = corpoPro();
     formato = b.dataset.formato;
-    db.setPref('formatoEditor', formato);
+    if (formato !== 'letra') db.setPref('formatoEditor', formato);
     ta.value = exibir(pro);
     view.querySelectorAll('[data-formato]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     dica();
@@ -5951,7 +5960,7 @@ function viewEditor(id, setId) {
       ta.setSelectionRange(ta.selectionStart - t.length + 1, ta.selectionStart - 1);
       return;
     }
-    if (nome === 'Estrofe') nome = `Estrofe ${(v.match(/^\s*\[estrofe\b/gim) || []).length + 1}`;
+    if (nome === 'Verse') nome = `Verse ${(v.match(/^\s*\[(verse|estrofe)\b/gim) || []).length + 1}`;
     const pos = ta.selectionStart;
     const ini = v.lastIndexOf('\n', pos - 1) + 1;
     let fim = v.indexOf('\n', pos);
@@ -6825,68 +6834,84 @@ function viewSettings() {
   const p = db.prefs();
   const accent = p.accent || COR_PADRAO;
   const personalizada = /^#/.test(accent) && !CORES_DESTAQUE.some(([c]) => c === accent);
+  const nMusicas = db.songs().length;
+  const nRepertorios = db.sets().length;
+  const nVideos = db.songs().filter((s) => s.youtube).length;
+  // seção com título, ícone e uma linha explicando; o atalho do topo leva até ela
+  const SECOES = [['aparencia', 'palette', 'Aparência'], ['cifras', 'chord', 'Cifras'], ['musica', 'music', 'Música'], ['pptx', 'grid', 'PowerPoint'], ['dados', 'database', 'Dados'], ['sobre', 'info', 'Sobre']];
+  const secao = (id, sub, corpo) => {
+    const [, ic, nome] = SECOES.find(([k]) => k === id);
+    return `<section class="aj-sec" id="aj-${id}"><h3 class="aj-titulo"><span class="aj-titulo-ic">${icon(ic, 16)}</span>${nome}</h3>${sub ? `<p class="aj-sub">${sub}</p>` : ''}${corpo}</section>`;
+  };
   view.innerHTML = `
-    <h2 class="greet">Ajustes</h2>
-    <div class="stats">
-      <div class="stat"><b>${db.songs().length}</b><span>Músicas</span></div>
-      <div class="stat"><b>${db.sets().length}</b><span>Repertórios</span></div>
-      <div class="stat"><b>${db.songs().filter((s) => s.youtube).length}</b><span>Com vídeo</span></div>
-    </div>
-
-    <div class="section-title">Modo</div>
-    <div class="theme-cards" id="theme">
-      ${[['dark', 'Escuro'], ['light', 'Claro'], ['auto', 'Automático']].map(([v, l]) => `
-        <button class="theme-card ${v}" data-v="${v}" aria-pressed="${(p.theme || 'dark') === v}"><div class="prev"><i></i><b></b></div>${l}</button>`).join('')}
-    </div>
-
-    <div class="section-title">Cor do site</div>
-    <div class="settings-group"><div class="setting" style="display:block">
-      <div class="swatches" id="cores">
-        ${CORES_DESTAQUE.map(([c, n]) => `<button class="swatch" style="--c:${c}" data-c="${c}" aria-pressed="${accent === c}" title="${n}" aria-label="${n}"></button>`).join('')}
-        <button class="swatch lit" data-c="liturgico" aria-pressed="${accent === 'liturgico'}" title="Cor litúrgica do dia" aria-label="Cor litúrgica do dia"></button>
-        <label class="swatch custom" style="--c:${personalizada ? accent : '#888'}" aria-pressed="${personalizada}" title="Escolher outra cor">
-          <input type="color" id="cor-livre" value="${personalizada ? accent : COR_PADRAO}" aria-label="Escolher outra cor"></label>
+    <div class="ajustes">
+    <section class="aj-topo">
+      <span class="aj-logo">${logo(52)}</span>
+      <div class="aj-ident"><div class="kind">Songbook Litúrgico</div><h2>Ajustes</h2><span class="aj-versao">versão ${APP_VERSAO}</span></div>
+      <div class="aj-stats">
+        <div><b>${nMusicas}</b><span>música${nMusicas === 1 ? '' : 's'}</span></div>
+        <div><b>${nRepertorios}</b><span>repertório${nRepertorios === 1 ? '' : 's'}</span></div>
+        <div><b>${nVideos}</b><span>com vídeo</span></div>
       </div>
-      <p class="swatch-label" id="cor-nome" style="margin:10px 0 0"></p>
-    </div></div>
+    </section>
+    <nav class="aj-atalhos" aria-label="Ir para">${SECOES.map(([k, ic, n]) => `<button class="chip" data-ir="${k}">${icon(ic, 14)} ${n}</button>`).join('')}</nav>
 
-    <div class="section-title">Cifras</div>
+    ${secao('aparencia', 'Modo claro ou escuro e a cor de destaque do app', `
+    <div class="settings-group aj-aparencia">
+      <div class="aj-bloco"><div class="aj-rotulo">Modo</div>
+        <div class="theme-cards" id="theme">
+          ${[['dark', 'Escuro'], ['light', 'Claro'], ['auto', 'Automático']].map(([v, l]) => `
+            <button class="theme-card ${v}" data-v="${v}" aria-pressed="${(p.theme || 'dark') === v}"><div class="prev"><i></i><b></b></div>${l}</button>`).join('')}
+        </div></div>
+      <div class="aj-bloco"><div class="aj-rotulo">Cor do site</div>
+        <div class="swatches" id="cores">
+          ${CORES_DESTAQUE.map(([c, n]) => `<button class="swatch" style="--c:${c}" data-c="${c}" aria-pressed="${accent === c}" title="${n}" aria-label="${n}"></button>`).join('')}
+          <button class="swatch lit" data-c="liturgico" aria-pressed="${accent === 'liturgico'}" title="Cor litúrgica do dia" aria-label="Cor litúrgica do dia"></button>
+          <label class="swatch custom" style="--c:${personalizada ? accent : '#888'}" aria-pressed="${personalizada}" title="Escolher outra cor">
+            <input type="color" id="cor-livre" value="${personalizada ? accent : COR_PADRAO}" aria-label="Escolher outra cor"></label>
+        </div>
+        <p class="swatch-label" id="cor-nome" style="margin:10px 0 0"></p></div>
+    </div>`)}
+
+    ${secao('cifras', 'Como os acordes aparecem nas músicas', `
     <div class="settings-group">
       <label class="setting"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Mostrar acordes</div><div class="s">Desligue para usar só a letra (coral, telão)</div></div><input type="checkbox" class="switch" id="chords" ${p.modo !== 'letra' && p.showChords !== false ? 'checked' : ''}></label>
-      <label class="setting"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Desenho dos acordes</div><div class="s">Mostra como montar cada acorde no violão (tabela no início da música e ao tocar num acorde)</div></div><input type="checkbox" class="switch" id="diagramas" ${p.diagramas ? 'checked' : ''}></label>
+      <label class="setting"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Desenho dos acordes</div><div class="s">Como montar cada acorde no violão: tabela no início da música e ao tocar num acorde</div></div><input type="checkbox" class="switch" id="diagramas" ${p.diagramas ? 'checked' : ''}></label>
       <label class="setting"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns !== false ? 'checked' : ''}></label>
       <div class="setting wrap"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div><div class="s">Tamanho, cor e fundo dos acordes sobre a letra</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
-    </div>
+    </div>`)}
 
-    <div class="section-title">Página da música</div>
+    ${secao('musica', 'A página de cada música', `
     <div class="settings-group">
       <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo no topo da música</div><div class="s">Um trecho do clipe passa sem som atrás do título, como no Spotify. Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
     </div>
+    ${jaInstalado() ? '' : `<div class="settings-group">
+      <div class="setting acao"><span class="ico" style="background:none">${logo(36)}</span><div class="grow"><div class="t">Instalar o Songbook</div><div class="s">Ícone na tela inicial, abre em tela cheia e funciona sem internet</div></div><div class="setting-acoes"><button class="btn small primary" id="instalar">Instalar</button></div></div>
+    </div>`}`)}
 
-    ${jaInstalado() ? '' : `<div class="section-title">App</div>
-    <div class="settings-group">
-      <div class="setting"><span class="ico" style="background:none">${logo(36)}</span><div class="grow"><div class="t">Instalar o Songbook</div><div class="s">Ícone na tela inicial, abre em tela cheia e funciona sem internet</div></div><button class="btn small primary" id="instalar">Instalar</button></div>
-    </div>`}
+    ${secao('pptx', 'O arquivo do seu grupo: no repertório, “PowerPoint” gera os slides com as letras', `
+    <div class="settings-group"><div class="aj-pptx" id="pptx"><div class="aj-pptx-vazio muted">Verificando…</div></div></div>`)}
 
-    <div class="section-title">PowerPoint da missa</div>
-    <div class="settings-group">
-      <div class="setting"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Modelo do grupo</div><div class="s" id="pptx-info">Verificando…</div></div>
-        <button class="btn small" id="pptx-enviar">Enviar</button><button class="btn small danger" id="pptx-apagar" hidden>Remover</button></div>
+    ${secao('dados', 'Tudo fica guardado neste aparelho. Faça um backup de vez em quando', `
+    <div class="aj-dados">
+      <button class="aj-dado" id="exp"><span class="ico">${icon('download', 20)}</span><b>Exportar backup</b><small>Todas as músicas e repertórios num arquivo .json</small></button>
+      <button class="aj-dado" id="imp"><span class="ico">${icon('upload', 20)}</span><b>Importar</b><small>Backup .json, ChordPro (.cho, .pro) ou texto</small></button>
     </div>
+    <div class="settings-group aj-perigo">
+      <div class="setting acao"><span class="ico">${icon('trash', 18)}</span><div class="grow"><div class="t">Apagar tudo</div><div class="s">Remove as músicas, os repertórios e os ajustes deste aparelho</div></div><div class="setting-acoes"><button class="btn small danger" id="clr">Apagar tudo</button></div></div>
+    </div>`)}
 
-    <div class="section-title">Dados</div>
-    <div class="settings-group">
-      <div class="setting"><span class="ico">${icon('download', 18)}</span><div class="grow"><div class="t">Exportar backup</div><div class="s">Todas as músicas e repertórios em .json</div></div><button class="btn small" id="exp">Exportar</button></div>
-      <div class="setting"><span class="ico">${icon('upload', 18)}</span><div class="grow"><div class="t">Importar</div><div class="s">Backup .json, ChordPro (.cho, .pro) ou texto</div></div><button class="btn small" id="imp">Importar</button></div>
-      <div class="setting"><span class="ico">${icon('trash', 18)}</span><div class="grow"><div class="t">Apagar tudo</div><div class="s">Remove os dados deste aparelho</div></div><button class="btn small danger" id="clr">Apagar</button></div>
-    </div>
-
-    <div class="section-title">Sobre</div>
-    <div class="settings-group">
-      <div class="setting"><span class="ico" style="background:none">${logo(40)}</span><div class="grow"><div class="t">Songbook Litúrgico <span class="chip sm" style="margin-left:6px">versão ${APP_VERSAO}</span></div>
-        <div class="s">Cifras e letras com transposição, capotraste, rolagem automática, repertórios e vídeos do YouTube, integrado à Liturgia Diária da CNBB, aos cantos de cindyferrarezi.com e do Músicas para Missa e às cifras do Cifra Club.</div></div></div>
+    ${secao('sobre', '', `
+    <div class="settings-group aj-sobre">
+      <div class="aj-sobre-cab"><span class="aj-logo">${logo(40)}</span><div><b>Songbook Litúrgico</b><span class="chip sm">versão ${APP_VERSAO}</span></div></div>
+      <p>Cifras e letras com transposição, capotraste, rolagem automática, repertórios e vídeos do YouTube, integrado à Liturgia Diária da CNBB, aos cantos de cindyferrarezi.com e do Músicas para Missa e às cifras do Cifra Club.</p>
+    </div>`)}
     </div>`;
+  view.querySelector('.aj-atalhos').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ir]');
+    if (b) $('#aj-' + b.dataset.ir).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
   const nomeCor = () => {
     const a = db.prefs().accent || COR_PADRAO;
     const txt = a === 'liturgico'
@@ -6913,19 +6938,24 @@ function viewSettings() {
     applyTheme();
     $('#theme').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   };
+  // modelo do PowerPoint: o arquivo (nome, tamanho) e as partes que ele tem, em etiquetas
   const infoModelo = async () => {
     const m = await lerModelo();
-    const el = $('#pptx-info');
+    const el = $('#pptx');
     if (!el) return;
-    el.textContent = m ? `${m.nome} · ${(m.tamanho / 1048576).toFixed(1)} MB · partes: ${m.partes.map((x) => x.nome).join(', ')}`
-      : 'Envie o arquivo "cru" do PowerPoint da missa. Depois, no repertório, toque em "PowerPoint" para gerar com as letras.';
-    $('#pptx-enviar').textContent = m ? 'Trocar' : 'Enviar';
-    $('#pptx-apagar').hidden = !m;
+    el.innerHTML = m ? `
+      <div class="aj-pptx-arq"><span class="ico">${icon('file', 20)}</span><div class="grow"><b>${esc(m.nome.replace(/\.pptx$/i, ''))}</b>
+        <small>PowerPoint · ${(m.tamanho / 1048576).toFixed(1)} MB · ${m.partes.length} parte${m.partes.length === 1 ? '' : 's'}</small></div></div>
+      ${m.partes.length ? `<div class="aj-rotulo">Partes do modelo</div><div class="aj-pptx-partes">${m.partes.map((x) => `<span class="chip sm">${esc(x.nome)}</span>`).join('')}</div>` : ''}
+      <div class="aj-pptx-acoes"><button class="btn small" id="pptx-enviar">${icon('refresh', 15)} Trocar</button><button class="btn small danger" id="pptx-apagar">${icon('trash', 15)} Remover</button></div>`
+      : `<div class="setting acao"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Modelo do grupo</div><div class="s">Envie o arquivo “cru” do PowerPoint da missa. Depois, no repertório, toque em “PowerPoint” para gerar com as letras</div></div>
+        <div class="setting-acoes"><button class="btn small primary" id="pptx-enviar">${icon('upload', 15)} Enviar modelo</button></div></div>`;
+    $('#pptx-enviar').onclick = async () => { if (await enviarModeloPptx()) infoModelo(); };
+    const apagar = $('#pptx-apagar');
+    if (apagar) apagar.onclick = async () => { if (await ask({ title: 'Remover o modelo?', text: 'O arquivo sai deste aparelho; os repertórios continuam.', ok: 'Remover', danger: true })) { await apagarModelo(); infoModelo(); } };
   };
   infoModelo();
   $('#instalar')?.addEventListener('click', instalarApp);
-  $('#pptx-enviar').onclick = async () => { if (await enviarModeloPptx()) infoModelo(); };
-  $('#pptx-apagar').onclick = async () => { if (await ask({ title: 'Remover o modelo?', text: 'O arquivo sai deste aparelho; os repertórios continuam.', ok: 'Remover', danger: true })) { await apagarModelo(); infoModelo(); } };
   $('#chords').onchange = (e) => { db.setPref('modo', e.target.checked ? 'cifra' : 'letra'); db.setPref('showChords', true); };
   $('#cols').onchange = (e) => db.setPref('columns', e.target.checked);
   $('#diagramas').onchange = (e) => { db.setPref('diagramas', e.target.checked); toast(e.target.checked ? 'Desenho dos acordes ligado' : 'Desenho dos acordes desligado'); };
