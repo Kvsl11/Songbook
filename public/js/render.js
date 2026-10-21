@@ -1,9 +1,10 @@
 // Renderização de ChordPro em HTML (acordes sobre a letra).
-import { acordesEntreParenteses, ehInstrumental, ehObservacao, isChord, parseChordPro, preferFlatsFor, semIntro, transposeChord, transposeKey } from './chordpro.js';
+import { acordesEntreParenteses, ehInstrumental, ehObservacao, isChord, parseChordPro, parteEmIngles, preferFlatsFor, semIntro, transposeChord, transposeKey } from './chordpro.js';
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-const LABELS = { chorus: 'Refrão', verse: '', bridge: 'Ponte', tab: 'Tablatura' };
+// nomes das partes em inglês (as cifras guardadas com "Refrão", "Estrofe 2"… aparecem traduzidas)
+const LABELS = { chorus: 'Chorus', verse: '', bridge: 'Bridge', tab: 'Tab' };
 
 export function renderSong(content, { transpose = 0, capo = 0, key = '' } = {}) {
   const { meta, sections } = parseChordPro(semIntro(content)); // sem a introdução: a cifra começa na letra
@@ -13,7 +14,7 @@ export function renderSong(content, { transpose = 0, capo = 0, key = '' } = {}) 
   const flats = preferFlatsFor(transposeKey(baseKey, shift) || targetKey);
   const html = [];
   for (const sec of sections) {
-    const label = sec.label || LABELS[sec.type] || '';
+    const label = parteEmIngles(sec.label) || LABELS[sec.type] || '';
     const textoDe = (line) => (line.segments ? line.segments.map((x) => x.text).join('') : line.text || '');
     // seção só com "Intro: …"/acordes escritos: some quando se mostra só a letra
     const soInstr = sec.lines.length > 0 && sec.lines.every((l) => l.kind !== 'comment' && (ehInstrumental(textoDe(l)) || (l.segments && l.segments.every((x) => !x.text.trim()))));
@@ -33,7 +34,7 @@ export function renderSong(content, { transpose = 0, capo = 0, key = '' } = {}) 
           html.push(`<div class="line lyrics-only eco"><span class="chunk"><span class="chord"></span><span class="lyric">(${esc(t)})</span></span></div>`);
           continue;
         }
-        html.push(`<div class="comment">${esc(line.text)}</div>`);
+        html.push(`<div class="comment">${esc(parteEmIngles(line.text))}</div>`);
         continue;
       }
       if (line.kind === 'text') { html.push(`<div class="tab">${esc(line.text)}</div>`); continue; }

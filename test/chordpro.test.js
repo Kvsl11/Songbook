@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  chordsOverLyricsToChordPro, isChord, parseChordPro, transposeChord, transposeChordPro, transposeKey,
+  chordsOverLyricsToChordPro, isChord, isChordOnlyLine, parteEmIngles, parseChordPro, transposeChord, transposeChordPro, transposeKey,
 } from '../public/js/chordpro.js';
 
 test('reconhece acordes e rejeita palavras', () => {
@@ -81,4 +81,15 @@ Na casa do Senhor
   assert.equal(temCifra(src), true);
   assert.equal(temCifra('{title: X}\nSó letra'), false);
   assert.equal(completarCifra('Só letra\nsem acordes').completadas, 0);
+});
+
+test('acordes com extensão depois da barra e linhas com marcas de repetição', () => {
+  for (const c of ['D7/9', 'G4/7', 'F#ø', 'A7M', 'C#m7(9)', 'E7+']) assert.ok(isChord(c), c);
+  for (const l of ['G D Em C (2x)', 'G  D/F#  Em7  C9 (bis)', 'A  E  F#m  D  [x2]', '\u200BD          A']) assert.ok(isChordOnlyLine(l), l);
+  assert.ok(!isChordOnlyLine('Eu te louvarei (2x)'));
+});
+
+test('nomes das partes em inglês', () => {
+  const casos = { Refrão: 'Chorus', 'Pré-Refrão': 'Pre-Chorus', 'Pre-chorus': 'Pre-Chorus', 'Primeira Parte': 'Verse 1', 'Segunda Parte': 'Verse 2', 'Estrofe 3': 'Verse 3', Ponte: 'Bridge', Final: 'Outro', 'Repetir refrão': 'Repeat Chorus', Introdução: 'Intro', '(só vozes)': '(só vozes)' };
+  for (const [pt, en] of Object.entries(casos)) assert.equal(parteEmIngles(pt), en, pt);
 });

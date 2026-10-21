@@ -10,7 +10,7 @@
 // - YouTube: busca pelo Piped (instâncias públicas, com CORS); o oEmbed confirma um link colado.
 
 import { decodeEntities, normalize } from './html.js';
-import { cifraComCapo, doEditor, isChord, organizarPartes, partesDosBlocos, semIntro } from '../chordpro.js';
+import { cifraComCapo, doEditor, ehCabecalho, ehNomeDeParte, isChord, isChordOnlyLine, linhaDeTab, organizarPartes, partesDosBlocos, preferFlatsFor, semInvisiveis, semIntro, temInvisiveis, transposeChordPro } from '../chordpro.js';
 
 const NO_NAVEGADOR = typeof window !== 'undefined';
 const UA = NO_NAVEGADOR ? {} : { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36', 'Accept-Language': 'pt-BR,pt;q=0.9' };
@@ -73,7 +73,7 @@ const pegar = (html, re) => { const m = re.exec(html); return m ? decodeEntities
 export function parseCifraClub(html, url = '') {
   const pre = /<pre[^>]*>([\s\S]*?)<\/pre>/i.exec(html);
   if (!pre) throw new Error('Cifra não encontrada na página');
-  const texto = decodeEntities(pre[1].replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ''));
+  const texto = semInvisiveis(decodeEntities(pre[1].replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '')));
   const doTitulo = pegar(html, /<title[^>]*>([\s\S]*?)<\/title>/i).split(/\s+-\s+/);
   const titulo = pegar(html, /<h1[^>]*class="[^"]*\bt1\b[^"]*"[^>]*>([\s\S]*?)<\/h1>/i) || doTitulo[0] || 'Cifra';
   const artista = pegar(html, /<h2[^>]*class="[^"]*\bt3\b[^"]*"[^>]*>([\s\S]*?)<\/h2>/i) || (doTitulo.length > 2 ? doTitulo[1] : '');
@@ -89,11 +89,35 @@ export function parseCifraClub(html, url = '') {
   if (isChord(tom)) cab.push(`{key: ${tom}}`);
   if (yt) cab.push(`{youtube: https://www.youtube.com/watch?v=${yt}}`);
   if (url) cab.push(`{source: ${url}}`);
-  let chordpro = cab.join('\n') + '\n\n' + simplificarCifra(cifraTextoParaChordPro(texto));
+  let chordpro = cab.join('\n') + '\n\n' + simplificarCifra(cifraTextoParaChordPro(semTablaturas(texto)));
   // com capotraste: acordes guardados no tom real e o capo marcado (o app mostra os desenhos com o capo)
   const n = Number(capo) || 0;
   if (n > 0) chordpro = cifraComCapo(chordpro, n, isChord(real) && forma ? real : '');
   return { titulo, artista, tom: n > 0 ? ((/\{key:\s*([^}]+)\}/.exec(chordpro) || [])[1] || '') : isChord(tom) ? tom : '', capo: n, url, chordpro };
+}
+
+// Tira os blocos "[Tab - Primeira Parte]" do texto do Cifra Club (o título, "Parte 1 de 8", os acordes em cima da
+// tablatura e as linhas da tablatura) e as linhas da batida (↑ ↑ ↓ ↓). Antes de converter: senão o título da
+// tablatura fechava a parte [Primeira Parte] e a letra que vem depois dele ficava fora dela.
+export function semTablaturas(texto) {
+  const linhas = String(texto || '').split('\n');
+  const out = [];
+  const batida = (l) => /^[\s↑↓⇡⇣xX]*[↑↓⇡⇣][\s↑↓⇡⇣xX]*$/.test(l);
+  const daTab = (i) => {
+    const l = linhas[i];
+    if (!l.trim() || /^\s*Parte \d+ de \d+\s*$/i.test(l) || linhaDeTab(l) || batida(l)) return true;
+    return isChordOnlyLine(l) && i + 1 < linhas.length && linhaDeTab(linhas[i + 1]); // acordes em cima da tablatura
+  };
+  for (let i = 0; i < linhas.length; i++) {
+    if (batida(linhas[i])) continue;
+    if (/^\s*\[\s*tab\b[^\]]*\]\s*$/i.test(linhas[i])) {
+      while (i + 1 < linhas.length && daTab(i + 1)) i++;
+      out.push('');
+      continue;
+    }
+    out.push(linhas[i]);
+  }
+  return out.join('\n');
 }
 
 // Versão simplificada: sem tablaturas, riffs, solos e introdução — só letra e acordes
@@ -120,6 +144,28 @@ export function simplificarCifra(pro) {
     return prox !== undefined && !/^\s*\{/.test(prox);
   });
   return organizarPartes(semIntro(limpo.join('\n')).replace(/\n{3,}/g, '\n\n').trim());
+}
+
+// Cifras trazidas do Cifra Club enquanto o app não tirava os caracteres invisíveis do começo das linhas: os
+// acordes ficaram como texto e as partes foram adivinhadas. Refaz a partir das linhas originais (as marcações de
+// parte adivinhadas saem; os [Refrão], [Primeira Parte]… do site voltam a valer). Nas outras cifras nada muda.
+const DIRETIVA_DE_PARTE = /^\s*\{\s*(start_of_\w+|end_of_\w+|so[cvb]|eo[cvb]|chorus)\s*(:[^}]*)?\}\s*$/i;
+export function repararCifraInvisivel(pro) {
+  if (!temInvisiveis(pro)) return pro;
+  const linhas = String(pro).split('\n');
+  // só quando alguma linha de acordes ou de parte ficou como texto por causa do caractere invisível
+  if (!linhas.some((l) => temInvisiveis(l) && !/^\s*\{/.test(l) && (isChordOnlyLine(l) || ehCabecalho(l)))) return pro;
+  const cab = [];
+  while (linhas.length && (/^\s*\{\s*(?!start_of_|so[cvb]\b|comment|c\s*:)[^}]*\}\s*$/i.test(linhas[0]) || !linhas[0].trim())) cab.push(linhas.shift());
+  // "(Primeira Parte)" solto era o título de uma tablatura: sai também
+  const tituloDeTab = (l) => { const m = /^\s*\((.+)\)\s*$/.exec(semInvisiveis(l)); return Boolean(m && ehNomeDeParte(m[1])); };
+  const corpo = semTablaturas(semInvisiveis(linhas.filter((l) => !DIRETIVA_DE_PARTE.test(l) && !tituloDeTab(l)).join('\n')));
+  let out = cab.join('\n').trim() + '\n\n' + simplificarCifra(doEditor(corpo));
+  // com capotraste os acordes estavam nos desenhos: passam para o tom real, como na importação
+  const capo = Number((/\{\s*capo\s*:\s*(\d{1,2})\s*\}/i.exec(pro) || [])[1]) || 0;
+  const tom = (/\{\s*key\s*:\s*([^}]+)\}/i.exec(pro) || [])[1]?.trim() || '';
+  if (capo) out = transposeChordPro(out, capo, preferFlatsFor(tom)).replace(/\{\s*key\s*:[^}]*\}/i, tom ? `{key: ${tom}}` : '');
+  return out;
 }
 
 // serviços públicos que abrem a página por nós (o 1º que responder com a cifra vence).
@@ -383,11 +429,11 @@ export function letraParaChordPro({ titulo = '', artista = '', letra = '', fonte
     const t = tipos[i];
     if (t === 'refrao') {
       if (primeiroRefrao !== null && normalize(e) === primeiroRefrao) corpo.push('{chorus}');
-      else corpo.push(`{start_of_chorus: Refrão}\n${e}\n{end_of_chorus}`);
+      else corpo.push(`{start_of_chorus}\n${e}\n{end_of_chorus}`);
       if (primeiroRefrao === null) primeiroRefrao = normalize(e);
-    } else if (t === 'ponte') corpo.push(`{start_of_bridge: Ponte}\n${e}\n{end_of_bridge}`);
-    else if (t === 'pre-refrao') corpo.push(`{start_of_verse: Pré-refrão}\n${e}\n{end_of_verse}`);
-    else corpo.push(`{start_of_verse: Estrofe ${++n}}\n${e}\n{end_of_verse}`);
+    } else if (t === 'ponte') corpo.push(`{start_of_bridge}\n${e}\n{end_of_bridge}`);
+    else if (t === 'pre-refrao') corpo.push(`{start_of_verse: Pre-Chorus}\n${e}\n{end_of_verse}`);
+    else corpo.push(`{start_of_verse: Verse ${++n}}\n${e}\n{end_of_verse}`);
   });
   return cab.join('\n') + '\n\n' + corpo.join('\n\n') + '\n';
 }

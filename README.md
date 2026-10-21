@@ -215,9 +215,16 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   e entra no repertório. A **Biblioteca** abre em Repertórios.
 - **Parte da missa editável**: no editor, "Parte da missa" (Entrada, Aclamação…) fica sempre disponível; no repertório (ícone de lista na linha, na fila ou tocando no nome da parte
   na música) troque a parte (Entrada, Comunhão…) a qualquer momento; ao adicionar uma música, o app pergunta a parte.
-- **Editor simples**: as partes são uma linha só — toque em **Refrão**, **Estrofe**, **Ponte** ou **Intro** onde a parte
-  começa e tudo dali para baixo pertence a ela, até a próxima (`[Refrão]`, `[Estrofe 2]`…); **Repetir refrão** e
-  **Observação** (ex.: `(2x)`). Sem códigos `{start_of_chorus}`: o app converte para ChordPro ao salvar.
+- **Editor simples**: as partes são uma linha só — toque em **Chorus** (refrão), **Verse** (estrofe), **Pre-Chorus**,
+  **Bridge** (ponte) ou **Intro** onde a parte começa e tudo dali para baixo pertence a ela, até a próxima (`[Chorus]`,
+  `[Verse 2]`…); **Repeat Chorus** e **Observação** (ex.: `(2x)`). Sem códigos `{start_of_chorus}`: o app converte
+  para ChordPro ao salvar.
+- **Partes sempre em inglês**: Intro, Verse 1, Pre-Chorus, Chorus, Bridge, Outro… Os nomes vindos do Cifra Club
+  (`[Primeira Parte]`, `[Pré-Refrão]`, `[Refrão]`), de outros sites (`Refrão:`, `Verso 1:`), da organização
+  automática e das cifras já guardadas (`Estrofe 2`, `Ponte`) aparecem traduzidos.
+- **Cifra Club com caracteres invisíveis**: o site passou a pôr um espaço de largura zero no começo de cada linha da
+  cifra, e os acordes e as partes deixavam de ser reconhecidos. O app tira esses caracteres (também no texto colado),
+  as tablaturas e a batida (↑ ↓); as cifras que já tinham entrado assim são refeitas sozinhas ao abrir.
   No celular, o texto ocupa a tela e a prévia abre no olho da barra; no computador, a prévia fica ao lado, ao vivo.
 - **Editor de música (nova / editar cifra)**: no topo, a capa (ao vivo), o **título** e o **autor** grandes e um resumo
   (tom, parte da missa, vídeo, quantas partes). Na música nova, o cartão **Trazer da internet** (Cifra Club ou texto
@@ -225,7 +232,7 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   missa. A barra do editor fica presa no alto ao rolar: **Cifra** (acordes na linha de cima, como num caderno),
   **[ ] Colchetes** ou **Só letra** (corrige o texto e os acordes voltam às mesmas sílabas), **desfazer/refazer** (o
   histórico do próprio app: Ctrl+Z, Ctrl+Shift+Z), prévia e **tela cheia**. Uma linha de partes e ferramentas
-  (tom/transposição permanente, Refrão, Estrofe, Ponte, Intro, Repetir refrão, Observação, Completar cifra,
+  (tom/transposição permanente, Chorus, Verse, Pre-Chorus, Bridge, Intro, Repeat Chorus, Observação, Completar cifra,
   Organizar cifra colada), a **paleta de acordes** (os do tom, os que já estão na cifra e **Outro…** para qualquer
   acorde) e o **mapa da estrutura** (um toque leva até a parte). Embaixo, linhas, partes e acordes. O que se escreve
   fica guardado como **rascunho** no aparelho: ao voltar, o app oferece continuar de onde parou; sair sem salvar

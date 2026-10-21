@@ -10,16 +10,23 @@ const NOTE_INDEX = {
 // Tons que, por convenção, são escritos com bemóis.
 const FLAT_KEYS = new Set(['F', 'Bb', 'Eb', 'Ab', 'Db', 'Dm', 'Gm', 'Cm', 'Fm', 'Bbm', 'Ebm']);
 
-const CHORD_RE = /^([A-G][#b]?)([^/\s]*)(?:\/([A-G][#b]?))?$/;
+// a extensão pode vir depois de uma barra ("D7/9", "G4/7"); o baixo é uma nota ("D/F#")
+const CHORD_RE = /^([A-G][#b]?)([^/\s]*(?:\/\d+[^/\s]*)?)(?:\/([A-G][#b]?))?$/;
 
 export function isChord(token) {
   if (!token) return false;
   const t = token.replace(/[()]/g, '');
   const m = CHORD_RE.exec(t);
   if (!m) return false;
-  // sufixo plausível: m, 7, maj7, sus4, dim, aug, 9, add9, º, +, -, M, números...
-  return /^(maj|min|m|M|dim|aug|sus|add|º|°|\+|-|#|b|\d)*$/.test(m[2]);
+  // sufixo plausível: m, 7, maj7, sus4, dim, aug, 9, add9, º, ø, +, -, M, números...
+  return /^(maj|min|m|M|dim|aug|sus|add|º|°|ø|\+|-|#|b|\/|\d)*$/.test(m[2]);
 }
+
+// Caracteres invisíveis que os sites colocam no texto (o Cifra Club põe um espaço de largura zero no
+// começo de cada linha da cifra): com eles a linha de acordes e o [Refrão] não eram reconhecidos
+const INVISIVEIS = /[\u200B-\u200D\u2060\uFEFF\u00AD]/g;
+export const temInvisiveis = (texto) => /[\u200B-\u200D\u2060\uFEFF\u00AD]/.test(String(texto || ''));
+export const semInvisiveis = (texto) => String(texto || '').replace(INVISIVEIS, '').replace(/[\u00A0\u2007\u202F]/g, ' ');
 
 function shiftNote(note, semitones, preferFlats) {
   const idx = NOTE_INDEX[note];
@@ -126,10 +133,12 @@ export function splitChordLine(line) {
 }
 
 // Detecta uma linha composta só de acordes (formato "cifra em cima da letra").
+// Marcas que podem vir junto dos acordes: | / - x2 (2x) (bis) [x2] % ...
+const MARCA_NA_LINHA = /^([|/x\d-]+|[([]?(\d+\s*x|x\s*\d+|bis)[)\]]?|%|\.{2,}|…)$/i;
 export function isChordOnlyLine(line) {
-  const tokens = line.trim().split(/\s+/).filter(Boolean);
+  const tokens = semInvisiveis(line).trim().split(/\s+/).filter(Boolean);
   if (!tokens.length) return false;
-  const ok = tokens.filter((t) => isChord(t) || /^[|/x\d-]+$/.test(t)).length;
+  const ok = tokens.filter((t) => isChord(t) || MARCA_NA_LINHA.test(t)).length;
   return ok === tokens.length && tokens.some(isChord);
 }
 
@@ -161,15 +170,14 @@ export function mergeChordLine(chordLine, lyricLine = '') {
 
 // Converte texto "cifra sobre a letra" (Cifra Club, etc.) para ChordPro.
 export function chordsOverLyricsToChordPro(text) {
-  const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+  const lines = semInvisiveis(text).replace(/\r\n?/g, '\n').split('\n');
   const out = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const header = /^\s*\[?(intro|refr[ãa]o|coro|ponte|final|solo|estrofe|verso|pr[ée]-?refr[ãa]o)\]?:?\s*(.*)$/i.exec(line);
-    if (header && (!header[2] || isChordOnlyLine(header[2]))) {
-      const label = header[1][0].toUpperCase() + header[1].slice(1).toLowerCase();
-      out.push(`{comment: ${label}}`);
-      if (header[2]) out.push(mergeChordLine(header[2]));
+    const header = /^\s*\[?(intro|refr[ãa]o|coro|ponte|final|solo|estrofe|verso|pr[ée]-?refr[ãa]o|chorus|verse|bridge|pre-?chorus|outro)(\s+\d+)?\]?:?\s*(.*)$/i.exec(line);
+    if (header && (!header[3] || isChordOnlyLine(header[3]))) {
+      out.push(`{comment: ${parteEmIngles(header[1] + (header[2] || ''))}}`);
+      if (header[3]) out.push(mergeChordLine(header[3]));
       continue;
     }
     if (isChordOnlyLine(line)) {
@@ -484,27 +492,59 @@ export function capoDaObservacao(src) {
 
 // Linha entre parênteses: é observação ("(2x)", "(bis)", "(só as mulheres)", "(solo)") ou é letra
 // cantada (o eco/segunda voz, "(Você não está sozinho)"), que continua a música e fica do tamanho normal
-const OBSERVACAO = /^\d+\s*x$|^x\s*\d+$|\b\d+\s*(x|vezes)\b|\bbis\b|repet|refr[ãa]o|\bcoro\b|solo|intro|instrumental|\bfinal\b|\bfim\b|todos|homens|mulheres|crian[çc]as|vozes|\bs[óo]\s|falad|declama|pausa|ad lib|capo|\btom\b|bateria|viol[ãa]o|teclado|guitarra|palmas|ministro|presidente|assembleia|solista|dueto|un[íi]ssono|acelera|devagar|lento|fade|ponte|estrofe|pr[ée]-?refr|riff|base|dedilhado|interl[úu]dio|^\W*$/i;
+const OBSERVACAO = /^\d+\s*x$|^x\s*\d+$|\b\d+\s*(x|vezes)\b|\bbis\b|repet|refr[ãa]o|\bcoro\b|chorus|\bverse\b|\bbridge\b|\brepeat\b|solo|intro|instrumental|\bfinal\b|\bfim\b|todos|homens|mulheres|crian[çc]as|vozes|\bs[óo]\s|falad|declama|pausa|ad lib|capo|\btom\b|bateria|viol[ãa]o|teclado|guitarra|palmas|ministro|presidente|assembleia|solista|dueto|un[íi]ssono|acelera|devagar|lento|fade|ponte|estrofe|pr[ée]-?refr|riff|base|dedilhado|interl[úu]dio|^\W*$/i;
 export const ehObservacao = (texto) => OBSERVACAO.test(String(texto || '').trim()) || ehInstrumental(texto); // acordes entre parênteses também
 
-// "[Refrão]" ou "[Intro] G D" (nome que não é acorde). Devolve { nome, resto, tab } ou null
+// Nomes das partes sempre em inglês (Intro, Verse 1, Pre-Chorus, Chorus, Bridge, Outro…), venham do Cifra Club
+// ("Primeira Parte", "Refrão"), de outro site, das cifras guardadas ou do editor. Nome desconhecido fica como está.
+const ORDINAIS = { primeira: 1, segunda: 2, terceira: 3, quarta: 4, quinta: 5, sexta: 6, 'sétima': 7, setima: 7, oitava: 8, nona: 9, 'décima': 10, decima: 10 };
+const NOMES_EM_INGLES = [
+  [/^(pr[ée]|pre)\s*-?\s*(refr[ãa]o|coro|chorus)$/i, 'Pre-Chorus'],
+  [/^(refr[ãa]o|coro|chorus)$/i, 'Chorus'],
+  [/^(ponte|bridge)$/i, 'Bridge'],
+  [/^(estrofe|verso|verse|parte)$/i, 'Verse'],
+  [/^(intro|introdu[çc][ãa]o)$/i, 'Intro'],
+  [/^(final|finaliza[çc][ãa]o|encerramento|outro)$/i, 'Outro'],
+  [/^(interl[úu]dio|interlude)$/i, 'Interlude'],
+  [/^solo$/i, 'Solo'],
+  [/^(repetir|repete|repeat)\s+(o\s+)?(refr[ãa]o|coro|chorus)$/i, 'Repeat Chorus'],
+];
+const nomeConhecido = (nome) => {
+  const t = String(nome || '').trim().replace(/\s+/g, ' ').replace(/:$/, '');
+  const ord = /^(\p{L}+)\s+parte$/iu.exec(t); // "Primeira Parte" -> Verse 1
+  if (ord && ORDINAIS[ord[1].toLowerCase()]) return `Verse ${ORDINAIS[ord[1].toLowerCase()]}`;
+  const m = /^(.*?)(?:\s*(\d+))?$/.exec(t);
+  const achou = NOMES_EM_INGLES.find(([re]) => re.test(m[1]));
+  return achou ? achou[1] + (m[2] && achou[1] !== 'Repeat Chorus' ? ' ' + m[2] : '') : null;
+};
+export const parteEmIngles = (nome) => nomeConhecido(nome) ?? String(nome || '').trim();
+export const ehNomeDeParte = (nome) => nomeConhecido(nome) !== null;
+
+// "[Refrão]" ou "[Intro] G D" (nome que não é acorde), e também "Refrão:" / "Verso 1:" sem colchetes (outros
+// sites), quando o nome é de uma parte conhecida. Devolve { nome (em inglês), resto, tab } ou null
 export function ehCabecalho(linha) {
-  const m = /^\s*\[([^\]]{2,40})\]\s*(.*)$/.exec(String(linha || ''));
-  if (!m || isChord(m[1].trim()) || !/\p{L}{2,}/u.test(m[1])) return null;
-  return { nome: m[1].trim().replace(/^tab\s*-\s*/i, ''), resto: m[2], tab: /^tab\b/i.test(m[1].trim()) };
+  const l = semInvisiveis(linha);
+  const m = /^\s*\[([^\]]{2,40})\]\s*(.*)$/.exec(l);
+  if (!m) {
+    const s = /^\s*([\p{L}][\p{L} -]{1,24}?(?:\s+\d+)?)\s*:\s*(.*)$/u.exec(l) || /^\s*([\p{L}][\p{L} -]{1,24}?(?:\s+\d+)?)\s*$/u.exec(l);
+    const nome = s && nomeConhecido(s[1]);
+    return nome && (!s[2] || isChordOnlyLine(s[2])) ? { nome, resto: s[2] || '', tab: false } : null;
+  }
+  if (isChord(m[1].trim()) || !/\p{L}{2,}/u.test(m[1])) return null;
+  return { nome: parteEmIngles(m[1].trim().replace(/^tab\s*-\s*/i, '')), resto: m[2], tab: /^tab\b/i.test(m[1].trim()) };
 }
 
 const TIPOS_PARTE = [
   [/^(refr[ãa]o|coro|chorus)/i, 'chorus'],
   [/^(ponte|bridge)/i, 'bridge'],
-  [/^(intro|introdu[çc][ãa]o|solo|final|riff|dedilhado|interl[úu]dio|tab|base|instrumental|outro)/i, 'comment'],
+  [/^(intro|introdu[çc][ãa]o|solo|final|riff|dedilhado|interl[úu]dio|interlude|tab|base|instrumental|outro)/i, 'comment'],
 ];
 const tipoDaParte = (nome) => (TIPOS_PARTE.find(([re]) => re.test(nome.trim())) || [null, 'verse'])[1];
-const linhaDeTab = (l) => /^\s*[A-Ga-g]?[#b]?\s*\|[-\d|hpbrx/\\~().* ]{4,}\|?\s*$/.test(l) || /^\s*[eBGDAE]\s*[-|][-\d|hpbrx/\\~().* ]{6,}$/.test(l);
+export const linhaDeTab = (l) => /^\s*[A-Ga-g]?[#b]?\s*\|[-\d|hpbrx/\\~().* ]{4,}\|?\s*$/.test(l) || /^\s*[eBGDAE]\s*[-|][-\d|hpbrx/\\~().* ]{6,}$/.test(l);
 
 // texto do editor (ou cifra colada: acordes em cima ou entre colchetes, partes em [Nome]) -> ChordPro
 export function doEditor(texto) {
-  const linhas = String(texto || '').replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n');
+  const linhas = semInvisiveis(texto).replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n');
   const out = [];
   let aberta = null; // tipo da parte aberta: chorus | verse | bridge
   let emTab = false;
@@ -529,14 +569,14 @@ export function doEditor(texto) {
     const cab = ehCabecalho(linha);
     if (cab) {
       fechar();
-      if (/^repetir\b|^refr[ãa]o\s*\(?(repete|bis|2x)/i.test(cab.nome)) { out.push('{chorus}', ''); continue; }
+      if (/^(repetir|repeat)\b|^(refr[ãa]o|chorus)\s*\(?(repete|bis|2x)/i.test(cab.nome)) { out.push('{chorus}', ''); continue; }
       const tipo = cab.tab ? 'comment' : tipoDaParte(cab.nome);
       if (tipo === 'comment') {
         out.push(`{comment: ${cab.nome}}`);
         if (cab.resto.trim()) out.push(cab.resto);
         continue;
       }
-      const rotulo = /^(estrofe|refr[ãa]o|ponte)$/i.test(cab.nome) ? '' : cab.nome; // o nome padrão já aparece sozinho
+      const rotulo = /^(verse|chorus|bridge)$/i.test(cab.nome) ? '' : cab.nome; // o nome padrão já aparece sozinho
       out.push(rotulo ? `{start_of_${tipo}: ${rotulo}}` : `{start_of_${tipo}}`);
       aberta = tipo;
       if (cab.resto.trim()) out.push(cab.resto);
@@ -568,7 +608,7 @@ export function doEditor(texto) {
     out.push(linha);
   }
   fechar();
-  return chordsOverLyricsToChordPro(out.join('\n').replace(/\n{3,}/g, '\n\n').trim());
+  return chordsOverLyricsToChordPro(out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+|\s+$/g, ''));
 }
 
 // ChordPro -> texto do editor (partes em [Nome], acordes entre colchetes na letra)
@@ -580,15 +620,15 @@ export function paraEditor(src) {
     if (d) {
       const n = d[1].toLowerCase();
       const v = (d[2] || '').trim();
-      const abre = { start_of_chorus: 'Refrão', soc: 'Refrão', start_of_verse: 'Estrofe', sov: 'Estrofe', start_of_bridge: 'Ponte', sob: 'Ponte', start_of_tab: 'Tab', sot: 'Tab' }[n];
-      if (abre) { out.push(`[${v || abre}]`); precisaParte = false; continue; }
+      const abre = { start_of_chorus: 'Chorus', soc: 'Chorus', start_of_verse: 'Verse', sov: 'Verse', start_of_bridge: 'Bridge', sob: 'Bridge', start_of_tab: 'Tab', sot: 'Tab' }[n];
+      if (abre) { out.push(`[${v ? parteEmIngles(v) : abre}]`); precisaParte = false; continue; }
       if (/^(end_of_\w+|eo[cvbt])$/.test(n)) { precisaParte = true; continue; }
-      if (n === 'chorus') { out.push('[Repetir refrão]'); precisaParte = false; continue; }
-      if (/^(comment|c|ci|comment_italic)$/.test(n)) { out.push(`(${v})`); continue; }
+      if (n === 'chorus') { out.push('[Repeat Chorus]'); precisaParte = false; continue; }
+      if (/^(comment|c|ci|comment_italic)$/.test(n)) { out.push(`(${parteEmIngles(v)})`); continue; }
       out.push(linha);
       continue;
     }
-    if (linha.trim() && precisaParte) { out.push('[Estrofe]'); precisaParte = false; }
+    if (linha.trim() && precisaParte) { out.push('[Verse]'); precisaParte = false; }
     out.push(linha);
   }
   return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '');
@@ -597,7 +637,7 @@ export function paraEditor(src) {
 // ---------------------------------------------------------------- partes da música (organizar com IA)
 // A IA recebe só as linhas da letra, numeradas, e devolve onde começa cada parte. O app só coloca
 // as marcações ([Refrão], [Estrofe 2]…): nenhuma palavra ou acorde é alterado.
-const NOMES_PARTE = { refrao: 'Refrão', estrofe: 'Estrofe', ponte: 'Ponte', 'pre-refrao': 'Pré-refrão', intro: 'Intro', final: 'Final' };
+const NOMES_PARTE = { refrao: 'Chorus', estrofe: 'Verse', ponte: 'Bridge', 'pre-refrao': 'Pre-Chorus', intro: 'Intro', final: 'Outro' };
 const ehLinhaDeLetra = (l) => { const p = /^\s*\(([^()]*)\)\s*$/.exec(l); return l.trim() && !ehDiretiva(l) && !soAcordes(l) && !(p && ehObservacao(p[1])); };
 
 export function linhasDaLetra(src) {
@@ -626,7 +666,7 @@ export function aplicarEstrutura(src, partes) {
       const ultimaBranca = pendentes.findLastIndex((x) => !x.trim());
       out.push(...pendentes.splice(0, ultimaBranca + 1));
       if (out.length && out[out.length - 1].trim()) out.push('');
-      out.push(`[${tipo === 'estrofe' ? `Estrofe ${++estrofes}` : NOMES_PARTE[tipo]}]`);
+      out.push(`[${tipo === 'estrofe' ? `Verse ${++estrofes}` : NOMES_PARTE[tipo]}]`);
     }
     out.push(...pendentes, l);
     pendentes = [];

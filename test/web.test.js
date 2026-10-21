@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cifraTextoParaChordPro, ehCifraClub, letraReserva, simplificarCifra, parseLetras, resultadosLetras, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
+  cifraTextoParaChordPro, ehCifraClub, repararCifraInvisivel, semTablaturas, letraReserva, simplificarCifra, parseLetras, resultadosLetras, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
 } from '../public/js/lib/web.js';
 import { organizarPartes, partesDosBlocos, tiposDosBlocos, semIntro, aplicarEstrutura, aplicarLetra, definirMeta, doEditor, letraDe, linhasDaLetra, paraEditor, parseChordPro } from '../public/js/chordpro.js';
 
@@ -41,7 +41,7 @@ B|-----3-----|
   assert.equal(c.artista, 'Fernandinho');
   assert.equal(c.tom, 'G');
   assert.match(c.chordpro, /\{youtube: https:\/\/www\.youtube\.com\/watch\?v=abcdefghijk\}/);
-  assert.match(c.chordpro, /\{start_of_verse: Primeira Parte\}/);
+  assert.match(c.chordpro, /\{start_of_verse: Verse 1\}/);
   assert.match(c.chordpro, /\{start_of_chorus\}\n\[Em\] {3}Eu me ale\[C\]grarei\n\{end_of_chorus\}/);
   assert.ok(!/start_of_tab|E\|---3/.test(c.chordpro)); // versão simplificada: sem tablatura
   const { sections } = parseChordPro(c.chordpro);
@@ -81,8 +81,8 @@ test('cifra colada: acordes no fim da parte não grudam na diretiva', () => {
 
 test('letra pura vira estrofes e refrão (estrofe repetida)', () => {
   const pro = letraParaChordPro({ titulo: 'T', artista: 'A', letra: 'Linha 1\nLinha 2\n\nRefrão aqui\n\nLinha 3\n\nRefrão aqui' });
-  assert.match(pro, /\{start_of_verse: Estrofe 1\}\nLinha 1\nLinha 2\n\{end_of_verse\}/);
-  assert.match(pro, /\{start_of_chorus: Refrão\}\nRefrão aqui\n\{end_of_chorus\}/);
+  assert.match(pro, /\{start_of_verse: Verse 1\}\nLinha 1\nLinha 2\n\{end_of_verse\}/);
+  assert.match(pro, /\{start_of_chorus\}\nRefrão aqui\n\{end_of_chorus\}/);
   assert.match(pro, /\{chorus\}\n$/);
 });
 
@@ -115,11 +115,11 @@ test('troca e remove diretivas (vídeo, etc.)', () => {
 test('editor simples: [Refrão] vale até a próxima parte e volta igual', () => {
   const pro = doEditor('[Refrão]\nG        D\nAleluia aleluia\nsegunda linha\n\n[Estrofe 1]\nPrimeira estrofe\n\nSegunda estrofe\n\n[Repetir refrão]\n(2x)');
   const secs = parseChordPro(pro).sections.map((x) => `${x.type}:${x.label}:${x.lines.length}`);
-  assert.deepEqual(secs, ['chorus::2', 'verse:Estrofe 1:1', 'verse::1', 'chorus::2', 'verse::1']);
+  assert.deepEqual(secs, ['chorus::2', 'verse:Verse 1:1', 'verse::1', 'chorus::2', 'verse::1']);
   assert.match(pro, /\{comment: 2x\}/);
   const original = '{start_of_chorus}\n[G]Ale[D]luia\n{end_of_chorus}\n\nVerso solto\n\n{chorus}';
   const ed = paraEditor(original);
-  assert.equal(ed, '[Refrão]\n[G]Ale[D]luia\n\n[Estrofe]\nVerso solto\n\n[Repetir refrão]');
+  assert.equal(ed, '[Chorus]\n[G]Ale[D]luia\n\n[Verse]\nVerso solto\n\n[Repeat Chorus]');
   const tipos = (x) => parseChordPro(x).sections.map((y) => y.type).join(',');
   assert.equal(tipos(doEditor(ed)), tipos(original));
 });
@@ -144,7 +144,7 @@ test('partes vindas da IA: só coloca as marcações, sem mudar a letra', () => 
   const pro = '[G]Deus está [D]aqui\nNeste momento\n\nE ainda se [C]vier\nnoite traiçoeira\n\nDeus está aqui\nde novo';
   assert.deepEqual(linhasDaLetra(pro), ['Deus está aqui', 'Neste momento', 'E ainda se vier', 'noite traiçoeira', 'Deus está aqui', 'de novo']);
   const r = aplicarEstrutura(pro, [{ inicio: 1, tipo: 'estrofe' }, { inicio: 3, tipo: 'refrao' }, { inicio: 5, tipo: 'estrofe' }]);
-  assert.deepEqual(parseChordPro(r).sections.map((x) => `${x.type}:${x.label}`), ['verse:Estrofe 1', 'chorus:', 'verse:Estrofe 2']);
+  assert.deepEqual(parseChordPro(r).sections.map((x) => `${x.type}:${x.label}`), ['verse:Verse 1', 'chorus:', 'verse:Verse 2']);
   assert.deepEqual(linhasDaLetra(r), linhasDaLetra(pro));
   assert.match(r, /\[G\]Deus está \[D\]aqui/);
 });
@@ -233,7 +233,7 @@ test('partes automáticas: refrão (mesmo com variações), pré-refrão e ponte
 test('cifra sem partes marcadas ganha refrão e estrofes; acordes e letra não mudam', () => {
   const pro = '{title: T}\n{key: G}\n\n[G]Deus está [D]aqui\nneste momento\n\n[C]Santo santo\né o [G]Senhor\n\nE ainda se vier\nnoite traiçoeira\n\nSanto santo\né o Senhor';
   const r = organizarPartes(pro);
-  assert.deepEqual(parseChordPro(r).sections.map((x) => `${x.type}:${x.label}`), ['verse:Estrofe 1', 'chorus:', 'verse:Estrofe 2', 'chorus:']);
+  assert.deepEqual(parseChordPro(r).sections.map((x) => `${x.type}:${x.label}`), ['verse:Verse 1', 'chorus:', 'verse:Verse 2', 'chorus:']);
   assert.deepEqual(linhasDaLetra(r), linhasDaLetra(pro));
   assert.match(r, /^\{title: T\}\n\{key: G\}\n/);
   assert.match(r, /\[G\]Deus está \[D\]aqui/);
@@ -279,4 +279,67 @@ test('letra de reserva: título parecido de outra música não serve', async () 
     { id: 2, trackName: 'Pelas Estradas da Vida - Ao Vivo', artistName: 'Coral', plainLyrics: 'certa' },
   ] : { type: 'notfound' }) });
   assert.equal((await letraReserva({ titulo: 'Pelas Estradas da Vida', artista: 'Músicas Católicas' }, fetchImpl)).letra, 'certa');
+});
+
+// o Cifra Club passou a pôr um espaço de largura zero (U+200B) no começo de cada linha da cifra
+const Z = '\u200B';
+const PAGINA_ZWSP = `<h1 class="t1">Ressuscita-me</h1><pre>${Z}[Intro] <b>C6</b>  <b>G/B</b>
+
+${Z}[Primeira Parte]
+
+${Z}[Tab - Primeira Parte]
+
+${Z}Parte 1 de 2
+${Z}   <b>D</b>  <b>A</b>
+${Z}E|-5-------0-2-3--|
+${Z}B|-5---5---------|
+${Z}            ↑ ↑ ↓ ↓ ↑ ↓ ↑
+
+${Z}D                            A
+${Z}  Mestre eu preciso de um milagre
+${Z}Bm                                 G
+${Z}   Transforma minha vida, o meu estado
+
+${Z}[Pré-Refrão]
+
+${Z}G          A
+${Z}Lázaro ouviu a Sua voz
+
+${Z}[Refrão]
+
+${Z}              D
+${Z}Remove minha pedra
+${Z}          A
+${Z}Me chama pelo nome
+</pre>`;
+
+test('Cifra Club com caracteres invisíveis: acordes e partes reconhecidos, nomes em inglês', () => {
+  const c = parseCifraClub(PAGINA_ZWSP);
+  assert.ok(!/\u200B/.test(c.chordpro));
+  assert.match(c.chordpro, /\{start_of_verse: Verse 1\}\n\[D\] {2}Mestre eu preciso de um mil\[A\]agre\n/);
+  assert.match(c.chordpro, /\{start_of_verse: Pre-Chorus\}\n\[G\]Lázaro ouvi\[A\]u a Sua voz\n/);
+  assert.match(c.chordpro, /\{start_of_chorus\}\nRemove minha p\[D\]edra\nMe chama p\[A\]elo nome\n\{end_of_chorus\}/);
+  assert.ok(!/↑|E\|-|Parte 1 de 2|Primeira Parte/.test(c.chordpro));
+});
+
+test('cifra já guardada com os caracteres invisíveis é refeita (uma vez); as outras não mudam', () => {
+  const quebrada = `{title: Ressuscita-me}\n{key: D}\n\n{start_of_verse: Estrofe 1}\n${Z}[Primeira Parte]\n{end_of_verse}\n\n{start_of_verse: Estrofe 2}\n(Primeira Parte)\n{end_of_verse}\n\n{start_of_verse: Estrofe 3}\n${Z}D            A\n${Z}Mestre eu preciso\n{end_of_verse}\n\n{start_of_verse: Pré-refrão}\n${Z}[Refrão]\n${Z}G     D\n${Z}Remove minha pedra\n{end_of_verse}`;
+  const r = repararCifraInvisivel(quebrada);
+  assert.equal(r, '{title: Ressuscita-me}\n{key: D}\n\n{start_of_verse: Verse 1}\n[D]Mestre eu pre[A]ciso\n{end_of_verse}\n\n{start_of_chorus}\n[G]Remove[D] minha pedra\n{end_of_chorus}');
+  assert.equal(repararCifraInvisivel(r), r);
+  const outra = `{title: a}\n\n{start_of_verse: Estrofe 1}\nCan\u00ADto bo${Z}nito\n{end_of_verse}`;
+  assert.equal(repararCifraInvisivel(outra), outra);
+});
+
+test('partes sempre em inglês: do editor, de outros sites ("Refrão:", "Verso 1:") e das cifras guardadas', () => {
+  const pro = doEditor('[Estrofe 1]\nG    D\nLinha um\n\n[Pré-refrão]\nPre\n\n[Refrão]\nAleluia\n\n[Ponte]\nPonte aqui\n\n[Repetir refrão]');
+  assert.deepEqual(parseChordPro(pro).sections.map((x) => `${x.type}:${x.label}`), ['verse:Verse 1', 'verse:Pre-Chorus', 'chorus:', 'bridge:', 'chorus:']);
+  const site = doEditor('Verso 1:\nG       D\nEu te louvarei\n\nRefrão:\nC   D\nAleluia');
+  assert.deepEqual(parseChordPro(site).sections.map((x) => `${x.type}:${x.label}`), ['verse:Verse 1', 'chorus:']);
+  assert.match(site, /\[G\]Eu te lo\[D\]uvarei/);
+  assert.equal(paraEditor('{start_of_chorus: Refrão}\nA\n{end_of_chorus}\n{start_of_verse: Estrofe 2}\nB\n{end_of_verse}\n{chorus}'), '[Chorus]\nA\n[Verse 2]\nB\n[Repeat Chorus]');
+});
+
+test('tablatura do Cifra Club sai antes de converter (a letra continua dentro da parte)', () => {
+  assert.equal(semTablaturas('[Primeira Parte]\n\n[Tab - Primeira Parte]\nParte 1 de 2\n  D  A\nE|-5--|\n   ↑ ↓\n\nD\nMestre'), '[Primeira Parte]\n\n\nD\nMestre');
 });

@@ -1,6 +1,6 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
-import { definirMeta, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasDaLetraComCifra, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
+import { definirMeta, semInvisiveis, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasDaLetraComCifra, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
 import { icon, iconeMenu, logo } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
@@ -17,7 +17,7 @@ import {
 import { corCss, corDominante } from './lib/cores.js';
 import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
 import { duracaoDoAviso, partesDoAviso, tipoDoAviso } from './lib/avisos.js';
-import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-178';
+export const APP_VERSAO = '2026.10.21-179';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1950,7 +1950,7 @@ async function trazerLetra(item) {
 
 // texto colado (cifra de qualquer site, letra pura ou ChordPro) -> ChordPro com título e autor
 function textoParaChordPro(texto, { titulo = '', artista = '', url = '' } = {}) {
-  const t = String(texto || '').replace(/\r\n?/g, '\n').trim();
+  const t = semInvisiveis(texto).replace(/\r\n?/g, '\n').trim();
   let corpo;
   if (looksLikeChordPro(t) && !/^\s*\[[^\]]*[a-z]{3,}[^\]]*\]\s*$/m.test(t)) corpo = t;
   else if (t.split('\n').some(isChordOnlyLine)) corpo = cifraTextoParaChordPro(t);
@@ -5073,6 +5073,12 @@ function viewSong(id, ctx = {}) {
     else db.saveSong({ ...song, content: capoAntigo.content, capo: Math.min(11, (song.capo || 0) + capoAntigo.capo) });
     return viewSong(id, ctx);
   }
+  // cifra trazida com os caracteres invisíveis do Cifra Club (acordes que viraram texto): refaz uma vez
+  const reparada = repararCifraInvisivel(song.content);
+  if (reparada !== song.content) {
+    if (isPreview) preview.content = reparada; else db.saveSong({ ...song, content: reparada });
+    return viewSong(id, ctx);
+  }
   // sem refrão marcado: o app separa sozinho refrão, estrofes e ponte (uma vez; depois fica guardado)
   if (!String(song.source || '').startsWith('cnbb:')) {
     const organizada = organizarPartes(song.content);
@@ -5632,17 +5638,17 @@ async function dialogoTons(tomBase, transpose = 0, { titulo = 'Escolher o tom', 
 // ------------------------------------------------------------- editor
 
 // estrutura inicial de uma música nova (o usuário troca pelo próprio texto)
-const TEMPLATE_CORPO = `{start_of_chorus: Refrão}
+const TEMPLATE_CORPO = `{start_of_chorus}
 [C]Escreva aqui o re[G]frão
 {end_of_chorus}
 
-{start_of_verse: Estrofe 1}
+{start_of_verse: Verse 1}
 [C]Primeira estrofe, com os a[Am]cordes
 {end_of_verse}
 
 {chorus}
 
-{start_of_verse: Estrofe 2}
+{start_of_verse: Verse 2}
 Segunda estrofe (use "Completar cifra" para repetir os acordes)
 {end_of_verse}
 
@@ -5700,7 +5706,8 @@ function viewEditor(id, setId) {
   setTint(corDe({ ...song, title: song.title || 'nova' }));
   const { meta, corpo } = separarMeta(song.content);
   // formato do texto: acordes na linha de cima, entre [colchetes] ou só a letra (acordes preservados)
-  let formato = ['colchetes', 'letra'].includes(db.prefs().formatoEditor) ? db.prefs().formatoEditor : 'acima';
+  // "Só letra" não fica guardado: o editor sempre volta a abrir mostrando os acordes
+  let formato = db.prefs().formatoEditor === 'colchetes' ? 'colchetes' : 'acima';
   if (/^#\/editar\/[^/]+\/letra/.test(location.hash)) formato = 'letra';
   let baseLetra = paraEditor(corpo); // no modo "só a letra", os acordes vêm desta versão
   const actions = [];
@@ -5714,8 +5721,10 @@ function viewEditor(id, setId) {
   }
   const voltar = setDestino ? '#/repertorio/' + setDestino.id : isNew ? '#/biblioteca/musicas' : '#/musica/' + id;
   setHeader(isNew ? 'Nova música' : 'Editar cifra', { back: () => sair(), actions, eyebrow: setDestino ? 'Para: ' + setDestino.name : isNew ? '' : song.title });
-  const partes = [['Refrão', 'plus', 'Daqui para baixo é o refrão (até a próxima parte)'], ['Estrofe', 'plus', 'Daqui para baixo é uma estrofe (até a próxima parte)'],
-    ['Ponte', 'plus', 'Daqui para baixo é a ponte'], ['Intro', 'plus', 'Linha da introdução (acordes)'], ['Repetir refrão', 'refresh', 'Canta o refrão de novo aqui']];
+  // partes com os nomes em inglês (Chorus, Verse, Bridge…), como ficam na cifra
+  const partes = [['Chorus', 'plus', 'Refrão: daqui para baixo é o refrão (até a próxima parte)'], ['Verse', 'plus', 'Estrofe: daqui para baixo é uma estrofe (até a próxima parte)'],
+    ['Pre-Chorus', 'plus', 'Pré-refrão: a parte que vem logo antes do refrão'], ['Bridge', 'plus', 'Ponte: daqui para baixo é a ponte'], ['Intro', 'plus', 'Linha da introdução (acordes)'],
+    ['Repeat Chorus', 'refresh', 'Canta o refrão de novo aqui']];
   view.innerHTML = `
     <div class="editor ed2">
       <section class="ed-topo">
@@ -5773,7 +5782,7 @@ function viewEditor(id, setId) {
   const ta = $('#content');
   const campo = (k) => $('#f-' + k);
   // nos dois formatos o texto é normalizado para ChordPro ao salvar (linhas só de acordes viram [acordes])
-  // o texto do editor tem as partes como [Refrão], [Estrofe 2]…; ao salvar vira ChordPro
+  // o texto do editor tem as partes como [Chorus], [Verse 2]…; ao salvar vira ChordPro
   const corpoPro = () => doEditor(formato === 'letra' ? aplicarLetra(baseLetra, ta.value) : ta.value);
   const exibir = (pro) => {
     const simples = paraEditor(pro);
@@ -5786,8 +5795,8 @@ function viewEditor(id, setId) {
     composer: campo('composer').value.trim(), parte: campo('parte').value === '__outra' ? '' : campo('parte').value, extras: meta.extras,
   }, corpoPro());
   const DICAS = {
-    acima: 'Toque em <b>Refrão</b>, <b>Estrofe</b> ou <b>Ponte</b> na linha onde a parte começa: tudo dali para baixo pertence a ela, até a próxima. Escreva os acordes na linha de cima, alinhados com a sílaba:<br><code>[Refrão]<br>Am        G<br>Senhor, tende piedade</code>',
-    colchetes: 'Partes numa linha só: <code>[Refrão]</code>, <code>[Estrofe 2]</code>… Os acordes vão entre colchetes antes da sílaba: <code>[G]Senhor, tende pie[D]dade</code>.',
+    acima: 'Toque em <b>Chorus</b> (refrão), <b>Verse</b> (estrofe) ou <b>Bridge</b> (ponte) na linha onde a parte começa: tudo dali para baixo pertence a ela, até a próxima. Escreva os acordes na linha de cima, alinhados com a sílaba:<br><code>[Chorus]<br>Am        G<br>Senhor, tende piedade</code>',
+    colchetes: 'Partes numa linha só: <code>[Chorus]</code>, <code>[Verse 2]</code>… Os acordes vão entre colchetes antes da sílaba: <code>[G]Senhor, tende pie[D]dade</code>.',
     letra: 'Corrija ou reescreva só o texto, sem se preocupar com os acordes: ao salvar, cada acorde volta para a mesma sílaba. Linhas novas entram sem acordes.',
   };
   const dica = () => {
@@ -5799,7 +5808,7 @@ function viewEditor(id, setId) {
     if (b.dataset.formato === formato) return;
     const pro = corpoPro();
     formato = b.dataset.formato;
-    db.setPref('formatoEditor', formato);
+    if (formato !== 'letra') db.setPref('formatoEditor', formato);
     ta.value = exibir(pro);
     view.querySelectorAll('[data-formato]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     dica();
@@ -5951,7 +5960,7 @@ function viewEditor(id, setId) {
       ta.setSelectionRange(ta.selectionStart - t.length + 1, ta.selectionStart - 1);
       return;
     }
-    if (nome === 'Estrofe') nome = `Estrofe ${(v.match(/^\s*\[estrofe\b/gim) || []).length + 1}`;
+    if (nome === 'Verse') nome = `Verse ${(v.match(/^\s*\[(verse|estrofe)\b/gim) || []).length + 1}`;
     const pos = ta.selectionStart;
     const ini = v.lastIndexOf('\n', pos - 1) + 1;
     let fim = v.indexOf('\n', pos);
