@@ -15,6 +15,7 @@ import {
   claveDaVoz, estimarAndamento, estimarTom, faixaDoModo, juntarPedaco, melodiaDasNotas, tomDaCifra, vozesDasNotas, colocarLetra, letraEmSilabas, temLetra, silabasDaLetra, temCifra as temCifraNaPartitura,
 } from './lib/partitura.js';
 import { corCss, corDominante } from './lib/cores.js';
+import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
 import { duracaoDoAviso, partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { SERVIDOR_AUDIO } from './config.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
@@ -52,7 +53,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-161';
+export const APP_VERSAO = '2026.10.21-162';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -3111,9 +3112,11 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
     mestre.gain.value = 0.9;
     mestre.connect(saida);
   };
+  let piano = false; // as gravações do piano chegaram (senão, o som sintetizado de antes)
   const nota = (freq, quando, dur, vol) => {
     if (vol <= 0) return;
     const f = freq * 2 ** (tomAtual() / 12);
+    if (piano && notaDePiano(audio, mestre, midiDaFrequencia(f), quando, dur, (1.4 / Math.sqrt(juntas())) * vol)) return;
     // as graves soam mais fracas ao ouvido (e no alto-falante do celular): ganham um pouco de volume
     // várias vozes juntas dividem o volume (antes somavam e o limitador apertava tudo: o som "chiava")
     const pico = (0.24 / Math.sqrt(juntas())) * vol * Math.min(1.6, Math.max(1, (330 / f) ** 0.35));
@@ -3176,9 +3179,20 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
     moverCursor(passoNoTempo(passos, tAgora()));
     quadro = requestAnimationFrame(acompanhar);
   };
+  // as gravações do piano para as notas desta partitura (no tom em que está): baixadas uma vez, na primeira vez que toca
+  const carregarAsDoPiano = async () => {
+    const midis = new Set(passos.flatMap((p) => p.notas.map((n) => midiDaFrequencia(n.freq * 2 ** (tomAtual() / 12)))));
+    if ([...midis].every(pianoPronto)) return true;
+    $('#ens-pos', barra).textContent = 'Preparando o piano…';
+    // sem internet ou demorando: toca com o som sintetizado (as gravações que faltam chegam para a próxima vez)
+    return Promise.race([carregarPiano(audio, midis), new Promise((r) => setTimeout(() => r(false), 8000))]);
+  };
   const tocar = async () => {
     if (!audio) { montarAudio(); novoMestre(); }
     if (audio.state === 'suspended') await audio.resume();
+    piano = await carregarAsDoPiano();
+    // o piano soa aberto (o filtro que tirava o chiado do som sintetizado abafaria o brilho das cordas)
+    saida.frequency.value = piano ? 14000 : 3200;
     mostrarCursor();
     tocando = true;
     inicioAudio = audio.currentTime + 0.08;
@@ -3280,12 +3294,22 @@ const notaSvg = (k, t = 22) => `<svg class="ic" width="${t}" height="${t}" viewB
 
 // som curto de uma nota (ao escrever ou tocar numa nota)
 let somCtx = null;
+// o piano das notas desta partitura já vai sendo baixado ao abrir o editor (o primeiro toque já sai no piano)
+function prepararPianoDoEditor(modelo) {
+  try {
+    somCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+    const midis = modelo.pautas.flatMap((p) => p.ev.flatMap((e) => e.a.map(midiDa)));
+    carregarPiano(somCtx, midis.length ? midis : [55, 60, 64, 67, 72]);
+  } catch { /* sem áudio */ }
+}
 function somNota(alturas) {
   try {
     somCtx ||= new (window.AudioContext || window.webkitAudioContext)();
     if (somCtx.state === 'suspended') somCtx.resume();
     const t = somCtx.currentTime + 0.01;
     for (const a of [].concat(alturas)) {
+      // no piano, se a gravação já chegou (senão o som sintetizado, e a gravação vem para a próxima vez)
+      if (notaDePiano(somCtx, somCtx.destination, midiDa(a), t, 0.55, 1.2)) continue;
       const g = somCtx.createGain();
       g.connect(somCtx.destination);
       g.gain.setValueAtTime(0, t);
@@ -3459,6 +3483,7 @@ function editorPartitura(song, titulo) {
   const id = song.id;
   let m = JSON.parse(JSON.stringify(song.partitura));
   m.pautas.forEach((p, i) => { p.id ||= 'p' + i; p.ev ||= []; });
+  prepararPianoDoEditor(m);
   let sel = { p: 0, i: m.pautas[0].ev.length - 1 };
   let porToque = false; // a seleção veio de um toque/seta (aí as durações mudam a nota); depois de escrever, não
   let dur = 8;
@@ -4307,24 +4332,22 @@ async function audioParaModelo(arrayBuffer) {
 // o áudio do vídeo do YouTube, baixado pelo servidor do app (yt-dlp; ver server/audio.js e render.yaml). Servido pelo
 // próprio servidor (Node), usa o endereço do app; no GitHub Pages, o do servidor no Render (config.js). O plano grátis
 // do Render dorme sem uso: o primeiro pedido do dia pode levar ~1 min para "acordar"
-async function audioDoVideo(id, avisar = () => {}, formato = 'm4a') {
+async function audioDoVideo(id, formato = 'm4a') {
   const servidores = [...new Set([...(/github\.io$/.test(location.hostname) ? [] : ['']), SERVIDOR_AUDIO].filter((x) => x !== undefined))];
   let erro = new Error('nenhum servidor configurado');
   for (const base of servidores) {
     const ctrl = new AbortController();
-    const limite = setTimeout(() => ctrl.abort(), 180e3);
-    const acordar = setTimeout(() => avisar('Acordando o servidor…', 'Na primeira vez do dia pode levar até 1 minuto.'), 6000);
+    const limite = setTimeout(() => ctrl.abort(), 240e3); // o servidor dormindo (~1 min) + as tentativas dele
     try {
       const r = await fetch(`${base}/api/audio?v=${encodeURIComponent(id)}&f=${formato}`, { signal: ctrl.signal });
       const tipo = r.headers.get('content-type') || '';
-      if (r.ok && tipo.startsWith('audio/')) { avisar('Áudio baixado', ''); return await r.blob(); }
+      if (r.ok && tipo.startsWith('audio/')) return await r.blob();
       // 404 com a página do app: não há servidor neste endereço
       erro = new Error(tipo.includes('json') ? (await r.json()).erro || `erro ${r.status}` : 'servidor não encontrado');
     } catch (e) {
       erro = e.name === 'AbortError' ? new Error('o servidor demorou demais') : new Error('sem conexão com o servidor');
     } finally {
       clearTimeout(limite);
-      clearTimeout(acordar);
     }
   }
   throw erro;
@@ -4424,24 +4447,26 @@ async function gerarComIA(song, titulo) {
   const passo = $('#ia-passo');
 
   // um toque só: o servidor do app baixa o áudio do vídeo da música (sem microfone, sem anúncio) e a IA ouve
+  const FALHOU_IA = 'Não consegui gerar a partitura deste vídeo agora. Tente de novo daqui a pouco ou use um arquivo de áudio da música.';
   async function automatico() {
     if (!song.youtube) { telaFontes('Esta música ainda não tem vídeo. Escolha um na página da música (em Referências) ou use um arquivo de áudio.'); return; }
     passo.onclick = null;
-    passo.innerHTML = `<div class="ia-auto"><span class="spin"></span><div><b id="ia-auto-status">Baixando o áudio do vídeo…</b>
-      <small id="ia-auto-sub">Só o som da música, sem anúncios. Leva alguns segundos.</small></div></div>`;
-    const avisar = (texto, sub = '') => { if ($('#ia-auto-status')) { $('#ia-auto-status').textContent = texto; $('#ia-auto-sub').textContent = sub; } };
+    // tudo acontece por trás: na tela, só "Gerando a partitura"
+    passo.innerHTML = `<div class="ia-auto"><span class="spin"></span><div><b>Gerando a partitura…</b>
+      <small>Isso leva cerca de um minuto. Pode deixar a tela aberta.</small></div></div>`;
     let arquivo;
     try {
-      arquivo = await audioDoVideo(song.youtube, avisar);
+      arquivo = await audioDoVideo(song.youtube);
     } catch (e) {
-      if (view.contains(passo)) telaFontes(`Não consegui baixar o áudio do vídeo (${e.message}).`);
+      console.warn('áudio do vídeo:', e.message);
+      if (view.contains(passo)) telaFontes(FALHOU_IA);
       return;
     }
     if (!view.contains(passo)) return;
     // aparelho que não abre o m4a (AAC): pede o mesmo áudio em webm (Opus)
     lerArquivo(arquivo, {
       seNaoAbrir: async () => {
-        try { lerArquivo(await audioDoVideo(song.youtube, () => {}, 'webm')); } catch (e) { telaFontes(`Não consegui baixar o áudio do vídeo (${e.message}).`); }
+        try { lerArquivo(await audioDoVideo(song.youtube, 'webm')); } catch (e) { console.warn('áudio do vídeo:', e.message); telaFontes(FALHOU_IA); }
       },
     });
   }
@@ -4552,7 +4577,7 @@ async function gerarComIA(song, titulo) {
 
   async function lerArquivo(arquivo, { seNaoAbrir = null } = {}) {
     telaLeitura('arquivo');
-    $('#ia-status').textContent = 'Preparando o áudio…';
+    $('#ia-status').textContent = 'Gerando a partitura…';
     let leitor;
     try {
       const { amostras, cortado } = await audioParaModelo(await arquivo.arrayBuffer());
@@ -4562,42 +4587,40 @@ async function gerarComIA(song, titulo) {
       // o arquivo entra em pedaços, como se estivesse tocando (a tela acompanha a análise)
       for (let i = 0; i < amostras.length && leitor; i += SR_IA * 5) {
         leitor.alimentar(amostras.subarray(i, Math.min(amostras.length, i + SR_IA * 5)));
-        animar(leitor, { nivel: 0.6, ouvindo: true, texto: `Ouvindo o arquivo · ${fmtSeg(leitor.analisados)} de ${fmtSeg(amostras.length / SR_IA)}` });
+        animar(leitor, { nivel: 0.6, ouvindo: true, texto: `Gerando a partitura · ${Math.min(99, Math.round((leitor.analisados / (amostras.length / SR_IA)) * 100))}%` });
         await new Promise((r) => setTimeout(r, 0));
         while (leitor && leitor.segundos - leitor.analisados > 10) {
           await new Promise((r) => setTimeout(r, 120));
-          animar(leitor, { nivel: 0.6, ouvindo: true, texto: `Ouvindo o arquivo · ${fmtSeg(leitor.analisados)} de ${fmtSeg(amostras.length / SR_IA)}` });
+          animar(leitor, { nivel: 0.6, ouvindo: true, texto: `Gerando a partitura · ${Math.min(99, Math.round((leitor.analisados / (amostras.length / SR_IA)) * 100))}%` });
         }
       }
       if (leitor) await concluir(leitor);
     } catch (e) {
       console.error(e);
       if (seNaoAbrir && e.name === 'EncodingError') { seNaoAbrir(); return; }
-      toast('Não consegui ler o áudio: ' + e.message);
-      telaFontes();
+      telaFontes(FALHOU_IA);
     }
   }
   let notas = null;
   async function concluir(leitor) {
     const st = $('#ia-status');
-    if (st) st.textContent = 'Terminando de ouvir…';
+    if (st) st.textContent = 'Gerando a partitura · quase pronto';
     $('#ia-parar') && ($('#ia-parar').disabled = true);
     // a IA pode estar alguns segundos atrás da gravação: mostra quanto falta e a faixa continua andando
     const falta = setInterval(() => {
-      animar(leitor, { nivel: 0.3, ouvindo: true, texto: `Terminando de ouvir… ${fmtSeg(leitor.analisados)} de ${fmtSeg(leitor.segundos)}` });
+      animar(leitor, { nivel: 0.3, ouvindo: true, texto: 'Gerando a partitura · quase pronto' });
     }, 100);
     try {
       notas = await leitor.terminar();
     } catch (e) {
       clearInterval(falta);
       console.error(e);
-      toast('A IA não conseguiu ouvir: ' + e.message);
-      telaFontes();
+      telaFontes(FALHOU_IA);
       return;
     }
     clearInterval(falta);
     if (!view.contains(passo)) return;
-    if (!notas.length) { toast('Não ouvi notas: tente de novo com o volume mais alto'); telaFontes(); return; }
+    if (!notas.length) { telaFontes('A IA não encontrou notas neste áudio. Tente de novo ou use outro arquivo de áudio da música.'); return; }
     resultado();
   }
 

@@ -55,9 +55,14 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 - **Servidor do app (Render)**: o GitHub Pages só serve as páginas; o áudio dos vídeos para a IA vem de um servidor
   Node com o yt-dlp (`Dockerfile`, `render.yaml`). Para criar: render.com → *New* → *Blueprint* → este repositório (plano
   grátis; dorme sem uso e o primeiro pedido do dia demora ~1 min). O endereço fica em `public/js/config.js`
-  (`https://songbook-audio.onrender.com`). Se o YouTube bloquear o servidor ("confirme que não é um robô"), cole o
-  conteúdo de um `cookies.txt` de uma conta do YouTube na variável `YTDLP_COOKIES` do serviço no Render; se parar de
-  baixar depois de uma mudança do YouTube, *Manual Deploy → Clear build cache & deploy* traz o yt-dlp mais novo.
+  (`https://songbook-audio.onrender.com`). O YouTube desconfia de servidores ("confirme que não é um robô"): o servidor
+  gera a prova de origem (PO Token, complemento bgutil), resolve os desafios do YouTube com o Node e tenta como
+  clientes diferentes (mweb, web, TV, incorporado, VR) até um passar. Se ainda bloquear, cole o conteúdo de um
+  `cookies.txt` de uma conta do YouTube em `YTDLP_COOKIES` (ou um proxy residencial em `YTDLP_PROXY`) no Render; se
+  parar de baixar depois de uma mudança do YouTube, *Manual Deploy → Clear build cache & deploy* traz as versões novas.
+- **Piano de verdade no ensaio**: ouvir a partitura (e tocar numa nota no editor) usa o **Salamander Grand Piano**,
+  um piano de cauda Yamaha C5 gravado nota por nota (Alexander Holm, CC-BY 3.0), pelo jsDelivr numa versão fixa
+  (`lib/piano.js`): só as gravações das notas da música são baixadas, uma vez; sem internet, o som sintetizado.
 - **Partituras** (menu do app): as partituras feitas no app e as prontas (acervo/Hinário) das músicas da biblioteca, com
   **Nova partitura** (escolhendo a música) e **Gerar com IA**: um toque só — o servidor do app baixa o áudio do
   vídeo da música (yt-dlp, `server/audio.js`; se falhar, dá para escolher um arquivo de áudio) e o modelo **Basic Pitch** (Spotify, código

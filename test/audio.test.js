@@ -11,6 +11,9 @@ test('áudio do vídeo: argumentos do yt-dlp e origens permitidas', () => {
   assert.ok(a.includes('bestaudio[ext=m4a]/bestaudio'));
   assert.ok(!a.includes('--cookies'));
   assert.ok(argumentosYtDlp('dQw4w9WgXcQ', '/tmp/x', { cookies: '/tmp/c.txt' }).includes('--cookies'));
+  assert.ok(argumentosYtDlp('dQw4w9WgXcQ', '/tmp/x', { cliente: 'mweb' }).includes('youtube:player_client=mweb'));
+  assert.ok(!argumentosYtDlp('dQw4w9WgXcQ', '/tmp/x').includes('--extractor-args'));
+  assert.ok(argumentosYtDlp('dQw4w9WgXcQ', '/tmp/x', { proxy: 'http://p:1' }).includes('--proxy'));
   assert.ok(origemPermitida('https://kvsl11.github.io'));
   assert.ok(origemPermitida('http://localhost:3000'));
   assert.ok(origemPermitida(undefined));
@@ -32,5 +35,10 @@ test('áudio do vídeo: baixa com o yt-dlp, recusa id inválido e explica as fal
   assert.equal(r.tipo, 'audio/mp4');
   await assert.rejects(baixarAudio('x', { bin: bom }), { status: 400 });
   await assert.rejects(baixarAudio('bbbbbbbbbbb', { bin: ruim }), /bloqueou o servidor/);
+  // bloqueado como um cliente, passa como outro: tenta os clientes em ordem
+  const exigente = path.join(pasta, 'exigente.sh');
+  await writeFile(exigente, '#!/bin/sh\ncase "$*" in *player_client=tv*) ;; *) echo "ERROR: Sign in to confirm you are not a bot" >&2; exit 1;; esac\nout=""\nwhile [ $# -gt 0 ]; do if [ "$1" = "-o" ]; then out="$2"; fi; shift; done\nprintf TV > "$(dirname "$out")/audio.m4a"\n');
+  await chmod(exigente, 0o755);
+  assert.equal(String((await baixarAudio('ddddddddddd', { bin: exigente })).dados), 'TV');
   await assert.rejects(baixarAudio('ccccccccccc', { bin: path.join(pasta, 'nao-existe') }), /não está instalado/);
 });
