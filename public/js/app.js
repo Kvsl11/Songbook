@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-159';
+export const APP_VERSAO = '2026.10.21-160';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4266,24 +4266,22 @@ async function audioParaModelo(arrayBuffer) {
 // o áudio do vídeo do YouTube, baixado pelo servidor do app (yt-dlp; ver server/audio.js e render.yaml). Servido pelo
 // próprio servidor (Node), usa o endereço do app; no GitHub Pages, o do servidor no Render (config.js). O plano grátis
 // do Render dorme sem uso: o primeiro pedido do dia pode levar ~1 min para "acordar"
-async function audioDoVideo(id, avisar = () => {}, formato = 'm4a') {
+async function audioDoVideo(id, formato = 'm4a') {
   const servidores = [...new Set([...(/github\.io$/.test(location.hostname) ? [] : ['']), SERVIDOR_AUDIO].filter((x) => x !== undefined))];
   let erro = new Error('nenhum servidor configurado');
   for (const base of servidores) {
     const ctrl = new AbortController();
-    const limite = setTimeout(() => ctrl.abort(), 180e3);
-    const acordar = setTimeout(() => avisar('Acordando o servidor…', 'Na primeira vez do dia pode levar até 1 minuto.'), 6000);
+    const limite = setTimeout(() => ctrl.abort(), 240e3); // o servidor dormindo (~1 min) + as tentativas dele
     try {
       const r = await fetch(`${base}/api/audio?v=${encodeURIComponent(id)}&f=${formato}`, { signal: ctrl.signal });
       const tipo = r.headers.get('content-type') || '';
-      if (r.ok && tipo.startsWith('audio/')) { avisar('Áudio baixado', ''); return await r.blob(); }
+      if (r.ok && tipo.startsWith('audio/')) return await r.blob();
       // 404 com a página do app: não há servidor neste endereço
       erro = new Error(tipo.includes('json') ? (await r.json()).erro || `erro ${r.status}` : 'servidor não encontrado');
     } catch (e) {
       erro = e.name === 'AbortError' ? new Error('o servidor demorou demais') : new Error('sem conexão com o servidor');
     } finally {
       clearTimeout(limite);
-      clearTimeout(acordar);
     }
   }
   throw erro;
@@ -4383,24 +4381,26 @@ async function gerarComIA(song, titulo) {
   const passo = $('#ia-passo');
 
   // um toque só: o servidor do app baixa o áudio do vídeo da música (sem microfone, sem anúncio) e a IA ouve
+  const FALHOU_IA = 'Não consegui gerar a partitura deste vídeo agora. Tente de novo daqui a pouco ou use um arquivo de áudio da música.';
   async function automatico() {
     if (!song.youtube) { telaFontes('Esta música ainda não tem vídeo. Escolha um na página da música (em Referências) ou use um arquivo de áudio.'); return; }
     passo.onclick = null;
-    passo.innerHTML = `<div class="ia-auto"><span class="spin"></span><div><b id="ia-auto-status">Baixando o áudio do vídeo…</b>
-      <small id="ia-auto-sub">Só o som da música, sem anúncios. Leva alguns segundos.</small></div></div>`;
-    const avisar = (texto, sub = '') => { if ($('#ia-auto-status')) { $('#ia-auto-status').textContent = texto; $('#ia-auto-sub').textContent = sub; } };
+    // tudo acontece por trás: na tela, só "Gerando a partitura"
+    passo.innerHTML = `<div class="ia-auto"><span class="spin"></span><div><b>Gerando a partitura…</b>
+      <small>Isso leva cerca de um minuto. Pode deixar a tela aberta.</small></div></div>`;
     let arquivo;
     try {
-      arquivo = await audioDoVideo(song.youtube, avisar);
+      arquivo = await audioDoVideo(song.youtube);
     } catch (e) {
-      if (view.contains(passo)) telaFontes(`Não consegui baixar o áudio do vídeo (${e.message}).`);
+      console.warn('áudio do vídeo:', e.message);
+      if (view.contains(passo)) telaFontes(FALHOU_IA);
       return;
     }
     if (!view.contains(passo)) return;
     // aparelho que não abre o m4a (AAC): pede o mesmo áudio em webm (Opus)
     lerArquivo(arquivo, {
       seNaoAbrir: async () => {
-        try { lerArquivo(await audioDoVideo(song.youtube, () => {}, 'webm')); } catch (e) { telaFontes(`Não consegui baixar o áudio do vídeo (${e.message}).`); }
+        try { lerArquivo(await audioDoVideo(song.youtube, 'webm')); } catch (e) { console.warn('áudio do vídeo:', e.message); telaFontes(FALHOU_IA); }
       },
     });
   }
@@ -4511,7 +4511,7 @@ async function gerarComIA(song, titulo) {
 
   async function lerArquivo(arquivo, { seNaoAbrir = null } = {}) {
     telaLeitura('arquivo');
-    $('#ia-status').textContent = 'Preparando o áudio…';
+    $('#ia-status').textContent = 'Gerando a partitura…';
     let leitor;
     try {
       const { amostras, cortado } = await audioParaModelo(await arquivo.arrayBuffer());
@@ -4521,42 +4521,40 @@ async function gerarComIA(song, titulo) {
       // o arquivo entra em pedaços, como se estivesse tocando (a tela acompanha a análise)
       for (let i = 0; i < amostras.length && leitor; i += SR_IA * 5) {
         leitor.alimentar(amostras.subarray(i, Math.min(amostras.length, i + SR_IA * 5)));
-        animar(leitor, { nivel: 0.6, ouvindo: true, texto: `Ouvindo o arquivo · ${fmtSeg(leitor.analisados)} de ${fmtSeg(amostras.length / SR_IA)}` });
+        animar(leitor, { nivel: 0.6, ouvindo: true, texto: `Gerando a partitura · ${Math.min(99, Math.round((leitor.analisados / (amostras.length / SR_IA)) * 100))}%` });
         await new Promise((r) => setTimeout(r, 0));
         while (leitor && leitor.segundos - leitor.analisados > 10) {
           await new Promise((r) => setTimeout(r, 120));
-          animar(leitor, { nivel: 0.6, ouvindo: true, texto: `Ouvindo o arquivo · ${fmtSeg(leitor.analisados)} de ${fmtSeg(amostras.length / SR_IA)}` });
+          animar(leitor, { nivel: 0.6, ouvindo: true, texto: `Gerando a partitura · ${Math.min(99, Math.round((leitor.analisados / (amostras.length / SR_IA)) * 100))}%` });
         }
       }
       if (leitor) await concluir(leitor);
     } catch (e) {
       console.error(e);
       if (seNaoAbrir && e.name === 'EncodingError') { seNaoAbrir(); return; }
-      toast('Não consegui ler o áudio: ' + e.message);
-      telaFontes();
+      telaFontes(FALHOU_IA);
     }
   }
   let notas = null;
   async function concluir(leitor) {
     const st = $('#ia-status');
-    if (st) st.textContent = 'Terminando de ouvir…';
+    if (st) st.textContent = 'Gerando a partitura · quase pronto';
     $('#ia-parar') && ($('#ia-parar').disabled = true);
     // a IA pode estar alguns segundos atrás da gravação: mostra quanto falta e a faixa continua andando
     const falta = setInterval(() => {
-      animar(leitor, { nivel: 0.3, ouvindo: true, texto: `Terminando de ouvir… ${fmtSeg(leitor.analisados)} de ${fmtSeg(leitor.segundos)}` });
+      animar(leitor, { nivel: 0.3, ouvindo: true, texto: 'Gerando a partitura · quase pronto' });
     }, 100);
     try {
       notas = await leitor.terminar();
     } catch (e) {
       clearInterval(falta);
       console.error(e);
-      toast('A IA não conseguiu ouvir: ' + e.message);
-      telaFontes();
+      telaFontes(FALHOU_IA);
       return;
     }
     clearInterval(falta);
     if (!view.contains(passo)) return;
-    if (!notas.length) { toast('Não ouvi notas: tente de novo com o volume mais alto'); telaFontes(); return; }
+    if (!notas.length) { telaFontes('A IA não encontrou notas neste áudio. Tente de novo ou use outro arquivo de áudio da música.'); return; }
     resultado();
   }
 
