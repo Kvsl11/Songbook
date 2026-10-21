@@ -60,12 +60,11 @@ body { background: var(--black); color: var(--text); font: 15px/1.5 var(--sans);
 a { color: inherit; }
 button, input, select, textarea { font: inherit; color: inherit; }
 
-/* textos justificados em todo o app, com hifenização em português (o <html lang="pt-BR"> diz o idioma): as palavras
-   compridas se quebram com hífen e a linha não abre buracos entre as palavras. A última linha fica à esquerda;
-   o que é centralizado continua centralizado (o text-align do próprio bloco vale mais que o herdado daqui) */
-body { text-align: justify; hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; text-wrap: pretty; }
-/* ficam como estavam: títulos, campos de digitar, a cifra/letra das músicas (versos são linhas de poesia), código
-   e o que é tabular (números, acordes) */
+/* hifenização em português em todo o app (o <html lang="pt-BR"> diz o idioma): só quebra a palavra com hífen
+   quando ela não cabe no fim da linha, separando pelas sílabas. Sem justificar: na tela do celular a linha é curta
+   e o justificado abria espaços desiguais entre as palavras */
+body { hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; text-wrap: pretty; }
+/* sem hífen: títulos, campos de digitar, a cifra/letra das músicas, código e o que é tabular */
 h1, h2, h3, h4, input, select, textarea, .song, .song *, .chord, pre, code, .tab, svg text, [contenteditable] {
   text-align: start; hyphens: manual; -webkit-hyphens: manual; }
 /* sem o retângulo azul do Android ao tocar: o retorno do toque segue o formato de cada elemento */
@@ -2095,6 +2094,17 @@ a.pptx-tipo { text-decoration: none; }
 .ia-ajustar summary > .ic:last-child { transition: transform 0.2s; }
 .ia-ajustar[open] summary > .ic:last-child { transform: rotate(180deg); }
 .ia-ajustar .settings-group { margin: 0; border-radius: 0; background: transparent; border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
+.ia-ajustes .setting { align-items: center; padding: 14px 12px; }
+.ia-ajustes .s { line-height: 1.4; }
+/* as escolhas (vozes, compasso) e o andamento descem para a linha de baixo, alinhados com o texto (depois do ícone),
+   como um seletor segmentado que ocupa a largura toda */
+.ia-ajustes .setting.wrap > .chips, .ia-ajustes .setting.wrap > .seg { flex: 1 1 100%; margin-left: 54px; }
+.ia-ajustes .chips { gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface-3); overflow: visible; }
+.ia-ajustes .seg { background: var(--surface-3); }
+.ia-ajustes .chips .chip { flex: 1; justify-content: center; border: 0; background: transparent; }
+.ia-ajustes .chips .chip[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.ia-ajustes .setting.wrap > .seg { justify-content: space-between; max-width: 260px; }
+@media (min-width: 601px) { .ia-ajustes .setting.wrap > .chips, .ia-ajustes .setting.wrap > .seg { flex: 0 1 auto; margin-left: auto; } }
 .ia-acoes { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 16px; }
 .ia-acoes-dir { display: flex; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 600px) {
