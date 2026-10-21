@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-176';
+export const APP_VERSAO = '2026.10.21-177';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -3544,9 +3544,10 @@ async function comecarPartitura(song, titulo) {
   setHeader(titulo, { back: '#/musica/' + song.id, eyebrow: 'Criar partitura' });
   const mxl = mxlDaPartitura(song.content);
   let compasso = [4, 4];
-  let fifths = 0;
-  let modo = 'major';
-  let bpm = 80;
+  // o tom já vem da cifra da música (dá para trocar); o andamento fica para os ajustes do editor
+  const tomC = tomDaCifra(renderSong(song.content).key || song.key);
+  let [fifths, modo] = tomC ? [tomC.fifths, tomC.modo] : [0, 'major'];
+  const bpm = 80;
   const tipos = [
     ['melodia', 'Melodia', 'Uma voz, para o canto da assembleia'],
     ['duas', 'Duas vozes', 'Primeira e segunda voz, em pautas separadas'],
@@ -3555,24 +3556,20 @@ async function comecarPartitura(song, titulo) {
   ];
   view.innerHTML = `<div class="compor-inicio">
     <h2 class="greet">Criar a partitura</h2>
-    <p class="muted">Escreva nota por nota aqui no app, com letra, cifras e várias vozes. Depois dá para ver, ensaiar ouvindo cada voz, imprimir e exportar.</p>
-    <div class="section-title">Comece por</div>
-    <div class="cp-tipos">${tipos.map(([k, n, d]) => `<button class="pptx-tipo" data-tipo="${k}"><b>${n}</b><span>${d}</span></button>`).join('')}</div>
-    <div class="section-title">Ajustes</div>
-    <div class="settings-group cp-ini-ajustes">
-      <div class="setting wrap"><span class="ico">${icon('clock', 18)}</span><div class="grow"><div class="t">Compasso</div></div>
-        <div class="chips" id="ini-compasso">${COMPASSOS.map(([a, b]) => `<button class="chip" data-c="${a}/${b}" aria-pressed="${a === 4 && b === 4}">${a}/${b}</button>`).join('')}</div></div>
-      <div class="setting"><span class="ico">${icon('music', 18)}</span><div class="grow"><div class="t">Tom</div><div class="s">A armadura de clave</div></div>
-        <button class="btn small" id="ini-tom">${nomeDoTom(0)}</button></div>
-      <div class="setting"><span class="ico">${icon('gauge', 18)}</span><div class="grow"><div class="t">Andamento</div><div class="s">Semínimas por minuto</div></div>
-        <div class="seg"><button data-bpm="-5" aria-label="Mais devagar">${icon('minus', 15)}</button><span class="val" id="ini-bpm">80</span><button data-bpm="5" aria-label="Mais rápido">${icon('plus', 15)}</button></div></div>
-    </div>
-    <div class="section-title">Ou comece de forma automática</div>
     <div class="cp-tipos">
-      <a class="pptx-tipo" href="#/musica/${song.id}/compor/ia"><b>${icon('sparkles', 16)} Gerar com IA</b><span>Escolha o áudio da música e a IA escreve a partitura para você ouvir, conferir e salvar</span></a>
-      ${mxl ? `<button class="pptx-tipo" id="ini-desenhada" hidden><b>${icon('score', 16)} Da partitura desenhada pelo app</b><span>Copia as notas lidas da partitura original para você corrigir e completar</span></button>` : ''}
-      <button class="pptx-tipo" id="ini-arquivo"><b>${icon('upload', 16)} De um arquivo MusicXML</b><span>.musicxml, .xml ou .mxl (exportado do MuseScore, Finale, Sibelius…)</span></button>
-    </div></div>`;
+      <a class="pptx-tipo" href="#/musica/${song.id}/compor/ia"><b>${icon('sparkles', 16)} Gerar com IA</b><span>Escolha o áudio da música: a IA escreve a partitura para você ouvir, conferir e salvar</span></a>
+      ${mxl ? `<button class="pptx-tipo" id="ini-desenhada" hidden><b>${icon('score', 16)} Da partitura pronta</b><span>Copia as notas da partitura que a música já tem, para corrigir e completar</span></button>` : ''}
+    </div>
+    <div class="section-title">Ou escreva nota por nota</div>
+    <div class="settings-group cp-ini-ajustes">
+      <div class="setting"><span class="ico">${icon('music', 18)}</span><div class="grow"><div class="t">Tom</div><div class="s">${tomC ? 'Pela cifra da música' : 'A armadura de clave'}</div></div>
+        <button class="btn small" id="ini-tom">${nomeDoTom(fifths, modo)}</button></div>
+      <div class="setting wrap"><span class="ico">${icon('clock', 18)}</span><div class="grow"><div class="t">Compasso</div></div>
+        <div class="chips" id="ini-compasso">${[[2, 4], [3, 4], [4, 4], [6, 8]].map(([a, b]) => `<button class="chip" data-c="${a}/${b}" aria-pressed="${a === 4 && b === 4}">${a}/${b}</button>`).join('')}</div></div>
+    </div>
+    <div class="cp-tipos">${tipos.map(([k, n, d]) => `<button class="pptx-tipo" data-tipo="${k}"><b>${n}</b><span>${d}</span></button>`).join('')}</div>
+    <p class="muted cp-ini-dica">Andamento, outros compassos e vozes ficam nos ajustes do editor (${icon('settings', 13)}). Tem a partitura no MuseScore, Finale ou Sibelius? <button class="link-btn" id="ini-arquivo">Abra o arquivo MusicXML</button>.</p>
+    </div>`;
   if (mxl) fetch(mxl, { method: 'HEAD' }).then((r) => { if (r.ok && $('#ini-desenhada')) $('#ini-desenhada').hidden = false; }).catch(() => {});
   const guardar = (modelo) => {
     modelo.titulo ||= titulo;
@@ -3592,7 +3589,6 @@ async function comecarPartitura(song, titulo) {
     [fifths, modo] = v;
     $('#ini-tom').textContent = nomeDoTom(fifths, modo);
   };
-  view.querySelectorAll('[data-bpm]').forEach((b) => (b.onclick = () => { bpm = Math.max(30, Math.min(220, bpm + Number(b.dataset.bpm))); $('#ini-bpm').textContent = bpm; }));
   const importar = async (fonte) => {
     try {
       toast('Lendo a partitura…');
@@ -3602,6 +3598,14 @@ async function comecarPartitura(song, titulo) {
   };
   $('#ini-desenhada')?.addEventListener('click', () => importar(mxl));
   $('#ini-arquivo').onclick = async () => { const f = await escolherArquivoMusicXML(); if (f) importar(f); };
+}
+
+// apagar a partitura feita no app (a música continua); devolve true se apagou
+async function apagarPartitura(id) {
+  if (!(await ask({ title: 'Apagar a partitura?', text: 'Todas as notas, letras e cifras desta partitura saem. A música continua na biblioteca.', ok: 'Apagar', danger: true }))) return false;
+  db.updateSong(id, { partitura: null });
+  toast('Partitura apagada');
+  return true;
 }
 
 function escolherTomPartitura(fifths, modo) {
@@ -3640,7 +3644,7 @@ function editorPartitura(song, titulo) {
       { icon: 'undo', label: 'Desfazer (Ctrl+Z)', onClick: () => historico(desfazer, refazer) },
       { icon: 'redo', label: 'Refazer (Ctrl+Y)', onClick: () => historico(refazer, desfazer) },
       { icon: 'play', label: 'Ouvir a partitura', onClick: () => ouvir() },
-      { icon: 'more', label: 'Mais opções', onClick: () => maisOpcoes() },
+      { icon: 'more', label: 'Imprimir, exportar ou importar', onClick: () => maisOpcoes() },
     ],
   });
   view.innerHTML = `<div class="compor">
@@ -3688,7 +3692,7 @@ function editorPartitura(song, titulo) {
           <input class="input" id="cp-silaba" placeholder="Sílaba desta nota" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="next">
           <button class="cp-b" data-silaba="1" aria-label="Próxima nota">${icon('next', 18)}</button>
         </div>
-        <p class="cp-dica">Espaço ou Enter vai para a próxima nota; hífen (-) liga a sílaba à seguinte. Ou <button class="link-btn" id="cp-colar">cole a letra inteira</button>.</p>
+        <p class="cp-dica">Espaço ou Enter vai para a próxima nota; hífen (-) liga a sílaba à seguinte. Ou <button class="link-btn" data-por="letra">ponha a letra da música</button> nas notas de uma vez, ou <button class="link-btn" id="cp-colar">cole outra letra</button>.</p>
       </div>
       <div class="cp-painel" data-painel="cifra" hidden>
         <div class="cp-linha cp-entrada">
@@ -3697,6 +3701,7 @@ function editorPartitura(song, titulo) {
           <button class="cp-b" data-cifra-mover="1" aria-label="Próxima nota">${icon('next', 18)}</button>
         </div>
         <div class="cp-linha"><div class="chips" id="cp-acordes"></div></div>
+        <p class="cp-dica">Toque numa nota e escreva o acorde, ou <button class="link-btn" data-por="cifra">ponha a cifra da música</button> nas notas de uma vez.</p>
       </div>
     </div></div>`;
   const folha = $('#cp-folha');
@@ -4125,53 +4130,40 @@ function editorPartitura(song, titulo) {
       sel.i = Math.min(sel.i, pauta().ev.length - 1);
     });
   }
-  async function maisOpcoes() {
-    const v = await escolherNaLista({
-      titulo: 'Partitura',
-      opcoes: [
-        { valor: 'ver', rotulo: 'Ver a partitura', sub: 'Do jeito que fica para cantar e ensaiar', ic: 'score' },
-        { valor: 'ajustes', rotulo: 'Ajustes', sub: 'Título, compasso, tom, andamento e vozes', ic: 'settings' },
-        { valor: 'letra', rotulo: 'Colocar a letra da música', sub: `Nas notas de todas as vozes, estrofe ${estrofe + 1}, sílaba por sílaba`, ic: 'text' },
-        { valor: 'cifra', rotulo: 'Colocar a cifra da música', sub: 'Cada acorde na nota da sílaba onde ele cai na cifra', ic: 'chord' },
-        { valor: 'pdf', rotulo: 'Imprimir ou salvar em PDF', sub: 'Em preto e branco', ic: 'file' },
-        { valor: 'xml', rotulo: 'Exportar MusicXML', sub: 'Abre no MuseScore, Finale, Sibelius…', ic: 'download' },
-        { valor: 'importar', rotulo: 'Importar MusicXML', sub: 'Troca esta partitura pela do arquivo', ic: 'upload' },
-        { valor: 'apagar', rotulo: 'Apagar a partitura', sub: 'A música continua; só a partitura sai', ic: 'trash' },
-      ],
-    });
-    if (v === 'ver') verPartitura();
-    if (v === 'ajustes') ajustes();
-    if (v === 'letra') {
+  // pôr a letra ou a cifra da música nas notas, de uma vez (nas abas Letra e Cifra)
+  async function porDaMusica(tipo) {
+    if (!m.pautas.some((p) => p.ev.some((e) => e.a.length))) { toast('Escreva as notas primeiro'); return; }
+    if (tipo === 'letra') {
       const texto = letraParaPartitura(song.content);
       if (!texto) { toast('Esta música não tem letra para colocar'); return; }
-      if (!m.pautas.some((p) => p.ev.some((e) => e.a.length))) { toast('Escreva as notas primeiro'); return; }
       if (temLetra(m) && !(await ask({ title: 'Trocar a letra?', text: `A letra da estrofe ${estrofe + 1} sai e entra a letra da música, do começo.`, ok: 'Trocar' }))) return;
       let sobrou = 0;
       mudar(() => { sobrou = colocarLetra(m, texto, { estrofe }); m.letraAuto = true; });
-      toast(sobrou ? `Letra colocada; faltaram notas para ${sobrou} sílaba(s)` : 'Letra colocada: corrija na aba Letra se precisar');
+      toast(sobrou ? `Letra colocada; faltaram notas para ${sobrou} sílaba(s)` : 'Letra colocada: corrija sílaba por sílaba se precisar');
+      return;
     }
-    if (v === 'cifra') {
-      const silabas = silabasDaMusica(song.content);
-      if (!silabas.some((x) => x.c)) { toast('Esta música não tem cifra para colocar'); return; }
-      if (!m.pautas.some((p) => p.ev.some((e) => e.a.length))) { toast('Escreva as notas primeiro'); return; }
-      if (temCifraNaPartitura(m) && !(await ask({ title: 'Trocar a cifra?', text: 'As cifras da primeira voz saem e entram as da música, do começo.', ok: 'Trocar' }))) return;
-      mudar(() => { colocarLetra(m, silabas, { comLetra: false, cifras: true }); m.cifraAuto = true; });
-      aba = 'cifra';
-      atualizarPalheta();
-      toast('Cifra colocada: toque numa nota e corrija na aba Cifra se precisar');
-    }
+    const silabas = silabasDaMusica(song.content);
+    if (!silabas.some((x) => x.c)) { toast('Esta música não tem cifra para colocar'); return; }
+    if (temCifraNaPartitura(m) && !(await ask({ title: 'Trocar a cifra?', text: 'As cifras da primeira voz saem e entram as da música, do começo.', ok: 'Trocar' }))) return;
+    mudar(() => { colocarLetra(m, silabas, { comLetra: false, cifras: true }); m.cifraAuto = true; });
+    toast('Cifra colocada: toque numa nota e corrija se precisar');
+  }
+  // ⋯ do editor: só o que é arquivo (os ajustes têm o seu botão, ver a partitura é o voltar, apagar fica na partitura)
+  async function maisOpcoes() {
+    const v = await escolherNaLista({
+      titulo: 'Arquivo da partitura',
+      opcoes: [
+        { valor: 'pdf', rotulo: 'Imprimir ou salvar em PDF', sub: 'Em preto e branco', ic: 'file' },
+        { valor: 'xml', rotulo: 'Exportar MusicXML', sub: 'Abre no MuseScore, Finale, Sibelius…', ic: 'download' },
+        { valor: 'importar', rotulo: 'Importar MusicXML', sub: 'Troca esta partitura pela do arquivo', ic: 'upload' },
+      ],
+    });
     if (v === 'xml') download(`${nomeArquivo(m.titulo || titulo)}.musicxml`, paraMusicXML(m), 'application/vnd.recordare.musicxml+xml');
     if (v === 'pdf') imprimirPartitura(m, m.titulo || titulo);
     if (v === 'importar') {
       const f = await escolherArquivoMusicXML();
       if (!f) return;
       try { const novo = modeloDoXML(await textoDoMusicXML(f)); mudar(() => { m = novo; m.titulo ||= titulo; sel = { p: 0, i: m.pautas[0].ev.length - 1 }; }); toast('Partitura importada'); } catch (e) { toast('Não consegui ler: ' + e.message); }
-    }
-    if (v === 'apagar' && await ask({ title: 'Apagar a partitura?', text: 'Todas as notas, letras e cifras desta partitura saem. A música continua na biblioteca.', ok: 'Apagar', danger: true })) {
-      clearTimeout(salvarTimer);
-      m = null;
-      db.updateSong(id, { partitura: null });
-      location.hash = '#/musica/' + id;
     }
   }
 
@@ -4196,6 +4188,7 @@ function editorPartitura(song, titulo) {
     if (d.silaba) { if (silaba.value !== (evSel()?.l?.[estrofe] || '')) gravarSilaba(silaba.value, false); if (proximaCantavel(Number(d.silaba))) desenhar(); return; }
     if (d.cifraMover) { mover(Number(d.cifraMover)); return; }
     if (d.acordeTom !== undefined) { gravarCifra(d.acordeTom, true); return; }
+    if (d.por) { porDaMusica(d.por); return; }
   });
   $('#cp-pautas').addEventListener('click', (e) => {
     const b = e.target.closest('[data-pauta]');
@@ -4333,7 +4326,7 @@ function viewPartituras() {
       <div class="part-cartao-pe"><div class="part-cartao-txt"><b>${esc(s.title)}</b>
         <small>${esc(s.artist || 'Feita no app')} · ${esc(vozes)} · ${total} compasso${total === 1 ? '' : 's'}</small>
         ${temLetra || temCifra ? `<div class="part-tags">${temLetra ? `<span>${icon('text', 12)} letra</span>` : ''}${temCifra ? `<span>${icon('chord', 12)} cifra</span>` : ''}</div>` : ''}</div>
-        <div class="part-cartao-acts"><a class="part-ensaiar" href="#/musica/${s.id}/partitura" aria-label="Ensaiar" title="Ensaiar">${icon('play', 18)}</a><a class="icon-btn" href="#/musica/${s.id}/compor" aria-label="Editar" title="Editar">${icon('edit', 18)}</a></div></div>
+        <div class="part-cartao-acts"><a class="part-ensaiar" href="#/musica/${s.id}/partitura" aria-label="Ensaiar" title="Ensaiar">${icon('play', 18)}</a><a class="icon-btn" href="#/musica/${s.id}/compor" aria-label="Editar" title="Editar">${icon('edit', 18)}</a><button class="icon-btn" data-apagar-part="${s.id}" aria-label="Apagar a partitura" title="Apagar a partitura">${icon('trash', 18)}</button></div></div>
     </article>`;
   };
   // partitura pronta (acervo/Hinário): uma página de partitura em miniatura, com melodia inventada a partir do título
@@ -4400,6 +4393,7 @@ function viewPartituras() {
   $('#part-nova').onclick = async () => { const s = await escolherMusica('Partitura de qual música?'); if (s) location.hash = `#/musica/${s.id}/compor`; };
   $('#part-ia').onclick = async () => { const s = await escolherMusica('Gerar a partitura de qual música?'); if (s) location.hash = `#/musica/${s.id}/compor/ia`; };
   view.querySelectorAll('[data-abrir-part]').forEach((el) => el.addEventListener('click', (e) => { if (!e.target.closest('a, button')) location.hash = `#/musica/${el.dataset.abrirPart}/partitura`; }));
+  view.querySelectorAll('[data-apagar-part]').forEach((b) => (b.onclick = async () => { if (await apagarPartitura(b.dataset.apagarPart)) route(); }));
 }
 
 // escolher uma música da biblioteca (com busca); devolve a música ou null
@@ -4450,7 +4444,9 @@ self.onmessage = async (e) => {
     modelo ||= new bp.BasicPitch('${BASIC_PITCH}/model/model.json');
     const f = [], o = [], c = [];
     await modelo.evaluateModel(amostras, (a, b, d) => { f.push(...a); o.push(...b); c.push(...d); }, () => {});
-    const notas = bp.noteFramesToTime(bp.addPitchBendsToNoteEvents(c, bp.outputToNotesPoly(f, o, 0.3, 0.3, 8)));
+    // o começo de nota no padrão do modelo (0,5): com 0,3, o vibrato da voz virava "começos" e cada nota cantada
+    // longa saía partida em vários pedaços (a melodia ficava picada, cheia de notas repetidas que não existem)
+    const notas = bp.noteFramesToTime(bp.addPitchBendsToNoteEvents(c, bp.outputToNotesPoly(f, o, 0.5, 0.3, 5)));
     self.postMessage({ id, notas: notas.map((n) => ({ startTimeSeconds: n.startTimeSeconds, durationSeconds: n.durationSeconds, pitchMidi: n.pitchMidi, amplitude: n.amplitude })) });
   } catch (err) { self.postMessage({ id, erro: String(err?.message || err) }); }
 };`;
@@ -4805,8 +4801,9 @@ async function gerarComIA(song, titulo) {
       <div class="settings-group ia-ajustes">
         <div class="setting wrap"><span class="ico">${icon('score', 18)}</span><div class="grow"><div class="t">Vozes</div><div class="s">Coral: a IA separa as notas que soam juntas em soprano, contralto, tenor e baixo, cada voz na sua pauta</div></div>
           <div class="chips" id="ia-vozes"><button class="chip" data-vozes="4" aria-pressed="true">Coral a 4 vozes</button><button class="chip" data-vozes="1" aria-pressed="false">Só a melodia</button></div></div>
-        <div class="setting wrap"><span class="ico">${icon('gauge', 18)}</span><div class="grow"><div class="t">Andamento</div><div class="s">Se as notas ficaram picadas ou longas demais, ajuste aqui</div></div>
-          <div class="seg"><button data-bpm="-4" aria-label="Mais devagar">${icon('minus', 15)}</button><span class="val" id="ia-bpm">${Math.round(bpm)}</span><button data-bpm="4" aria-label="Mais rápido">${icon('plus', 15)}</button></div></div>
+        <div class="setting wrap"><span class="ico">${icon('gauge', 18)}</span><div class="grow"><div class="t">Andamento</div><div class="s">Se as notas ficaram picadas ou longas demais, ajuste aqui. Música lenta escrita rápida demais (tudo em colcheias e semicolcheias)? Use a metade</div></div>
+          <div class="seg"><button data-bpm="-4" aria-label="Mais devagar">${icon('minus', 15)}</button><span class="val" id="ia-bpm">${Math.round(bpm)}</span><button data-bpm="4" aria-label="Mais rápido">${icon('plus', 15)}</button></div>
+          <div class="chips"><button class="chip" data-bpmx="0.5">Metade</button><button class="chip" data-bpmx="2">Dobro</button></div></div>
         <div class="setting"><span class="ico">${icon('music', 18)}</span><div class="grow"><div class="t">Tom</div><div class="s">${tomCifra ? 'Pela cifra da música' : 'Pelo que a IA ouviu'}</div></div><button class="btn small" id="ia-tom">${nomeDoTom(fifths, modo)}</button></div>
         <div class="setting wrap"><span class="ico">${icon('clock', 18)}</span><div class="grow"><div class="t">Compasso</div><div class="s" id="ia-compasso-s"></div></div>
           <div class="chips" id="ia-compasso"><button class="chip" data-c="auto">Automático</button>${[[2, 4], [3, 4], [4, 4], [6, 8]].map(([a, b]) => `<button class="chip" data-c="${a}/${b}">${a}/${b}</button>`).join('')}</div></div>
@@ -4863,6 +4860,8 @@ async function gerarComIA(song, titulo) {
       const b = e.target.closest('button');
       if (!b) return;
       if (b.dataset.bpm) { bpm = Math.max(40, Math.min(200, bpm + Number(b.dataset.bpm))); previa(); }
+      // metade ou dobro: a mesma música escrita com as figuras dobradas (o andamento lento) ou pela metade
+      if (b.dataset.bpmx) { bpm = Math.max(30, Math.min(240, Math.round(bpm * Number(b.dataset.bpmx) * 10) / 10)); previa(); }
       if (b.dataset.vozes) { coral = b.dataset.vozes === '4'; $('#ia-vozes').querySelectorAll('[data-vozes]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); previa(); }
       if (b.dataset.oit) { oitava = Math.max(-2, Math.min(2, oitava + Number(b.dataset.oit))); previa(); }
       if (b.dataset.c) { compassoAuto = b.dataset.c === 'auto'; if (!compassoAuto) compasso = b.dataset.c.split('/').map(Number); previa(); }
@@ -4966,6 +4965,7 @@ async function viewPartitura(id) {
     <div class="partitura-barra">
       ${temDesenho && paginas.length ? `<div class="seg"><button data-modo="desenhada">${icon('score', 15)} ${propria ? 'Do app' : 'Desenhada'}</button><button data-modo="original">${icon('file', 15)} Original</button></div>` : ''}
       <a class="btn small cp-editar" href="#/musica/${id}/compor${!propria && temDesenho ? '/desenhada' : ''}" title="${propria ? 'Editar a partitura feita no app' : temDesenho ? 'Abrir esta partitura no editor para corrigir notas, letra e cifras' : 'Escrever a partitura aqui no app, nota por nota'}">${icon('edit', 15)} ${propria || temDesenho ? 'Editar' : 'Criar no app'}</a>
+      ${propria && id !== 'previa' ? `<button class="icon-btn" id="part-apagar" aria-label="Apagar a partitura" title="Apagar a partitura">${icon('trash', 18)}</button>` : ''}
       <div class="seg so-desenhada"><button data-cor="app">Cores do app</button><button data-cor="pb">Preto e branco</button></div>
       <div class="seg so-desenhada"><button data-tom="-1" aria-label="Meio tom abaixo">${icon('minus', 15)}</button><span class="val" id="tom-part"><small>Tom</small>0</span><button data-tom="1" aria-label="Meio tom acima">${icon('plus', 15)}</button></div>
       <span class="spacer"></span>
@@ -5050,6 +5050,7 @@ async function viewPartitura(id) {
   view.querySelectorAll('[data-cor]').forEach((b) => (b.onclick = () => { cores = b.dataset.cor; db.setPref('partituraCores', cores); aplicar(); }));
   view.querySelectorAll('[data-tom]').forEach((b) => (b.onclick = () => { tom = Math.max(-11, Math.min(11, tom + Number(b.dataset.tom))); aplicar(); }));
   view.querySelectorAll('[data-z]').forEach((b) => (b.onclick = () => { zoom = Math.min(3, Math.max(0.6, +(zoom + Number(b.dataset.z) * 0.15).toFixed(2))); aplicar(); }));
+  $('#part-apagar')?.addEventListener('click', async () => { if (await apagarPartitura(id)) route(); });
   aplicar();
 }
 

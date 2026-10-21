@@ -43,12 +43,16 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   letra em várias estrofes (sílaba por sílaba ou colando o texto com hífens) e cifras com atalhos do tom; compasso,
   anacruse, tom, andamento e vozes nos ajustes; desfazer/refazer, teclado do computador (como no MuseScore), ouvir no
   ensaio, imprimir/PDF e exportar/importar MusicXML. Dá para começar da partitura desenhada pelo app e corrigir. Fica
-  guardada na música (`lib/partitura.js` converte para MusicXML).
+  guardada na música (`lib/partitura.js` converte para MusicXML). A tela de criar começa por *Gerar com IA* (e *Da
+  partitura pronta*, quando a música tem); para escrever nota por nota, só o tom (já pela cifra da música) e o
+  compasso (2/4, 3/4, 4/4, 6/8) e o tipo: o resto fica nos ajustes do editor (⚙). No editor, o ⋯ é só o arquivo
+  (PDF, exportar e importar MusicXML); **apagar a partitura** fica na lixeira ao lado de *Editar*, na tela da
+  partitura, e no cartão dela em Partituras.
   **Letra automática**: a letra da música entra sozinha nas notas de todas as vozes, sílaba por sílaba (separação de
   sílabas do português: `separarSilabas`, `colocarLetra`), no rascunho da IA, ao abrir o editor ou a partitura sem
-  letra, e em ⋯ → *Colocar a letra da música*; corrige-se na aba **Letra**. A **cifra** vem junto: cada acorde da
+  letra, e na aba **Letra** (*ponha a letra da música*), onde também se corrige. A **cifra** vem junto: cada acorde da
   cifra da música vai para a nota da sílaba onde ele cai (`silabasDaLetra`), na primeira voz (rascunho da IA, partitura
-  sem cifra e ⋯ → *Colocar a cifra da música*); corrige-se na aba **Cifra**. No editor, o ▶ do topo vira ⏸ enquanto
+  sem cifra e na aba **Cifra**: *ponha a cifra da música*), onde também se corrige. No editor, o ▶ do topo vira ⏸ enquanto
   toca; na partitura e no editor (ouvindo), tocar numa nota leva a música para ali e toca a partir dela.
   Partitura grande no editor: só um trecho de compassos em volta da nota escolhida é desenhado (8 com 4 vozes, até
   16 com uma), com ‹ › para andar; ouvir toca a partitura inteira.
@@ -65,7 +69,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 - **Partituras** (menu do app): as partituras feitas no app e as prontas (acervo/Hinário) das músicas da biblioteca, com
   **Nova partitura** (escolhendo a música) e **Gerar com IA**: escolha o arquivo de áudio da música (ou arraste, no
   computador) e o modelo **Basic Pitch** (Spotify, código
-  aberto, roda no próprio aparelho) transforma o som em notas; o app escolhe a melodia, acha tom (pela cifra ou pelo
+  aberto, roda no próprio aparelho) transforma o som em notas (com o começo de nota no padrão do modelo, 0,5: mais
+  sensível, o vibrato da voz virava "começos" e cada nota cantada longa saía partida em pedaços repetidos); o app escolhe a melodia, acha tom (pela cifra ou pelo
   que ouviu) e andamento e põe no compasso. O andamento (`estimarAndamento`) sai dos intervalos entre as notas e é
   afinado em décimos com todas elas (baixo e acordes inclusive): com bpm inteiro, a grade já escorregava um tempo no
   fim de uma música longa; e o tempo dividido em 3 (6/8) é escrito pela semínima, não pela semínima pontuada. A
@@ -87,7 +92,8 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   duas notas da mesma voz viram a nota de antes ligada. O **compasso também vem do áudio** (`estimarCompasso`): a IA
   vê em que tamanho de compasso (4/4, 3/4 ou 6/8) o primeiro tempo sai mais forte que os outros (é onde costumam cair o
   baixo, a troca de acorde e as notas longas) e onde ele começa, com a anacruse. O 2/4 não dá para separar do 4/4 pelo
-  áudio: fica para escolher. Em *Ajustar o rascunho* dá para trocar por *Só a melodia* ou escolher outro compasso (e
+  áudio: fica para escolher. Em *Ajustar o rascunho* dá para pôr o andamento na **metade** ou no **dobro** (a balada lenta que a IA escreveu a
+  ♩ = 130, tudo em colcheias, volta a ♩ = 65 com as figuras dobradas), trocar por *Só a melodia* ou escolher outro compasso (e
   voltar para o *Automático*). É um rascunho: funciona melhor com voz e violão (ou o coral sozinho) do que com banda
   completa.
 - **Mixer das vozes no ensaio** (na partitura salva, no editor e no fim da IA): cada voz com o seu volume e um botão
