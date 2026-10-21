@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-167';
+export const APP_VERSAO = '2026.10.21-168';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4250,12 +4250,18 @@ function viewPartituras() {
     </div>
     <div class="shelf-head"><h2>Suas partituras</h2>${proprias.length ? `<span class="muted part-conta">${proprias.length}</span>` : ''}</div>
     ${proprias.length ? `<div class="part-grade">${proprias.map(cartao).join('')}</div>`
-      : `<div class="part-vazia">${ARTE_PAUTA}<b>Nenhuma partitura sua ainda</b><p>Crie uma do zero ou gere com IA a partir de uma música da sua biblioteca. Elas aparecem aqui, prontas para ensaiar.</p></div>`}
+      : `<div class="part-vazia">
+        <div class="part-vazia-folhas" aria-hidden="true"><span></span><span></span><span>${miniPauta({ clave: 'G', ev: [] }, [4, 4])}<i>${icon('plus', 22)}</i></span></div>
+        <div class="part-vazia-txt"><b>Sua estante ainda está vazia</b><p>Escreva uma partitura do zero ou deixe a IA ouvir uma música da sua biblioteca. Elas ficam aqui, prontas para ensaiar com cada voz.</p>
+          <div class="part-vazia-acts"><button class="btn primary" data-vazia="part-nova">${icon('edit', 16)} Escrever do zero</button><button class="btn part-vazia-ia" data-vazia="part-ia">${icon('sparkles', 16)} Gerar com IA</button></div></div></div>`}
     ${prontas.length ? `<div class="shelf-head"><h2>Prontas no app</h2><span class="muted part-conta">${prontas.length}</span></div>
       <p class="muted part-sub">Do acervo litúrgico e do Hinário, nas músicas da sua biblioteca: abra para ensaiar ouvindo cada voz, ou edite para corrigir.</p>
       <div class="shelf part-shelf">${prontas.map(pronta).join('')}</div>` : ''}
-    <a class="part-acervo" href="#/acervo"><span class="part-acao-ic">${icon('book', 20)}</span><span><b>Mais partituras no acervo litúrgico</b><small>Hinários e subsídios da CNBB com partitura: salve na biblioteca e ela aparece aqui</small></span>${icon('next', 18)}</a>`;
+    <a class="part-acervo" href="#/acervo"><span class="part-livros" aria-hidden="true"><span class="l1"><i>${icon('cross', 14)}</i></span><span class="l2"></span><span class="l3"></span></span>
+      <span class="part-acervo-txt"><small>Acervo litúrgico</small><b>Mais partituras da CNBB</b><span>Hinários e subsídios com partitura: salve na biblioteca e ela aparece aqui.</span></span>
+      <span class="part-acervo-ir">${icon('next', 18)}</span></a>`;
   view.querySelectorAll('.part-cartao').forEach((el) => { const m = db.song(el.dataset.abrirPart); if (m) corDaCapa(m).then((c) => { if (c) el.style.setProperty('--cor', c); }); });
+  view.querySelectorAll('[data-vazia]').forEach((b) => (b.onclick = () => $('#' + b.dataset.vazia).click()));
   $('#part-nova').onclick = async () => { const s = await escolherMusica('Partitura de qual música?'); if (s) location.hash = `#/musica/${s.id}/compor`; };
   $('#part-ia').onclick = async () => { const s = await escolherMusica('Gerar a partitura de qual música?'); if (s) location.hash = `#/musica/${s.id}/compor/ia`; };
   view.querySelectorAll('[data-abrir-part]').forEach((el) => el.addEventListener('click', (e) => { if (!e.target.closest('a, button')) location.hash = `#/musica/${el.dataset.abrirPart}/partitura`; }));
