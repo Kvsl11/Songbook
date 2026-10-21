@@ -53,7 +53,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-162';
+export const APP_VERSAO = '2026.10.21-163';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4213,10 +4213,21 @@ function viewPartituras() {
   };
   view.innerHTML = `
     <section class="part-hero">
-      ${ARTE_PAUTA}
-      <div class="part-hero-txt"><div class="kind">Partituras</div><h2>Escreva, ensaie e gere com IA</h2>
+      <div class="part-hero-txt"><div class="kind">Partituras</div>
+        <h2><span class="h-escreva">Escreva,</span> <span class="h-ensaie">ensaie</span> e <span class="h-ia">gere com IA</span></h2>
         <p>Partitura de qualquer música da sua biblioteca: nota por nota, com letra, cifras e vozes — ou deixe a IA ouvir e escrever a melodia.</p>
+        <div class="part-passos">
+          <span class="escreva">${icon('edit', 16)}<b>Escreva</b><small>nota por nota</small></span>
+          <span class="ensaie">${icon('play', 16)}<b>Ensaie</b><small>ouvindo cada voz</small></span>
+          <span class="ia">${icon('sparkles', 16)}<b>Gere com IA</b><small>a partir do vídeo</small></span>
+        </div>
         <div class="part-numeros"><span><b>${proprias.length}</b> sua${proprias.length === 1 ? '' : 's'}</span><span><b>${prontas.length}</b> pronta${prontas.length === 1 ? '' : 's'} no app</span></div></div>
+      <div class="part-palco" aria-hidden="true">
+        <div class="part-palco-folha atras">${miniPauta({ clave: 'F', ev: [['C3', 16], ['G2', 16], ['A2', 16], ['E2', 16], ['F2', 16], ['C3', 16]].map(([n, d]) => ({ a: [n], d })) }, [4, 4])}</div>
+        <div class="part-palco-folha"><b>Ave Maria</b><small>Soprano</small>${miniPauta({ clave: 'G', ev: [['G4', 8], ['G4', 8], ['A4', 16], ['G4', 8], ['C5', 8], ['B4', 16], ['G4', 8], ['G4', 8], ['D5', 16], ['C5', 8]].map(([n, d]) => ({ a: [n], d })) }, [4, 4])}${miniPauta({ clave: 'G', ev: [['E4', 16], ['F4', 8], ['G4', 8], ['E4', 16], ['D4', 16], ['C4', 32]].map(([n, d]) => ({ a: [n], d })) }, [4, 4])}</div>
+        <div class="part-palco-vozes">${['S', 'C', 'T', 'B'].map((v, i) => `<span><i style="--i:${i}"></i><b>${v}</b></span>`).join('')}</div>
+        <div class="part-palco-ia">${icon('sparkles', 18)}</div>
+      </div>
     </section>
     <div class="part-acoes">
       <button class="part-acao nova" id="part-nova">
