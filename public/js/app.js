@@ -12,7 +12,7 @@ import { destacarVoz, duracaoTotal, FUNDO, nomearVozes, passoNoTempo, segundosPo
 import {
   acordesDoTom as acordesDaArmadura, alterar, alturaPeloNome, CLAVES, COMPASSOS, deMusicXML, distribuirLetra, DURACOES, emCompassos, frequenciaDa, midiDa, moverGrau,
   mudarOitava, NOMES_NOTA, nomeDaAltura, nomeDoTom, nomeDuracao, novaPartitura, paraMusicXML, tiquesDoCompasso,
-  claveDaVoz, estimarAndamento, estimarTom, faixaDoModo, juntarPedaco, melodiaDasNotas, tomDaCifra, vozesDasNotas, colocarLetra, letraEmSilabas, temLetra, silabasDaLetra, temCifra as temCifraNaPartitura,
+  claveDaVoz, estimarAndamento, estimarCompasso, estimarTom, faixaDoModo, FAIXA_CORAL, juntarPedaco, melodiaDasNotas, tomDaCifra, vozesDasNotas, colocarLetra, letraEmSilabas, temLetra, silabasDaLetra, temCifra as temCifraNaPartitura,
 } from './lib/partitura.js';
 import { corCss, corDominante } from './lib/cores.js';
 import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-172';
+export const APP_VERSAO = '2026.10.21-173';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4578,13 +4578,15 @@ async function gerarComIA(song, titulo) {
     const { clave, centro } = claveDaVoz(notas, modoIA);
     $('#ia-tom-vivo') && ($('#ia-tom-vivo').textContent = nomeDoTom(fifths, modo));
     $('#ia-bpm-vivo') && ($('#ia-bpm-vivo').textContent = `♩ ${bpm}`);
-    const m = novaPartitura({ titulo, fifths, modo, bpm });
+    const { compasso, anacruse } = estimarCompasso(notas, { bpm, faixa: faixaDoModo(modoIA) });
+    const m = novaPartitura({ titulo, fifths, modo, bpm, compasso });
     m.pautas[0].clave = clave;
     m.pautas[0].nome = modoIA === 'voz' ? 'Voz' : 'Melodia';
     m.pautas[0].ev = melodiaDasNotas(notas, { bpm, fifths, modo: modoIA, centro });
     if (!m.pautas[0].ev.length) return;
-    // só os últimos ~8 compassos (a tela não fica enorme e o desenho é rápido)
+    // só os últimos ~8 compassos (a tela não fica enorme e o desenho é rápido); a anacruse entra como pausa no começo
     const cheio = tiquesDoCompasso(m.compasso);
+    if (anacruse) m.pautas[0].ev.unshift({ a: [], d: cheio - anacruse, l: [], c: '' });
     let soma = 0;
     let corte = m.pautas[0].ev.length;
     while (corte > 0 && soma + m.pautas[0].ev[corte - 1].d <= cheio * 8) soma += m.pautas[0].ev[--corte].d;
@@ -4695,10 +4697,19 @@ async function gerarComIA(song, titulo) {
     let [fifths, modo] = tomCifra ? [tomCifra.fifths, tomCifra.modo] : (({ fifths: f, modo: m }) => [f, m])(estimarTom(notas));
     let bpm = estimarAndamento(notas, { faixa: faixaDoModo(modoIA) });
     const { clave, centro } = claveDaVoz(notas, modoIA);
-    let compasso = [4, 4];
     let oitava = 0;
     let meioTempo = false;
     let coral = true; // separar em Soprano, Contralto, Tenor e Baixo (o padrão: o coral inteiro, cada voz na sua pauta)
+    // compasso pelo áudio (e onde ele começa: a anacruse), até a pessoa escolher outro; refeito quando muda o
+    // andamento, o contratempo ou as vozes (a grade das notas muda)
+    let compassoAuto = true;
+    let compasso = [4, 4];
+    let anacruse = 0;
+    const acertarCompasso = () => {
+      const est = estimarCompasso(notas, { bpm, meioTempo, faixa: coral ? FAIXA_CORAL : faixaDoModo(modoIA), compasso: compassoAuto ? null : compasso });
+      ({ compasso, anacruse } = est);
+    };
+    acertarCompasso();
     const silabasMusica = silabasDaMusica(song.content);
     const textoLetra = silabasMusica.length > 0;
     const temCifraMusica = silabasMusica.some((x) => x.c);
@@ -4709,13 +4720,14 @@ async function gerarComIA(song, titulo) {
       let m;
       if (coral) {
         m = novaPartitura({ titulo, compasso, fifths, modo, bpm, tipo: 'satb' });
-        m.pautas = vozesDasNotas(notas, { bpm, fifths, oitava, meioTempo });
+        m.pautas = vozesDasNotas(notas, { bpm, fifths, oitava, meioTempo, faixa: FAIXA_CORAL });
       } else {
         m = novaPartitura({ titulo, compasso, fifths, modo, bpm });
         m.pautas[0].clave = clave;
         m.pautas[0].nome = modoIA === 'voz' ? 'Voz' : 'Melodia';
         m.pautas[0].ev = melodiaDasNotas(notas, { bpm, fifths, oitava, modo: modoIA, centro, meioTempo });
       }
+      m.anacruse = anacruse;
       if (comLetra || comCifra) colocarLetra(m, silabasMusica, { comLetra, cifras: comCifra });
       // não coloca de novo ao abrir no editor (se a pessoa desligou, fica sem)
       m.letraAuto = true;
@@ -4736,8 +4748,8 @@ async function gerarComIA(song, titulo) {
         <div class="setting wrap"><span class="ico">${icon('gauge', 18)}</span><div class="grow"><div class="t">Andamento</div><div class="s">Se as notas ficaram picadas ou longas demais, ajuste aqui</div></div>
           <div class="seg"><button data-bpm="-4" aria-label="Mais devagar">${icon('minus', 15)}</button><span class="val" id="ia-bpm">${bpm}</span><button data-bpm="4" aria-label="Mais rápido">${icon('plus', 15)}</button></div></div>
         <div class="setting"><span class="ico">${icon('music', 18)}</span><div class="grow"><div class="t">Tom</div><div class="s">${tomCifra ? 'Pela cifra da música' : 'Pelo que a IA ouviu'}</div></div><button class="btn small" id="ia-tom">${nomeDoTom(fifths, modo)}</button></div>
-        <div class="setting wrap"><span class="ico">${icon('clock', 18)}</span><div class="grow"><div class="t">Compasso</div></div>
-          <div class="chips" id="ia-compasso">${[[2, 4], [3, 4], [4, 4], [6, 8]].map(([a, b]) => `<button class="chip" data-c="${a}/${b}" aria-pressed="${a === 4 && b === 4}">${a}/${b}</button>`).join('')}</div></div>
+        <div class="setting wrap"><span class="ico">${icon('clock', 18)}</span><div class="grow"><div class="t">Compasso</div><div class="s" id="ia-compasso-s"></div></div>
+          <div class="chips" id="ia-compasso"><button class="chip" data-c="auto">Automático</button>${[[2, 4], [3, 4], [4, 4], [6, 8]].map(([a, b]) => `<button class="chip" data-c="${a}/${b}">${a}/${b}</button>`).join('')}</div></div>
         ${textoLetra ? `<label class="setting"><span class="ico">${icon('text', 18)}</span><div class="grow"><div class="t">Letra da música</div><div class="s">Uma sílaba em cada nota; confira e corrija na aba Letra do editor</div></div><input type="checkbox" class="switch" id="ia-letra" checked></label>` : ''}
         ${temCifraMusica ? `<label class="setting"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Cifra da música</div><div class="s">Cada acorde na nota da sílaba onde ele cai; corrija na aba Cifra do editor</div></div><input type="checkbox" class="switch" id="ia-cifra" checked></label>` : ''}
         <label class="setting"><span class="ico">${icon('clock', 18)}</span><div class="grow"><div class="t">Começa no contratempo</div><div class="s">Se as notas ficaram deslocadas meio tempo (comum com a voz sozinha), ligue</div></div><input type="checkbox" class="switch" id="ia-meio"></label>
@@ -4755,6 +4767,9 @@ async function gerarComIA(song, titulo) {
       $('#ia-bpm').textContent = bpm;
       $('#ia-oit').textContent = oitava > 0 ? '+' + oitava : oitava;
       $('#ia-tom').textContent = nomeDoTom(fifths, modo);
+      acertarCompasso();
+      $('#ia-compasso').querySelectorAll('[data-c]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.c === (compassoAuto ? 'auto' : compasso.join('/')))));
+      $('#ia-compasso-s').textContent = `${compassoAuto ? `Pelo que a IA ouviu: ${compasso.join('/')}` : 'Escolhido por você'}${anacruse ? ` · começa com anacruse de ${anacruse % 8 || compasso[1] === 8 ? `${anacruse / 4} colcheia${anacruse > 4 ? 's' : ''}` : `${anacruse / 8} tempo${anacruse > 8 ? 's' : ''}`}` : ''}`;
       $('#ia-resumo').innerHTML = [
         [icon('music', 15), nomeDoTom(fifths, modo)], [icon('gauge', 15), `♩ ${bpm}`], [icon('clock', 15), compasso.join('/')],
         [icon('score', 15), coral ? '4 vozes' : 'Melodia'], [icon('sparkles', 15), `${notas.length} notas`],
@@ -4790,7 +4805,7 @@ async function gerarComIA(song, titulo) {
       if (b.dataset.bpm) { bpm = Math.max(40, Math.min(200, bpm + Number(b.dataset.bpm))); previa(); }
       if (b.dataset.vozes) { coral = b.dataset.vozes === '4'; $('#ia-vozes').querySelectorAll('[data-vozes]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); previa(); }
       if (b.dataset.oit) { oitava = Math.max(-2, Math.min(2, oitava + Number(b.dataset.oit))); previa(); }
-      if (b.dataset.c) { compasso = b.dataset.c.split('/').map(Number); $('#ia-compasso').querySelectorAll('[data-c]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); previa(); }
+      if (b.dataset.c) { compassoAuto = b.dataset.c === 'auto'; if (!compassoAuto) compasso = b.dataset.c.split('/').map(Number); previa(); }
       if (b.id === 'ia-tom') { const v = await escolherTomPartitura(fifths, modo); if (v) { [fifths, modo] = v; previa(); } }
       if (b.id === 'ia-denovo') {
         if (!(await ask({ title: 'Descartar esta partitura?', text: 'O rascunho não é salvo. Depois é só escolher o áudio de novo (ou outro arquivo).', ok: 'Descartar', danger: true }))) return;

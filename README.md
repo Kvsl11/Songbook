@@ -67,8 +67,11 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   sua pauta e clave, sem cruzar as vozes e seguindo a linha de cada uma: `vozesDasNotas`). O Soprano leva a melodia
   ouvida (a mesma do *Só a melodia*) e o Baixo, o baixo da música; quando soam menos notas que vozes, a voz que sobra
   dobra uma nota do acorde (na extensão dela) em vez de ficar em pausa, e os buraquinhos de menos de um tempo entre
-  duas notas da mesma voz viram a nota de antes ligada. Em *Ajustar o rascunho* dá
-  para trocar por *Só a melodia*. É um rascunho: funciona melhor com voz e violão (ou o coral sozinho) do que com banda
+  duas notas da mesma voz viram a nota de antes ligada. O **compasso também vem do áudio** (`estimarCompasso`): a IA
+  vê em que tamanho de compasso (4/4, 3/4 ou 6/8) o primeiro tempo sai mais forte que os outros (é onde costumam cair o
+  baixo, a troca de acorde e as notas longas) e onde ele começa, com a anacruse. O 2/4 não dá para separar do 4/4 pelo
+  áudio: fica para escolher. Em *Ajustar o rascunho* dá para trocar por *Só a melodia* ou escolher outro compasso (e
+  voltar para o *Automático*). É um rascunho: funciona melhor com voz e violão (ou o coral sozinho) do que com banda
   completa.
 - **Mixer das vozes no ensaio** (na partitura salva, no editor e no fim da IA): cada voz com o seu volume e um botão
   de silenciar; tocar no nome **destaca** a voz e deixa as outras baixinho, de fundo (`destacarVoz`), para a pessoa se

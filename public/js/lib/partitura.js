@@ -646,6 +646,56 @@ function gradeDasNotas(notas, validas, { bpm, minAmp, meioTempo }) {
   const fim = Math.max(...validas.map((n) => n.startTimeSeconds + n.durationSeconds));
   return { passo, comeco, nPassos: Math.ceil((fim - comeco) / passo) };
 }
+// compasso pelo áudio: onde caem as notas fortes, longas e graves (o baixo e as mudanças de acorde costumam vir no
+// primeiro tempo). Dobra os começos das notas (em colcheias, a partir do começo da grade) no tamanho de cada compasso,
+// em cada ponto de partida possível, e vê o quanto o primeiro tempo sai mais forte que os outros tempos do compasso
+// (no compasso errado, os tempos fortes se espalham e a diferença some). 3/4 e 6/8 têm o mesmo tamanho: o 6/8 tem o
+// segundo tempo no meio (3 colcheias), o 3/4 em 2 e 4. Devolve o compasso e a anacruse (em tiques, na mesma grade da
+// melodia e das vozes: mesma faixa e meioTempo). Com "compasso", só acha onde ele começa. O 4/4 é o mais comum no
+// canto (e o 2/4 não dá para separar dele pelo áudio: fica para a pessoa escolher)
+const DESENHOS = [
+  { c: [4, 4], tempos: [0, 2, 4, 6], passo: 2, peso: 1.15 },
+  { c: [3, 4], tempos: [0, 2, 4], passo: 2, peso: 1 },
+  { c: [6, 8], tempos: [0, 3], passo: 1, peso: 1 },
+  { c: [2, 4], tempos: [0, 2], passo: 2, peso: 1, soFixo: true },
+];
+const TAMANHO = { '4/4': 8, '3/4': 6, '6/8': 6, '2/4': 4 };
+export function estimarCompasso(notas, { bpm = 80, faixa = [48, 84], minAmp = 0.2, meioTempo = false, compasso = null } = {}) {
+  const passoS = 60 / bpm / 4;
+  const validas = notas.filter((n) => n.pitchMidi >= faixa[0] && n.pitchMidi <= faixa[1] && (n.amplitude ?? 1) >= minAmp && n.durationSeconds > passoS * 0.6);
+  const fixo = compasso && DESENHOS.find((x) => x.c[0] === compasso[0] && x.c[1] === compasso[1]);
+  if (!validas.length || (compasso && !fixo)) return { compasso: compasso || [4, 4], anacruse: 0 };
+  const { passo, comeco, nPassos } = gradeDasNotas(notas, validas, { bpm, minAmp, meioTempo });
+  const tempo = passo * 4;
+  const nCol = Math.ceil(nPassos / 2) + 1;
+  const forca = new Array(nCol).fill(0);
+  for (const n of notas) {
+    if ((n.amplitude ?? 1) < minAmp || n.durationSeconds <= passo * 0.6) continue;
+    const i = Math.round((n.startTimeSeconds - comeco) / (passo * 2));
+    if (i < 0 || i >= nCol) continue;
+    forca[i] += (n.amplitude ?? 1) * Math.min(2, n.durationSeconds / tempo) * (n.pitchMidi < 55 ? 2 : 1);
+  }
+  const media = (xs) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1);
+  let melhor = null;
+  for (const d of fixo ? [fixo] : DESENHOS.filter((x) => !x.soFixo)) {
+    const L = TAMANHO[d.c.join('/')];
+    // poucos compassos inteiros: não dá para saber (fica o 4/4)
+    if (nCol < L * 3 && !fixo) continue;
+    for (let o = 0; o < L; o += d.passo) {
+      const soma = new Array(L).fill(0);
+      const conta = new Array(L).fill(0);
+      for (let i = 0; i < nCol; i++) { const p = (((i - o) % L) + L) % L; soma[p] += forca[i]; conta[p]++; }
+      const P = soma.map((x, p) => (conta[p] ? x / conta[p] : 0));
+      // 3/4 ou 6/8: onde cai o segundo tempo
+      const meio = L === 6 ? P[3] - (P[2] + P[4]) / 2 : 0;
+      if (!fixo && ((d.c[1] === 8 && meio <= 0) || (L === 6 && d.c[1] === 4 && meio > 0))) continue;
+      const r = (P[0] - media(d.tempos.slice(1).map((x) => P[x]))) * d.peso;
+      if (!melhor || r > melhor.r) melhor = { r, d, o };
+    }
+  }
+  if (!melhor) return { compasso: compasso || [4, 4], anacruse: 0 };
+  return { compasso: melhor.d.c, anacruse: melhor.o * 4 };
+}
 const soaEm = (n, t) => n.startTimeSeconds <= t && n.startTimeSeconds + n.durationSeconds >= t;
 
 // de uma linha da grade (a nota de cada semicolcheia, ou null) para os eventos da partitura
@@ -751,7 +801,9 @@ function fecharBuracos(grade, max) {
   }
   return grade;
 }
-export function vozesDasNotas(notas, { bpm = 80, fifths = 0, oitava = 0, minAmp = 0.2, meioTempo = false, faixa = [38, 84] } = {}) {
+// alturas que entram no coral (do Mi grave do baixo ao Dó agudo do soprano)
+export const FAIXA_CORAL = [38, 84];
+export function vozesDasNotas(notas, { bpm = 80, fifths = 0, oitava = 0, minAmp = 0.2, meioTempo = false, faixa = FAIXA_CORAL } = {}) {
   const vozes = VOZES_CORAL;
   const vazias = () => vozes.map((v) => ({ id: v.id, nome: v.nome, clave: v.clave, ev: [] }));
   const passoS = 60 / bpm / 4;
@@ -778,7 +830,8 @@ export function vozesDasNotas(notas, { bpm = 80, fifths = 0, oitava = 0, minAmp 
     soando.sort((a, b) => b.pitchMidi - a.pitchMidi);
     // a melodia (a mais forte na extensão do canto; desempate: a mais aguda) é do Soprano; o que soa acima dela
     // (um enfeite do teclado) fica de fora. A IA corta as notas cantadas antes da hora: até a próxima nota começar
-    // (por até um tempo), a melodia continua na mesma, e não passa para uma nota do acompanhamento que já soava
+    // (por até um tempo), a melodia continua na mesma, e não passa para uma nota do acompanhamento que já soava nem
+    // para uma bem mais fraca que ela (um acorde do violão no meio da nota cantada)
     let mel = null;
     for (const n of soando) {
       if (n.pitchMidi < melLo || n.pitchMidi > melHi) continue;
@@ -786,13 +839,14 @@ export function vozesDasNotas(notas, { bpm = 80, fifths = 0, oitava = 0, minAmp 
       if (!mel || forca > mel.forca) mel = { n, forca };
     }
     const segue = melAtual && t - (melAtual.startTimeSeconds + melAtual.durationSeconds) < passo * 4;
-    if (segue && (!mel || mel.n.startTimeSeconds <= melAtual.startTimeSeconds + passo * 0.5)) mel = { n: melAtual };
+    const fraca = (n) => (n.amplitude ?? 1) < (melAtual.amplitude ?? 1) * 0.7;
+    if (segue && (!mel || mel.n.startTimeSeconds <= melAtual.startTimeSeconds + passo * 0.5 || fraca(mel.n))) mel = { n: melAtual };
     melAtual = mel?.n || null;
     if (!soando.length && !mel) { for (let v = 0; v < vozes.length; v++) anterior[v] = null; continue; }
     const escolha = vozes.map(() => null);
     let resto = soando;
     let livres = vozes.map((_, v) => v);
-    if (mel && (soando.length > 1 || !soando.includes(mel.n))) {
+    if (mel) {
       escolha[0] = mel.n;
       resto = soando.filter((n) => n.pitchMidi < mel.n.pitchMidi);
       livres = livres.slice(1);
