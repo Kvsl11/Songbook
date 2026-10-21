@@ -14,6 +14,34 @@
     "music",
     "lifestyle"
   ],
+  "share_target": {
+    "action": "./compartilhar",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "audio",
+          "accept": [
+            "audio/*",
+            "video/mp4",
+            "video/webm",
+            ".mp3",
+            ".m4a",
+            ".wav",
+            ".ogg",
+            ".opus",
+            ".webm",
+            ".aac",
+            ".flac"
+          ]
+        }
+      ]
+    }
+  },
   "icons": [
     {
       "src": "icon-192-v7.png",

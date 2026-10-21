@@ -59,6 +59,15 @@ html, body { margin: 0; height: 100%; }
 body { background: var(--black); color: var(--text); font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
 a { color: inherit; }
 button, input, select, textarea { font: inherit; color: inherit; }
+
+/* textos justificados em todo o app, com hifenização em português (o <html lang="pt-BR"> diz o idioma): as palavras
+   compridas se quebram com hífen e a linha não abre buracos entre as palavras. A última linha fica à esquerda;
+   o que é centralizado continua centralizado (o text-align do próprio bloco vale mais que o herdado daqui) */
+body { text-align: justify; hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; text-wrap: pretty; }
+/* ficam como estavam: títulos, campos de digitar, a cifra/letra das músicas (versos são linhas de poesia), código
+   e o que é tabular (números, acordes) */
+h1, h2, h3, h4, input, select, textarea, .song, .song *, .chord, pre, code, .tab, svg text, [contenteditable] {
+  text-align: start; hyphens: manual; -webkit-hyphens: manual; }
 /* sem o retângulo azul do Android ao tocar: o retorno do toque segue o formato de cada elemento */
 * { -webkit-tap-highlight-color: transparent; }
 :focus:not(:focus-visible) { outline: none; }
@@ -2008,6 +2017,72 @@ a.pptx-tipo { text-decoration: none; }
 .ia-nasce .osmd-box.chegou svg { animation: ia-chegou 0.5s ease; }
 @keyframes ia-chegou { from { opacity: 0.4; transform: translateX(10px); } }
 @media (prefers-reduced-motion: reduce) { .ia-nasce .osmd-box.chegou svg { animation: none; } }
+
+/* Gerar com IA, repaginado: selo, cartão de progresso com barra, e o resultado com player e salvar/descartar */
+.ia-selo { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px; color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.ia-topo p { max-width: 560px; line-height: 1.45; }
+.ia-progresso-card { display: grid; gap: 10px; padding: 16px; border-radius: 18px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, var(--surface-2)), var(--surface-2) 70%); }
+.ia-progresso-card .ia-estado { padding-left: 4px; }
+.ia-progresso-card .ia-estado b { font-size: 16px; }
+.ia-progresso-card .ia-relogio { color: var(--text); font-size: 18px; }
+.ia-progresso { --pct: 0%; position: relative; height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); overflow: hidden; }
+.ia-progresso i { position: absolute; inset: 0 auto 0 0; width: var(--pct); border-radius: inherit; transition: width 0.3s ease;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #fff)); }
+.ia-progresso i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: translateX(-100%); animation: ia-brilho 1.6s ease-in-out infinite; }
+.ia-progresso.fim i { width: 100%; opacity: 0.7; }
+@keyframes ia-brilho { to { transform: translateX(100%); } }
+.ia-dica { color: var(--muted); font-size: 12.5px; }
+.ia-rolo { border: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
+.ia-numeros span, .ia-nasce { border: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
+.ia-leitura .ia-fim { justify-content: center; }
+
+.ia-solte { display: grid; justify-items: center; gap: 8px; width: 100%; margin-top: 12px; padding: 28px 18px; text-align: center; color: var(--text);
+  font: inherit; cursor: pointer; border-radius: 18px; border: 2px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, var(--surface-2)), var(--surface-2) 75%); transition: border-color 0.2s, transform 0.2s; }
+.ia-solte:hover, .ia-solte.sobre { border-color: var(--accent); }
+.ia-solte.sobre { transform: scale(1.01); }
+.ia-solte b { font-size: 18px; font-weight: 900; }
+.ia-solte small { max-width: 380px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.ia-solte .btn { margin-top: 6px; pointer-events: none; }
+.ia-solte-ic { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%; color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.ia-dica-compartilhar { display: flex; gap: 10px; align-items: flex-start; margin: 12px 2px 16px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.ia-dica-compartilhar .ic { margin-top: 1px; color: var(--accent-ink); }
+.ia-pronto { display: grid; gap: 12px; margin-top: 12px; }
+.ia-pronto-cab { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 18px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 24%, var(--surface-2)), var(--surface-2) 72%); animation: ia-surge 0.4s ease; }
+.ia-pronto-cab > div { display: grid; gap: 2px; min-width: 0; }
+.ia-pronto-cab b { font-size: 18px; font-weight: 900; letter-spacing: -0.01em; }
+.ia-pronto-cab small { color: var(--muted); font-size: 13px; line-height: 1.35; }
+.ia-pronto-ic { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 50%; color: #000; background: var(--accent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 22%, transparent); }
+@keyframes ia-surge { from { opacity: 0; transform: translateY(8px); } }
+.ia-resumo { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.ia-resumo span { display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  background: var(--surface-2); }
+.ia-resumo .ic { color: var(--accent-ink); }
+.ia-pronto .ia-previa { margin: 0; padding: 10px 6px; border-radius: 18px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--text) 6%, transparent); cursor: pointer; }
+.ia-pronto .ensaio { margin: 0; }
+.ia-ajustar { border-radius: 18px; background: var(--surface-2); overflow: hidden; }
+.ia-ajustar summary { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; list-style: none; }
+.ia-ajustar summary::-webkit-details-marker { display: none; }
+.ia-ajustar summary > span { display: grid; flex: 1; min-width: 0; }
+.ia-ajustar summary small { color: var(--muted); font-size: 12.5px; }
+.ia-ajustar summary > .ic:first-child { color: var(--accent-ink); }
+.ia-ajustar summary > .ic:last-child { transition: transform 0.2s; }
+.ia-ajustar[open] summary > .ic:last-child { transform: rotate(180deg); }
+.ia-ajustar .settings-group { margin: 0; border-radius: 0; background: transparent; border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
+.ia-acoes { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 16px; }
+.ia-acoes-dir { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .ia-acoes { flex-direction: column-reverse; align-items: stretch; }
+  .ia-acoes-dir .btn { flex: 1; }
+  .ia-acoes-dir .btn.primary { flex: 2; }
+}
+@media (prefers-reduced-motion: reduce) { .ia-progresso i::after, .ia-pronto-cab { animation: none; } }
 
 /* listas de escolha no PC e no tablet: janela larga e baixa, a lista rola por dentro (o título e a busca ficam
    parados) e as opções em colunas — nada de uma tirinha estreita e comprida */
