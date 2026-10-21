@@ -38,8 +38,9 @@ export async function carregarPiano(ctx, midis) {
 }
 export const pianoPronto = (midi) => prontas.has(amostraPara(midi).nome);
 
-// toca uma nota no piano (se a gravação já chegou): ataque da própria gravação, abafa ao soltar a tecla
-export function notaDePiano(ctx, destino, midi, quando, dur, volume = 1) {
+// toca uma nota no piano (se a gravação já chegou): ataque da própria gravação, abafa ao soltar a tecla ("abafar":
+// quanto tempo o som leva para morrer depois, em segundos; maior = o pedal soltando devagar, o som da sala)
+export function notaDePiano(ctx, destino, midi, quando, dur, volume = 1, abafar = 0.09) {
   const a = amostraPara(midi);
   const buf = prontas.get(a.nome);
   if (!buf) { baixar(ctx, a.nome); return false; }
@@ -49,9 +50,9 @@ export function notaDePiano(ctx, destino, midi, quando, dur, volume = 1) {
   const g = ctx.createGain();
   const solta = quando + Math.max(0.08, dur);
   g.gain.setValueAtTime(volume, quando);
-  g.gain.setTargetAtTime(0, solta, 0.09); // o abafador desce na corda
+  g.gain.setTargetAtTime(0, solta, abafar); // o abafador desce na corda
   src.connect(g).connect(destino);
   src.start(quando);
-  src.stop(solta + 0.7);
+  src.stop(Math.min(solta + abafar * 7 + 0.1, quando + buf.duration / a.afinacao));
   return true;
 }

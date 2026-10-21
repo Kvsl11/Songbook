@@ -55,13 +55,27 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 - **Piano de verdade no ensaio**: ouvir a partitura (e tocar numa nota no editor) usa o **Salamander Grand Piano**,
   um piano de cauda Yamaha C5 gravado nota por nota (Alexander Holm, CC-BY 3.0), pelo jsDelivr numa versão fixa
   (`lib/piano.js`): só as gravações das notas da música são baixadas, uma vez; sem internet, o som sintetizado.
+  O piano soa cheio, não seco: **meio pedal** (cada nota continua um pouco além do escrito, até um tempo, sem passar
+  da barra do compasso, e se apaga devagar: `comPedal`), **sala** com uns 1,8 s de cauda (linhas de atraso com
+  retorno, leves para o celular) e, quando a partitura tem cifra, **acompanhamento**: em cada acorde, o baixo e o
+  acorde fechado logo abaixo do canto, as notas abrindo uma depois da outra, de novo a cada compasso e perto do acorde
+  anterior (`notasDoAcorde`); ele tem o seu canal no mixer (*Acompanhamento*, começa em 70%). O som segue o andamento
+  exato da partitura (o da IA vem em décimos; o metrônomo escrito e a tela mostram inteiro).
 - **Partituras** (menu do app): as partituras feitas no app e as prontas (acervo/Hinário) das músicas da biblioteca, com
   **Nova partitura** (escolhendo a música) e **Gerar com IA**: escolha o arquivo de áudio da música (ou arraste, no
   computador) e o modelo **Basic Pitch** (Spotify, código
   aberto, roda no próprio aparelho) transforma o som em notas; o app escolhe a melodia, acha tom (pela cifra ou pelo
   que ouviu) e andamento e põe no compasso. O andamento (`estimarAndamento`) sai dos intervalos entre as notas e é
   afinado em décimos com todas elas (baixo e acordes inclusive): com bpm inteiro, a grade já escorregava um tempo no
-  fim de uma música longa; e o tempo dividido em 3 (6/8) é escrito pela semínima, não pela semínima pontuada. No fim, a partitura pronta já toca ali mesmo (o mesmo ensaio do editor,
+  fim de uma música longa; e o tempo dividido em 3 (6/8) é escrito pela semínima, não pela semínima pontuada. A
+  **grade segue o cantor** (`gradeDasNotas`): a cada tempo, as notas em volta dizem se ele veio um pouco antes ou
+  depois do previsto e a grade vai junto (correções de menos de meia semicolcheia, que nunca pulam uma nota), então o
+  rubato e a frase que segura no fim não tiram as sílabas rápidas do lugar; onde ela começa, decide a primeira nota
+  forte e qual das 4 semicolcheias põe mais notas fortes nos tempos. Na melodia só entram as notas quase tão fortes
+  quanto o canto daquele trecho (`notasDoCanto`: o dedilhado do violão e o baixo da banda entravam quando a nota
+  cantada acabava antes da hora), e o buraco que a IA deixa no fim da nota cantada vira a nota ligada (a pausa da
+  respiração fica). As sílabas rápidas (semicolcheias) e as notas repetidas na mesma altura (com o respiro da
+  consoante entre elas) ficam na partitura, em vez de sumirem dentro da vizinha. No fim, a partitura pronta já toca ali mesmo (o mesmo ensaio do editor,
   e tocar numa nota ouve dali), com os ajustes recolhidos e os botões **Salvar partitura**, **Editar** e
   **Descartar e gerar de novo**. O áudio também pode vir de outro app do Android: **Compartilhar → Songbook**
   (`share_target` do manifesto; o service worker guarda o arquivo e o app pergunta de qual música ele é). Por padrão a IA

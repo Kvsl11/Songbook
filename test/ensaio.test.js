@@ -48,3 +48,24 @@ test('nomearVozes: usa o nome de cada pauta quando todas têm o seu', async () =
   assert.deepEqual(nomearVozes(passos, { nomes: new Map([['a:1', 'Solista'], ['b:1', 'Coro']]) }).map((v) => v.nome), ['Solista', 'Coro']);
   assert.deepEqual(nomearVozes(passos, { nomes: new Map([['a:1', 'Solista']]) }).map((v) => v.nome), ['Voz aguda', 'Voz grave']);
 });
+
+test('piano mais cheio: meio pedal até a barra e o acompanhamento pela cifra', async () => {
+  const { comPedal, notasDoAcorde } = await import('../public/js/lib/ensaio.js');
+  // colcheia no começo do compasso: soa mais um tempo; colada na barra: para ali (o pedal troca); longa: não encurta
+  assert.equal(comPedal(0, 0.125, [0, 1]), 0.375);
+  assert.equal(comPedal(0.875, 0.125, [0, 1]), 0.125);
+  assert.equal(comPedal(0.5, 0.75, [0, 1, 2]), 0.75);
+  // Ré maior: baixo Ré2… Ré#3, acorde fechado entre Mi3 e Mi4 (abaixo do canto)
+  const d = notasDoAcorde({ raiz: 2 });
+  assert.equal(d.baixo, 50);
+  assert.deepEqual(d.acorde.map((m) => m % 12).sort((a, b) => a - b), [2, 6, 9]);
+  assert.ok(d.acorde.every((m) => m >= 52 && m <= 67));
+  // Lá com baixo em Dó# (A/C#): o baixo é o Dó#; Bm7 tem a sétima; Asus4 tem a quarta e não a terça
+  assert.equal(notasDoAcorde({ raiz: 9, baixo: 1 }).baixo % 12, 1);
+  assert.deepEqual(notasDoAcorde({ raiz: 11, tipo: 6 }).acorde.map((m) => m % 12).sort((a, b) => a - b), [2, 6, 9, 11]);
+  assert.deepEqual(notasDoAcorde({ raiz: 9, tipo: 23 }).acorde.map((m) => m % 12).sort((a, b) => a - b), [2, 4, 9]);
+  // o acorde seguinte fica perto do anterior (sem pular de região)
+  const g = notasDoAcorde({ raiz: 7 }, d.acorde);
+  const media = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  assert.ok(Math.abs(media(g.acorde) - media(d.acorde)) <= 3);
+});
