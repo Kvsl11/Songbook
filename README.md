@@ -43,12 +43,16 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   letra em várias estrofes (sílaba por sílaba ou colando o texto com hífens) e cifras com atalhos do tom; compasso,
   anacruse, tom, andamento e vozes nos ajustes; desfazer/refazer, teclado do computador (como no MuseScore), ouvir no
   ensaio, imprimir/PDF e exportar/importar MusicXML. Dá para começar da partitura desenhada pelo app e corrigir. Fica
-  guardada na música (`lib/partitura.js` converte para MusicXML).
+  guardada na música (`lib/partitura.js` converte para MusicXML). A tela de criar começa por *Gerar com IA* (e *Da
+  partitura pronta*, quando a música tem); para escrever nota por nota, só o tom (já pela cifra da música) e o
+  compasso (2/4, 3/4, 4/4, 6/8) e o tipo: o resto fica nos ajustes do editor (⚙). No editor, o ⋯ é só o arquivo
+  (PDF, exportar e importar MusicXML); **apagar a partitura** fica na lixeira ao lado de *Editar*, na tela da
+  partitura, e no cartão dela em Partituras.
   **Letra automática**: a letra da música entra sozinha nas notas de todas as vozes, sílaba por sílaba (separação de
   sílabas do português: `separarSilabas`, `colocarLetra`), no rascunho da IA, ao abrir o editor ou a partitura sem
-  letra, e em ⋯ → *Colocar a letra da música*; corrige-se na aba **Letra**. A **cifra** vem junto: cada acorde da
+  letra, e na aba **Letra** (*ponha a letra da música*), onde também se corrige. A **cifra** vem junto: cada acorde da
   cifra da música vai para a nota da sílaba onde ele cai (`silabasDaLetra`), na primeira voz (rascunho da IA, partitura
-  sem cifra e ⋯ → *Colocar a cifra da música*); corrige-se na aba **Cifra**. No editor, o ▶ do topo vira ⏸ enquanto
+  sem cifra e na aba **Cifra**: *ponha a cifra da música*), onde também se corrige. No editor, o ▶ do topo vira ⏸ enquanto
   toca; na partitura e no editor (ouvindo), tocar numa nota leva a música para ali e toca a partir dela.
   Partitura grande no editor: só um trecho de compassos em volta da nota escolhida é desenhado (8 com 4 vozes, até
   16 com uma), com ‹ › para andar; ouvir toca a partitura inteira.
