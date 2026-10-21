@@ -75,6 +75,10 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   com os nomes dos acordes da cifra da música; só a voz, sem banda, fica a cifra da sílaba. Numa música de teste
   (introdução de piano + 4 versos), a letra na nota certa foi de 0 para 24 de 26 sílabas e a cifra certa de 7 para
   32 de 32 tempos. Na melodia, a nota longe da região do canto (o baixo do piano) perde força.
+- **Coral da IA sem vozes emboladas**: o Soprano é a voz mais aguda que canta forte (não a mais forte: o baixo ficava
+  com a melodia e as 4 vozes saíam trocadas) e não é só o eco (harmônico) de uma nota mais grave. Num coral a 4 vozes
+  sintetizado e ouvido pelo Basic Pitch: Soprano 1 → 26 de 29 notas, Contralto 0 → 12/15, Tenor 2 → 13/15, Baixo
+  7 → 14/15. A IA ouve cada pedaço com 2 s de contexto antes (era 1 s): menos nota perdida na emenda.
 - **Som do ensaio mais limpo**: o pedal não emenda mais uma nota na próxima da mesma voz (com 4 vozes soavam 6 notas
   e segundas que não estão escritas em 78% do tempo; agora 4,6 e 29%), o acorde do acompanhamento fica abaixo do canto
   (antes subia por cima da melodia) e, com o app em segundo plano, o som é agendado com mais folga (as notas saíam
