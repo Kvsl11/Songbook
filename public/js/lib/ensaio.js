@@ -32,10 +32,20 @@ export function nomearVozes(passos, { minimo = 0.4, nomes: nomesDasPautas = new 
   return principais.map((v, i) => ({ voz: v.voz, nome: usarProprios ? proprios[i] : nomes[i], membros: v.membros }));
 }
 
-// volume de cada nota: "todas" iguais; com uma voz escolhida, só ela ou ela com as outras bem baixinho, de fundo
-export function volumeDa(voz, { escolhida = '', so = false } = {}) {
-  if (!escolhida || voz === escolhida) return 1;
-  return so ? 0 : 0.08;
+// volume de cada voz (0 a 1) ao destacar uma: ela inteira e as outras bem baixinho, de fundo, para a pessoa se
+// localizar na música; sem voz escolhida, todas iguais
+export const FUNDO = 0.15;
+export function destacarVoz(vozes, escolhida = '', fundo = FUNDO) {
+  return Object.fromEntries(vozes.map((v) => [v.voz, !escolhida || v.voz === escolhida ? 1 : fundo]));
+}
+
+// volumes guardados por nome da voz (Soprano, Contralto…): o id de cada voz muda a cada desenho da partitura,
+// o nome não. Devolve { voz: volume } só com números válidos entre 0 e 1 (o que falta fica 1)
+export function volumesPeloNome(vozes, guardados = {}) {
+  return Object.fromEntries(vozes.map((v) => {
+    const x = Number(guardados?.[v.nome]);
+    return [v.voz, Number.isFinite(x) ? Math.max(0, Math.min(1, x)) : 1];
+  }));
 }
 
 // segundos por semibreve: o andamento é em semínimas por minuto, ajustado pela velocidade do ensaio (1 = normal)

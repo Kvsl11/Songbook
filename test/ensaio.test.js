@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { duracaoTotal, nomearVozes, passoNoTempo, segundosPorSemibreve, volumeDa } from '../public/js/lib/ensaio.js';
+import { destacarVoz, duracaoTotal, FUNDO, nomearVozes, passoNoTempo, segundosPorSemibreve, volumesPeloNome } from '../public/js/lib/ensaio.js';
 
 const passo = (t, ...notas) => ({ t, notas: notas.map(([voz, freq, dur = 0.25]) => ({ voz, freq, dur })) });
 
@@ -19,11 +19,17 @@ test('vozes com poucas notas entram na principal mais próxima', () => {
   assert.deepEqual(v[1].membros, ['b', 'ruido']);
 });
 
-test('volume: todas iguais, destaque ou só a voz escolhida', () => {
-  assert.equal(volumeDa('s'), 1);
-  assert.equal(volumeDa('s', { escolhida: 's' }), 1);
-  assert.ok(volumeDa('c', { escolhida: 's' }) > 0 && volumeDa('c', { escolhida: 's' }) < 0.5);
-  assert.equal(volumeDa('c', { escolhida: 's', so: true }), 0);
+test('volume: destacar uma voz deixa as outras baixinho, de fundo; sem escolha, todas iguais', () => {
+  const vozes = [{ voz: 's', nome: 'Soprano' }, { voz: 'c', nome: 'Contralto' }, { voz: 't', nome: 'Tenor' }];
+  assert.deepEqual(destacarVoz(vozes), { s: 1, c: 1, t: 1 });
+  assert.deepEqual(destacarVoz(vozes, 'c'), { s: FUNDO, c: 1, t: FUNDO });
+  assert.ok(FUNDO > 0 && FUNDO < 0.5);
+});
+
+test('volume: guardado pelo nome da voz, limitado entre 0 e 1', () => {
+  const vozes = [{ voz: 'x:1', nome: 'Soprano' }, { voz: 'y:1', nome: 'Baixo' }, { voz: 'z:1', nome: 'Tenor' }];
+  assert.deepEqual(volumesPeloNome(vozes, { Soprano: 0.2, Baixo: 7, Tenor: 'nada' }), { 'x:1': 0.2, 'y:1': 1, 'z:1': 1 });
+  assert.deepEqual(volumesPeloNome(vozes, null), { 'x:1': 1, 'y:1': 1, 'z:1': 1 });
 });
 
 test('tempo: segundos por semibreve, passo que está soando e duração', () => {

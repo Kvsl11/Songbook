@@ -8,7 +8,7 @@ import { apagarModelo, carregarJSZip, gerarPowerPoint, gerarPowerPointSimples, l
 import { COLECOES_LITURGICAS, parteFixa, PARTES_FIXAS, tempoDe, TEMPOS } from './lib/acervo.js';
 import { sugerirParaODia } from './lib/sugestoes-liturgicas.js';
 import { revisarRepertorio, NOME_PARTE } from './lib/revisor.js';
-import { duracaoTotal, nomearVozes, passoNoTempo, segundosPorSemibreve, volumeDa } from './lib/ensaio.js';
+import { destacarVoz, duracaoTotal, FUNDO, nomearVozes, passoNoTempo, segundosPorSemibreve, volumesPeloNome } from './lib/ensaio.js';
 import {
   acordesDoTom as acordesDaArmadura, alterar, alturaPeloNome, CLAVES, COMPASSOS, deMusicXML, distribuirLetra, DURACOES, emCompassos, frequenciaDa, midiDa, moverGrau,
   mudarOitava, NOMES_NOTA, nomeDaAltura, nomeDoTom, nomeDuracao, novaPartitura, paraMusicXML, tiquesDoCompasso,
@@ -52,7 +52,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-169';
+export const APP_VERSAO = '2026.10.21-170';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -2990,9 +2990,14 @@ const carregarScript = (src) => {
 const OSMD_JS = 'https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.2/build/opensheetmusicdisplay.min.js';
 const CIFRA_NO_TEXTO = /^[A-G][#b♯♭]?(m|maj|min|dim|aug|sus|add|°|º|ø|M)?[\d()+#b♯♭]*(\/[A-G][#b♯♭]?)?$/;
 
-// Ensaio: toca a partitura desenhada (todas as vozes, só a voz escolhida ou ela com as outras baixinho), com o cursor
-// andando sobre as notas, no andamento escolhido e no tom da tela. Som feito no próprio navegador (Web Audio).
-function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
+// o mixer das vozes recolhido (só a linha "Vozes"): lembrado entre as músicas
+const mixerRecolhido = () => { try { return localStorage.getItem('ensaio-mixer-recolhido') === '1'; } catch { return false; } };
+
+// Ensaio: toca a partitura desenhada com o cursor andando sobre as notas, no andamento escolhido e no tom da tela.
+// Com várias vozes, cada uma tem o seu volume (mixer): destacar uma deixa as outras baixinho, de fundo, para a pessoa
+// se localizar; dá para silenciar ou baixar qualquer uma. Os volumes ficam guardados por música (chave).
+// Som feito no próprio navegador (Web Audio).
+function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null, chave = '' } = {}) {
   if (!barra) return null;
   // as notas de cada momento da partitura (o cursor do desenho percorre tudo, já com as repetições)
   const passos = [];
@@ -3034,16 +3039,25 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
   const vozes = nomearVozes(passos, { nomes: new Map([...nomesDasPautas].filter(([, n]) => n && !genericos.test(n))) });
   const grupoDe = new Map(vozes.flatMap((g) => g.membros.map((m) => [m, g.voz])));
   const fim = duracaoTotal(passos);
-  // quantas notas soam juntas, no máximo (todas as vozes, ou só a escolhida quando ela toca sozinha)
+  // volume de cada voz (0 a 1), guardado por música e pelo nome da voz
+  const guardarEm = chave ? `ensaio-vozes:${chave}` : '';
+  let guardados = {};
+  try { guardados = guardarEm ? JSON.parse(localStorage.getItem(guardarEm) || '{}') : {}; } catch { /* sem armazenamento */ }
+  const vol = volumesPeloNome(vozes, guardados);
+  const antesDoMudo = {}; // o volume de antes de silenciar, para voltar nele
+  const guardarVolumes = () => {
+    if (!guardarEm) return;
+    try { localStorage.setItem(guardarEm, JSON.stringify(Object.fromEntries(vozes.map((v) => [v.nome, vol[v.voz]])))); } catch { /* sem armazenamento */ }
+  };
+  // quantas notas soam juntas, no máximo, contando só as vozes que estão soando (o volume é dividido entre elas)
   const maxJuntas = new Map();
   const juntas = () => {
-    const chave = escolhida && so ? escolhida : '';
-    if (!maxJuntas.has(chave)) maxJuntas.set(chave, Math.max(1, ...passos.map((p) => p.notas.filter((n) => !chave || grupoDe.get(n.voz) === chave).length)));
-    return maxJuntas.get(chave);
+    const ativas = vozes.filter((v) => vol[v.voz] > 0).map((v) => v.voz);
+    const k = ativas.join('|');
+    if (!maxJuntas.has(k)) maxJuntas.set(k, Math.max(1, ...passos.map((p) => p.notas.filter((n) => ativas.includes(grupoDe.get(n.voz))).length)));
+    return maxJuntas.get(k);
   };
   let bpm = Math.round(osmd.Sheet.SourceMeasures[0]?.TempoInBPM || osmd.Sheet.DefaultStartTempoInBpm || 90);
-  let escolhida = '';
-  let so = true; // escolher uma voz toca só ela; as outras de fundo só se pedir
   let audio = null;
   let mestre = null;
   let tocando = false;
@@ -3062,14 +3076,43 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
       <div class="ensaio-info"><b>Ensaiar</b><small id="ens-pos">${vozes2 ? `${vozes.length} vozes` : 'Melodia'} · toque para ouvir</small></div>
       <div class="seg"><button data-e="lento" aria-label="Mais devagar">${icon('minus', 15)}</button><span class="val" id="ens-bpm"><small>♩ =</small>${bpm}</span><button data-e="rapido" aria-label="Mais rápido">${icon('plus', 15)}</button></div>
     </div>
-    ${vozes2 ? `<div class="ensaio-linha vozes"><div class="chips" id="ens-vozes"><button class="chip" data-voz="">Todas</button>${vozes.map((v) => `<button class="chip" data-voz="${esc(v.voz)}">${esc(v.nome)}</button>`).join('')}</div>
-      <label class="ens-so" title="Ligado: a voz escolhida em destaque e as outras bem baixinho, de fundo"><input type="checkbox" class="switch" id="ens-so"><span>Outras vozes de fundo</span></label></div>` : ''}`;
+    ${vozes2 ? `<div class="ens-mixer${mixerRecolhido() ? ' recolhido' : ''}"><div class="ens-mixer-cab">
+        <button class="ens-mixer-abre" data-recolher aria-expanded="${!mixerRecolhido()}">${icon('som', 16)}<b>Vozes</b>${icon('down', 16)}</button>
+        <small>Toque no nome para destacar a voz; as outras ficam baixinho, de fundo</small>
+        <button class="chip sm" data-todas>Todas iguais</button></div>
+      <div class="ens-vozes">${vozes.map((v) => `<div class="ens-voz" data-canal="${esc(v.voz)}">
+        <button class="ens-voz-nome" data-destacar="${esc(v.voz)}">${esc(v.nome)}</button>
+        <button class="icon-btn ens-mudo" data-mudo="${esc(v.voz)}" aria-label="Silenciar ${esc(v.nome)}"></button>
+        <input type="range" min="0" max="100" step="5" data-vol="${esc(v.voz)}" aria-label="Volume: ${esc(v.nome)}"></div>`).join('')}</div></div>` : ''}`;
   const desenharBarra = () => {
     aoMudar?.(tocando);
     barra.querySelector('[data-e="play"]').innerHTML = icon(tocando ? 'pause' : 'play', 22);
     barra.querySelector('[data-e="play"]').setAttribute('aria-label', tocando ? 'Pausar' : 'Tocar');
     $('#ens-bpm', barra).innerHTML = `<small>♩ =</small>${bpm}`;
-    barra.querySelectorAll('[data-voz]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.voz === escolhida)));
+    desenharMixer();
+  };
+  // o mixer mostra o volume de cada voz, quem está em destaque e quem está sem som
+  function desenharMixer() {
+    const maior = Math.max(...vozes.map((v) => vol[v.voz]));
+    for (const v of vozes) {
+      const canal = barra.querySelector(`[data-canal="${CSS.escape(v.voz)}"]`);
+      if (!canal) continue;
+      const x = vol[v.voz];
+      canal.querySelector('[data-vol]').value = Math.round(x * 100);
+      canal.querySelector('[data-vol]').style.setProperty('--v', `${Math.round(x * 100)}%`);
+      canal.classList.toggle('mudo', x === 0);
+      canal.classList.toggle('destaque', x > 0 && x === maior && vozes.some((o) => vol[o.voz] < x));
+      const b = canal.querySelector('[data-mudo]');
+      b.innerHTML = icon(x === 0 ? 'mudo' : 'som', 18);
+      b.setAttribute('aria-pressed', String(x === 0));
+    }
+  }
+  // volume mudou: vale na hora (cada voz tem o seu controle de volume no som)
+  const aplicarVolumes = () => {
+    if (audio) for (const v of vozes) ganhos.get(v.voz)?.gain.setTargetAtTime(vol[v.voz], audio.currentTime, 0.05);
+    maxJuntas.clear();
+    guardarVolumes();
+    desenharMixer();
   };
   const tAgora = () => (tocando ? inicioT + (audio.currentTime - inicioAudio) / segundosPorSemibreve(bpm) : inicioT);
   // som: timbre de voz/órgão suave (harmônicos que caem rápido, sem o "apito" do triângulo), filtro que tira o
@@ -3106,21 +3149,29 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
     nivelSala.gain.value = 0.16;
     saida.connect(sala).connect(nivelSala).connect(limitador);
   };
+  const ganhos = new Map(); // voz → controle de volume dela, ligado ao mestre
   const novoMestre = () => {
     mestre = audio.createGain();
     mestre.gain.value = 0.9;
     mestre.connect(saida);
+    for (const v of vozes) {
+      const g = audio.createGain();
+      g.gain.value = vol[v.voz];
+      g.connect(mestre);
+      ganhos.set(v.voz, g);
+    }
   };
   let piano = false; // as gravações do piano chegaram (senão, o som sintetizado de antes)
-  const nota = (freq, quando, dur, vol) => {
-    if (vol <= 0) return;
+  // a nota vai para o controle de volume da voz dela (silenciada, ela é agendada igual: aumentar o volume já a ouve)
+  const nota = (freq, quando, dur, voz) => {
+    const destino = ganhos.get(grupoDe.get(voz)) || mestre;
     const f = freq * 2 ** (tomAtual() / 12);
-    if (piano && notaDePiano(audio, mestre, midiDaFrequencia(f), quando, dur, (1.4 / Math.sqrt(juntas())) * vol)) return;
+    if (piano && notaDePiano(audio, destino, midiDaFrequencia(f), quando, dur, 1.4 / Math.sqrt(juntas()))) return;
     // as graves soam mais fracas ao ouvido (e no alto-falante do celular): ganham um pouco de volume
     // várias vozes juntas dividem o volume (antes somavam e o limitador apertava tudo: o som "chiava")
-    const pico = (0.24 / Math.sqrt(juntas())) * vol * Math.min(1.6, Math.max(1, (330 / f) ** 0.35));
+    const pico = (0.24 / Math.sqrt(juntas())) * Math.min(1.6, Math.max(1, (330 / f) ** 0.35));
     const g = audio.createGain();
-    g.connect(mestre);
+    g.connect(destino);
     const solta = quando + Math.max(0.1, dur - 0.02);
     g.gain.setValueAtTime(0, quando);
     g.gain.linearRampToValueAtTime(pico, quando + 0.035);
@@ -3151,7 +3202,7 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
     while (proximo < passos.length && passos[proximo].t <= ate) {
       const p = passos[proximo];
       const quando = inicioAudio + (p.t - inicioT) * spw;
-      for (const n of p.notas) nota(n.freq, Math.max(audio.currentTime, quando), n.dur * spw, volumeDa(grupoDe.get(n.voz), { escolhida, so }));
+      for (const n of p.notas) nota(n.freq, Math.max(audio.currentTime, quando), n.dur * spw, n.voz);
       proximo++;
     }
     if (proximo >= passos.length && tAgora() >= fim) { pausar(); irPara(0); }
@@ -3223,18 +3274,43 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
     moverCursor(passoNoTempo(passos, t));
     if (estava) tocar();
   }
-  // mudar andamento ou voz tocando: recomeça do ponto atual com o novo jeito
+  // mudar andamento tocando: recomeça do ponto atual com o novo jeito
   const reajustar = () => { if (tocando) { const t = tAgora(); pausar(); inicioT = t; tocar(); } else desenharBarra(); };
   barra.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-e], [data-voz]');
+    const b = e.target.closest('[data-e], [data-destacar], [data-mudo], [data-todas], [data-recolher]');
     if (!b) return;
-    if (b.dataset.voz !== undefined) { escolhida = b.dataset.voz; reajustar(); return; }
+    if (b.dataset.recolher !== undefined) {
+      const m = b.closest('.ens-mixer');
+      const rec = m.classList.toggle('recolhido');
+      b.setAttribute('aria-expanded', String(!rec));
+      try { localStorage.setItem('ensaio-mixer-recolhido', rec ? '1' : ''); } catch { /* sem armazenamento */ }
+      return;
+    }
+    // destacar: tocar de novo na voz já destacada volta todas iguais
+    if (b.dataset.destacar !== undefined) {
+      const ja = b.closest('.ens-voz').classList.contains('destaque');
+      Object.assign(vol, destacarVoz(vozes, ja ? '' : b.dataset.destacar));
+      aplicarVolumes();
+      return;
+    }
+    if (b.dataset.mudo !== undefined) {
+      const v = b.dataset.mudo;
+      if (vol[v] > 0) { antesDoMudo[v] = vol[v]; vol[v] = 0; } else vol[v] = antesDoMudo[v] || 1;
+      aplicarVolumes();
+      return;
+    }
+    if (b.dataset.todas !== undefined) { Object.assign(vol, destacarVoz(vozes)); aplicarVolumes(); return; }
     const acao = b.dataset.e;
     if (acao === 'play') { if (tocando) pausar(); else tocar(); }
     if (acao === 'inicio') irPara(0);
     if (acao === 'lento' || acao === 'rapido') { bpm = Math.max(30, Math.min(200, bpm + (acao === 'rapido' ? 5 : -5))); reajustar(); }
   });
-  $('#ens-so', barra)?.addEventListener('change', (e) => { so = !e.target.checked; reajustar(); });
+  barra.addEventListener('input', (e) => {
+    const v = e.target.dataset?.vol;
+    if (v === undefined) return;
+    vol[v] = Number(e.target.value) / 100;
+    aplicarVolumes();
+  });
   // tocar a partir de onde a pessoa tocou na partitura: a nota (ou pausa) desenhada mais perto do toque
   const momentoNoToque = (x, y) => {
     let melhor = null;
@@ -3928,7 +4004,7 @@ function editorPartitura(song, titulo) {
       if (!folha.isConnected || ensaio) return;
     }
     const barra = $('#cp-ensaio');
-    ensaio = criarEnsaio(osmd, barra, () => 0, { aoMudar: botaoOuvir });
+    ensaio = criarEnsaio(osmd, barra, () => 0, { aoMudar: botaoOuvir, chave: id });
     if (!ensaio) return;
     // enquanto ouve, o painel do ensaio fica no lugar da palheta
     $('#cp-palheta').hidden = true;
@@ -4622,7 +4698,7 @@ async function gerarComIA(song, titulo) {
     let compasso = [4, 4];
     let oitava = 0;
     let meioTempo = false;
-    let coral = false; // separar em Soprano, Contralto, Tenor e Baixo
+    let coral = true; // separar em Soprano, Contralto, Tenor e Baixo (o padrão: o coral inteiro, cada voz na sua pauta)
     const silabasMusica = silabasDaMusica(song.content);
     const textoLetra = silabasMusica.length > 0;
     const temCifraMusica = silabasMusica.some((x) => x.c);
@@ -4656,7 +4732,7 @@ async function gerarComIA(song, titulo) {
       <details class="ia-ajustar"><summary>${icon('gauge', 18)}<span><b>Ajustar o rascunho</b><small>Vozes, andamento, tom, compasso, letra e oitava</small></span>${icon('down', 18)}</summary>
       <div class="settings-group ia-ajustes">
         <div class="setting wrap"><span class="ico">${icon('score', 18)}</span><div class="grow"><div class="t">Vozes</div><div class="s">Coral: a IA separa as notas que soam juntas em soprano, contralto, tenor e baixo, cada voz na sua pauta</div></div>
-          <div class="chips" id="ia-vozes"><button class="chip" data-vozes="1" aria-pressed="true">Só a melodia</button><button class="chip" data-vozes="4" aria-pressed="false">Coral a 4 vozes</button></div></div>
+          <div class="chips" id="ia-vozes"><button class="chip" data-vozes="4" aria-pressed="true">Coral a 4 vozes</button><button class="chip" data-vozes="1" aria-pressed="false">Só a melodia</button></div></div>
         <div class="setting wrap"><span class="ico">${icon('gauge', 18)}</span><div class="grow"><div class="t">Andamento</div><div class="s">Se as notas ficaram picadas ou longas demais, ajuste aqui</div></div>
           <div class="seg"><button data-bpm="-4" aria-label="Mais devagar">${icon('minus', 15)}</button><span class="val" id="ia-bpm">${bpm}</span><button data-bpm="4" aria-label="Mais rápido">${icon('plus', 15)}</button></div></div>
         <div class="setting"><span class="ico">${icon('music', 18)}</span><div class="grow"><div class="t">Tom</div><div class="s">${tomCifra ? 'Pela cifra da música' : 'Pelo que a IA ouviu'}</div></div><button class="btn small" id="ia-tom">${nomeDoTom(fifths, modo)}</button></div>
@@ -4695,7 +4771,7 @@ async function gerarComIA(song, titulo) {
         osmd.zoom = innerWidth < 640 ? 0.7 : 0.9;
         osmd.render();
         if (!$('#ia-ensaio')) return;
-        ensaio = criarEnsaio(osmd, $('#ia-ensaio'), () => 0);
+        ensaio = criarEnsaio(osmd, $('#ia-ensaio'), () => 0, { chave: id });
       } catch (e) { $('#ia-previa').textContent = 'Não consegui desenhar a prévia: ' + e.message; }
     };
     // tocar na partitura: ouve dali
@@ -4862,7 +4938,7 @@ async function viewPartitura(id) {
       // cifras na cor de destaque (o desenho não tem cor própria para elas)
       caixa.querySelectorAll('svg text').forEach((t) => { if (CIFRA_NO_TEXTO.test(t.textContent.trim())) { t.setAttribute('fill', c.cifra); t.style.fontWeight = '700'; } });
       if (!ensaio) {
-        ensaio = criarEnsaio(osmd, $('#ensaio'), () => tom);
+        ensaio = criarEnsaio(osmd, $('#ensaio'), () => tom, { chave: id === 'previa' ? '' : id });
         caixa.addEventListener('click', (e) => ensaio?.tocarDe(e.clientX, e.clientY));
         caixa.title = 'Toque numa nota para ouvir a partir dela';
       }

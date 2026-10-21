@@ -1615,19 +1615,44 @@ a.source { text-decoration: none; color: inherit; }
   box-shadow: var(--shadow-lg); display: grid; gap: 8px; }
 .ensaio:empty { display: none; }
 .ensaio-linha { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.ensaio-linha.vozes { flex-wrap: wrap; gap: 6px 10px; }
 .ensaio .play-big { width: 46px; height: 46px; }
+/* mixer das vozes: cada voz com o nome (toque = destacar, as outras de fundo), silenciar e o volume */
+.ens-mixer { display: grid; gap: 8px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
+.ens-mixer-cab { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; }
+.ens-mixer-abre { display: inline-flex; align-items: center; gap: 6px; padding: 4px 2px; border: 0; background: none; color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+.ens-mixer-abre .ic:first-child { color: var(--accent-ink); }
+.ens-mixer-abre .ic:last-child { color: var(--muted); transition: transform 0.2s; }
+.ens-mixer.recolhido .ens-mixer-abre .ic:last-child { transform: rotate(-90deg); }
+.ens-mixer.recolhido .ens-vozes, .ens-mixer.recolhido .ens-mixer-cab small { display: none; }
+.ens-mixer-cab small { flex: 1 1 200px; color: var(--muted); font-size: 12px; line-height: 1.3; }
+.ens-mixer-cab .chip { margin-left: auto; cursor: pointer; }
+.ens-vozes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
+.ens-voz { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 4px; padding: 6px 6px 8px 10px; border-radius: 12px;
+  background: var(--surface-2); border: 1px solid transparent; transition: background 0.2s, border-color 0.2s, opacity 0.2s; }
+.ens-voz.destaque { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); }
+.ens-voz.mudo { opacity: 0.55; }
+.ens-voz-nome { min-width: 0; padding: 4px 0; border: 0; background: none; color: var(--text); font: inherit; font-size: 13.5px; font-weight: 800; text-align: start;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.ens-voz.destaque .ens-voz-nome { color: var(--accent-ink); }
+.ens-mudo { width: 34px; height: 34px; }
+.ens-mudo[aria-pressed="true"] { color: var(--danger); }
+.ens-voz input[type="range"] { --v: 100%; grid-column: 1 / -1; width: 100%; height: 22px; margin: 0; background: none; -webkit-appearance: none; appearance: none; cursor: pointer; }
+.ens-voz input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent) var(--v), var(--surface-3) var(--v)); }
+.ens-voz input[type="range"]::-moz-range-track { height: 6px; border-radius: 999px; background: var(--surface-3); }
+.ens-voz input[type="range"]::-moz-range-progress { height: 6px; border-radius: 999px; background: var(--accent); }
+.ens-voz input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -6px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / 0.4); }
+.ens-voz input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / 0.4); }
+@media (max-width: 600px) {
+  .ens-mixer { gap: 6px; padding-top: 6px; }
+  .ens-mixer-cab small { display: none; } /* no celular, sem a explicação: o nome da voz já diz "toque" */
+  .ens-vozes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+  .ens-voz { padding: 2px 4px 4px 10px; border-radius: 10px; }
+  .ens-mudo { width: 30px; height: 30px; }
+}
 .ensaio-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .ensaio-info small { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ensaio .icon-btn { flex: none; }
-.ensaio .vozes .chips { margin: 0; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-.ensaio .vozes .chips .chip { flex: none; }
-.ens-so { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 700; color: var(--muted); white-space: nowrap; cursor: pointer; }
-.ens-so:has(:checked) { color: var(--text); }
-.ensaio:has([data-voz=""][aria-pressed="true"]) .ens-so { opacity: 0.4; pointer-events: none; } /* com "Todas" não há fundo */
-.ens-so .switch { width: 38px; height: 22px; }
-.ens-so .switch::after { width: 16px; height: 16px; }
-.ens-so .switch:checked::after { left: 19px; }
 .switch:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 /* caixas de marcar com a cara do app (quadrado arredondado na cor de destaque), no lugar da genérica do sistema */
 label.check input[type="checkbox"] { appearance: none; -webkit-appearance: none; flex: none; width: 20px; height: 20px; margin: 0; border-radius: 6px;
@@ -1705,8 +1730,6 @@ label.check input[type="checkbox"]:focus-visible { outline: 2px solid var(--text
   #title { font-size: 16px; }
   .ensaio { padding: 6px 10px; gap: 4px; }
   .ensaio .play-big { width: 38px; height: 38px; }
-  .ensaio-linha.vozes { flex-wrap: nowrap; }
-  .ensaio .vozes .chips { flex: 1 1 auto; }
   .cta-bar { padding: 6px 10px; }
   .page-hero .cover { width: 120px; height: 120px; }
   .song.lyrics-mode { padding-top: 24px; }
