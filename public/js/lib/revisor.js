@@ -8,7 +8,7 @@ const simples = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').
 const EM_TEMPO = { advento: 'no Advento', quaresma: 'na Quaresma' };
 const NOME_TEMPO = { advento: 'do Advento', natal: 'do Natal', quaresma: 'da Quaresma', pascoa: 'da Páscoa', comum: 'do Tempo Comum' };
 const ORDEM = ['refrao', 'entrada', 'ato', 'gloria', 'salmo', 'aclamacao', 'oferendas', 'santo', 'oracao', 'cordeiro', 'comunhao', 'final'];
-const NOME_PARTE = { entrada: 'Entrada', ato: 'Ato penitencial', gloria: 'Glória', salmo: 'Salmo', aclamacao: 'Aclamação ao Evangelho', oferendas: 'Oferendas', santo: 'Santo', cordeiro: 'Cordeiro', comunhao: 'Comunhão', final: 'Canto final' };
+export const NOME_PARTE = { entrada: 'Entrada', ato: 'Ato penitencial', gloria: 'Glória', salmo: 'Salmo', aclamacao: 'Aclamação ao Evangelho', oferendas: 'Oferendas', santo: 'Santo', cordeiro: 'Cordeiro', comunhao: 'Comunhão', final: 'Canto final' };
 // palavras que contam para comparar o refrão do salmo com a letra
 const palavras = (t) => simples(t).split(' ').filter((p) => p.length >= 4);
 
@@ -21,8 +21,9 @@ const LETRA_DO_TEMPO = [
 ];
 // tempos em que a letra de outro tempo destoa (ex.: canto de Páscoa na Quaresma; canto de Natal fora do Natal)
 const DESTOA = { natal: ['advento', 'quaresma', 'pascoa', 'comum'], pascoa: ['advento', 'quaresma', 'natal'], quaresma: ['pascoa', 'natal'], advento: ['pascoa', 'quaresma'] };
-// vocabulário de fé: uma letra sem nada disso não parece canto religioso
-const FE = /\b(deus|senhor|jesus|cristo|espirito|pai|maria|mae de deus|nossa senhora|aleluia|amem|gloria|santo|santa|ceu|fe|graca|louvor|louvai|bendito|bendita|salvador|cordeiro|igreja|cruz|altar|eucaristia|perdao|piedade|hosana|evangelho|apostolo|profeta|reino|oracao|rezar|virgem|anjo|anjos|alma|sagrado|divino|criador|redentor|messias|emanuel|trindade|alianca|povo de deus)\b/;
+// vocabulário de fé: uma letra longa sem nada disso não é canto religioso (a lista é larga de propósito,
+// para que o veredito seja firme: canto de igreja sempre tem pelo menos uma destas)
+const FE = /\b(deus|senhor|jesus|cristo|espirito|pai|maria|mae de deus|nossa senhora|senhora|aleluia|amem|gloria|santo|santa|santos|santissimo|ceu|ceus|fe|graca|louvor|louvai|louvar|louvamos|bendito|bendita|bendizei|bendizer|salvador|salvacao|cordeiro|igreja|cruz|altar|eucaristia|perdao|piedade|hosana|evangelho|apostolo|profeta|reino|oracao|rezar|virgem|anjo|anjos|alma|sagrado|sagrada|divino|divina|criador|redentor|messias|emanuel|trindade|alianca|povo de deus|pecado|pecados|pecador|batismo|comunhao|hostia|calice|adorar|adoramos|adoracao|ofertorio|oferenda|sacrificio|ressuscitou|salmo|vinde|missa|rei dos reis|palavra de deus|pao da vida|cristaos|cristao|fieis|sacramento|misericordia)\b/;
 // artistas evangélicos conhecidos: a letra pode não condizer com a fé católica (Maria, santos, Eucaristia…)
 const EVANGELICOS = /aline barros|fernandinho|gabriela rocha|isaias saad|diante do trono|ministerio zoe|thalles roberto|anderson freire|bruna karla|cassiane|harpa crista|hillsong|morada|preto no branco|kemuel|leandro borges|nivea soares|eli soares|gabriel guedes|julliany souza|fernanda brum|damares|marquinhos gomes|davi sacer|ludmila ferber|mariana valadao|andre valadao|paulo cesar baruk|sarah farias|elevation worship|bethel music|casa worship|toque no altar|trazendo a arca|resgate|oficina g3|regis danese|lauriete|shirley carvalhaes|midian lima|valesca mayssa|jotta a|soraya moraes/;
 
@@ -69,7 +70,7 @@ export function revisarRepertorio(lit, itens, { recentes = [] } = {}) {
     // (as fontes católicas — acervo, Hinário, CNBB, Cindy Ferrarezi, Músicas para Missa — não precisam da conferência)
     const fonteCatolica = /^(acervo|hinario|cnbb):|cindyferrarezi|musicasparamissa/.test(String(it.source || ''));
     if (!fonteCatolica && letraPura.split(' ').length >= 25 && !FE.test(letraPura) && !FE.test(simples(it.titulo))) {
-      avisos.push({ nivel: 'atencao', i, acao: 'trocar', texto: `${nome} não parece um canto religioso: confira se condiz com a missa.` });
+      avisos.push({ nivel: 'erro', i, acao: 'trocar', texto: `${nome} não é um canto religioso: a letra não fala de Deus nem da fé. Troque por um canto litúrgico.` });
     } else if (EVANGELICOS.test(simples(it.artista))) {
       avisos.push({ nivel: 'atencao', i, acao: 'trocar', texto: `${nome} é de ${it.artista}, artista evangélico: confira se a letra condiz com a fé católica e com a liturgia.` });
     }
