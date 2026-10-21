@@ -189,11 +189,19 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
 - **Editor simples**: as partes são uma linha só — toque em **Refrão**, **Estrofe**, **Ponte** ou **Intro** onde a parte
   começa e tudo dali para baixo pertence a ela, até a próxima (`[Refrão]`, `[Estrofe 2]`…); **Repetir refrão** e
   **Observação** (ex.: `(2x)`). Sem códigos `{start_of_chorus}`: o app converte para ChordPro ao salvar.
-  O texto ocupa a tela; a prévia abre no botão **Ver prévia** (sem dividir a tela) e há **Tela cheia**.
-- **Editor de cifra**: modo **Só a letra** (corrige o texto e os acordes voltam às mesmas sílabas), campos de
-  composição e vídeo (com busca no YouTube), botão "Trazer da internet"; acordes na linha de cima da letra (como num caderno) ou entre [colchetes]; campos de título, autor, tom e vídeo; prévia ao vivo; acordes do tom para
-  inserir com um toque; transposição permanente; conversão de "cifra sobre a letra". Cantos vindos da
-  busca ou da liturgia também podem ser editados (são salvos na biblioteca antes).
+  No celular, o texto ocupa a tela e a prévia abre no olho da barra; no computador, a prévia fica ao lado, ao vivo.
+- **Editor de música (nova / editar cifra)**: no topo, a capa (ao vivo), o **título** e o **autor** grandes e um resumo
+  (tom, parte da missa, vídeo, quantas partes). Na música nova, o cartão **Trazer da internet** (Cifra Club ou texto
+  colado de qualquer site). **Detalhes da música** recolhe tom, composição, vídeo (com busca no YouTube) e parte da
+  missa. A barra do editor fica presa no alto ao rolar: **Cifra** (acordes na linha de cima, como num caderno),
+  **[ ] Colchetes** ou **Só letra** (corrige o texto e os acordes voltam às mesmas sílabas), **desfazer/refazer** (o
+  histórico do próprio app: Ctrl+Z, Ctrl+Shift+Z), prévia e **tela cheia**. Uma linha de partes e ferramentas
+  (tom/transposição permanente, Refrão, Estrofe, Ponte, Intro, Repetir refrão, Observação, Completar cifra,
+  Organizar cifra colada), a **paleta de acordes** (os do tom, os que já estão na cifra e **Outro…** para qualquer
+  acorde) e o **mapa da estrutura** (um toque leva até a parte). Embaixo, linhas, partes e acordes. O que se escreve
+  fica guardado como **rascunho** no aparelho: ao voltar, o app oferece continuar de onde parou; sair sem salvar
+  pede confirmação; **Ctrl+S** salva. Cantos vindos da busca ou da liturgia também podem ser editados (são salvos
+  na biblioteca antes).
 - **Personalização**: modo escuro, claro ou automático; cor padrão ciano (a da logo), outras 8 cores de destaque, cor livre ou a
   **cor litúrgica do dia**; menu lateral recolhível no computador.
 - Importa `.cho/.chopro/.pro/.txt` (inclusive "cifra sobre a letra"), exporta e faz backup. PWA instalável e offline:
