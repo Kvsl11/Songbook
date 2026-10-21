@@ -10,6 +10,7 @@ import { getLiturgia } from '../public/js/lib/cnbb.js';
 import { buscarCantos, buscarPorTexto, getCanto, getRepertorio } from '../public/js/lib/cindy.js';
 import { getMissa } from '../public/js/lib/missa.js';
 import { getMusicaMpm } from '../public/js/lib/mpm.js';
+import { baixarAudio, origemPermitida } from './audio.js';
 import { buscarCifraClub, buscarLetras, ehCifraClub, ehLetras, getCifraClub, getLetra, letraReserva, PROXIES_PUBLICOS } from '../public/js/lib/web.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
@@ -101,6 +102,17 @@ async function serveStatic(req, res, pathname) {
 export function createServer() {
   return http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
+    if (url.pathname === '/api/saude') return send(res, 200, JSON.stringify({ ok: true }));
+    // o áudio do vídeo (binário): para a IA escrever a partitura
+    if (url.pathname === '/api/audio') {
+      if (!origemPermitida(req.headers.origin)) return send(res, 403, JSON.stringify({ erro: 'origem não permitida' }));
+      try {
+        const { dados, tipo } = await baixarAudio(url.searchParams.get('v') || '', { formato: url.searchParams.get('f') || 'm4a' });
+        return send(res, 200, dados, tipo, { 'Cache-Control': 'no-store', 'Content-Length': dados.length });
+      } catch (e) {
+        return send(res, e.status || 502, JSON.stringify({ erro: e.message }));
+      }
+    }
     const route = routes[url.pathname];
     if (!route) return serveStatic(req, res, url.pathname);
     try {

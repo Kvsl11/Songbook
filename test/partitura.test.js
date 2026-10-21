@@ -230,3 +230,17 @@ test('cifra automática: cada acorde na sílaba onde cai e na nota dela (só na 
   assert.equal(m.pautas[0].ev[0].l[0], 'Ho-');
   assert.equal(temCifra(m), true);
 });
+
+test('paraMusicXML: só um trecho de compassos (editor de partitura grande)', () => {
+  const m = novaPartitura({ tipo: 'duas' });
+  m.pautas[0].ev = Array.from({ length: 12 }, (_, i) => n(['C4', 'D4', 'E4', 'F4'][i % 4], 32));
+  m.pautas[1].ev = Array.from({ length: 12 }, () => n('A3', 32));
+  const xml = paraMusicXML(m, { de: 4, ate: 7 });
+  const nums = [...xml.matchAll(/<measure number="(\d+)"/g)].map((x) => Number(x[1]));
+  assert.deepEqual(nums, [5, 6, 7, 5, 6, 7]);
+  // o primeiro compasso do trecho traz armadura, compasso e clave
+  assert.equal((xml.match(/<attributes>/g) || []).length, 2);
+  assert.ok(!xml.includes('<metronome>'));
+  const lido = ler(xml);
+  assert.deepEqual(lido.pautas[0].ev.map((e) => e.a[0]), ['C4', 'D4', 'E4']);
+});

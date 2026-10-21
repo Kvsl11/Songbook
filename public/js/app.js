@@ -14,6 +14,8 @@ import {
   mudarOitava, NOMES_NOTA, nomeDaAltura, nomeDoTom, nomeDuracao, novaPartitura, paraMusicXML, tiquesDoCompasso,
   claveDaVoz, estimarAndamento, estimarTom, faixaDoModo, juntarPedaco, melodiaDasNotas, tomDaCifra, vozesDasNotas, colocarLetra, letraEmSilabas, temLetra, silabasDaLetra, temCifra as temCifraNaPartitura,
 } from './lib/partitura.js';
+import { corCss, corDominante } from './lib/cores.js';
+import { SERVIDOR_AUDIO } from './config.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -259,7 +261,58 @@ function abrirCalendario(ancora, valor, aoEscolher) {
 
 const hue = (s) => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
 const host = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } };
-const corDaMusica = (titulo) => `hsl(${hue(titulo)} 45% 32%)`;
+// sem capa: uma cor pelo título (matiz, saturação e brilho variam de música para música)
+const corDaMusica = (titulo) => `hsl(${hue(titulo)} ${36 + (hue(titulo + 's') % 28)}% ${27 + (hue(titulo + 'l') % 10)}%)`;
+// cor da capa: a cor dominante da capa da música (ou da miniatura do vídeo) vira o fundo da letra e do player. É
+// calculada uma vez por imagem e guardada; sem capa, capa cinza ou sem internet, fica a cor pelo título
+const CORES_CAPA = 'songbook.coresCapa';
+let coresCapa = {};
+try { coresCapa = JSON.parse(localStorage.getItem(CORES_CAPA) || '{}') || {}; } catch { /* sem armazenamento */ }
+const capaDaMusica = (song) => song.cover || song.capa || (song.youtube ? `https://i.ytimg.com/vi/${song.youtube}/mqdefault.jpg` : '');
+const corDe = (song) => coresCapa[capaDaMusica(song)] || corDaMusica(song.title || song.titulo || '');
+const calculando = new Map();
+function corDaCapa(song) {
+  const src = capaDaMusica(song);
+  if (!src) return Promise.resolve(null);
+  if (src in coresCapa) return Promise.resolve(coresCapa[src] || null);
+  if (calculando.has(src)) return calculando.get(src);
+  const p = (async () => {
+    // a imagem direto (o YouTube deixa ler os pixels) ou, se o site não deixa, por um redimensionador público
+    for (const url of [src, `https://wsrv.nl/?url=${encodeURIComponent(src)}&w=48&h=48&fit=cover&output=png`]) {
+      try {
+        const r = await fetch(url, { mode: 'cors' });
+        if (!r.ok) continue;
+        const bmp = await createImageBitmap(await r.blob());
+        const c = document.createElement('canvas');
+        c.width = c.height = 32;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(bmp, 0, 0, 32, 32);
+        const d = corDominante(ctx.getImageData(0, 0, 32, 32).data);
+        coresCapa[src] = d ? corCss(d) : ''; // '' = capa sem cor: fica a do título
+        const chaves = Object.keys(coresCapa);
+        if (chaves.length > 400) for (const k of chaves.slice(0, chaves.length - 400)) delete coresCapa[k];
+        try { localStorage.setItem(CORES_CAPA, JSON.stringify(coresCapa)); } catch { /* cota cheia */ }
+        return coresCapa[src] || null;
+      } catch { /* tenta o próximo */ }
+    }
+    return null; // sem internet: tenta de novo outra vez
+  })();
+  calculando.set(src, p);
+  p.finally(() => calculando.delete(src));
+  return p;
+}
+// a cor da música na tela e no player: a conhecida já, e a da capa quando ficar pronta (se ainda estiver na mesma tela)
+function corDaMusicaNaTela(song) {
+  const cor = corDe(song);
+  setTint(cor);
+  const tela = location.hash;
+  if (song.youtube && player.desta(song.youtube)) player.atualizar({ cor });
+  corDaCapa(song).then((c) => {
+    if (!c) return;
+    if (location.hash === tela) setTint(c);
+    if (song.youtube && player.desta(song.youtube)) player.atualizar({ cor: c });
+  });
+}
 const saudacao = () => { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; };
 const ytBusca = (t) => `https://www.youtube.com/results?search_query=${encodeURIComponent(t)}`;
 
@@ -374,8 +427,10 @@ function tocarReferencia(song) {
 }
 // o que o player precisa saber de uma música (e de onde ela veio: repertório e parte da missa)
 function itemDoPlayer(song, set = null, index = -1) {
+  // a cor da capa ainda não calculada chega ao player quando ficar pronta
+  corDaCapa(song).then((c) => { if (c && song.youtube && player.desta(song.youtube)) player.atualizar({ cor: c }); });
   return {
-    youtube: song.youtube, titulo: song.title, artista: song.artist || '', capa: song.cover || '', songId: song.id, cor: corDaMusica(song.title),
+    youtube: song.youtube, titulo: song.title, artista: song.artist || '', capa: song.cover || '', songId: song.id, cor: corDe(song),
     href: set ? `#/repertorio/${set.id}/${index}` : song.id && song.id !== 'previa' ? `#/musica/${song.id}` : location.hash,
     parte: set ? set.items[index]?.label || '' : '', setId: set?.id || '', index,
   };
@@ -2920,7 +2975,7 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
       }
     }
     passos.push({ t, notas });
-    cur.next();
+    cur.Iterator.moveToNextVisibleVoiceEntry(false); // sem cur.next(): ele redesenha o cursor a cada passo
   }
   cur.reset();
   if (!passos.some((p) => p.notas.length)) return null;
@@ -2929,12 +2984,22 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
     const c = osmd.cursor;
     try { c.CursorOptions = { ...c.CursorOptions, color: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#06b6d4', alpha: 0.45, follow: false }; } catch { /* versão sem a opção */ }
     c.show();
+    // o desenho do cursor compara as opções com uma cópia delas e, por isso, refaz a imagem do cursor (canvas →
+    // PNG) a cada nota: pesado no celular, travava o som. Marcando as opções como já desenhadas, ele só se move
+    try { c.cursorOptionsRendered = c.cursorOptions; } catch { /* versão diferente */ }
   };
   // nomes das pautas só quando cada uma tem o seu (a leitura automática chama todas de "Voice", "Piano"…)
   const genericos = /^(voice|voz|part|parte|piano|instrument|staff|p\d+|music|melodia)\b/i;
   const vozes = nomearVozes(passos, { nomes: new Map([...nomesDasPautas].filter(([, n]) => n && !genericos.test(n))) });
   const grupoDe = new Map(vozes.flatMap((g) => g.membros.map((m) => [m, g.voz])));
   const fim = duracaoTotal(passos);
+  // quantas notas soam juntas, no máximo (todas as vozes, ou só a escolhida quando ela toca sozinha)
+  const maxJuntas = new Map();
+  const juntas = () => {
+    const chave = escolhida && so ? escolhida : '';
+    if (!maxJuntas.has(chave)) maxJuntas.set(chave, Math.max(1, ...passos.map((p) => p.notas.filter((n) => !chave || grupoDe.get(n.voz) === chave).length)));
+    return maxJuntas.get(chave);
+  };
   let bpm = Math.round(osmd.Sheet.SourceMeasures[0]?.TempoInBPM || osmd.Sheet.DefaultStartTempoInBpm || 90);
   let escolhida = '';
   let so = true; // escolher uma voz toca só ela; as outras de fundo só se pedir
@@ -2971,28 +3036,29 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
   let timbre = null;
   let saida = null; // entrada da cadeia final (filtro → limitador, com a sala em paralelo)
   const montarAudio = () => {
-    audio = new (window.AudioContext || window.webkitAudioContext)();
+    // "playback": o sistema usa um buffer de áudio maior (no celular, o padrão curto chia e corta quando a tela pesa)
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    try { audio = new Ctx({ latencyHint: 'playback' }); } catch { audio = new Ctx(); }
     const harm = [0, 1, 0.42, 0.2, 0.11, 0.06, 0.035, 0.02];
     timbre = audio.createPeriodicWave(new Float32Array(harm.length), new Float32Array(harm));
     const limitador = audio.createDynamicsCompressor();
-    limitador.threshold.value = -14;
-    limitador.knee.value = 10;
-    limitador.ratio.value = 6;
-    limitador.attack.value = 0.005;
-    limitador.release.value = 0.2;
+    limitador.threshold.value = -6;
+    limitador.knee.value = 6;
+    limitador.ratio.value = 8;
+    limitador.attack.value = 0.003;
+    limitador.release.value = 0.25;
     limitador.connect(audio.destination);
     saida = audio.createBiquadFilter();
     saida.type = 'lowpass';
     saida.frequency.value = 3200;
     saida.Q.value = 0.5;
     saida.connect(limitador);
-    // sala: ruído que se apaga em ~1,4 s, misturado baixinho
-    const dur = 1.4;
-    const ir = audio.createBuffer(2, Math.round(audio.sampleRate * dur), audio.sampleRate);
-    for (let c = 0; c < 2; c++) {
-      const d = ir.getChannelData(c);
-      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 3;
-    }
+    // sala: ruído que se apaga em ~1 s, misturado baixinho. Um canal só e curto: a reverberação é a parte mais
+    // pesada do som e, longa e em estéreo, fazia o celular chiar e cortar (o áudio não dava conta a tempo)
+    const dur = 1;
+    const ir = audio.createBuffer(1, Math.round(audio.sampleRate * dur), audio.sampleRate);
+    const d = ir.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 3;
     const sala = audio.createConvolver();
     sala.buffer = ir;
     const nivelSala = audio.createGain();
@@ -3008,7 +3074,8 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
     if (vol <= 0) return;
     const f = freq * 2 ** (tomAtual() / 12);
     // as graves soam mais fracas ao ouvido (e no alto-falante do celular): ganham um pouco de volume
-    const pico = 0.2 * vol * Math.min(1.6, Math.max(1, (330 / f) ** 0.35));
+    // várias vozes juntas dividem o volume (antes somavam e o limitador apertava tudo: o som "chiava")
+    const pico = (0.24 / Math.sqrt(juntas())) * vol * Math.min(1.6, Math.max(1, (330 / f) ** 0.35));
     const g = audio.createGain();
     g.connect(mestre);
     const solta = quando + Math.max(0.1, dur - 0.02);
@@ -3037,7 +3104,7 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
   };
   const agendar = () => {
     const spw = segundosPorSemibreve(bpm);
-    const ate = tAgora() + 0.25 / spw * 1; // 250 ms adiante
+    const ate = tAgora() + 0.6 / spw; // 600 ms adiante: uma travada da tela não deixa buraco no som
     while (proximo < passos.length && passos[proximo].t <= ate) {
       const p = passos[proximo];
       const quando = inicioAudio + (p.t - inicioT) * spw;
@@ -3050,15 +3117,19 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
   const moverCursor = (i) => {
     if (i === mostrado) return;
     if (i < mostrado || mostrado < 0) { osmd.cursor.reset(); mostrado = 0; }
-    while (mostrado < i && !osmd.cursor.Iterator.EndReached) { osmd.cursor.next(); mostrado++; }
+    let andou = false;
+    while (mostrado < i && !osmd.cursor.Iterator.EndReached) { osmd.cursor.Iterator.moveToNextVisibleVoiceEntry(false); mostrado++; andou = true; }
+    if (andou) osmd.cursor.update();
     const el = osmd.cursor.cursorElement;
     if (el) {
       const r = el.getBoundingClientRect();
       if (r.top < 90 || r.bottom > innerHeight - 160) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
     const compasso = osmd.cursor.Iterator.CurrentMeasureIndex;
-    $('#ens-pos', barra).textContent = `${tocando ? 'Tocando' : 'Pausado'} · compasso ${(compasso ?? 0) + 1}`;
+    const pos = `${tocando ? 'Tocando' : 'Pausado'} · compasso ${(compasso ?? 0) + 1}`;
+    if (pos !== textoPos) { textoPos = pos; $('#ens-pos', barra).textContent = pos; } // só quando muda (evita refazer o layout)
   };
+  let textoPos = '';
   const acompanhar = () => {
     if (!tocando) return;
     moverCursor(passoNoTempo(passos, tAgora()));
@@ -3073,7 +3144,7 @@ function criarEnsaio(osmd, barra, tomAtual, { aoMudar = null } = {}) {
     proximo = passoNoTempo(passos, inicioT);
     if (passos[proximo] && passos[proximo].t < inicioT) inicioT = passos[proximo].t;
     agendar();
-    timer = setInterval(agendar, 40);
+    timer = setInterval(agendar, 60);
     acompanhar();
     desenharBarra();
   };
@@ -3299,7 +3370,7 @@ async function comecarPartitura(song, titulo) {
     </div>
     <div class="section-title">Ou comece de forma automática</div>
     <div class="cp-tipos">
-      <a class="pptx-tipo" href="#/musica/${song.id}/compor/ia"><b>${icon('sparkles', 16)} Gerar com IA</b><span>O app ouve o vídeo ou um áudio da música e escreve a melodia para você conferir</span></a>
+      <a class="pptx-tipo" href="#/musica/${song.id}/compor/ia"><b>${icon('sparkles', 16)} Gerar com IA</b><span>Um toque: o app baixa o áudio do vídeo da música e escreve a partitura para você conferir</span></a>
       ${mxl ? `<button class="pptx-tipo" id="ini-desenhada" hidden><b>${icon('score', 16)} Da partitura desenhada pelo app</b><span>Copia as notas lidas da partitura original para você corrigir e completar</span></button>` : ''}
       <button class="pptx-tipo" id="ini-arquivo"><b>${icon('upload', 16)} De um arquivo MusicXML</b><span>.musicxml, .xml ou .mxl (exportado do MuseScore, Finale, Sibelius…)</span></button>
     </div></div>`;
@@ -3377,6 +3448,7 @@ function editorPartitura(song, titulo) {
       <div class="chips" id="cp-pautas"></div>
       <button class="chip cp-ajustes" id="cp-ajustes" title="Título, compasso, tom, andamento e vozes">${icon('settings', 15)}<span id="cp-resumo"></span></button>
     </div>
+    <div class="cp-janela" id="cp-janela" hidden></div>
     <div class="osmd-box compor-folha" id="cp-folha"><div class="loading-note"><span class="spin"></span>Preparando o editor…</div></div>
     <div class="ensaio" id="cp-ensaio" hidden></div>
     <div class="compor-palheta" id="cp-palheta">
@@ -3459,16 +3531,56 @@ function editorPartitura(song, titulo) {
   const corDestaque = () => getComputedStyle(document.documentElement).getPropertyValue('--accent-ink').trim() || '#06b6d4';
   let desenhando = null;
   let deNovo = false;
-  const pararDeOuvir = () => {
+  // partitura grande: o editor desenha só um trecho de compassos em volta da nota escolhida (redesenhar tudo a cada
+  // nota levava segundos no celular). Para ouvir, desenha a partitura inteira
+  // o tamanho do trecho depende de quantas vozes há (o custo é por compasso de cada pauta): 4 vozes → 8 compassos
+  let JANELA = 12;
+  let LIMITE = 16; // até aqui, desenha tudo
+  let janelaDe = 0;
+  let janela = { de: 0, ate: Infinity, total: 0 };
+  let inteira = false;
+  const pararDeOuvir = (redesenhar = true) => {
     if (!ensaio) return;
     ensaio.parar();
     ensaio = null;
     botaoOuvir(false);
     $('#cp-ensaio').hidden = true;
     $('#cp-palheta').hidden = false;
+    if (inteira) { inteira = false; if (redesenhar) desenhar(); }
   };
+  function calcularJanela() {
+    JANELA = Math.max(6, Math.min(16, Math.round(32 / m.pautas.length)));
+    LIMITE = JANELA + 4;
+    const { porPauta, total } = emCompassos(m);
+    if (inteira || total <= LIMITE) { janela = { de: 0, ate: total, total }; return; }
+    const c = porPauta[sel.p]?.onde[sel.i]?.compasso ?? total - 1;
+    if (c < janelaDe || c >= janelaDe + JANELA) janelaDe = c - 2;
+    janelaDe = Math.max(0, Math.min(janelaDe, total - JANELA));
+    janela = { de: janelaDe, ate: janelaDe + JANELA, total };
+  }
+  function mostrarJanela() {
+    const el = $('#cp-janela');
+    const parcial = janela.de > 0 || janela.ate < janela.total;
+    el.hidden = !parcial;
+    if (parcial) {
+      el.innerHTML = `<button class="icon-btn" data-janela="-1" aria-label="Compassos anteriores" ${janela.de ? '' : 'disabled'}>${icon('back', 18)}</button>
+        <span>Compassos <b>${janela.de + 1}–${Math.min(janela.ate, janela.total)}</b> de ${janela.total}</span>
+        <button class="icon-btn" data-janela="1" aria-label="Próximos compassos" ${janela.ate < janela.total ? '' : 'disabled'}>${icon('next', 18)}</button>`;
+    }
+  }
+  $('#cp-janela').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-janela]');
+    if (!b) return;
+    // anda um trecho e escolhe a primeira nota dele (na voz atual)
+    const { porPauta, total } = emCompassos(m);
+    const novo = Math.max(0, Math.min(janelaDe + Number(b.dataset.janela) * (JANELA - 2), total - JANELA));
+    const i = porPauta[sel.p].onde.findIndex((o) => o && o.compasso >= novo);
+    janelaDe = novo;
+    if (i >= 0) { sel.i = i; selecionouPorToque(); }
+    desenhar();
+  });
   async function desenhar() {
-    pararDeOuvir();
+    pararDeOuvir(false);
     atualizarPalheta();
     if (desenhando) { deNovo = true; return; }
     desenhando = (async () => {
@@ -3485,7 +3597,9 @@ function editorPartitura(song, titulo) {
         const css = getComputedStyle(document.documentElement);
         const cor = css.getPropertyValue('--text').trim() || '#f2f2f2';
         osmd.setOptions({ drawPartNames: m.pautas.length > 1, defaultColorMusic: cor, defaultColorNotehead: cor, defaultColorStem: cor, defaultColorRest: cor, defaultColorLabel: cor, defaultColorTitle: cor });
-        await osmd.load(paraMusicXML(m, { marcar: evSel() ? { pauta: sel.p, i: sel.i } : null, cor: corDestaque() }));
+        calcularJanela();
+        mostrarJanela();
+        await osmd.load(paraMusicXML(m, { marcar: evSel() ? { pauta: sel.p, i: sel.i } : null, cor: corDestaque(), de: janela.de, ate: janela.ate }));
         osmd.zoom = innerWidth < 640 ? 0.8 : 1;
         osmd.render();
         folha.querySelectorAll('svg text').forEach((t) => { if (CIFRA_NO_TEXTO.test(t.textContent.trim())) { t.setAttribute('fill', corDestaque()); t.style.fontWeight = '700'; } });
@@ -3505,7 +3619,8 @@ function editorPartitura(song, titulo) {
     const { porPauta } = emCompassos(m);
     const lista = osmd.GraphicSheet?.MeasureList || [];
     porPauta.forEach((pp, pi) => pp.onde.forEach((o, i) => {
-      const gm = lista[o.compasso]?.[pi];
+      if (o.compasso < janela.de || o.compasso >= janela.ate) return; // fora do trecho desenhado
+      const gm = lista[o.compasso - janela.de]?.[pi];
       const se = gm?.staffEntries?.[o.figura];
       const nota = se?.graphicalVoiceEntries?.[0]?.notes?.[0];
       let el = null;
@@ -3734,10 +3849,19 @@ function editorPartitura(song, titulo) {
     b.setAttribute('aria-label', b.title);
   }
   actionsEl.querySelector('[aria-label="Ouvir a partitura"]')?.setAttribute('data-ouvir', '');
-  function ouvir() {
+  async function ouvir() {
     if (!osmd) return;
     if (ensaio) { if (ensaio.tocando) ensaio.pausar(); else ensaio.tocar(); return; }
     if (!m.pautas.some((p) => p.ev.some((e) => e.a.length))) { toast('Escreva algumas notas para ouvir'); return; }
+    // só um trecho desenhado: para ouvir, a partitura inteira
+    if (janela.de > 0 || janela.ate < janela.total) {
+      toast('Preparando a partitura inteira para ouvir…');
+      while (desenhando) await desenhando;
+      inteira = true;
+      await desenhar();
+      while (desenhando) await desenhando;
+      if (!folha.isConnected || ensaio) return;
+    }
     const barra = $('#cp-ensaio');
     ensaio = criarEnsaio(osmd, barra, () => 0, { aoMudar: botaoOuvir });
     if (!ensaio) return;
@@ -3995,7 +4119,7 @@ function viewPartituras() {
     </section>
     <div class="part-acoes">
       <button class="part-acao" id="part-nova">${ARTE_PAUTA}<span class="part-acao-ic">${icon('score', 22)}</span><b>Nova partitura</b><span>Escolha a música e escreva nota por nota, com letra, cifras e várias vozes</span><em>Começar ${icon('next', 14)}</em></button>
-      <button class="part-acao ia" id="part-ia">${ARTE_IA}<span class="part-acao-ic">${icon('sparkles', 22)}</span><b>Gerar com IA</b><span>O app ouve o vídeo, você cantando ou um áudio, e escreve a melodia para você conferir</span><em>Escolher a música ${icon('next', 14)}</em></button>
+      <button class="part-acao ia" id="part-ia">${ARTE_IA}<span class="part-acao-ic">${icon('sparkles', 22)}</span><b>Gerar com IA</b><span>Um toque: o app baixa o áudio do vídeo da música e escreve a partitura para você conferir</span><em>Escolher a música ${icon('next', 14)}</em></button>
     </div>
     <div class="shelf-head"><h2>Suas partituras</h2>${proprias.length ? `<span class="muted part-conta">${proprias.length}</span>` : ''}</div>
     ${proprias.length ? `<div class="part-grade">${proprias.map(cartao).join('')}</div>`
@@ -4042,7 +4166,7 @@ function escolherMusica(titulo) {
 }
 
 // ---------------------------------------------------------------- Gerar a partitura com IA
-// O som vem do microfone (com o vídeo tocando), do som de uma aba (computador) ou de um arquivo de áudio. O modelo
+// O som vem do vídeo da música (o servidor do app baixa o áudio: audioDoVideo) ou de um arquivo de áudio. O modelo
 // Basic Pitch (Spotify, código aberto) roda no próprio aparelho e transforma o som em notas; o app escolhe a
 // melodia, acha tom e andamento e põe no compasso. Sai um rascunho para conferir e corrigir no editor.
 const BASIC_PITCH = 'https://cdn.jsdelivr.net/npm/@spotify/basic-pitch@1.0.1';
@@ -4098,29 +4222,30 @@ async function audioParaModelo(arrayBuffer) {
   src.start();
   return { amostras: (await off.startRendering()).getChannelData(0), cortado: buf.duration > 360 };
 }
-// reamostragem contínua (microfone a 44,1/48 kHz → 22050 Hz): média de cada intervalo (já filtra o agudo)
-function reamostrador(de) {
-  const passo = de / SR_IA;
-  let pos = 0; // posição fracionária dentro do bloco atual
-  let resto = new Float32Array(0);
-  return (bloco) => {
-    const x = new Float32Array(resto.length + bloco.length);
-    x.set(resto);
-    x.set(bloco, resto.length);
-    const out = [];
-    while (pos + passo <= x.length) {
-      const a = Math.floor(pos);
-      const b = Math.floor(pos + passo);
-      let s = 0;
-      for (let i = a; i < b; i++) s += x[i];
-      out.push(s / Math.max(1, b - a));
-      pos += passo;
+// o áudio do vídeo do YouTube, baixado pelo servidor do app (yt-dlp; ver server/audio.js e render.yaml). Servido pelo
+// próprio servidor (Node), usa o endereço do app; no GitHub Pages, o do servidor no Render (config.js). O plano grátis
+// do Render dorme sem uso: o primeiro pedido do dia pode levar ~1 min para "acordar"
+async function audioDoVideo(id, avisar = () => {}, formato = 'm4a') {
+  const servidores = [...new Set([...(/github\.io$/.test(location.hostname) ? [] : ['']), SERVIDOR_AUDIO].filter((x) => x !== undefined))];
+  let erro = new Error('nenhum servidor configurado');
+  for (const base of servidores) {
+    const ctrl = new AbortController();
+    const limite = setTimeout(() => ctrl.abort(), 180e3);
+    const acordar = setTimeout(() => avisar('Acordando o servidor…', 'Na primeira vez do dia pode levar até 1 minuto.'), 6000);
+    try {
+      const r = await fetch(`${base}/api/audio?v=${encodeURIComponent(id)}&f=${formato}`, { signal: ctrl.signal });
+      const tipo = r.headers.get('content-type') || '';
+      if (r.ok && tipo.startsWith('audio/')) { avisar('Áudio baixado', ''); return await r.blob(); }
+      // 404 com a página do app: não há servidor neste endereço
+      erro = new Error(tipo.includes('json') ? (await r.json()).erro || `erro ${r.status}` : 'servidor não encontrado');
+    } catch (e) {
+      erro = e.name === 'AbortError' ? new Error('o servidor demorou demais') : new Error('sem conexão com o servidor');
+    } finally {
+      clearTimeout(limite);
+      clearTimeout(acordar);
     }
-    const corte = Math.floor(pos);
-    resto = x.slice(corte);
-    pos -= corte;
-    return Float32Array.from(out);
-  };
+  }
+  throw erro;
 }
 // A IA ouvindo aos poucos: o áudio chega em pedaços e é analisado a cada 5 s (com 1 s de contexto antes, para não
 // perder a nota que atravessa o corte). As notas vão aparecendo enquanto a música toca.
@@ -4145,7 +4270,7 @@ function criarLeitor(aoAtualizar) {
       const fim = Math.min(total, ini + PEDACO);
       const de = Math.max(0, ini - ANTES);
       try {
-        // volume: microfone longe ou baixo chega fraco e a IA quase não ouve; o pedaço é aumentado até perto do máximo
+        // volume: áudio baixo chega fraco e a IA quase não ouve; o pedaço é aumentado até perto do máximo
         const trecho = audio.slice(de, fim);
         let pico = 0;
         for (let i = 0; i < trecho.length; i++) pico = Math.max(pico, Math.abs(trecho[i]));
@@ -4209,34 +4334,46 @@ function desenharRolo(canvas, notas, agora, { janela = 10 } = {}) {
 async function gerarComIA(song, titulo) {
   const id = song.id;
   setHeader(titulo, { back: '#/partituras', eyebrow: 'Gerar partitura com IA' });
-  const celular = matchMedia('(max-width: 699px)').matches || /Android|iPhone|iPad/i.test(navigator.userAgent);
-  const podeAba = !celular && !!navigator.mediaDevices?.getDisplayMedia;
-  const podeMic = !!navigator.mediaDevices?.getUserMedia;
-  let sessao = null; // captura em andamento
-  let modoIA = 'mistura'; // 'voz' (cantando no microfone) ou 'mistura' (música com banda: vídeo, aba, arquivo)
-  aoSair(() => pararCaptura());
+  const modoIA = 'mistura'; // a música inteira (voz e instrumentos), do vídeo ou de um arquivo
   view.innerHTML = `<div class="ia">
     <section class="ia-topo">${capa(song)}<div><div class="kind">Gerar com IA</div><h2>${esc(titulo)}</h2>
-      <p class="muted">O app ouve a música e escreve a <b>melodia</b> na partitura — ou <b>todas as vozes do coral</b> (soprano, contralto, tenor e baixo), cada uma na sua pauta —, já no tom e no andamento. É um rascunho: confira e corrija no editor (fica melhor com voz e violão do que com banda completa).</p></div></section>
+      <p class="muted">O app baixa o áudio do vídeo da música, ouve e escreve a <b>melodia</b> na partitura — ou <b>todas as vozes do coral</b> (soprano, contralto, tenor e baixo), cada uma na sua pauta —, já no tom e no andamento. É um rascunho: confira e corrija no editor (fica melhor com voz e violão do que com banda completa).</p></div></section>
     <div id="ia-passo"></div></div>`;
   const passo = $('#ia-passo');
 
-  function telaFontes() {
+  // um toque só: o servidor do app baixa o áudio do vídeo da música (sem microfone, sem anúncio) e a IA ouve
+  async function automatico() {
+    if (!song.youtube) { telaFontes('Esta música ainda não tem vídeo. Escolha um na página da música (em Referências) ou use um arquivo de áudio.'); return; }
     passo.onclick = null;
-    passo.innerHTML = `<div class="section-title">De onde vem o som?</div>
+    passo.innerHTML = `<div class="ia-auto"><span class="spin"></span><div><b id="ia-auto-status">Baixando o áudio do vídeo…</b>
+      <small id="ia-auto-sub">Só o som da música, sem anúncios. Leva alguns segundos.</small></div></div>`;
+    const avisar = (texto, sub = '') => { if ($('#ia-auto-status')) { $('#ia-auto-status').textContent = texto; $('#ia-auto-sub').textContent = sub; } };
+    let arquivo;
+    try {
+      arquivo = await audioDoVideo(song.youtube, avisar);
+    } catch (e) {
+      if (view.contains(passo)) telaFontes(`Não consegui baixar o áudio do vídeo (${e.message}).`);
+      return;
+    }
+    if (!view.contains(passo)) return;
+    // aparelho que não abre o m4a (AAC): pede o mesmo áudio em webm (Opus)
+    lerArquivo(arquivo, {
+      seNaoAbrir: async () => {
+        try { lerArquivo(await audioDoVideo(song.youtube, () => {}, 'webm')); } catch (e) { telaFontes(`Não consegui baixar o áudio do vídeo (${e.message}).`); }
+      },
+    });
+  }
+  // reserva (o automático falhou, ou a música não tem vídeo): tentar de novo ou escolher um arquivo de áudio
+  function telaFontes(motivo = '') {
+    passo.onclick = null;
+    passo.innerHTML = `${motivo ? `<div class="aviso">${icon('info', 18)}<span>${esc(motivo)}</span></div>` : ''}
       <div class="ia-fontes">
-        ${podeMic && song.youtube ? `<div class="ia-fonte destaque"><div class="ia-fonte-cab"><span class="part-acao-ic">${icon('youtube', 22)}</span><div><b>Do vídeo da música</b><small>O app toca o vídeo e ouve pelo microfone. Os anúncios ficam de fora: só grava enquanto a música está tocando. Volume alto, celular perto.</small></div></div>
-          <div class="ia-fonte-acts"><button class="btn small primary" id="ia-video">${icon('play', 15)} Tocar e criar a partitura</button></div></div>` : ''}
-        ${podeMic ? `<div class="ia-fonte"><div class="ia-fonte-cab"><span class="part-acao-ic">${icon('mic', 22)}</span><div><b>Cantar ou tocar</b><small>Cante ou toque a melodia perto do aparelho.</small></div></div>
-          <div class="ia-fonte-acts"><button class="btn small" id="ia-mic">${icon('mic', 15)} Gravar</button></div></div>` : ''}
-        ${podeAba ? `<div class="ia-fonte"><div class="ia-fonte-cab"><span class="part-acao-ic">${icon('video', 22)}</span><div><b>Som de uma aba do navegador</b><small>Abra o vídeo noutra aba (pule o anúncio antes), escolha a aba e marque “Compartilhar áudio da aba”.</small></div></div>
-          <div class="ia-fonte-acts"><button class="btn small" id="ia-aba">${icon('video', 15)} Escolher a aba</button></div></div>` : ''}
+        ${song.youtube ? `<div class="ia-fonte destaque"><div class="ia-fonte-cab"><span class="part-acao-ic">${icon('youtube', 22)}</span><div><b>Do vídeo da música</b><small>O app baixa o áudio do vídeo e escreve a partitura.</small></div></div>
+          <div class="ia-fonte-acts"><button class="btn small primary" id="ia-video">${icon('sparkles', 15)} Gerar partitura</button></div></div>` : ''}
         <div class="ia-fonte"><div class="ia-fonte-cab"><span class="part-acao-ic">${icon('upload', 22)}</span><div><b>Arquivo de áudio</b><small>MP3, M4A, WAV… da música (ou só da melodia). Até 6 minutos.</small></div></div>
           <div class="ia-fonte-acts"><button class="btn small" id="ia-arquivo">${icon('upload', 15)} Escolher arquivo</button></div></div>
       </div>`;
-    $('#ia-video')?.addEventListener('click', () => capturar('video'));
-    $('#ia-mic')?.addEventListener('click', () => capturar('mic'));
-    $('#ia-aba')?.addEventListener('click', () => capturar('aba'));
+    $('#ia-video')?.addEventListener('click', automatico);
     $('#ia-arquivo').onclick = () => {
       const inp = document.createElement('input');
       inp.type = 'file';
@@ -4331,166 +4468,7 @@ async function gerarComIA(song, titulo) {
     $('#ia-status').textContent = estado.texto;
   }
 
-  // captura ao vivo: microfone (com ou sem o vídeo) ou som de uma aba. Todo microfone aberto aqui fica anotado e
-  // fecha ao pausar, terminar, cancelar ou sair da tela — nada fica ligado depois (o aviso de microfone do celular some)
-  const abertos = new Set();
-  const fecharAbertos = () => { for (const st of abertos) st.getTracks().forEach((t) => t.stop()); abertos.clear(); };
-  aoSair(fecharAbertos);
-  let pedindo = false;
-  // microfone: cantando, com o ajuste automático de volume e o filtro de ruído do aparelho (a voz chega forte e limpa);
-  // com o vídeo tocando no próprio celular, sem filtro de ruído (ele apagaria a música) e sem cancelar o eco
-  const pedirAudio = (tipo) => (tipo === 'aba'
-    ? navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
-    : navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: tipo === 'mic', autoGainControl: true } }));
-  let somSessao = null; // um áudio só para a sessão inteira (pausar e continuar usam o mesmo)
-  async function capturar(tipo) {
-    if (pedindo || sessao) return; // dois toques em Gravar não abrem dois microfones
-    pedindo = true;
-    modoIA = tipo === 'mic' ? 'voz' : 'mistura';
-    // o áudio é criado já no toque: no celular, criado depois da janela de permissão ele fica parado ("suspenso")
-    // e nada era gravado
-    somSessao?.close?.();
-    somSessao = new (window.AudioContext || window.webkitAudioContext)();
-    somSessao.resume?.();
-    let stream;
-    try {
-      stream = await pedirAudio(tipo);
-    } catch {
-      toast(tipo === 'aba' ? 'Captura da aba cancelada' : 'Sem acesso ao microfone: permita nas configurações do navegador');
-      somSessao.close?.();
-      somSessao = null;
-      return;
-    } finally { pedindo = false; }
-    // saiu da tela enquanto o navegador pedia a permissão: fecha na hora
-    if (!view.contains(passo)) { stream.getTracks().forEach((t) => t.stop()); somSessao?.close?.(); somSessao = null; return; }
-    if (tipo === 'aba' && !stream.getAudioTracks().length) { stream.getTracks().forEach((t) => t.stop()); toast('Marque “Compartilhar áudio da aba” ao escolher a aba'); return; }
-    if (somSessao.state === 'suspended') await somSessao.resume().catch(() => {});
-    telaLeitura(tipo);
-    const leitor = ligarLeitor();
-    // vídeo: os blocos esperam ~1 s numa fila e só entram se o vídeo da música andou nesse meio-tempo
-    // (no anúncio, o tempo do vídeo fica parado; pausado também não entra)
-    const historico = []; // [{ t (ms), v (tempo do vídeo), tocando }]
-    let fila = [];
-    const estado = { nivel: 0, ouvindo: false, texto: 'Preparando…' };
-    let pausado = false;
-    let reabrindo = false;
-    const tocouEntre = (a, b) => {
-      const x = historico.find((h) => h.t >= a);
-      const y = [...historico].reverse().find((h) => h.t <= b);
-      return x && y && y.tocando && y.v - x.v > (b - a) / 1000 * 0.5;
-    };
-    // a entrada de som (microfone ou aba) ligada ao leitor; desligar fecha o microfone de verdade
-    let entrada = null;
-    const ligar = (st) => {
-      abertos.add(st);
-      const ctx = somSessao;
-      const fonte = ctx.createMediaStreamSource(new MediaStream(st.getAudioTracks()));
-      const proc = ctx.createScriptProcessor(4096, 1, 1);
-      const mudo = ctx.createGain();
-      mudo.gain.value = 0;
-      fonte.connect(proc);
-      proc.connect(mudo).connect(ctx.destination);
-      const reamostrar = reamostrador(ctx.sampleRate);
-      proc.onaudioprocess = (e) => {
-        const bloco = new Float32Array(e.inputBuffer.getChannelData(0));
-        let pico = 0;
-        for (let i = 0; i < bloco.length; i += 16) pico = Math.max(pico, Math.abs(bloco[i]));
-        estado.nivel = Math.min(1, pico * 3);
-        estado.media = (estado.media ?? 0.1) * 0.97 + estado.nivel * 0.03;
-        const agora = performance.now();
-        if (tipo !== 'video') { if (!pausado) leitor.alimentar(reamostrar(bloco)); return; }
-        fila.push({ t: agora, bloco });
-        while (fila.length && agora - fila[0].t > 1100) {
-          const b = fila.shift();
-          if (tocouEntre(b.t - 300, b.t + 900)) leitor.alimentar(reamostrar(b.bloco));
-        }
-      };
-      entrada = { stream: st, fonte, proc };
-    };
-    const desligar = () => {
-      if (!entrada) return;
-      const { stream: st, fonte, proc } = entrada;
-      entrada = null;
-      fila = [];
-      estado.nivel = 0;
-      proc.onaudioprocess = null;
-      fonte.disconnect();
-      proc.disconnect();
-      st.getTracks().forEach((t) => t.stop());
-      abertos.delete(st);
-    };
-    // continuar depois de pausar: abre o microfone de novo (a permissão já foi dada; a aba não fecha ao pausar)
-    const religar = async () => {
-      if (entrada || reabrindo || !sessao) return;
-      reabrindo = true;
-      try {
-        const st = await pedirAudio(tipo);
-        if (!sessao || pausado) st.getTracks().forEach((t) => t.stop()); else ligar(st);
-      } catch { toast('Não consegui abrir o microfone de novo'); }
-      reabrindo = false;
-    };
-    ligar(stream);
-    let quadro = 0;
-    const laco = () => {
-      if (tipo === 'video') {
-        const tocando = player.desta(song.youtube) && player.estado === 'tocando';
-        historico.push({ t: performance.now(), v: player.tempoInformado, tocando });
-        while (historico.length > 400) historico.shift();
-        const recente = historico.filter((h) => performance.now() - h.t < 1500);
-        const anda = recente.length > 2 && recente[recente.length - 1].v - recente[0].v > 0.4;
-        estado.ouvindo = tocando && anda && !!entrada;
-        pausado = player.desta(song.youtube) && player.estado === 'pausado';
-        // música pausada (pelo botão ou pelo player): o microfone fecha; voltou a tocar: abre de novo
-        if (pausado) desligar(); else if (tocando) religar();
-        estado.texto = !player.desta(song.youtube) || player.estado === 'parado' ? 'Abrindo o vídeo…'
-          : pausado ? 'Música pausada: a partitura e o microfone também. Toque em Continuar'
-            : anda ? `Ouvindo a música · ${fmtSeg(player.tempoInformado)}${player.duracao ? ' / ' + fmtSeg(player.duracao) : ''}`
-              : 'Esperando a música começar (anúncio ou carregando: não entra na partitura)';
-        // a música acabou: termina sozinho
-        if (player.duracao && player.tempoInformado >= player.duracao - 0.6 && !anda && leitor.segundos > 5) { terminar(); return; }
-      } else {
-        estado.ouvindo = !pausado && !!entrada;
-        estado.texto = pausado ? `Pausado${tipo === 'mic' ? ' (microfone fechado)' : ''}: a partitura continua de onde parou ao tocar em Continuar`
-          : tipo === 'aba' ? 'Ouvindo o som da aba' : !entrada ? 'Abrindo o microfone…'
-            : leitor.segundos > 3 && estado.media < 0.02 ? 'O som está chegando muito baixo: cante mais perto do celular'
-              : 'Ouvindo pelo microfone';
-      }
-      // o botão mostra o que dá para fazer agora (no vídeo, segue também o pausar/tocar do player)
-      const bp = $('#ia-pausa');
-      if (bp && bp.dataset.pausado !== String(pausado)) { bp.dataset.pausado = String(pausado); bp.innerHTML = pausado ? `${icon('play', 16)} Continuar` : `${icon('pause', 16)} Pausar`; }
-      animar(leitor, estado);
-      quadro = requestAnimationFrame(laco);
-    };
-    sessao = { parar: () => { cancelAnimationFrame(quadro); desligar(); } };
-    if (tipo === 'video') {
-      if (player.desta(song.youtube)) player.irPara(0);
-      player.tocar(itemDoPlayer(song));
-    }
-    laco();
-    $('#ia-cancelar').onclick = () => { pararCaptura(); if (tipo === 'video' && player.estado === 'tocando') player.alternar(); telaFontes(); };
-    $('#ia-parar').onclick = terminar;
-    // pausar: no vídeo, pausa (ou continua) o próprio vídeo, e a partitura junto; no microfone, fecha o microfone
-    $('#ia-pausa').onclick = () => {
-      if (tipo === 'video') { player.alternar(); return; }
-      pausado = !pausado;
-      if (tipo === 'mic') { if (pausado) desligar(); else religar(); }
-    };
-    async function terminar() {
-      if (!sessao) return;
-      pararCaptura();
-      if (tipo === 'video' && player.estado === 'tocando') player.alternar();
-      await concluir(leitor);
-    }
-  }
-  function pararCaptura() {
-    const s = sessao;
-    sessao = null;
-    s?.parar();
-    fecharAbertos();
-    somSessao?.close?.();
-    somSessao = null;
-  }
-  async function lerArquivo(arquivo) {
+  async function lerArquivo(arquivo, { seNaoAbrir = null } = {}) {
     telaLeitura('arquivo');
     $('#ia-status').textContent = 'Preparando o áudio…';
     let leitor;
@@ -4512,6 +4490,7 @@ async function gerarComIA(song, titulo) {
       if (leitor) await concluir(leitor);
     } catch (e) {
       console.error(e);
+      if (seNaoAbrir && e.name === 'EncodingError') { seNaoAbrir(); return; }
       toast('Não consegui ler o áudio: ' + e.message);
       telaFontes();
     }
@@ -4630,7 +4609,7 @@ async function gerarComIA(song, titulo) {
     };
     previa();
   }
-  telaFontes();
+  automatico();
 }
 
 async function viewPartitura(id) {
@@ -4695,7 +4674,9 @@ async function viewPartitura(id) {
         await carregarScript(OSMD_JS);
         caixa.innerHTML = '';
         osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(caixa, {
-          autoResize: true, backend: 'svg', drawTitle: false, drawSubtitle: false, drawComposer: false, drawLyricist: false,
+          // sem o redesenho automático da biblioteca: ele refazia a partitura inteira a cada mudança de ALTURA da
+          // janela (no celular, a barra do navegador aparecendo/sumindo ao rolar), travando a tela por segundos
+          autoResize: false, backend: 'svg', drawTitle: false, drawSubtitle: false, drawComposer: false, drawLyricist: false,
           drawCredits: false, drawPartNames: false, defaultFontFamily: 'Figtree, sans-serif',
         });
         await osmd.load(propria ? paraMusicXML(song.partitura) : mxl);
@@ -4721,6 +4702,16 @@ async function viewPartitura(id) {
       caixa.innerHTML = `<div class="alert">${icon('info', 18)}<span>Não consegui desenhar a partitura agora (${esc(e.message)}). Veja a original.</span></div>`;
     }
   };
+  // redesenha só quando a largura muda (girar o celular, janela do computador), depois que parar de mudar
+  let largura = innerWidth;
+  let timerLargura = 0;
+  const aoRedimensionar = () => {
+    if (innerWidth === largura) return;
+    clearTimeout(timerLargura);
+    timerLargura = setTimeout(() => { largura = innerWidth; if (osmd && view.contains(caixa)) desenhar(); }, 350);
+  };
+  addEventListener('resize', aoRedimensionar);
+  aoSair(() => { removeEventListener('resize', aoRedimensionar); clearTimeout(timerLargura); });
   const aplicar = () => {
     view.querySelectorAll('[data-modo]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.modo === modo)));
     view.querySelectorAll('[data-cor]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cor === cores)));
@@ -4773,8 +4764,8 @@ function viewSong(id, ctx = {}) {
     song = { ...song, title: r.meta.title || 'Canto', artist: r.meta.artist || r.meta.subtitle || '', youtube: youtubeId(r.meta.youtube) || '', cover: r.meta.cover || '', pdf: r.meta.pdf || '', key: r.key, composer: r.meta.composer || r.meta.lyricist || '' };
   } else db.touchRecent(song.id);
   setTab(ctx.set ? 'biblioteca' : isPreview ? (song.back?.startsWith('#/buscar') ? 'buscar' : 'liturgia') : 'biblioteca');
-  setTint(corDaMusica(song.title));
-  if (song.youtube && player.desta(song.youtube)) player.atualizar({ titulo: song.title, artista: song.artist || '', cor: corDaMusica(song.title) });
+  if (song.youtube && player.desta(song.youtube)) player.atualizar({ titulo: song.title, artista: song.artist || '' });
+  corDaMusicaNaTela(song);
   const prefs = db.prefs();
   let { transpose = 0, capo = 0 } = song;
   const canvas = Boolean(song.youtube && prefs.videoFundo !== false);
@@ -5383,7 +5374,7 @@ function viewEditor(id, setId) {
   const setDestino = isNew && setId ? db.set(setId) : null; // música nova já vai para este repertório
   const song = isNew ? { content: `{title: }\n\n${TEMPLATE_CORPO}` } : db.song(id);
   if (!song) return viewNotFound();
-  setTint(corDaMusica(song.title || 'nova'));
+  setTint(corDe({ ...song, title: song.title || 'nova' }));
   const { meta, corpo } = separarMeta(song.content);
   // formato do texto: acordes na linha de cima, entre [colchetes] ou só a letra (acordes preservados)
   let formato = ['colchetes', 'letra'].includes(db.prefs().formatoEditor) ? db.prefs().formatoEditor : 'acima';
