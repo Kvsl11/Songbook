@@ -53,7 +53,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-183';
+export const APP_VERSAO = '2026.10.21-184';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -5021,16 +5021,21 @@ async function viewPartitura(id) {
   let ensaio = null;
   aoSair(() => ensaio?.parar());
   const caixa = $('#part-desenhada');
-  // cores: as do tema escolhido no app (notas e letra no tom do texto, cifras na cor de destaque) ou preto e branco
+  // cores: o desenho sai sempre nas do tema do app (notas e letra no tom do texto, cifras na cor de destaque); o preto
+  // e branco é só o CSS pintando tudo de preto na folha branca (.osmd-box.pb), sem desenhar de novo: antes cada troca
+  // refazia a partitura inteira e a tela travava
   const coresDoTema = () => {
     const css = getComputedStyle(document.documentElement);
     const v = (n, d) => css.getPropertyValue(n).trim() || d;
-    return cores === 'pb' ? { musica: '#000000', texto: '#000000', cifra: '#000000' } : { musica: v('--text', '#f2f2f2'), texto: v('--text', '#f2f2f2'), cifra: v('--accent-ink', '#4fd1e8') };
+    return { musica: v('--text', '#f2f2f2'), texto: v('--text', '#f2f2f2'), cifra: v('--accent-ink', '#4fd1e8') };
   };
+  let desenhado = ''; // o tom, o zoom e a largura do último desenho: igual, não desenha de novo
   const desenhar = async () => {
-    if (modo !== 'desenhada') return;
-    const c = coresDoTema();
     caixa.classList.toggle('pb', cores === 'pb');
+    if (modo !== 'desenhada') return;
+    const chave = `${tom}|${zoom}|${innerWidth}`;
+    if (osmd && chave === desenhado) return;
+    const c = coresDoTema();
     try {
       if (!osmd) {
         caixa.innerHTML = '<div class="loading-note"><span class="spin"></span>Desenhando a partitura…</div>';
@@ -5052,6 +5057,7 @@ async function viewPartitura(id) {
       osmd.zoom = zoom * (innerWidth < 640 ? 0.75 : 1);
       osmd.updateGraphic();
       osmd.render();
+      desenhado = chave;
       // cifras na cor de destaque (o desenho não tem cor própria para elas)
       caixa.querySelectorAll('svg text').forEach((t) => { if (CIFRA_NO_TEXTO.test(t.textContent.trim())) { t.setAttribute('fill', c.cifra); t.style.fontWeight = '700'; } });
       if (!ensaio) {
@@ -5086,8 +5092,19 @@ async function viewPartitura(id) {
     $('#part-original').style.setProperty('--zoom', zoom);
     $('#tom-part').innerHTML = `<small>Tom</small>${tom > 0 ? '+' : ''}${tom}`;
     sessionStorage.setItem('zoomPartitura', zoom);
-    desenhar();
+    redesenhar();
   };
+  // o botão responde na hora (a partitura fica um pouco apagada enquanto é desenhada de novo) e vários toques seguidos
+  // (A+ A+ A+, tom + +) viram um desenho só
+  let timerDesenho = 0;
+  const redesenhar = () => {
+    clearTimeout(timerDesenho);
+    const precisa = modo === 'desenhada' && osmd && `${tom}|${zoom}|${innerWidth}` !== desenhado;
+    if (!precisa) { desenhar(); return; }
+    caixa.classList.add('redesenhando');
+    timerDesenho = setTimeout(() => requestAnimationFrame(async () => { await desenhar(); caixa.classList.remove('redesenhando'); }), 220);
+  };
+  aoSair(() => clearTimeout(timerDesenho));
   view.querySelectorAll('[data-modo]').forEach((b) => (b.onclick = () => { modo = b.dataset.modo; db.setPref('partituraModo', modo); aplicar(); }));
   view.querySelectorAll('[data-cor]').forEach((b) => (b.onclick = () => { cores = b.dataset.cor; db.setPref('partituraCores', cores); aplicar(); }));
   view.querySelectorAll('[data-tom]').forEach((b) => (b.onclick = () => { tom = Math.max(-11, Math.min(11, tom + Number(b.dataset.tom))); aplicar(); }));
