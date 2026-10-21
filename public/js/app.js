@@ -15,6 +15,7 @@ import {
   claveDaVoz, estimarAndamento, estimarTom, faixaDoModo, juntarPedaco, melodiaDasNotas, tomDaCifra, vozesDasNotas, colocarLetra, letraEmSilabas, temLetra, silabasDaLetra, temCifra as temCifraNaPartitura,
 } from './lib/partitura.js';
 import { corCss, corDominante } from './lib/cores.js';
+import { duracaoDoAviso, partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { SERVIDOR_AUDIO } from './config.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
@@ -50,9 +51,11 @@ document.addEventListener('error', (e) => {
   img.replaceWith(document.createRange().createContextualFragment(icon('music', 24)));
 }, true);
 
+// a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
+export const APP_VERSAO = '2026.10.21-159';
+
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
-export const APP_VERSAO = '2026.10.20-149';
 const dica = document.createElement('div');
 dica.id = 'tooltip';
 dica.setAttribute('role', 'tooltip');
@@ -112,12 +115,50 @@ const aoSair = (fn) => limpezas.push(fn);
 
 // ------------------------------------------------------------------ util
 
-function toast(msg, ms = 2600) {
-  const t = $('#toast');
-  t.innerHTML = icon('check', 18) + `<span>${esc(msg)}</span>`;
-  t.classList.add('show');
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => t.classList.remove('show'), ms);
+// avisos: cartões empilhados (até 3), com ícone e cor pelo tipo (sucesso, erro, IA, carregando, informação),
+// título e detalhe, e a barra do tempo que falta. Tocar fecha; arrastar para o lado também.
+// opcoes: número (ms) ou { tipo, titulo (o texto vira o detalhe), ms }
+const ICONE_AVISO = { sucesso: 'check', erro: 'alerta', ia: 'sparkles', info: 'info', atualizacao: 'download' };
+function fecharAviso(card, ja = false) {
+  if (!card || card.classList.contains('saindo')) return;
+  clearTimeout(card.timer);
+  card.classList.add('saindo');
+  setTimeout(() => card.remove(), ja ? 0 : 260);
+}
+function toast(msg, opcoes = {}) {
+  if (typeof opcoes === 'number') opcoes = { ms: opcoes };
+  const caixa = $('#toast');
+  const tipo = opcoes.tipo || tipoDoAviso(msg);
+  const { titulo, detalhe } = opcoes.titulo ? { titulo: opcoes.titulo, detalhe: msg } : partesDoAviso(msg);
+  const ms = Math.max(opcoes.ms || 0, duracaoDoAviso(tipo, msg));
+  // o "carregando…" sai quando chega o aviso seguinte; o mesmo texto de novo não empilha
+  caixa.querySelectorAll('.aviso-card').forEach((c) => { if (c.dataset.tipo === 'carregando' || c.dataset.msg === msg) fecharAviso(c, true); });
+  const card = document.createElement('div');
+  card.className = 'aviso-card';
+  card.dataset.tipo = tipo;
+  card.dataset.msg = msg;
+  card.setAttribute('role', tipo === 'erro' ? 'alert' : 'status');
+  card.innerHTML = `<span class="aviso-ic">${tipo === 'carregando' ? '<span class="spin"></span>' : icon(ICONE_AVISO[tipo] || 'info', 18)}</span>
+    <div class="aviso-txt"><b>${esc(titulo)}</b>${detalhe ? `<small>${esc(detalhe)}</small>` : ''}</div>
+    <button class="aviso-x" aria-label="Fechar aviso">${icon('x', 15)}</button>
+    ${tipo === 'carregando' ? '' : `<i class="aviso-tempo" style="animation-duration:${ms}ms"></i>`}`;
+  // arrastar para o lado fecha (no celular)
+  let x0 = null;
+  card.addEventListener('pointerdown', (e) => { x0 = e.clientX; card.setPointerCapture?.(e.pointerId); });
+  card.addEventListener('pointermove', (e) => { if (x0 !== null) { const dx = e.clientX - x0; card.style.transform = `translateX(${dx}px)`; card.style.opacity = String(1 - Math.min(0.8, Math.abs(dx) / 200)); } });
+  card.addEventListener('pointerup', (e) => {
+    const dx = x0 === null ? 0 : e.clientX - x0;
+    x0 = null;
+    if (Math.abs(dx) > 70) { card.style.transition = 'transform 0.2s, opacity 0.2s'; card.style.transform = `translateX(${Math.sign(dx) * 120}%)`; card.style.opacity = '0'; fecharAviso(card); return; }
+    card.style.transform = '';
+    card.style.opacity = '';
+    if (Math.abs(dx) < 6) fecharAviso(card); // um toque
+  });
+  caixa.append(card);
+  const abertos = [...caixa.querySelectorAll('.aviso-card:not(.saindo)')];
+  for (const c of abertos.slice(0, Math.max(0, abertos.length - 3))) fecharAviso(c);
+  requestAnimationFrame(() => card.classList.add('show'));
+  card.timer = setTimeout(() => fecharAviso(card), ms);
 }
 
 function setHeader(title, { back = null, actions = [], eyebrow = '' } = {}) {
@@ -6930,4 +6971,4 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
   }).catch(() => {});
 }
-if (sessionStorage.getItem('atualizado')) { sessionStorage.removeItem('atualizado'); setTimeout(() => toast(`App atualizado (versão ${APP_VERSAO})`), 400); }
+if (sessionStorage.getItem('atualizado')) { sessionStorage.removeItem('atualizado'); setTimeout(() => toast(`Versão ${APP_VERSAO}: as novidades já estão valendo`, { titulo: 'App atualizado', tipo: 'atualizacao', ms: 4500 }), 400); }
