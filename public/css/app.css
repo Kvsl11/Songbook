@@ -60,12 +60,15 @@ body { background: var(--black); color: var(--text); font: 15px/1.5 var(--sans);
 a { color: inherit; }
 button, input, select, textarea { font: inherit; color: inherit; }
 
-/* textos justificados em todo o app, com hifenização em português (o <html lang="pt-BR"> diz o idioma): as palavras
-   compridas se quebram com hífen e a linha não abre buracos entre as palavras. A última linha fica à esquerda;
-   o que é centralizado continua centralizado (o text-align do próprio bloco vale mais que o herdado daqui) */
-body { text-align: justify; hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; text-wrap: pretty; }
-/* ficam como estavam: títulos, campos de digitar, a cifra/letra das músicas (versos são linhas de poesia), código
-   e o que é tabular (números, acordes) */
+/* hifenização em português em todo o app (o <html lang="pt-BR"> diz o idioma): só quebra a palavra com hífen
+   quando ela não cabe no fim da linha, separando pelas sílabas */
+body { hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; text-wrap: pretty; }
+/* justificado só nos parágrafos de leitura, que têm largura para isso. Em coisa estreita (avisos, notificações,
+   botões, cartões, descrições curtas), justificar abria buracos enormes entre as palavras: lá fica à esquerda */
+:where(p, .leitura, .texto-liturgico, .texto-extra) { text-align: justify; }
+/* parágrafos dentro de blocos centralizados continuam centralizados */
+:where(.page-hero, .empty, .part-vazia, .ia-gravando, .ia-analisando, .ia-solte, .versiculo, .loading-note) p { text-align: inherit; }
+/* sem hífen: títulos, campos de digitar, a cifra/letra das músicas, código e o que é tabular */
 h1, h2, h3, h4, input, select, textarea, .song, .song *, .chord, pre, code, .tab, svg text, [contenteditable] {
   text-align: start; hyphens: manual; -webkit-hyphens: manual; }
 /* sem o retângulo azul do Android ao tocar: o retorno do toque segue o formato de cada elemento */
