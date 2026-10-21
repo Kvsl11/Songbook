@@ -178,6 +178,30 @@ test('IA: andamento exato (em décimos) numa música longa e o 6/8 pela semínim
   assert.ok(Math.abs(estimarAndamento(banda(96, 24, 6, 2)) - 96) <= 1, `3/4: ${estimarAndamento(banda(96, 24, 6, 2))}`);
 });
 
+test('IA: balada com sílabas rápidas (semicolcheias) e notas repetidas: nenhuma some', async () => {
+  const { melodiaDasNotas } = await import('../public/js/lib/partitura.js');
+  // 72 bpm; a frase tem semicolcheias logo depois do tempo (puxavam a grade para a frente, e ela lia as notas tarde) e
+  // sílabas repetidas na mesma altura (com o respiro da consoante entre elas); um violão em colcheias por baixo
+  const sc = 15 / 72;
+  const frase = [[62, 2], [64, 1], [66, 1], [67, 2], [67, 1], [67, 1], [69, 4], [71, 1], [69, 1], [67, 2], [66, 4]];
+  const notas = [];
+  let k = 0;
+  for (let rep = 0; rep < 4; rep++) {
+    for (const [p, len] of frase) {
+      notas.push({ startTimeSeconds: 1 + k * sc, durationSeconds: len * sc * 0.8, pitchMidi: p, amplitude: 0.75 });
+      k += len;
+    }
+  }
+  for (let e = 0; e < k / 2; e++) notas.push({ startTimeSeconds: 1 + e * 2 * sc, durationSeconds: sc * 1.8, pitchMidi: e % 4 ? 57 : 50, amplitude: e % 4 ? 0.3 : 0.5 });
+  const mel = melodiaDasNotas(notas, { bpm: 72 });
+  const alturas = mel.filter((e) => e.a.length).map((e) => e.a[0]);
+  const uma = ['D4', 'E4', 'F#4', 'G4', 'G4', 'G4', 'A4', 'B4', 'A4', 'G4', 'F#4'];
+  assert.deepEqual(alturas, [...uma, ...uma, ...uma, ...uma]);
+  // e cada uma no seu lugar, com a sua figura (em semicolcheias: tique 2)
+  const figuras = mel.filter((e) => e.a.length).map((e) => e.d / 2);
+  assert.deepEqual(figuras.slice(0, 11), frase.map(([, len]) => len));
+});
+
 test('IA: voz grave na clave de tenor e música que começa no contratempo', async () => {
   const { claveDaVoz, melodiaDasNotas } = await import('../public/js/lib/partitura.js');
   const q = 60 / 96;

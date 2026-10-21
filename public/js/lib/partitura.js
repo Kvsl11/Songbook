@@ -205,7 +205,9 @@ export function paraMusicXML(modelo, { marcar = null, cor = '#06b6d4', de = 0, a
       if (mi === ini) {
         attrs = `<attributes><divisions>${TPQ}</divisions><key><fifths>${modelo.fifths || 0}</fifths><mode>${modelo.modo === 'minor' ? 'minor' : 'major'}</mode></key>`
           + `<time><beats>${tempos}</beats><beat-type>${unidade}</beat-type></time>${CLAVE_XML[pauta.clave] || CLAVE_XML.G}</attributes>`;
-        if (pi === 0 && modelo.bpm && mi === 0) attrs += `<direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${Math.round(modelo.bpm)}</per-minute></metronome></direction-type><sound tempo="${Math.round(modelo.bpm)}"/></direction>`;
+        // o metrônomo escrito é inteiro; o som segue o andamento exato (o da IA vem em décimos: arredondado, a música
+        // tocada adiantava uns segundos no fim)
+        if (pi === 0 && modelo.bpm && mi === 0) attrs += `<direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${Math.round(modelo.bpm)}</per-minute></metronome></direction-type><sound tempo="${Math.round(modelo.bpm * 10) / 10}"/></direction>`;
       }
       const notas = figs.map((f) => {
         const tipo = TIPO_DE.get(f.d) || TIPO_DE.get(f.d / 1.5);
@@ -679,17 +681,32 @@ function gradeDasNotas(notas, validas, { bpm, minAmp, meioTempo }) {
   // onde caem os tempos: a média circular dos começos de TODAS as notas ouvidas — o baixo e os acordes da banda mudam
   // no tempo — com as mais fortes e longas pesando mais. A grade começa num tempo, e não na primeira nota: música que
   // começa no contratempo não fica toda deslocada meio tempo
+  // A média no tempo sozinha erra: as sílabas rápidas depois do tempo puxam a média para a frente (e a grade, lida no
+  // meio de cada semicolcheia, pega a nota tarde ou pega a do baixo). Por isso a grade é acertada primeiro na
+  // semicolcheia, onde quase toda nota cai, e a média no tempo só escolhe qual das 4 semicolcheias é o tempo
   const tempo = 60 / bpm;
-  let sx = 0;
-  let sy = 0;
-  for (const n of notas.filter((x) => (x.amplitude ?? 1) >= minAmp && x.durationSeconds > passo * 0.6)) {
-    const ang = (2 * Math.PI * n.startTimeSeconds) / tempo;
-    const w = (n.amplitude ?? 1) * Math.min(1, n.durationSeconds / tempo);
-    sx += w * Math.cos(ang);
-    sy += w * Math.sin(ang);
+  const media = (periodo) => {
+    let sx = 0, sy = 0, sw = 0;
+    for (const n of notas) {
+      if ((n.amplitude ?? 1) < minAmp || n.durationSeconds <= passo * 0.6) continue;
+      const ang = (2 * Math.PI * n.startTimeSeconds) / periodo;
+      const w = (n.amplitude ?? 1) * Math.min(1, n.durationSeconds / tempo);
+      sx += w * Math.cos(ang);
+      sy += w * Math.sin(ang);
+      sw += w;
+    }
+    return { fase: ((Math.atan2(sy, sx) / (2 * Math.PI)) * periodo + periodo) % periodo, forca: sw ? Math.hypot(sx, sy) / sw : 0 };
+  };
+  const noTempo = media(tempo);
+  let fase = noTempo.fase;
+  const naSemi = media(passo);
+  // (com o andamento meio errado ou muito rubato, a semicolcheia se espalha: fica a média no tempo)
+  if (naSemi.forca >= 0.3) {
+    const dist = (j) => { const d = Math.abs(naSemi.fase + j * passo - noTempo.fase) % tempo; return Math.min(d, tempo - d); };
+    fase = naSemi.fase + [0, 1, 2, 3].reduce((a, j) => (dist(j) < dist(a) ? j : a), 0) * passo;
   }
   // meioTempo: a pessoa diz que os tempos caem no meio (a voz sozinha não deixa saber)
-  const fase = ((Math.atan2(sy, sx) / (2 * Math.PI)) * tempo + (meioTempo ? tempo / 2 : 0) + tempo) % tempo;
+  fase = (fase + (meioTempo ? tempo / 2 : 0) + tempo) % tempo;
   const primeira = Math.min(...validas.map((n) => n.startTimeSeconds));
   const comeco = fase + Math.floor((primeira - fase + passo / 2) / tempo) * tempo;
   const fim = Math.max(...validas.map((n) => n.startTimeSeconds + n.durationSeconds));
@@ -748,23 +765,27 @@ export function estimarCompasso(notas, { bpm = 80, faixa = [48, 84], minAmp = 0.
 const soaEm = (n, t) => n.startTimeSeconds <= t && n.startTimeSeconds + n.durationSeconds >= t;
 
 // de uma linha da grade (a nota de cada semicolcheia, ou null) para os eventos da partitura
-function eventosDaGrade(grade, passo) {
+function eventosDaGrade(grade, passo, comeco = null) {
   // blocos: a mesma nota seguida vira uma só; uma nota nova começa onde muda
   const blocos = [];
-  for (const n of grade) {
+  grade.forEach((n, k) => {
     const ult = blocos[blocos.length - 1];
-    if (ult && ult.n === n) ult.len++; else blocos.push({ n, len: 1 });
-  }
-  // limpa: notas de uma semicolcheia só e pausas curtas somem dentro da vizinha
+    if (ult && ult.n === n) ult.len++; else blocos.push({ n, len: 1, ini: k });
+  });
+  // uma semicolcheia que é nota de verdade (sílaba rápida): a nota começa ali e dura boa parte da semicolcheia (se
+  // ela só é a mesma nota partida em duas, coladas, as duas se juntam logo abaixo)
+  const notaPropria = (b) => comeco != null && b.n && !b.n.dobra
+    && Math.abs(b.n.startTimeSeconds - (comeco + b.ini * passo)) < passo * 0.75 && b.n.durationSeconds >= passo * 0.6;
+  // limpa: notas de uma semicolcheia só (que não são sílaba rápida) e pausas curtas somem dentro da vizinha
   for (let i = 0; i < blocos.length; i++) {
     const b = blocos[i];
-    if (b.len === 1 && blocos.length > 1) {
+    if (b.len === 1 && blocos.length > 1 && !notaPropria(b)) {
       // um pedacinho antes de uma nota costuma ser o ataque dela: vai para a seguinte (ou para a vizinha de mesma altura)
       const ant = blocos[i - 1];
       const prox = blocos[i + 1];
       const mesma = (x) => x?.n && b.n && Math.round(x.n.pitchMidi) === Math.round(b.n.pitchMidi);
       const viz = mesma(prox) ? prox : mesma(ant) ? ant : prox?.n ? prox : ant || prox;
-      if (viz === prox) prox.n = prox.n || b.n;
+      if (viz === prox) { prox.n = prox.n || b.n; prox.ini = b.ini; }
       viz.len += 1;
       blocos.splice(i, 1);
       i = Math.max(-1, i - 2);
@@ -774,17 +795,27 @@ function eventosDaGrade(grade, passo) {
   for (const b of blocos) {
     const ult = juntos[juntos.length - 1];
     // a mesma altura detectada duas vezes, uma por cima da outra, é uma nota só (notas repetidas de verdade não se sobrepõem)
-    // e um pedacinho curto logo antes da mesma nota (a IA às vezes parte o ataque) também
+    // e um pedacinho curto colado na mesma nota (a IA às vezes parte o ataque) também; com um respiro entre as duas
+    // (a consoante da sílaba seguinte), são duas notas repetidas de verdade
     const mesma = ult?.n && b.n && Math.round(ult.n.pitchMidi) === Math.round(b.n.pitchMidi);
     const sobreposta = mesma && (b.n.startTimeSeconds < ult.n.startTimeSeconds + ult.n.durationSeconds - passo * 0.5
-      || (ult.n.durationSeconds < passo * 1.5 && b.n.startTimeSeconds - (ult.n.startTimeSeconds + ult.n.durationSeconds) < passo * 0.5));
+      || (ult.n.durationSeconds < passo * 1.5 && b.n.startTimeSeconds - (ult.n.startTimeSeconds + ult.n.durationSeconds) < passo * 0.12));
     if (ult && (ult.n === b.n || sobreposta)) ult.len += b.len;
     else juntos.push({ ...b });
   }
-  // o começo de cada nota vai para a colcheia mais perto (o canto quase nunca usa semicolcheia solta)
+  // o começo de cada nota vai para a colcheia mais perto (a leitura fica mais limpa); mas quando duas notas cairiam na
+  // mesma colcheia (sílabas rápidas, em semicolcheias), elas ficam na semicolcheia exata em vez de uma sumir
   let t = 0;
-  const marcas = juntos.map((b) => { const ini = Math.round(t / 2) * 2; t += b.len; return ini; });
-  marcas.push(Math.round(t / 2) * 2);
+  const exatas = juntos.map((b) => { const ini = t; t += b.len; return ini; });
+  exatas.push(t);
+  const marcas = exatas.map((x) => Math.round(x / 2) * 2);
+  for (let i = 0; i + 1 < marcas.length; i++) {
+    if (marcas[i + 1] > marcas[i]) continue;
+    marcas[i] = exatas[i];
+    marcas[i + 1] = exatas[i + 1];
+    // a de antes pode ter ficado depois desta (arredondada para cima): volta para a exata também
+    for (let j = i; j > 0 && marcas[j - 1] >= marcas[j]; j--) marcas[j - 1] = exatas[j - 1];
+  }
   juntos.forEach((b, i) => { b.len = marcas[i + 1] - marcas[i]; });
   for (let i = juntos.length - 1; i >= 0; i--) if (juntos[i].len <= 0) juntos.splice(i, 1);
   return juntos;
@@ -808,7 +839,7 @@ export function melodiaDasNotas(notas, { bpm = 80, fifths = 0, modo = 'mistura',
     }
     grade[k] = melhor?.n || null;
   }
-  const juntos = eventosDaGrade(grade, passo);
+  const juntos = eventosDaGrade(grade, passo, comeco);
   // oitava: a melodia inteira vai para perto da extensão da clave (centro: Sol4 na clave de sol, Sol3 na de tenor)
   const alturas = juntos.filter((b) => b.n).map((b) => b.n.pitchMidi);
   const mediana = [...alturas].sort((a, b) => a - b)[Math.floor(alturas.length / 2)] ?? 67;
@@ -888,7 +919,7 @@ export function vozesDasNotas(notas, { bpm = 80, fifths = 0, oitava = 0, minAmp 
       if (!mel || forca > mel.forca) mel = { n, forca };
     }
     const segue = melAtual && t - (melAtual.startTimeSeconds + melAtual.durationSeconds) < passo * 4;
-    const fraca = (n) => (n.amplitude ?? 1) < (melAtual.amplitude ?? 1) * 0.7;
+    const fraca = (n) => (n.amplitude ?? 1) < (melAtual.amplitude ?? 1) * 0.5;
     if (segue && (!mel || mel.n.startTimeSeconds <= melAtual.startTimeSeconds + passo * 0.5 || fraca(mel.n))) mel = { n: melAtual };
     melAtual = mel?.n || null;
     if (!soando.length && !mel) { for (let v = 0; v < vozes.length; v++) anterior[v] = null; continue; }
@@ -952,7 +983,7 @@ export function vozesDasNotas(notas, { bpm = 80, fifths = 0, oitava = 0, minAmp 
     }
   }
   const pautas = vazias();
-  const linhas = grades.map((g) => eventosDaGrade(fecharBuracos(g, 4), passo));
+  const linhas = grades.map((g) => eventosDaGrade(fecharBuracos(g, 4), passo, comeco));
   // todas as vozes do mesmo tamanho (as que acabam antes ganham a pausa do fim)
   const total = Math.max(...linhas.map((l) => l.reduce((a, b) => a + b.len, 0)));
   linhas.forEach((l, v) => {
