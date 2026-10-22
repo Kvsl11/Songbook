@@ -90,7 +90,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-211';
+export const APP_VERSAO = '2026.10.22-212';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -150,6 +150,8 @@ window.addEventListener('hashchange', esconderDica);
 // tarefas a desfazer ao trocar de tela (ex.: ouvintes do player)
 let limpezas = [];
 const aoSair = (fn) => limpezas.push(fn);
+// o expandir da letra no painel "Tocando agora": a página da música já abre com a letra na tela toda
+let abrirLetraCheia = false;
 
 // ------------------------------------------------------------------ util
 
@@ -681,7 +683,7 @@ const player = (() => {
     </div>
     <div class="pl-cab"><button class="icon-btn" data-pl="recolher" aria-label="Recolher o painel" title="Recolher">${icon('sidebar', 20)}</button>
       <span><small>Tocando agora</small><b></b></span><i class="pl-cab-vazio"></i></div>
-    <section class="pl-letra" hidden><div class="pl-letra-cab"><h3>Letra</h3><button class="icon-btn" data-pl="cheio" aria-label="Abrir a música na tela toda" title="Abrir a música na tela toda">${icon('expand', 16)}</button></div><div class="pl-linhas"></div></section>`;
+    <section class="pl-letra" hidden><div class="pl-letra-cab"><h3>Letra</h3><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></div><div class="pl-linhas"></div></section>`;
   // no tablet o player é o painel "Tocando agora" à direita, fora da coluna principal (que não o corta)
   const casa = ehTablet() ? document.body : $('.main-col');
   document.body.classList.toggle('painel-recolhido', Boolean(db.prefs().painelRecolhido));
@@ -1051,10 +1053,12 @@ const player = (() => {
       if (s) escolherVideo(s).then((url) => { if (!url) return; db.saveSong({ ...db.song(s.id), content: definirMeta(db.song(s.id).content, 'youtube', url) }); api.tocar({ ...atual, youtube: youtubeId(url) }); route(); });
     }
     if (b.dataset.pl === 'ampliar') { el.classList.toggle('grande'); b.innerHTML = icon(el.classList.contains('grande') ? 'shrink' : 'expand', 18); }
-    // abrir a música (o nome no player, ou expandir a letra): a página dela, na tela toda
+    // abrir a música (o nome no player): a página dela; expandir a letra: a página dela já com a letra na tela toda
     if ((b.dataset.pl === 'abrir' || b.dataset.pl === 'cheio') && atual) {
+      abrirLetraCheia = b.dataset.pl === 'cheio';
       if (atual.href && location.hash !== atual.href) location.hash = atual.href;
       else if (!atual.href && atual.abrir) atual.abrir();
+      else if (abrirLetraCheia) { abrirLetraCheia = false; $('#btn-palco')?.click(); }
     }
   });
   return api;
@@ -5679,7 +5683,8 @@ function viewSong(id, ctx = {}) {
     if (b.dataset.palco === 'cifra') view.querySelector(`#tools [data-modo="${comCifra ? 'letra' : 'cifra'}"]`)?.click();
     if (b.dataset.palco === 'fila') verFila();
   });
-  if (sessionStorage.getItem('palco') === '1') entrarPalco(); // continua em tela cheia ao trocar de música
+  if (sessionStorage.getItem('palco') === '1' || abrirLetraCheia) entrarPalco(); // continua em tela cheia ao trocar de música (ou veio do expandir da letra)
+  abrirLetraCheia = false;
 
   // fila do repertório
   async function verFila() {
