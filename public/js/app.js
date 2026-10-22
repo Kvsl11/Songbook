@@ -53,7 +53,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-185';
+export const APP_VERSAO = '2026.10.22-186';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -486,6 +486,14 @@ function ytEmbed(id, { inicio = 0, autoplay = true } = {}) {
   return `https://www.youtube.com/embed/${encodeURIComponent(id)}?${p}`;
 }
 
+// nome e canal de um vídeo do YouTube (para o cartão das Referências): pergunta uma vez e guarda enquanto
+// o app está aberto; sem internet devolve null (e pergunta de novo da próxima vez)
+const infosDeVideo = new Map();
+function infoDoVideo(id) {
+  if (!infosDeVideo.has(id)) infosDeVideo.set(id, youtubeOEmbed(`https://www.youtube.com/watch?v=${id}`).catch(() => { infosDeVideo.delete(id); return null; }));
+  return infosDeVideo.get(id);
+}
+
 // "Canvas" (como no Spotify) sem tocar o vídeo: quadros de verdade do clipe, que o YouTube publica como
 // imagens (de vários pontos do vídeo), passando com zoom lento e troca suave. Sem anúncio, sem botões
 // do player e com poucos dados. 'hd' = quadros em alta (nem todo vídeo tem); 'sd' = 640x480, com
@@ -616,41 +624,24 @@ const player = (() => {
   const desta = (id) => Boolean(atual && id && atual.youtube === id);
   const noPalco = () => Boolean(atual && palco?.isConnected && desta(palcoDe));
   const iframeAtual = () => tela.querySelector('iframe');
-  // Na página da música o vídeo toca no topo (como o Canvas do Spotify): enquanto carrega e passa o
-  // anúncio fica na frente (dá para pular o anúncio); quando o clipe começa, vai para trás do título.
-  // Nas Referências dá para escolher assistir com os controles do YouTube, na telinha.
-  let fundo = null; // topo da música (área do vídeo de fundo)
-  let verAqui = false; // o usuário pediu para ver na telinha
-  let modoAnterior = '';
+  // Na página da música o vídeo toca na telinha das Referências, com os controles do YouTube (dá para pular
+  // o anúncio). O topo da música não toca o vídeo: continua só com os quadros do clipe passando.
+  // Quando o vídeo sai da telinha (outra música tocando, player fechado), ela volta a mostrar a miniatura
+  // com o botão de tocar, como a página desenhou.
+  let telinhaParada = ''; // o que a telinha mostra sem o vídeo
+  let naTelinha = false;
+  const telinha = (comVideo) => {
+    if (comVideo === naTelinha || !palco?.isConnected) return;
+    naTelinha = comVideo;
+    palco.innerHTML = comVideo ? '<div class="video-embed pl-alvo"></div>' : telinhaParada;
+  };
   const alvo = () => {
     if (!atual) return null;
     if (noPalco()) {
-      const topo = fundo?.isConnected && !verAqui;
-      const modo = !topo ? 'telinha' : estado === 'tocando' && tempo <= 1.5 ? 'frente' : 'fundo';
-      if (modo !== modoAnterior) {
-        const mudouLugar = (modo === 'telinha') !== (modoAnterior === 'telinha') || !modoAnterior;
-        modoAnterior = modo;
-        fundo?.closest('.song-topo')?.classList.toggle('com-video', modo !== 'telinha');
-        if (mudouLugar) {
-          palco.innerHTML = modo === 'telinha' ? '<div class="video-embed pl-alvo"></div>'
-            : `<button class="video-card" data-ver-aqui aria-label="Assistir aqui"><img src="https://i.ytimg.com/vi/${esc(atual.youtube)}/hqdefault.jpg" alt="" loading="lazy">
-              <span class="vplay"><span>${icon('expand', 24)}</span></span><span class="vtitle">O vídeo está tocando no topo<small>Toque para assistir aqui, com os controles</small></span></button>`;
-          palco.querySelector('[data-ver-aqui]')?.addEventListener('click', () => { verAqui = true; });
-        }
-      }
-      tela.classList.toggle('na-frente', modo === 'frente');
-      if (modo === 'frente') {
-        // na frente (anúncio/começo), o vídeo cobre o topo só até acima dos botões: eles continuam à vista
-        const topoEl = fundo.closest('.song-topo');
-        let frente = topoEl?.querySelector('.canvas-frente');
-        if (topoEl && !frente) { topoEl.insertAdjacentHTML('afterbegin', '<div class="canvas-frente" aria-hidden="true"></div>'); frente = topoEl.querySelector('.canvas-frente'); }
-        const botoes = topoEl?.querySelector('.actions-row');
-        if (frente && botoes) frente.style.bottom = `${Math.max(0, topoEl.getBoundingClientRect().bottom - botoes.getBoundingClientRect().top + 6)}px`;
-        return frente || fundo;
-      }
-      return modo === 'telinha' ? palco.querySelector('.pl-alvo') : fundo;
+      telinha(true);
+      return palco.querySelector('.pl-alvo');
     }
-    modoAnterior = '';
+    telinha(false);
     return el.hidden ? null : mini;
   };
   // acompanha o lugar do vídeo a cada quadro (rolagem, troca de tela, ampliar)
@@ -666,7 +657,6 @@ const player = (() => {
     tela.style.width = r.width + 'px';
     tela.style.height = r.height + 'px';
     tela.classList.toggle('no-palco', noPalco());
-    tela.classList.toggle('no-fundo', a === fundo && !tela.classList.contains('na-frente'));
   };
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
   const avisar = () => ouvintes.forEach((fn) => fn());
@@ -753,16 +743,16 @@ const player = (() => {
       avisar();
     },
     // a página da música avisa onde fica a telinha do vídeo dela (box) — ou null ao sair da página
-    palco(box, youtube = '', topo = null) {
+    palco(box, youtube = '') {
       palco = box;
       palcoDe = box ? youtube : '';
-      fundo = topo;
-      verAqui = false;
-      modoAnterior = '';
+      telinhaParada = box ? box.innerHTML : '';
+      naTelinha = false;
       mostrarBarra();
       return noPalco();
     },
     fechar() {
+      telinha(false); // a telinha da página volta a mostrar a miniatura
       if ('mediaSession' in navigator) { navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none'; }
       sessaoDe = '';
       tela.innerHTML = '';
@@ -5443,34 +5433,56 @@ function viewSong(id, ctx = {}) {
   $('#btn-fila')?.addEventListener('click', verFila);
   $('#btn-parte')?.addEventListener('click', async () => { if (await trocarParte(db.set(ctx.set.id), ctx.index)) viewSetSong(ctx.set.id, ctx.index); });
 
-  // referências: vídeo, fonte, partitura, outras versões
-  const refs = [];
+  // referências: um cartão com a telinha do vídeo (é nela que o vídeo toca nesta página), o nome e o canal
+  // do vídeo, trocar/abrir no YouTube e, embaixo, de onde veio a cifra, partitura e outras versões
+  const duracaoVideo = song.duracao > 0 ? fmtTempo(song.duracao) : '';
+  const video = song.youtube ? `
+    <div class="ref-video" id="ref-video">
+      <div class="video-ref" id="video-box"><button class="video-card" id="video-ref" aria-label="Tocar o vídeo aqui"><img src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt="" loading="lazy">
+        <span class="vplay"><span>${icon('play', 26)}</span></span>${duracaoVideo ? `<span class="vdur">${duracaoVideo}</span>` : ''}</button></div>
+      <div class="ref-video-info">
+        <span class="ref-yt" aria-hidden="true">${icon('youtube', 20)}</span>
+        <div class="grow"><b id="ref-video-titulo">${esc(song.title)}</b><small id="ref-video-canal">YouTube${duracaoVideo ? ' · ' + duracaoVideo : ''}</small></div>
+        <span class="ref-tocando" title="Tocando" aria-hidden="true"><i></i><i></i><i></i></span>
+      </div>
+      <div class="ref-acoes">
+        <button class="btn small" data-video title="Escolher outra versão no YouTube">${icon('refresh', 15)} Trocar vídeo</button>
+        <a class="btn small ghost" href="https://www.youtube.com/watch?v=${esc(song.youtube)}" target="_blank" rel="noopener">${icon('external', 15)} Abrir no YouTube</a>
+      </div>
+    </div>`
+    : `<button class="ref-sem-video" data-video><span class="ref-sem-video-ic">${icon('youtube', 26)}</span><b>Sem vídeo de referência</b>
+      <small>Escolha um vídeo no YouTube para ouvir como a música é cantada</small><span class="btn small primary">${icon('search', 15)} Escolher vídeo</span></button>`;
+  const links = [];
+  const linkRef = (href, ic, titulo, sub) => `<a class="ref-link" href="${esc(href)}" target="_blank" rel="noopener">${ic}<span class="grow"><b>${titulo}</b><small>${esc(sub)}</small></span>${icon('external', 16)}</a>`;
+  if (song.source && /^https?:/.test(song.source)) links.push(linkRef(song.source, song.cover ? capa(song) : `<span class="ico">${icon('link', 18)}</span>`, 'Cifra original', host(song.source)));
+  if (song.source?.startsWith('cnbb:')) links.push(linkRef('https://www.cnbb.org.br/liturgia-diaria/', `<span class="ico">${icon('cross', 18)}</span>`, 'Liturgia Diária', 'cnbb.org.br'));
+  if (song.pdf) links.push(linkRef(song.pdf, `<span class="ico">${icon('file', 18)}</span>`, 'Partitura', 'PDF'));
+  links.push(`<button class="ref-link" data-buscar-cifra title="Procura outras cifras desta música (Cifra Club e cantos litúrgicos)"><span class="ico">${icon('chord', 18)}</span><span class="grow"><b>Outras cifras</b><small>Cifra Club e cantos da missa</small></span>${icon('next', 16)}</button>`);
+  $('#refs').innerHTML = `<div class="ref-cartao">${video}<div class="ref-links">${links.join('')}</div></div>`;
+  // nome e canal do vídeo (do YouTube; sem internet, fica o nome da música)
   if (song.youtube) {
-    refs.push(`<div class="video-ref" id="video-box"><button class="video-card" id="video-ref" aria-label="Tocar o vídeo"><img src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt="" loading="lazy">
-      <span class="vplay"><span>${icon('play', 26)}</span></span><span class="vtitle">${esc(song.title)}<small>Toque para assistir aqui</small></span></button></div>`);
+    infoDoVideo(song.youtube).then((v) => {
+      if (!v || !$('#ref-video-titulo')) return;
+      if (v.titulo) $('#ref-video-titulo').textContent = v.titulo;
+      $('#ref-video-canal').textContent = [v.canal || 'YouTube', duracaoVideo].filter(Boolean).join(' · ');
+    });
   }
-  const cards = [];
-  cards.push(`<button class="ref-card" data-video><span class="ico">${icon('youtube', 22)}</span><span><b>${song.youtube ? 'Trocar vídeo' : 'Escolher vídeo'}</b><small>${song.youtube ? 'Outra versão no YouTube' : 'Procurar no YouTube'}</small></span></button>`);
-  if (song.source && /^https?:/.test(song.source)) cards.push(`<a class="ref-card" href="${esc(song.source)}" target="_blank" rel="noopener">${song.cover ? capa(song) : `<span class="ico">${icon('link', 22)}</span>`}<span><b>Cifra original</b><small>${esc(host(song.source))}</small></span></a>`);
-  if (song.source?.startsWith('cnbb:')) cards.push(`<a class="ref-card" href="https://www.cnbb.org.br/liturgia-diaria/" target="_blank" rel="noopener"><span class="ico">${icon('cross', 22)}</span><span><b>Liturgia Diária</b><small>cnbb.org.br</small></span></a>`);
-  if (song.pdf) cards.push(`<a class="ref-card" href="${esc(song.pdf)}" target="_blank" rel="noopener"><span class="ico">${icon('file', 22)}</span><span><b>Partitura</b><small>PDF</small></span></a>`);
-  cards.push(`<button class="ref-card" data-buscar-cifra title="Procura outras cifras desta música (Cifra Club e cantos litúrgicos)"><span class="ico">${icon('chord', 22)}</span><span><b>Outras cifras</b><small>Cifra Club e cantos da missa</small></span></button>`);
-  $('#refs').innerHTML = refs.join('') + `<div class="refs-grid">${cards.join('')}</div>`;
 
-  // créditos (como no Spotify): quem canta, quem compôs, de onde veio
+  // créditos (como no Spotify): quem canta, quem compôs, de onde veio — cada linha com o seu ícone
   const metaR = renderSong(song.content).meta;
   const creditos = [
-    ['Intérprete', song.artist],
-    ['Composição', metaR.composer],
-    ['Letra', metaR.lyricist],
-    ['Álbum', metaR.album],
-    ['Ano', metaR.year],
-    ['Tom original', tomBase],
-    [/letras\.mus\.br|lrclib|vagalume/.test(song.source || '') ? 'Fonte da letra' : /cifraclub/.test(song.source || '') ? 'Fonte da cifra' : 'Fonte', fonte && song.source ? `<a href="${esc(song.source)}" target="_blank" rel="noopener">${esc(fonte)}</a>` : esc(fonte), true],
-    ['Na biblioteca desde', !isPreview && song.createdAt ? new Date(song.createdAt).toLocaleDateString('pt-BR') : ''],
-  ].filter(([, v]) => v);
-  $('#creditos').innerHTML = creditos.length ? `<div class="creditos"><h3>Créditos</h3>${creditos.map(([k, v, html]) => `<div class="cred"><span>${esc(k)}</span><b>${html ? v : esc(v)}</b></div>`).join('')}
-    ${isPreview ? '' : `<a class="link-btn" href="#/editar/${song.id}">${icon('edit', 13)} Editar créditos</a>`}</div>` : '';
+    ['mic', 'Intérprete', song.artist],
+    ['edit', 'Composição', metaR.composer],
+    ['text', 'Letra', metaR.lyricist],
+    ['disc', 'Álbum', metaR.album],
+    ['calendar', 'Ano', metaR.year],
+    ['music', 'Tom original', tomBase],
+    ['link', /letras\.mus\.br|lrclib|vagalume/.test(song.source || '') ? 'Fonte da letra' : /cifraclub/.test(song.source || '') ? 'Fonte da cifra' : 'Fonte', fonte && song.source ? `<a href="${esc(song.source)}" target="_blank" rel="noopener">${esc(fonte)}</a>` : esc(fonte), true],
+    ['clock', 'Na biblioteca desde', !isPreview && song.createdAt ? new Date(song.createdAt).toLocaleDateString('pt-BR') : ''],
+  ].filter(([, , v]) => v);
+  $('#creditos').innerHTML = creditos.length ? `<div class="ref-creditos"><div class="ref-creditos-cab"><h3>Créditos</h3>
+    ${isPreview ? '' : `<a class="link-btn" href="#/editar/${song.id}">${icon('edit', 13)} Editar</a>`}</div>
+    ${creditos.map(([ic, k, v, html]) => `<div class="ref-cred"><span class="ico">${icon(ic, 16)}</span><span class="grow"><small>${esc(k)}</small><b>${html ? v : esc(v)}</b></span></div>`).join('')}</div>` : '';
 
   // vídeo do YouTube: escolher/trocar e tocar no player do app
   const salvarVideo = (url) => {
@@ -5487,8 +5499,16 @@ function viewSong(id, ctx = {}) {
     if (e.target.closest('[data-buscar-cifra]')) buscarCifraNoApp(song);
     if (e.target.closest('#video-ref')) tocar();
   });
-  const iconePlay = () => { const b = $('#btn-play'); if (b && song.youtube) b.innerHTML = icon(player.tocandoAgora(song.youtube) ? 'pause' : 'play', 24); };
+  // o botão de tocar e o "tocando" do cartão do vídeo (nas Referências) acompanham o player
+  const iconePlay = () => {
+    const tocando = player.tocandoAgora(song.youtube);
+    const b = $('#btn-play');
+    if (b && song.youtube) b.innerHTML = icon(tocando ? 'pause' : 'play', 24);
+    $('#ref-video')?.classList.toggle('tocando', tocando);
+  };
   aoSair(player.ouvir(iconePlay));
+  iconePlay();
+  // tocar: o vídeo toca na telinha das Referências (o topo continua com os quadros do clipe)
   $('#btn-play').onclick = () => {
     if (!song.youtube) { mudarVideo(); return; }
     if (player.desta(song.youtube)) player.alternar(); else tocar();
@@ -5540,9 +5560,9 @@ function viewSong(id, ctx = {}) {
     }
   }
 
-  // nesta página o vídeo toca aqui (Referências); ao sair, continua no mini player
+  // nesta página o vídeo toca aqui (Referências); o topo fica só com os quadros do clipe. Ao sair, continua no mini player
   if (song.youtube) {
-    player.palco($('#video-box'), song.youtube, view.querySelector('.canvas-fundo'));
+    player.palco($('#video-box'), song.youtube);
     aoSair(() => player.palco(null));
   }
 
@@ -5834,7 +5854,7 @@ function viewEditor(id, setId) {
           <div class="editor-prev" id="prev"><div class="song" id="prev-song"></div></div>
         </div>
         <div class="ed-status"><span id="ed-status"></span><span class="ed-salvo" id="ed-salvo"></span></div>
-        <p class="ed-dica" id="dica"></p>
+        <div class="ed-dica ed-guia" id="dica"></div>
       </section>
       <div class="ed-rodape"><button class="btn ghost" id="ed-cancelar">Cancelar</button><span class="spacer"></span><button class="btn primary" id="save">${icon('check', 18)} Salvar</button></div>
     </div>`;
@@ -5853,13 +5873,26 @@ function viewEditor(id, setId) {
     title: campo('title').value.trim(), artist: campo('artist').value.trim(), key: campo('key').value.trim(), youtube: campo('yt').value.trim(),
     composer: campo('composer').value.trim(), parte: campo('parte').value === '__outra' ? '' : campo('parte').value, extras: meta.extras,
   }, corpoPro());
-  const DICAS = {
-    acima: 'Toque em <b>Chorus</b> (refrão), <b>Verse</b> (estrofe) ou <b>Bridge</b> (ponte) na linha onde a parte começa: tudo dali para baixo pertence a ela, até a próxima. Escreva os acordes na linha de cima, alinhados com a sílaba:<br><code>[Chorus]<br>Am        G<br>Senhor, tende piedade</code>',
-    colchetes: 'Partes numa linha só: <code>[Chorus]</code>, <code>[Verse 2]</code>… Os acordes vão entre colchetes antes da sílaba: <code>[G]Senhor, tende pie[D]dade</code>.',
-    letra: 'Corrija ou reescreva só o texto, sem se preocupar com os acordes: ao salvar, cada acorde volta para a mesma sílaba. Linhas novas entram sem acordes.',
+  // guia "Como escrever" de cada jeito de editar, como uma tabelinha: o que se digita (no bloco de código, com os
+  // acordes e as partes coloridos) e, ao lado, para que serve; nos colchetes, também como fica na música
+  const ac = (c) => `<span class="g-ac">${c}</span>`;
+  const itemGuia = (codigo, titulo, texto, fica = '') => `<li class="ed-guia-item"><pre class="ed-guia-cod">${codigo}</pre>
+    <div class="ed-guia-txt"><b>${titulo}</b><span>${texto}</span>${fica}</div></li>`;
+  const ficaAssim = `<span class="ed-guia-fica"><small>Fica assim</small><span class="gc"><i>G</i>Senhor, tende pie</span><span class="gc"><i>D</i>dade</span></span>`;
+  const guiaParte = itemGuia('<span class="g-parte">[Chorus]</span>', 'Parte da música', 'Numa linha só, onde a parte começa: <b>Chorus</b> (refrão), <b>Verse</b> (estrofe), <b>Bridge</b> (ponte)… Vale até a próxima parte.');
+  const guiaExtras = itemGuia('<span class="g-parte">[Repeat Chorus]</span>', 'Repetir o refrão', 'Canta o refrão de novo neste ponto, sem escrever outra vez.')
+    + itemGuia('<span class="g-obs">(2x)</span>', 'Observação', 'Entre parênteses, numa linha só: (2x), (só as vozes), (solo)…');
+  const GUIAS = {
+    acima: { nome: 'Cifra', itens: guiaParte + itemGuia(`${ac('G'.padEnd(17))}${ac('D')}\nSenhor, tende piedade`, 'Acordes em cima', 'Na linha de cima da letra, cada acorde alinhado com a sílaba em que entra.') + guiaExtras },
+    colchetes: { nome: 'Colchetes', itens: guiaParte + itemGuia(`${ac('[G]')}Senhor, tende pie${ac('[D]')}dade`, 'Acorde antes da sílaba', 'Entre colchetes, colado na sílaba em que entra.', ficaAssim) + guiaExtras },
+    letra: { nome: 'Só letra', itens: itemGuia('Senhor, tende piedade', 'Só o texto', 'Corrija ou reescreva sem se preocupar com os acordes: ao salvar, cada acorde volta para a mesma sílaba.')
+      + itemGuia('<span class="g-obs">+ linha nova</span>', 'Linhas novas', 'Entram sem acordes. Para colocar acordes nelas, volte para <b>Cifra</b>.') },
   };
   const dica = () => {
-    $('#dica').innerHTML = DICAS[formato] + (formato === 'letra' ? '' : ' Toque num acorde acima para inseri-lo onde está o cursor.');
+    const g = GUIAS[formato];
+    $('#dica').innerHTML = `<div class="ed-guia-cab">${icon('info', 16)}<b>Como escrever</b><span class="chip sm">${g.nome}</span></div>
+      <ul class="ed-guia-lista"><li class="ed-guia-rotulos" aria-hidden="true"><span>Você escreve</span><span>Para que serve</span></li>${g.itens}</ul>`
+      + (formato === 'letra' ? '' : `<p class="ed-guia-rodape">${icon('chord', 14)}<span>Os botões acima colocam partes e acordes onde está o cursor.</span></p>`);
     $('#pal').hidden = formato === 'letra';
   };
   dica();
@@ -6941,14 +6974,14 @@ function viewSettings() {
     <div class="settings-group">
       <label class="setting"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Mostrar acordes</div><div class="s">Desligue para usar só a letra (coral, telão)</div></div><input type="checkbox" class="switch" id="chords" ${p.modo !== 'letra' && p.showChords !== false ? 'checked' : ''}></label>
       <label class="setting"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Desenho dos acordes</div><div class="s">Como montar cada acorde no violão: tabela no início da música e ao tocar num acorde</div></div><input type="checkbox" class="switch" id="diagramas" ${p.diagramas ? 'checked' : ''}></label>
-      <label class="setting"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns !== false ? 'checked' : ''}></label>
+      <label class="setting so-largo"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns !== false ? 'checked' : ''}></label>
       <div class="setting wrap"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div><div class="s">Tamanho, cor e fundo dos acordes sobre a letra</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
     </div>`)}
 
     ${secao('musica', 'A página de cada música', `
     <div class="settings-group">
-      <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo no topo da música</div><div class="s">Um trecho do clipe passa sem som atrás do título, como no Spotify. Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
+      <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo no topo da música</div><div class="s">Quadros do clipe passam sem som atrás do título, como no Spotify (o vídeo toca nas Referências). Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
     </div>
     ${jaInstalado() ? '' : `<div class="settings-group">
       <div class="setting acao"><span class="ico" style="background:none">${logo(36)}</span><div class="grow"><div class="t">Instalar o Songbook</div><div class="s">Ícone na tela inicial, abre em tela cheia e funciona sem internet</div></div><div class="setting-acoes"><button class="btn small primary" id="instalar">Instalar</button></div></div>
