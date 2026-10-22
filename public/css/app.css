@@ -198,6 +198,10 @@ body.performance .palco-ctrl:hover, body.performance .palco-ctrl:focus-within { 
   background: transparent; transition: background 0.25s;
 }
 .topbar.scrolled { background: color-mix(in srgb, var(--tint) 45%, var(--bg)); }
+/* a linha do andamento da música no pé da faixa do topo (aparece ao rolar a página da música que está tocando) */
+.topo-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgb(255 255 255 / 0.18); opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+.topo-prog b { display: block; width: calc(var(--p, 0) * 100%); height: 100%; border-radius: 0 2px 2px 0; background: #fff; }
+.topbar.scrolled.com-prog .topo-prog { opacity: 1; }
 .topbar .titles { flex: 1; min-width: 0; opacity: 0; transition: opacity 0.2s; }
 .topbar.scrolled .titles { opacity: 1; }
 .topbar small { display: block; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -748,6 +752,11 @@ body.editando-cheio .nav, body.editando-cheio #player { display: none !important
 .ed-detalhes[open] summary > .ic:last-child { transform: rotate(180deg); }
 .ed-detalhes .campos { padding: 4px 16px 16px; }
 .ed-detalhes .campos .input { background: var(--surface); }
+/* campo de escolha (abre uma janela do app no lugar da lista do sistema), com a cara dos outros campos */
+.escolha-campo { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; cursor: pointer; color: var(--text); font: inherit; text-align: left; }
+.escolha-campo span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.escolha-campo.vazio span { color: var(--muted); }
+.escolha-campo svg { flex: none; color: var(--muted); }
 @media (max-width: 600px) { .ed-detalhes .campos { grid-template-columns: 1fr; } }
 
 .ed-card { display: grid; gap: 10px; padding: 10px; border-radius: 18px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
@@ -2415,11 +2424,12 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 .ref-mais:hover { text-decoration: underline; }
 /* as pessoas por trás da música (o "SongDNA" do Spotify): bolinhas com as iniciais, o nome e o papel; embaixo, a
    música e quantas pessoas estão nos créditos. O cartão leva a cor da primeira pessoa */
-.ref-pessoas { padding: 18px 16px 14px; background: color-mix(in srgb, var(--cor-cartao) 40%, var(--bg-elev)); }
+.ref-pessoas { --text: #fff; padding: 18px 16px 14px; background: color-mix(in srgb, var(--tint) 75%, #000); color: #fff; } /* a mesma cor do fundo da letra */
 .ref-rodas { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 14px; }
 .ref-roda { display: grid; justify-items: center; text-align: center; gap: 3px; min-width: 0; }
 .ref-avatar { width: min(112px, 28vw); aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; margin-bottom: 8px; color: #fff;
   font-size: clamp(26px, 7vw, 38px); font-weight: 800; letter-spacing: 0.02em; box-shadow: 0 8px 24px rgb(0 0 0 / 0.3); }
+.ref-avatar.com-foto { background-size: cover !important; background-position: center !important; }
 .ref-roda b { font-size: 14px; font-weight: 700; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ref-roda small { font-size: 13px; color: color-mix(in srgb, var(--text) 75%, transparent); }
 .ref-pessoas-pe { display: flex; align-items: center; gap: 12px; }
@@ -2615,6 +2625,7 @@ html.tablet #player .pl-cab > span { flex: 1; min-width: 0; display: flex; flex-
 html.tablet #player .pl-cab small { font-size: 12px; color: rgb(255 255 255 / 0.75); }
 html.tablet #player .pl-cab b { font-size: 15px; font-weight: 800; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html.tablet #player .pl-cab .icon-btn { color: rgb(255 255 255 / 0.85); }
+html.tablet #player .pl-cab-vazio { width: 40px; flex: none; } /* do tamanho do botão da esquerda: o título fica no centro */
 html.tablet #player .pl-lado { display: none; }
 html.tablet #player .pl-video { order: 1; width: 100%; margin: 0; border-radius: 12px; box-shadow: 0 12px 30px rgb(0 0 0 / 0.4); flex: none; }
 html.tablet #player .pl-info { order: 2; padding: 4px 2px 0; margin: 0; }
@@ -2695,21 +2706,14 @@ html.tablet body.painel-recolhido #player .pl-pulo { display: none; }
 html.tablet body.painel-recolhido #player { cursor: pointer; }
 html.tablet body.painel-recolhido #pl-tela:not(.no-palco) { pointer-events: none; } /* tocar na capinha do vídeo também abre o painel */
 html.tablet body.painel-recolhido #player .pl-lado { display: none; }
+/* na página da música o menu de baixo some (volta ao sair pela seta do topo) */
+html.tablet body.na-musica .nav { display: none; }
+html.tablet body.na-musica { --rodape: env(safe-area-inset-bottom); }
+html.tablet body.na-musica.com-player.painel-recolhido { --rodape: var(--base-rodape); }
 /* em pé a linha é estreita: o menu fica mais junto */
 @media (orientation: portrait) {
   html.tablet body.com-player.painel-recolhido .nav { padding: 0 4px; }
 }
-/* tela inteira: a música ocupa tudo (deitado, o vídeo e os controles de um lado e a letra grande do outro) */
-html.tablet body.painel-cheio #player { left: 8px; width: auto; z-index: 40; padding: 20px 24px 24px; }
-html.tablet body.painel-cheio #player .pl-letra { max-height: none; flex: 1 1 auto; }
-html.tablet body.painel-cheio #player .pl-linhas p { font-size: 30px; margin-bottom: 18px; }
-@media (orientation: landscape) {
-  html.tablet body.painel-cheio #player { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-auto-rows: min-content; column-gap: 28px; row-gap: 14px; overflow: hidden; }
-  html.tablet body.painel-cheio #player > * { grid-column: 1; }
-  html.tablet body.painel-cheio #player .pl-letra { grid-column: 2; grid-row: 1 / span 8; height: calc(100dvh - 60px); max-height: none; }
-}
-html.tablet body.painel-cheio #pl-tela { z-index: 41; }
-@media (orientation: landscape) { html.tablet body.painel-cheio #player { align-content: start; } }
 
 /* ---------------------------------------------------------------- Notificações: o sino no topo guarda os avisos do
    servidor (letra sincronizada, YouTube pedindo login…) em vez de eles pularem na tela; o número diz quantos são novos */
