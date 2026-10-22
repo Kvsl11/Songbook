@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buscarNaWeb, criarIndice, explica, lerResultadosDuckDuckGo, melhoresFrases, pedeCanto, semCifra } from '../public/js/lib/duvidas.js';
+import { buscarNaWeb, criarIndice, explica, hifenizar, lerResultadosDuckDuckGo, melhoresFrases, pedeCanto, semCifra } from '../public/js/lib/duvidas.js';
 
 const IGMR = 'O Glória é um hino antiquíssimo e venerável, pelo qual a Igreja glorifica a Deus. É cantado aos domingos fora do Advento e da Quaresma, nas solenidades e festas.';
 
@@ -68,4 +68,17 @@ test('tirar dúvidas: a busca na internet tenta de novo quando o leitor falha e 
   assert.equal(pedidos.length, 2);
   assert.match(pedidos[0], /^https:\/\/r\.jina\.ai\/https:\/\/html\.duckduckgo\.com\/html\/\?kl=br-pt&q=/);
   assert.deepEqual(r.map((x) => x.site), ['catolicosorantes.com.br', 'iglesia.com.ar']);
+});
+
+test('tirar dúvidas: divide as palavras longas nas sílabas, para o texto justificado quebrar com hífen', () => {
+  const div = (p) => hifenizar(p).replace(/­/g, '-');
+  assert.equal(div('penitência'), 'pe-ni-tên-cia');
+  assert.equal(div('preparação'), 'pre-pa-ra-ção');
+  assert.equal(div('celebrações'), 'ce-le-bra-ções');
+  assert.equal(div('sacerdote'), 'sa-cer-dote'); // não deixa só 2 letras para a outra linha
+  assert.equal(div('antiquíssimo'), 'an-ti-quís-simo');
+  // ch, lh, nh e consoante + l/r ficam juntos; palavra curta não divide
+  assert.equal(div('assembleia'), 'as-sem-bleia');
+  assert.equal(div('caminhada'), 'ca-mi-nhada');
+  assert.equal(div('missa'), 'missa');
 });

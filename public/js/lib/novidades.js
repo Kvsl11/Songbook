@@ -6,7 +6,7 @@ export const NOVIDADES = [
     versao: 224, data: '2026-10-22', titulo: 'Lumen mais organizado',
     itens: [
       { tipo: 'melhoria', texto: 'A apresentação do Lumen ficou organizada em três itens, cada um com ícone: o acervo litúrgico, os sites católicos e a conversa por voz.' },
-      { tipo: 'melhoria', texto: 'As respostas do Lumen vêm com o texto justificado.' },
+      { tipo: 'melhoria', texto: 'As respostas do Lumen vêm com o texto justificado, sem buracos entre as palavras: as palavras longas quebram no fim da linha com hífen, nas sílabas certas (pe-ni-tên-cia).' },
       { tipo: 'melhoria', texto: 'Os sites da internet nas respostas do Lumen aparecem com o ícone do próprio site, além do nome e do link.' },
     ],
   },

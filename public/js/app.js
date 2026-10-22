@@ -20,7 +20,7 @@ import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } fro
 import { partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { NOVIDADES, novidadesNaoVistas } from './lib/novidades.js';
 import { baseDoServidor, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
-import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
+import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -8151,10 +8151,11 @@ async function indiceDasDuvidas() {
 }
 // quantas palavras diferentes da pergunta aparecem no texto
 const termosEm = (texto, pergunta) => { const t = new Set(palavrasDuvida(pergunta).map(raizDuvida)); return new Set(palavrasDuvida(texto).map(raizDuvida).filter((p) => t.has(p))).size; };
-// as palavras da pergunta em negrito no trecho
+// as palavras da pergunta em negrito no trecho; as palavras longas ganham os pontos onde podem quebrar com hífen
+// (o texto é justificado: sem isso, abria buracos entre as palavras)
 const realcar = (texto, pergunta) => {
   const termos = new Set(palavrasDuvida(pergunta).map(raizDuvida));
-  return esc(texto).replace(/[\p{L}\d]+/gu, (p) => (termos.has(raizDuvida(palavrasDuvida(p)[0] || '')) ? `<b>${p}</b>` : p));
+  return esc(texto).replace(/[\p{L}\d]+/gu, (p) => (termos.has(raizDuvida(palavrasDuvida(p)[0] || '')) ? `<b>${hifenizar(p)}</b>` : hifenizar(p)));
 };
 // a resposta em texto (para copiar)
 const textoDaResposta = (m) => [

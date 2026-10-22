@@ -2656,8 +2656,9 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
   .chat-vazio p:not(.dv-lema), .dv-recursos small { display: none; }
 }
 /* Tirar dúvidas: a resposta (texto corrido) e a fonte embaixo, como uma etiqueta */
-.dv-texto { margin: 0 0 10px; font-size: 15.5px; line-height: 1.65; text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
-.dv-texto b { font-weight: 700; color: inherit; background: color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 4px; padding: 0 2px; }
+.dv-texto { margin: 0 0 10px; font-size: 15.5px; line-height: 1.65; text-align: justify; text-justify: inter-word; hyphens: manual; -webkit-hyphens: manual; }
+.dv-texto b { font-weight: 700; color: inherit; background: color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 3px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .chat-bolha .dv-fonte { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; margin: 0 0 4px; padding: 6px 10px 6px 8px; border-radius: 10px; font-size: 13px; color: var(--accent); }
 .chat-bolha .dv-fonte span { min-width: 0; }
 .chat-bolha .dv-fonte b { color: var(--text); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
