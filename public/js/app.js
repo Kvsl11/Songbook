@@ -107,7 +107,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-222';
+export const APP_VERSAO = '2026.10.22-223';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1921,7 +1921,7 @@ function viewHome() {
   setTab('inicio');
   setTint('#1e3264');
   setHeader('Início', { actions: [
-    { icon: 'sparkles', label: 'Tirar dúvidas', href: '#/duvidas' },
+    { icon: 'sparkles', label: 'Lumen, o assistente litúrgico', href: '#/duvidas' },
     { icon: 'upload', label: 'Importar arquivos', onClick: openImport },
     { icon: 'settings', label: 'Ajustes', href: '#/ajustes' },
   ] });
@@ -2166,12 +2166,12 @@ async function videoDaMusica(titulo, artista, source) {
   return vs.find((v) => videoCombina(v.titulo, titulo)) || null;
 }
 
-async function abrirPrevia(content, source, back, videoJa = null) {
+async function abrirPrevia(content, source, back, videoJa = null, { espera = 3000 } = {}) {
   const novo = { id: 'previa', content, source, transpose: 0, capo: capoDaCifra(content), back }; // capo da cifra (Cifra Club)
   const m = renderSong(content).meta;
   if (!youtubeId(m.youtube) && !String(source || '').startsWith('cnbb:')) {
     const busca = (videoJa ? videoJa.then((vs) => vs[0] || null) : videoDaMusica(m.title, m.artist, source)).catch(() => null);
-    const v = await Promise.race([busca, new Promise((r) => setTimeout(() => r(undefined), 3000))]);
+    const v = await Promise.race([busca, new Promise((r) => setTimeout(() => r(undefined), espera))]);
     if (v) novo.content = definirMeta(content, 'youtube', v.url);
     else if (v === null) novo.semVideo = true; // procurou e não achou
     novo.videoProcurado = v !== undefined;
@@ -2795,11 +2795,12 @@ function linhaMusicaAcervo(m, i, { pasta = true } = {}) {
     <div class="info"><div class="t">${esc(m.titulo)}</div><div class="s">${m.tipo === 'cifra' ? 'Cifra' : m.tipo === 'partitura' ? 'Partitura' : 'Letra'}${m.tipo !== 'partitura' && /x_partitura/.test(m.chordpro) ? ' · <span class="tag-partitura">Partitura</span>' : ''}${m.parte ? ` · ${esc(m.parte)}` : ''}${m.autor ? ` · ${esc(m.autor)}` : ''}${onde ? ` · ${esc(onde)}` : ''}</div></div>
     <span class="acts">${salva ? `<span class="chip sm" title="Na sua biblioteca">${icon('check', 14)}</span>` : ''}<button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 }
-// abre a música do acervo como música do app (a salva, se já estiver na biblioteca)
-function abrirMusicaAcervo(m, voltar = location.hash) {
+// abre a música do acervo como música do app (a salva, se já estiver na biblioteca); naHora: abre já, sem esperar
+// a busca do vídeo (ela segue com a página aberta)
+function abrirMusicaAcervo(m, voltar = location.hash, { naHora = false } = {}) {
   const salva = db.songBySource(m.fonte);
   if (salva) { location.hash = '#/musica/' + salva.id; return; }
-  abrirPrevia(m.chordpro, m.fonte, voltar);
+  abrirPrevia(m.chordpro, m.fonte, voltar, null, naHora ? { espera: 0 } : undefined);
 }
 // lista de músicas agrupada pela coleção de origem, com busca dentro dela
 function desenharMusicas(box, lista, { filtro = '', vazio = 'Nada encontrado.', agrupar = true, pasta = true } = {}) {
@@ -8083,7 +8084,7 @@ function viewConectarYoutube() {
   };
 }
 
-// ---------------------------------------------------------------- Tirar dúvidas
+// ---------------------------------------------------------------- Lumen, o assistente litúrgico (tirar dúvidas)
 // Como o NotebookLM: a pergunta vai para o servidor da IA, que responde primeiro pelos arquivos do acervo litúrgico
 // (citando cada um: [1], [2]…) e, se eles não trazem a resposta, busca na internet. A conversa fica na tela (dá para
 // perguntar "e no ofertório?") e as fontes do acervo abrem no app.
@@ -8168,7 +8169,7 @@ function viewDuvidas() {
   conversaDuvidas = conversaDuvidas.filter((m) => m.carregando || Date.now() - (m.t || 0) < DIA);
   setTab('inicio');
   setTint('#2a3a6b');
-  setHeader('Tirar dúvidas', { back: '#/', eyebrow: 'Acervo litúrgico + internet', actions: [...(ReconhecerVoz ? [{ icon: 'som', label: 'Conversa ao vivo', onClick: () => abrirVivo() }] : []), ...(conversaDuvidas.length ? [{ icon: 'trash', label: 'Apagar conversa', onClick: async () => { if (await ask({ title: 'Apagar a conversa?', text: 'As perguntas e respostas saem deste aparelho. (Elas também somem sozinhas depois de 24 horas.)', ok: 'Apagar', danger: true })) { conversaDuvidas = []; guardarConversa(); viewDuvidas(); } } }] : [])] });
+  setHeader('Lumen', { back: '#/', eyebrow: 'Seu assistente litúrgico', actions: [...(ReconhecerVoz ? [{ icon: 'som', label: 'Conversa ao vivo', onClick: () => abrirVivo() }] : []), ...(conversaDuvidas.length ? [{ icon: 'trash', label: 'Apagar conversa', onClick: async () => { if (await ask({ title: 'Apagar a conversa?', text: 'As perguntas e respostas saem deste aparelho. (Elas também somem sozinhas depois de 24 horas.)', ok: 'Apagar', danger: true })) { conversaDuvidas = []; guardarConversa(); viewDuvidas(); } } }] : [])] });
   const avatar = `<span class="dv-avatar" aria-hidden="true">${icon('sparkles', 18)}</span>`;
   view.innerHTML = `<div class="chat">
     <div class="chat-rolo" id="dv-conversa"></div>
@@ -8184,7 +8185,8 @@ function viewDuvidas() {
   const caixa = $('#dv-conversa');
   const boasVindas = () => `<div class="chat-vazio">
       <div class="dv-hero"><span class="dv-avatar grande">${icon('sparkles', 30)}</span></div>
-      <h2>Como posso ajudar o seu ministério?</h2>
+      <h2>Olá, eu sou o Lumen</h2>
+      <p class="dv-lema">Como posso ajudar o seu ministério hoje?</p>
       <p>Pergunte sobre a missa, os tempos litúrgicos ou que canto escolher${ReconhecerVoz ? ' — digitando ou <b>falando</b>, pelo microfone' : ''}. Procuro primeiro no <b>acervo litúrgico</b> e depois na internet.</p>
       ${ReconhecerVoz ? `<button type="button" class="dv-vivo-entrar" data-vivo>${icon('som', 18)}<span><b>Conversar ao vivo</b><small>Fale e ouça a resposta, sem tocar na tela</small></span></button>` : ''}
       <div class="chat-sugestoes">${SUGESTOES_DUVIDAS.map(([ic, q]) => `<button type="button" class="chat-sugestao" data-q="${esc(q)}"><span class="dv-ico">${icon(ic, 18)}</span><span>${esc(q)}</span></button>`).join('')}</div></div>`;
@@ -8224,7 +8226,7 @@ function viewDuvidas() {
   };
   const msg = (m, k) => (m.role === 'user'
     ? `<div class="chat-msg eu"><div class="chat-bolha">${esc(m.content)}</div><small class="chat-hora">${horaCurta(m.t)}</small></div>`
-    : `<div class="chat-msg ia"><div class="chat-corpo"><div class="chat-nome">${avatar}<span>Assistente litúrgico</span><small class="chat-hora">${horaCurta(m.t)}</small></div>
+    : `<div class="chat-msg ia"><div class="chat-corpo"><div class="chat-nome">${avatar}<span>Lumen</span><small class="chat-hora">${horaCurta(m.t)}</small></div>
         <div class="chat-bolha">${corpo(m, k)}</div>
         ${!m.carregando ? `<div class="chat-acoes">${m.acervo?.length || m.cantos?.length || m.web?.length || m.wiki ? `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>` : ''}
           ${m.pergunta ? `<a href="${esc(google(m.pergunta))}" target="_blank" rel="noopener">${icon('search', 14)} Pesquisar no Google</a>` : ''}</div>` : ''}</div></div>`);
@@ -8318,11 +8320,11 @@ function viewDuvidas() {
     if (!a) return;
     if (a.tipo === 'canto') {
       const c = (await carregarCantos()).find((x) => x.id === a.id && x.i === a.i);
-      if (c) { abrirMusicaAcervo({ fonte: `acervo:${c.id}:${c.i}`, chordpro: c.chordpro }, '#/duvidas'); return; }
+      if (c) { abrirMusicaAcervo({ fonte: `acervo:${c.id}:${c.i}`, chordpro: c.chordpro }, '#/duvidas', { naHora: true }); return; }
     }
     if (a.tipo === 'hinario') {
       const cad = (await carregarHinario()).find((x) => x.id === a.id);
-      if (cad?.cantos[a.i]) { abrirMusicaAcervo({ fonte: sourceHinario(cad, a.i), chordpro: cad.cantos[a.i].chordpro }, '#/duvidas'); return; }
+      if (cad?.cantos[a.i]) { abrirMusicaAcervo({ fonte: sourceHinario(cad, a.i), chordpro: cad.cantos[a.i].chordpro }, '#/duvidas', { naHora: true }); return; }
     }
     toast(`${a.titulo} — ${a.caminho}`);
   };
@@ -8344,8 +8346,8 @@ function viewDuvidas() {
     const el = document.createElement('div');
     el.className = 'dv-vivo';
     el.setAttribute('role', 'dialog');
-    el.setAttribute('aria-label', 'Conversa ao vivo');
-    el.innerHTML = `<div class="dv-vivo-topo"><span class="dv-vivo-selo"><i></i>Ao vivo</span>
+    el.setAttribute('aria-label', 'Conversa ao vivo com o Lumen');
+    el.innerHTML = `<div class="dv-vivo-topo"><span class="dv-vivo-selo"><i></i>Lumen ao vivo</span>
         <button type="button" class="dv-vivo-fechar" aria-label="Encerrar a conversa">${icon('x', 22)}</button></div>
       <div class="dv-vivo-palco">
         <button type="button" class="dv-orbe"><span class="dv-orbe-anel"></span><span class="dv-orbe-anel"></span><span class="dv-orbe-nucleo">${icon('mic', 34)}</span></button>
@@ -8446,7 +8448,7 @@ function viewDuvidas() {
       tocarResposta(e);
     });
     estado('falando', 'Olá!');
-    falar('Olá! Pode perguntar sobre a liturgia e os cantos.').then(() => { if (aberto && el.dataset.estado === 'falando') ouvir(); });
+    falar('Olá, eu sou o Lumen! Pode perguntar sobre a liturgia e os cantos.').then(() => { if (aberto && el.dataset.estado === 'falando') ouvir(); });
   }
 }
 
