@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-231';
+export const APP_VERSAO = '2026.10.22-232';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -8312,32 +8312,36 @@ function viewDuvidas() {
   vozDuvidas = null;
   conversaDuvidas = conversaDuvidas.filter((m) => m.carregando || Date.now() - (m.t || 0) < DIA);
   setTab('inicio');
-  setTint('#2a3a6b');
-  setHeader('Lumen', { back: '#/', eyebrow: 'Seu assistente litúrgico', actions: [...(ReconhecerVoz ? [{ icon: 'som', label: 'Conversa ao vivo', onClick: () => abrirVivo() }] : []), ...(conversaDuvidas.length ? [{ icon: 'trash', label: 'Apagar conversa', onClick: async () => { if (await ask({ title: 'Apagar a conversa?', text: 'As perguntas e respostas saem deste aparelho. (Elas também somem sozinhas depois de 24 horas.)', ok: 'Apagar', danger: true })) { conversaDuvidas = []; guardarConversa(); viewDuvidas(); } } }] : [])] });
+  setTint('#0b1020');
+  setHeader('Lumen', { back: '#/', eyebrow: 'Seu assistente litúrgico', actions: [...(conversaDuvidas.length ? [{ icon: 'trash', label: 'Apagar conversa', onClick: async () => { if (await ask({ title: 'Apagar a conversa?', text: 'As perguntas e respostas saem deste aparelho. (Elas também somem sozinhas depois de 24 horas.)', ok: 'Apagar', danger: true })) { conversaDuvidas = []; guardarConversa(); viewDuvidas(); } } }] : [])] });
   const avatar = `<span class="dv-avatar" aria-hidden="true">${icon('sparkles', 18)}</span>`;
   view.innerHTML = `<div class="chat">
     <div class="chat-rolo" id="dv-conversa"></div>
     <form class="chat-barra" id="dv-form">
       <div class="chat-ouvindo" id="dv-ouvindo" hidden><span class="dv-onda" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span>Ouvindo… fale a sua pergunta</span></div>
       <div class="chat-campo">
-        <textarea name="q" rows="1" placeholder="${ReconhecerVoz ? 'Pergunte ou fale…' : 'Pergunte sobre liturgia e canto…'}" aria-label="Sua pergunta"></textarea>
-        ${ReconhecerVoz ? `<button class="chat-mic" type="button" aria-label="Falar a pergunta" aria-pressed="false" title="Falar a pergunta">${icon('mic', 20)}</button>` : ''}
-        <button class="chat-enviar" type="submit" aria-label="Enviar" disabled>${icon('enviar', 20)}</button>
+        <textarea name="q" rows="1" placeholder="Pergunte ao Lumen" aria-label="Sua pergunta"></textarea>
+        ${ReconhecerVoz ? `<button class="chat-mic" type="button" aria-label="Falar a pergunta (ditado)" aria-pressed="false" title="Falar a pergunta">${icon('mic', 22)}</button>` : ''}
+        <button class="chat-enviar${ReconhecerVoz ? ' com-vivo' : ''}" type="submit" aria-label="Enviar" disabled>${icon('enviar', 20)}</button>
+        ${ReconhecerVoz ? `<button class="chat-vivo" type="button" aria-label="Conversar ao vivo" title="Conversar ao vivo">${icon('onda', 22)}</button>` : ''}
       </div>
       <small class="chat-rodape">Acervo litúrgico + internet · a conversa se apaga em 24 horas</small>
     </form></div>`;
   const caixa = $('#dv-conversa');
+  // a tela vazia, como a do Gemini: a estrela e a saudação no meio, as sugestões em linhas simples embaixo
+  const hora = new Date().getHours();
+  const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
+  const estrela = `<svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="dv-estrela-cor" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#4f8cff"/><stop offset="0.45" stop-color="#9b72ff"/><stop offset="0.75" stop-color="#ff6fa8"/><stop offset="1" stop-color="#ffb84d"/></linearGradient></defs>
+    <path fill="url(#dv-estrela-cor)" d="M12 0C12.6 6.4 17.6 11.4 24 12 17.6 12.6 12.6 17.6 12 24 11.4 17.6 6.4 12.6 0 12 6.4 11.4 11.4 6.4 12 0Z"/></svg>`;
   const boasVindas = () => `<div class="chat-vazio">
-      <div class="dv-hero"><span class="dv-avatar grande">${icon('sparkles', 30)}</span></div>
-      <h2>Olá, eu sou o Lumen</h2>
-      <p class="dv-lema">Como posso ajudar o seu ministério hoje?</p>
-      <ul class="dv-recursos">
-        <li><span class="dv-ico">${icon('library', 18)}</span><span><b>Acervo litúrgico</b><small>Procuro primeiro nos documentos e cantos do acervo</small></span></li>
-        <li><span class="dv-ico">${icon('search', 18)}</span><span><b>Sites católicos</b><small>Depois na internet, com o ícone e o link de cada fonte</small></span></li>
-        ${ReconhecerVoz ? `<li><button type="button" class="dv-recurso-vivo" data-vivo><span class="dv-ico">${icon('mic', 18)}</span><span><b>Conversar ao vivo</b><small>Pergunte falando e ouça a resposta</small></span>${icon('next', 18)}</button></li>` : ''}
-      </ul>
-      <h3 class="dv-rotulo">Experimente perguntar</h3>
-      <div class="chat-sugestoes">${SUGESTOES_DUVIDAS.map(([ic, q, curto]) => `<button type="button" class="chat-sugestao" data-q="${esc(q)}" title="${esc(q)}"><span class="dv-ico">${icon(ic, 18)}</span><span class="dv-longo">${esc(q)}</span><span class="dv-curto">${esc(curto)}</span></button>`).join('')}</div></div>`;
+      <div class="dv-boas">
+        <span class="dv-estrela">${estrela}</span>
+        <h2>Pode perguntar!</h2>
+        <p class="dv-sub-boas">${saudacao}! Eu sou o Lumen, o seu assistente litúrgico.</p>
+      </div>
+      <div class="dv-sugs">${SUGESTOES_DUVIDAS.map(([ic, q]) => `<button type="button" class="dv-sug" data-q="${esc(q)}">${icon(ic, 22)}<span>${esc(q)}</span></button>`).join('')}</div>
+    </div>`;
   const google = (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
   const corpo = (m, k) => {
     if (m.carregando) return `<div class="chat-digitando" aria-label="Procurando a resposta"><i></i><i></i><i></i><span>${esc(m.etapa || 'Procurando no acervo…')}</span></div>`;
@@ -8509,7 +8513,14 @@ function viewDuvidas() {
   const form = $('#dv-form');
   const campo = form.q;
   const enviar = form.querySelector('.chat-enviar');
-  const ajustar = () => { campo.style.height = 'auto'; campo.style.height = Math.min(180, campo.scrollHeight) + 'px'; enviar.disabled = !campo.value.trim(); };
+  const ajustar = () => {
+    campo.style.height = 'auto';
+    campo.style.height = Math.min(180, campo.scrollHeight) + 'px';
+    enviar.disabled = !campo.value.trim();
+    form.classList.toggle('tem-texto', Boolean(campo.value.trim()));
+  };
+  // o botão azul da caixa (sem texto): a conversa ao vivo
+  form.querySelector('.chat-vivo')?.addEventListener('click', () => abrirVivo());
   // o microfone: o que a pessoa fala vai aparecendo no campo (dá para corrigir antes de enviar); tocar de novo para de ouvir
   const mic = form.querySelector('.chat-mic');
   const ouvindo = (sim) => {
@@ -8600,20 +8611,31 @@ function viewDuvidas() {
     el.className = 'dv-vivo';
     el.setAttribute('role', 'dialog');
     el.setAttribute('aria-label', 'Conversa ao vivo com o Lumen');
-    el.innerHTML = `<div class="dv-vivo-topo"><span class="dv-vivo-selo"><i></i>Lumen ao vivo</span>
-        <button type="button" class="dv-vivo-fechar" aria-label="Encerrar a conversa">${icon('x', 22)}</button></div>
-      <div class="dv-vivo-palco">
-        <button type="button" class="dv-orbe"><span class="dv-orbe-anel"></span><span class="dv-orbe-anel"></span><span class="dv-orbe-nucleo">${icon('mic', 34)}</span></button>
+    // como a conversa ao vivo do Gemini: a resposta em letra grande no alto (as fontes num cartão, pelo botão), o que
+    // a pessoa falou embaixo, "Toque para interromper" e a barra: fontes · a pílula que brilha · microfone · encerrar
+    el.innerHTML = `<div class="dv-vivo-topo"><span class="dv-vivo-selo"><i></i>Lumen ao vivo</span></div>
+      <div class="dv-vivo-meio">
         <p class="dv-vivo-estado" aria-live="polite"></p>
-        <p class="dv-vivo-fala"></p>
+        <div class="dv-vivo-resposta chat-bolha" hidden></div>
       </div>
-      <div class="dv-vivo-resposta chat-bolha" hidden></div>`;
+      <div class="dv-vivo-baixo">
+        <button type="button" class="dv-vivo-interromper">Toque para interromper</button>
+        <p class="dv-vivo-fala"></p>
+        <div class="dv-vivo-barra">
+          <button type="button" class="dv-vivo-btn dv-vivo-fontes" aria-label="Mostrar as fontes" aria-pressed="false" disabled>${icon('library', 22)}</button>
+          <button type="button" class="dv-orbe"><span class="dv-orbe-brilho"></span></button>
+          <button type="button" class="dv-vivo-btn dv-vivo-mic" aria-label="Microfone">${icon('mic', 22)}</button>
+          <button type="button" class="dv-vivo-btn dv-vivo-fechar" aria-label="Encerrar a conversa">${icon('x', 22)}</button>
+        </div>
+      </div>`;
     document.body.append(el);
     requestAnimationFrame(() => el.classList.add('aberto'));
     const orbe = el.querySelector('.dv-orbe');
     const estadoEl = el.querySelector('.dv-vivo-estado');
     const falaEl = el.querySelector('.dv-vivo-fala');
     const respEl = el.querySelector('.dv-vivo-resposta');
+    const fontesBtn = el.querySelector('.dv-vivo-fontes');
+    const micBtn = el.querySelector('.dv-vivo-mic');
     let aberto = true;
     let rec = null;
     let silencios = 0;
@@ -8621,6 +8643,9 @@ function viewDuvidas() {
       el.dataset.estado = qual;
       estadoEl.textContent = texto;
       orbe.setAttribute('aria-label', { ouvindo: 'Parar de ouvir', falando: 'Interromper e perguntar', pensando: 'Procurando', parado: 'Falar' }[qual]);
+      // o microfone desligado (parado) fica marcado; tocar nele liga de novo
+      micBtn.classList.toggle('desligado', qual === 'parado');
+      micBtn.setAttribute('aria-label', qual === 'ouvindo' ? 'Desligar o microfone' : 'Ligar o microfone');
     };
     // a voz: em frases curtas (o Chrome corta a fala comprida no meio); termina quando a última frase acaba
     const falar = (texto) => new Promise((pronto) => {
@@ -8650,7 +8675,7 @@ function viewDuvidas() {
       r.interimResults = true;
       r.continuous = false;
       let erro = '';
-      estado('ouvindo', 'Ouvindo… pode perguntar');
+      estado('ouvindo', 'Pode falar, estou ouvindo…');
       falaEl.textContent = '';
       r.onresult = (e) => { if (rec === r) falaEl.textContent = [...e.results].map((x) => x[0].transcript).join('').trim(); };
       r.onerror = (e) => { erro = e.error; };
@@ -8662,20 +8687,25 @@ function viewDuvidas() {
         // ficou em silêncio: tenta ouvir mais uma vez antes de parar
         if (erro === 'no-speech' && ++silencios < 2) { ouvir(); return; }
         silencios = 0;
-        estado('parado', /not-allowed/.test(erro) ? 'Permita o microfone para conversar' : erro === 'network' ? 'O ditado precisa de internet' : 'Toque no microfone para falar');
+        estado('parado', /not-allowed/.test(erro) ? 'Permita o microfone para conversar.' : erro === 'network' ? 'O ditado precisa de internet.' : 'Microfone desligado. Toque nele para falar.');
       };
-      try { r.start(); } catch { estado('parado', 'Toque no microfone para falar'); }
+      try { r.start(); } catch { estado('parado', 'Microfone desligado. Toque nele para falar.'); }
     };
     const responder = async (q) => {
-      estado('pensando', 'Procurando no acervo…');
+      estado('pensando', 'Pensando…');
+      respEl.hidden = true;
+      fontesBtn.disabled = true;
+      fontesBtn.setAttribute('aria-pressed', 'false');
       const m = await perguntar(q);
       if (!aberto) return;
       if (!m) { ouvir(); return; }
+      // a resposta em letra grande (o que a voz lê); as fontes e os cantos ficam no cartão, pelo botão da esquerda
+      const fala = falaDaResposta(m);
       respEl.innerHTML = corpo(m, conversaDuvidas.indexOf(m));
-      respEl.hidden = false;
-      respEl.scrollTop = 0;
-      estado('falando', 'Respondendo… toque para interromper');
-      await falar(falaDaResposta(m));
+      fontesBtn.disabled = false;
+      estado('falando', fala);
+      el.querySelector('.dv-vivo-meio').scrollTop = 0;
+      await falar(fala);
       if (aberto && el.dataset.estado === 'falando') ouvir();
     };
     const fechar = () => {
@@ -8695,12 +8725,27 @@ function viewDuvidas() {
       if (agora === 'ouvindo') rec?.stop();
       else if (agora !== 'pensando') ouvir();
     };
+    // "Toque para interromper": a voz para e já ouve a próxima pergunta
+    el.querySelector('.dv-vivo-interromper').onclick = () => ouvir();
+    // o microfone: ouvindo, desliga; desligado (ou falando), liga
+    micBtn.onclick = () => {
+      const agora = el.dataset.estado;
+      if (agora === 'ouvindo') { const r = rec; rec = null; r?.abort(); silencios = 0; estado('parado', 'Microfone desligado. Toque nele para falar.'); }
+      else if (agora !== 'pensando') ouvir();
+    };
+    // as fontes e os cantos da resposta, num cartão embaixo do texto
+    fontesBtn.onclick = () => {
+      const mostrar = respEl.hidden;
+      respEl.hidden = !mostrar;
+      fontesBtn.setAttribute('aria-pressed', String(mostrar));
+      if (mostrar) respEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
     respEl.addEventListener('click', (e) => {
       // abrir um canto ou a Liturgia sai da conversa ao vivo; o link da internet abre noutra aba e ela continua
       if (e.target.closest('button.dv-fonte, a[href^="#"]')) fechar();
       tocarResposta(e);
     });
-    estado('falando', 'Olá!');
+    estado('falando', 'Olá! Eu sou o Lumen. Pode perguntar sobre a liturgia e os cantos.');
     falar('Olá, eu sou o Lumen! Pode perguntar sobre a liturgia e os cantos.').then(() => { if (aberto && el.dataset.estado === 'falando') ouvir(); });
   }
 }
