@@ -884,6 +884,7 @@ body.editando-cheio .nav, body.editando-cheio #player { display: none !important
 #tooltip.show { opacity: 1; }
 :root[data-theme="light"] #tooltip { background: #282828; color: #fff; }
 button, a.icon-btn, .chip, .swatch { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.seg-nota { margin-left: 2px; font-size: 12px; font-weight: 600; opacity: 0.55; }
 .aviso { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin: 0 0 14px; border-radius: var(--radius); background: var(--accent-soft); color: var(--text); font-size: 13px; font-weight: 600; }
 .aviso .ic { color: var(--accent-ink); }
 .aviso span { flex: 1; min-width: 180px; }

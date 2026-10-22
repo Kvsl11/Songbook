@@ -3,6 +3,12 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 229, data: '2026-10-22', titulo: 'Sem o aviso “Esta música não tem cifra”',
+    itens: [
+      { tipo: 'melhoria', texto: 'Música sem cifra não mostra mais o aviso “Esta música não tem cifra” em cima da letra: a aba diz “Letra · sem cifra”, discreta. A falta de letra ou de vídeo continua avisada.' },
+    ],
+  },
+  {
     versao: 228, data: '2026-10-22', titulo: 'Lumen respeita a data pedida',
     itens: [
       { tipo: 'correcao', texto: 'Pedindo “o salmo do dia 25/10/2026”, o Lumen trazia o salmo de hoje. Agora traz o do dia pedido (vale 25/10, 25/10/2026, “25 de outubro” e “dia 25”), e tocar em “Liturgia de…” abre a Liturgia nessa data.' },
