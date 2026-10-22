@@ -18,6 +18,7 @@ import { corCss, corDominante } from './lib/cores.js';
 import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
 import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } from './lib/alinhamento.js';
 import { partesDoAviso, tipoDoAviso } from './lib/avisos.js';
+import { NOVIDADES, novidadesNaoVistas } from './lib/novidades.js';
 import { baseDoServidor, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWikipedia, criarIndice as criarIndiceDuvidas, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
@@ -90,7 +91,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-214';
+export const APP_VERSAO = '2026.10.22-215';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -6020,6 +6021,9 @@ function viewSong(id, ctx = {}) {
       // o bloqueio do YouTube avisa uma vez só (as outras músicas dariam o mesmo aviso)
       if (e.status === 403) { if (!notificacoes.some((x) => x.href === '#/youtube' && !x.lida)) notificar(motivo, { tipo: 'erro', titulo: 'Conecte o YouTube', href: '#/youtube' }); }
       else if (!sozinho) notificar(motivo, { tipo: 'erro', titulo: `Letra de ${song.title}`, href: aqui });
+      // servidor ocupado (com a partitura ou a letra de outra música) ou sem resposta: não foi culpa desta música,
+      // então tenta de novo da próxima vez que ela abrir (antes ficava sem sincronizar até fechar e abrir o app)
+      if (e.status === 503 || !e.status) tentouSincronizar.delete(song.youtube);
     }
   };
   $('#btn-sincronizar')?.addEventListener('click', () => { $('#menu-mais').hidden = true; sincronizarLetra(); });
@@ -7515,6 +7519,7 @@ function viewSettings() {
     ${secao('sobre', '', `
     <div class="settings-group aj-sobre">
       <div class="aj-sobre-cab"><span class="aj-logo">${logo(40)}</span><div><b>Songbook Litúrgico</b><span class="chip sm">versão ${APP_VERSAO}</span></div></div>
+      <a class="setting" href="#/novidades"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Novidades</div><div class="s">O que foi corrigido e melhorado em cada atualização</div></div>${icon('next', 18)}</a>
       <p>Cifras e letras com transposição, capotraste, rolagem automática, repertórios e vídeos do YouTube, integrado à Liturgia Diária da CNBB, aos cantos de cindyferrarezi.com e do Músicas para Missa e às cifras do Cifra Club.</p>
     </div>`)}
     </div>`;
@@ -8212,6 +8217,7 @@ function route() {
     case 'oracoes': return viewOracoes();
     case 'oracao': return viewOracao(b);
     case 'fontes': return viewFontes();
+    case 'novidades': return viewNovidades(b);
     case 'arquivo': return viewArquivo(b, c, d);
     case 'setor': return viewSetor(b, c);
     case 'acervo': return viewAcervo(b || '');
@@ -8353,4 +8359,36 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
   }).catch(() => {});
 }
-if (sessionStorage.getItem('atualizado')) { sessionStorage.removeItem('atualizado'); setTimeout(() => toast(`Versão ${APP_VERSAO}: as novidades já estão valendo`, { titulo: 'App atualizado', tipo: 'atualizacao', ms: 4500 }), 400); }
+// notas de atualização: cada versão nova (que a pessoa ainda não viu) vira uma notificação "Atualização" no sininho;
+// tocar nela abre a tela Novidades, com o que foi corrigido e melhorado
+sessionStorage.removeItem('atualizado');
+(() => {
+  const CHAVE = 'songbook.versaoVista';
+  let vista = 0;
+  try { vista = Number(localStorage.getItem(CHAVE)) || 0; } catch { /* sem armazenamento */ }
+  const novas = novidadesNaoVistas(vista);
+  if (!novas.length) return;
+  try { localStorage.setItem(CHAVE, String(NOVIDADES[0].versao)); } catch { /* sem armazenamento */ }
+  [...novas].reverse().forEach((n) => {
+    const qtd = n.itens.length;
+    notificar(`${n.titulo}: ${qtd} ${qtd === 1 ? 'mudança' : 'mudanças'}. Toque para ver o que foi corrigido e melhorado.`,
+      { tipo: 'atualizacao', titulo: `Atualização · versão ${n.versao}`, href: `#/novidades/${n.versao}` });
+  });
+})();
+
+// a tela Novidades: as versões, da mais nova para a mais antiga, cada mudança com o tipo (novo, melhoria, correção)
+function viewNovidades(versao) {
+  const TIPO_NOVIDADE = { novo: ['Novo', 'sparkles'], melhoria: ['Melhoria', 'up'], correcao: ['Correção', 'check'] };
+  setTab('');
+  setTint('#1f3a44');
+  setHeader('Novidades', { back: '#/ajustes' });
+  const data = (d) => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+  view.innerHTML = `<h2 class="greet">Novidades do app</h2>
+    <p class="muted nv-intro">O que foi corrigido e melhorado em cada atualização. Você está na versão ${esc(APP_VERSAO)}.</p>
+    <div class="nv-lista">${NOVIDADES.map((n) => `<section class="nv-versao${String(n.versao) === String(versao) ? ' destaque' : ''}" id="nv-${n.versao}">
+      <div class="nv-cab"><span class="chip sm">versão ${n.versao}</span><small>${esc(data(n.data))}</small></div>
+      <h3>${esc(n.titulo)}</h3>
+      <ul>${n.itens.map((it) => { const [nome, ic] = TIPO_NOVIDADE[it.tipo] || TIPO_NOVIDADE.melhoria; return `<li data-tipo="${it.tipo}"><span class="nv-ic">${icon(ic, 14)}</span><span><b>${nome}</b> ${esc(it.texto)}</span></li>`; }).join('')}</ul>
+    </section>`).join('')}</div>`;
+  if (versao) requestAnimationFrame(() => $(`#nv-${CSS.escape(versao)}`)?.scrollIntoView({ block: 'start' }));
+}

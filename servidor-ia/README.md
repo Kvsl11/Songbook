@@ -50,4 +50,4 @@ Precisa do `ffmpeg` instalado. No app: **Ajustes → IA da partitura**, cole o e
 | `POST /letra` | `{"url": "...", "linhas": [...]}` → início e fim de cada linha |
 
 Variáveis: `IA_ORIGENS` (CORS), `IA_CHAVE` (senha, cabeçalho `X-Chave`), `IA_TAREFAS`, `IA_MAX_MB`, `IA_COOKIES`,
-`IA_WHISPER` (small), `IA_CREPE` (full). Testes: `python -m pytest tests`.
+`IA_WHISPER` (small), `IA_CREPE` (tiny; `full` é mais lento e só um pouco mais preciso). Testes: `python -m pytest tests`.

@@ -12,3 +12,16 @@ test('versão: a do app (APP_VERSAO) acompanha a do service worker', async () =>
   assert.ok(doSw && doApp);
   assert.equal(doApp, doSw, `APP_VERSAO (${doApp}) diferente do sw.js (${doSw}): mude os dois juntos`);
 });
+
+// cada versão publicada tem as notas de atualização (a tela Novidades e o aviso no sininho): a primeira da lista é
+// a versão atual
+test('versão: as Novidades começam pela versão atual', async () => {
+  const sw = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
+  const { NOVIDADES, novidadesNaoVistas } = await import('../public/js/lib/novidades.js');
+  const doSw = Number(/const VERSION = 'songbook-v(\d+)'/.exec(sw)?.[1]);
+  assert.equal(NOVIDADES[0].versao, doSw, 'escreva em lib/novidades.js o que mudou nesta versão');
+  assert.ok(NOVIDADES.every((n) => n.titulo && n.itens.length));
+  assert.deepEqual(novidadesNaoVistas(doSw), []);
+  assert.deepEqual(novidadesNaoVistas(doSw - 2).map((n) => n.versao), [doSw, doSw - 1]);
+  assert.equal(novidadesNaoVistas(0).length, 1);
+});

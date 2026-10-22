@@ -353,7 +353,9 @@ OPCOES_MISTURA = dict(onset_threshold=0.5, frame_threshold=0.3, minimum_note_len
 
 def afinacao_da_voz(voz: np.ndarray):
     """A afinação cantada, quadro a quadro: (altura em MIDI, se há voz, instante). Com o CREPE (rede treinada para
-    a afinação da voz: erra bem menos oitava que o pYIN) quando instalado; senão, o pYIN do librosa."""
+    a afinação da voz: erra bem menos oitava que o pYIN) quando instalado; senão, o pYIN do librosa. O modelo "tiny"
+    do CREPE: no servidor (2 CPUs) o "full" levava ~10 min numa música de 3 min e segurava a fila (a outra música
+    esperando parecia travada no "Baixando"); o tiny leva segundos e acerta quase igual na voz."""
     import librosa
 
     try:
@@ -364,7 +366,7 @@ def afinacao_da_voz(voz: np.ndarray):
     if torchcrepe is not None and not os.environ.get("IA_SEM_CREPE"):
         sr, hop = 16000, 160  # quadros de 10 ms
         x = torch.tensor(librosa.resample(voz, orig_sr=SR, target_sr=sr), dtype=torch.float32)[None]
-        f0, period = torchcrepe.predict(x, sr, hop, 65.0, 1100.0, os.environ.get("IA_CREPE", "full"),
+        f0, period = torchcrepe.predict(x, sr, hop, 65.0, 1100.0, os.environ.get("IA_CREPE", "tiny"),
                                         decoder=torchcrepe.decode.viterbi, return_periodicity=True,
                                         batch_size=1024, device="cpu")
         period = torchcrepe.filter.median(period, 3)[0].numpy()
