@@ -22,7 +22,7 @@ import numpy as np
 
 SR_WHISPER = 16000
 _trava = threading.Lock()
-_whisper = None
+_whisper: dict = {}  # um modelo por tamanho (o "small" de sempre e o "medium" do refazer)
 
 
 def tem_whisper() -> bool:
@@ -33,16 +33,18 @@ def tem_whisper() -> bool:
         return False
 
 
-def modelo_whisper():
-    global _whisper
+def modelo_whisper(preciso: bool = False):
+    """O Whisper: o "small" (rápido) na sincronia de sempre; no "sincronizar de novo" (preciso), o "medium", que
+    ouve melhor o canto e erra menos palavras (as linhas puladas da sincronia vinham de palavras não reconhecidas)"""
+    nome = os.environ.get("IA_WHISPER_PRECISO", "medium") if preciso else os.environ.get("IA_WHISPER", "small")
     with _trava:
-        if _whisper is None:
+        if nome not in _whisper:
             from faster_whisper import WhisperModel
 
             # cpu_threads: os núcleos da máquina (o padrão do faster-whisper é 4, e o servidor tem mais)
-            _whisper = WhisperModel(os.environ.get("IA_WHISPER", "small"), device="cpu", compute_type="int8",
-                                    cpu_threads=int(os.environ.get("IA_THREADS") or 0))
-        return _whisper
+            _whisper[nome] = WhisperModel(nome, device="cpu", compute_type="int8",
+                                          cpu_threads=int(os.environ.get("IA_THREADS") or 0))
+        return _whisper[nome]
 
 
 # ------------------------------------------------------------------ texto
@@ -182,15 +184,15 @@ def _preencher(saida: list, pesos: list[int], duracao: float) -> list[dict]:
 
 # ------------------------------------------------------------------ a música
 
-def ouvir_palavras(y16: np.ndarray, dica: str) -> list[tuple[str, float, float]]:
-    segmentos, _ = modelo_whisper().transcribe(
+def ouvir_palavras(y16: np.ndarray, dica: str, preciso: bool = False) -> list[tuple[str, float, float]]:
+    segmentos, _ = modelo_whisper(preciso).transcribe(
         y16, language=os.environ.get("IA_IDIOMA", "pt"), word_timestamps=True, vad_filter=True,
         initial_prompt=dica[:800] or None, condition_on_previous_text=False, beam_size=5)
     return [(w.word.strip(), float(w.start), float(w.end)) for s in segmentos for w in (s.words or [])]
 
 
 def sincronizar(caminho: str | None, linhas: list[str], separar_voz: bool = True, etapa=lambda nome: None,
-                audio=None, video: str | None = None) -> dict:
+                audio=None, video: str | None = None, preciso: bool = False) -> dict:
     """audio = (y, cortado) já carregado (o do vídeo guardado); video: o id, para usar e guardar a voz já separada
     (a partitura da mesma música aproveita, e vice-versa)."""
     import librosa
@@ -211,7 +213,7 @@ def sincronizar(caminho: str | None, linhas: list[str], separar_voz: bool = True
     y16 = librosa.resample(voz, orig_sr=transcricao.SR, target_sr=SR_WHISPER).astype(np.float32)
     dica = " ".join(re.sub(r"\[[^\]]*\]", "", l) for l in linhas)
     etapa("ouvindo")
-    palavras = ouvir_palavras(y16, dica)
+    palavras = ouvir_palavras(y16, dica, preciso)
     etapa("alinhando")
     tempos = tempos_das_linhas(linhas, palavras, duracao)
     achadas = sum(1 for t in tempos if t["confianca"] > 0)

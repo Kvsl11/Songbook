@@ -22,6 +22,8 @@ imagem = (
         # os modelos já baixados na montagem: a primeira música não espera o download
         "python -c \"from demucs.pretrained import get_model; get_model('htdemucs')\"",
         "python -c \"from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')\"",
+        # o "medium", do "sincronizar de novo" (mais preciso)
+        "python -c \"from faster_whisper import WhisperModel; WhisperModel('medium', device='cpu', compute_type='int8')\"",
     )
     .env({"IA_WHISPER": "small", "PYTHONUNBUFFERED": "1"})
     .add_local_dir(PASTA, remote_path="/root/app", ignore=["tests", "**/__pycache__", ".pytest_cache", "Dockerfile"])

@@ -54,3 +54,22 @@ def test_youtube_manda_a_porcentagem_do_download_e_avisa_a_fila(monkeypatch, tmp
     monkeypatch.setattr(youtube, "baixar_audio", lambda *a, **k: (_ for _ in ()).throw(AssertionError("baixou de novo")))
     r = TestClient(app.app).post("/youtube?etapas=1", json={"url": "https://youtu.be/dQw4w9WgXcQ"})
     assert '"resultado"' in r.text and '"titulo": "t"' in r.text
+
+
+def test_letra_de_novo_nao_devolve_a_guardada_e_ouve_com_o_whisper_preciso(monkeypatch, tmp_path):
+    import letra
+    import youtube
+
+    monkeypatch.setattr(transcricao, "CACHE", str(tmp_path))
+    monkeypatch.setattr(transcricao, "carregar", lambda caminho: (np.zeros(100, dtype=np.float32), False))
+    monkeypatch.setattr(youtube, "baixar_audio", lambda video, pasta, progresso=lambda p: None: {"caminho": "x", "titulo": "t"})
+    monkeypatch.setattr(letra, "tem_whisper", lambda: True)
+    pedidos = []
+    monkeypatch.setattr(letra, "sincronizar", lambda *a, preciso=False, **k: pedidos.append(preciso) or {"linhas": [], "achadas": 0, "total": 1})
+    app._letras.clear()
+    c = TestClient(app.app)
+    corpo = {"url": "https://youtu.be/dQw4w9WgXcQ", "linhas": ["Santo"]}
+    c.post("/letra", json=corpo)
+    c.post("/letra", json=corpo)  # a mesma: a guardada
+    c.post("/letra", json={**corpo, "refazer": True})
+    assert pedidos == [False, True]
