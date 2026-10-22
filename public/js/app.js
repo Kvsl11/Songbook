@@ -85,7 +85,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-194';
+export const APP_VERSAO = '2026.10.22-195';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -5353,7 +5353,8 @@ function viewSong(id, ctx = {}) {
   const tipoQuadros = renderSong(song.content).meta.x_canvas;
   // música sem nenhum acorde: só existe a letra. O botão # liga/desliga a cifra (sem ele, só a letra).
   const semCifra = !temCifra(song.content);
-  let comCifra = !semCifra && prefs.modo !== 'letra' && prefs.showChords !== false;
+  // cifra ou só letra: o botão Cifra/Letra da própria música (lembrado em prefs.modo) decide
+  let comCifra = !semCifra && prefs.modo !== 'letra';
   // tom de referência: o do {key} ou, se não houver, o primeiro acorde da música
   const tomBase = renderSong(song.content).key || song.key || (/\[([A-G][#b]?m?)(?![a-z])/.exec(song.content || '') || [])[1] || '';
   const save = () => { if (!isPreview) db.updateSong(song.id, { transpose, capo }); };
@@ -5641,28 +5642,28 @@ function viewSong(id, ctx = {}) {
   // do vídeo, trocar/abrir no YouTube e, embaixo, de onde veio a cifra, partitura e outras versões
   const duracaoVideo = song.duracao > 0 ? fmtTempo(song.duracao) : '';
   const video = song.youtube ? `
-    <div class="ref-video" id="ref-video">
+    <section class="ref-cartao ref-video" id="ref-video"><h3 class="ref-cab">Vídeo de referência</h3>
       <div class="video-ref" id="video-box"><button class="video-card" id="video-ref" aria-label="Tocar o vídeo aqui"><img src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt="" loading="lazy">
-        <span class="vplay"><span>${icon('play', 26)}</span></span>${duracaoVideo ? `<span class="vdur">${duracaoVideo}</span>` : ''}</button></div>
+        <span class="vplay"><span>${icon('play', 22)}</span></span>${duracaoVideo ? `<span class="vdur">${duracaoVideo}</span>` : ''}</button></div>
       <div class="ref-video-info">
-        <span class="ref-yt" aria-hidden="true">${icon('youtube', 20)}</span>
         <div class="grow"><b id="ref-video-titulo">${esc(song.title)}</b><small id="ref-video-canal">YouTube${duracaoVideo ? ' · ' + duracaoVideo : ''}</small></div>
         <span class="ref-tocando" title="Tocando" aria-hidden="true"><i></i><i></i><i></i></span>
       </div>
       <div class="ref-acoes">
-        <button class="btn small" data-video title="Escolher outra versão no YouTube">${icon('refresh', 15)} Trocar vídeo</button>
-        <a class="btn small ghost" href="https://www.youtube.com/watch?v=${esc(song.youtube)}" target="_blank" rel="noopener">${icon('external', 15)} Abrir no YouTube</a>
+        <button class="ref-pilula" data-video title="Escolher outra versão no YouTube">${icon('refresh', 14)} Trocar vídeo</button>
+        <a class="ref-pilula" href="https://www.youtube.com/watch?v=${esc(song.youtube)}" target="_blank" rel="noopener">${icon('youtube', 14)} Abrir no YouTube</a>
       </div>
-    </div>`
+    </section>`
     : `<button class="ref-sem-video" data-video><span class="ref-sem-video-ic">${icon('youtube', 26)}</span><b>Sem vídeo de referência</b>
       <small>Escolha um vídeo no YouTube para ouvir como a música é cantada</small><span class="btn small primary">${icon('search', 15)} Escolher vídeo</span></button>`;
+  // as fontes (como as linhas dos "Créditos" do Spotify: o nome em cima, o que é embaixo)
   const links = [];
-  const linkRef = (href, ic, titulo, sub) => `<a class="ref-link" href="${esc(href)}" target="_blank" rel="noopener">${ic}<span class="grow"><b>${titulo}</b><small>${esc(sub)}</small></span>${icon('external', 16)}</a>`;
-  if (song.source && /^https?:/.test(song.source)) links.push(linkRef(song.source, song.cover ? capa(song) : `<span class="ico">${icon('link', 18)}</span>`, 'Cifra original', host(song.source)));
-  if (song.source?.startsWith('cnbb:')) links.push(linkRef('https://www.cnbb.org.br/liturgia-diaria/', `<span class="ico">${icon('cross', 18)}</span>`, 'Liturgia Diária', 'cnbb.org.br'));
-  if (song.pdf) links.push(linkRef(song.pdf, `<span class="ico">${icon('file', 18)}</span>`, 'Partitura', 'PDF'));
-  links.push(`<button class="ref-link" data-buscar-cifra title="Procura outras cifras desta música (Cifra Club e cantos litúrgicos)"><span class="ico">${icon('chord', 18)}</span><span class="grow"><b>Outras cifras</b><small>Cifra Club e cantos da missa</small></span>${icon('next', 16)}</button>`);
-  $('#refs').innerHTML = `<div class="ref-cartao">${video}<div class="ref-links">${links.join('')}</div></div>`;
+  const linkRef = (href, titulo, sub) => `<a class="ref-linha" href="${esc(href)}" target="_blank" rel="noopener"><span class="grow"><b>${titulo}</b><small>${esc(sub)}</small></span>${icon('external', 16)}</a>`;
+  if (song.source && /^https?:/.test(song.source)) links.push(linkRef(song.source, 'Cifra original', host(song.source)));
+  if (song.source?.startsWith('cnbb:')) links.push(linkRef('https://www.cnbb.org.br/liturgia-diaria/', 'Liturgia Diária', 'cnbb.org.br'));
+  if (song.pdf) links.push(linkRef(song.pdf, 'Partitura', 'PDF'));
+  links.push(`<button class="ref-linha" data-buscar-cifra title="Procura outras cifras desta música (Cifra Club e cantos litúrgicos)"><span class="grow"><b>Outras cifras</b><small>Cifra Club e cantos da missa</small></span><span class="ref-pilula">Procurar</span></button>`);
+  $('#refs').innerHTML = `${video}<section class="ref-cartao"><h3 class="ref-cab">Fontes</h3>${links.join('')}</section>`;
   // nome e canal do vídeo (do YouTube; sem internet, fica o nome da música)
   if (song.youtube) {
     infoDoVideo(song.youtube).then((v) => {
@@ -5672,21 +5673,38 @@ function viewSong(id, ctx = {}) {
     });
   }
 
-  // créditos (como no Spotify): quem canta, quem compôs, de onde veio — cada linha com o seu ícone
+  // créditos (como no Spotify): primeiro as pessoas por trás da música (cada uma com todos os papéis dela: "Composição
+  // • Letra"), em bolinhas e em linhas com o nome em cima e o papel embaixo; depois os detalhes (álbum, ano, tom, fonte)
   const metaR = renderSong(song.content).meta;
-  const creditos = [
-    ['mic', 'Intérprete', song.artist],
-    ['edit', 'Composição', metaR.composer],
-    ['text', 'Letra', metaR.lyricist],
-    ['disc', 'Álbum', metaR.album],
-    ['calendar', 'Ano', metaR.year],
-    ['music', 'Tom original', tomBase],
-    ['link', /letras\.mus\.br|lrclib|vagalume/.test(song.source || '') ? 'Fonte da letra' : /cifraclub/.test(song.source || '') ? 'Fonte da cifra' : 'Fonte', fonte && song.source ? `<a href="${esc(song.source)}" target="_blank" rel="noopener">${esc(fonte)}</a>` : esc(fonte), true],
-    ['clock', 'Na biblioteca desde', !isPreview && song.createdAt ? new Date(song.createdAt).toLocaleDateString('pt-BR') : ''],
-  ].filter(([, , v]) => v);
-  $('#creditos').innerHTML = creditos.length ? `<div class="ref-creditos"><div class="ref-creditos-cab"><h3>Créditos</h3>
-    ${isPreview ? '' : `<a class="link-btn" href="#/editar/${song.id}">${icon('edit', 13)} Editar</a>`}</div>
-    ${creditos.map(([ic, k, v, html]) => `<div class="ref-cred"><span class="ico">${icon(ic, 16)}</span><span class="grow"><small>${esc(k)}</small><b>${html ? v : esc(v)}</b></span></div>`).join('')}</div>` : '';
+  const pessoas = [];
+  for (const [papel, nomes] of [['Intérprete', song.artist], ['Composição', metaR.composer], ['Letra', metaR.lyricist]]) {
+    for (const nome of String(nomes || '').split(/\s*[,;&/]\s*/).map((x) => x.trim()).filter(Boolean)) {
+      const ja = pessoas.find((x) => x.nome.toLowerCase() === nome.toLowerCase());
+      if (ja) { if (!ja.papeis.includes(papel)) ja.papeis.push(papel); } else pessoas.push({ nome, papeis: [papel] });
+    }
+  }
+  const detalhes = [
+    ['Álbum', metaR.album],
+    ['Ano', metaR.year],
+    ['Tom original', tomBase],
+    [/letras\.mus\.br|lrclib|vagalume/.test(song.source || '') ? 'Fonte da letra' : /cifraclub/.test(song.source || '') ? 'Fonte da cifra' : 'Fonte', fonte && song.source ? `<a href="${esc(song.source)}" target="_blank" rel="noopener">${esc(fonte)}</a>` : esc(fonte), true],
+    ['Na biblioteca desde', !isPreview && song.createdAt ? new Date(song.createdAt).toLocaleDateString('pt-BR') : ''],
+  ].filter(([, v]) => v);
+  // a página do artista (do Cifra Club) quando a cifra veio de lá: o "Seguir" do Spotify vira "Ver artista"
+  const slugArtista = /cifraclub\.com\.br\/([^/?#]+)/.exec(song.source || '')?.[1];
+  const verArtista = slugArtista && song.artist ? `<a class="ref-pilula" href="#/artista/${encodeURIComponent(slugArtista)}/${encodeURIComponent(song.artist)}">Ver artista</a>` : '';
+  const iniciais = (n) => n.split(/\s+/).filter((x) => /^\p{L}/u.test(x)).slice(0, 2).map((x) => x[0]).join('').toUpperCase() || '♪';
+  const corDaPessoa = (n) => `hsl(${[...n].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)} 45% 38%)`;
+  const papeisCurtos = (p) => p.papeis[0] + (p.papeis.length > 1 ? ` + ${p.papeis.length - 1}` : '');
+  const roda = pessoas.length ? `<section class="ref-cartao ref-pessoas" style="--cor-cartao:${corDaPessoa(pessoas[0].nome)}">
+    <div class="ref-rodas">${pessoas.slice(0, 2).map((p) => `<div class="ref-roda"><span class="ref-avatar" style="background:${corDaPessoa(p.nome)}">${esc(iniciais(p.nome))}</span>
+      <b>${esc(p.nome)}</b><small>${esc(papeisCurtos(p))}</small></div>`).join('')}</div>
+    <div class="ref-pessoas-pe"><span class="grow"><b>${esc(song.title)}</b><small>${pessoas.length} ${pessoas.length === 1 ? 'pessoa' : 'pessoas'} nos créditos</small></span></div>
+    <p>Conheça quem está por trás da música.</p></section>` : '';
+  $('#creditos').innerHTML = pessoas.length || detalhes.length ? `${roda}<section class="ref-cartao ref-creditos"><div class="ref-creditos-cab"><h3 class="ref-cab">Créditos</h3>
+    ${isPreview ? '' : `<a class="ref-mais" href="#/editar/${song.id}">Editar</a>`}</div>
+    ${pessoas.map((p, i) => `<div class="ref-linha"><span class="grow"><b>${esc(p.nome)}</b><small>${esc(p.papeis.join(' • '))}</small></span>${i === 0 ? verArtista : ''}</div>`).join('')}
+    ${detalhes.map(([k, v, html]) => `<div class="ref-linha"><span class="grow"><b>${html ? v : esc(v)}</b><small>${esc(k)}</small></span></div>`).join('')}</section>` : '';
 
   // vídeo do YouTube: escolher/trocar e tocar no player do app
   const salvarVideo = (url) => {
@@ -7253,7 +7271,6 @@ function viewSettings() {
 
     ${secao('cifras', 'Como os acordes aparecem nas músicas', `
     <div class="settings-group">
-      <label class="setting"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Mostrar acordes</div><div class="s">Desligue para usar só a letra (coral, telão)</div></div><input type="checkbox" class="switch" id="chords" ${p.modo !== 'letra' && p.showChords !== false ? 'checked' : ''}></label>
       <label class="setting"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Desenho dos acordes</div><div class="s">Como montar cada acorde no violão: tabela no início da música e ao tocar num acorde</div></div><input type="checkbox" class="switch" id="diagramas" ${p.diagramas ? 'checked' : ''}></label>
       <label class="setting so-largo"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns !== false ? 'checked' : ''}></label>
       <div class="setting wrap"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div><div class="s">Tamanho, cor e fundo dos acordes sobre a letra</div></div>
@@ -7335,7 +7352,6 @@ function viewSettings() {
   };
   infoModelo();
   $('#instalar')?.addEventListener('click', instalarApp);
-  $('#chords').onchange = (e) => { db.setPref('modo', e.target.checked ? 'cifra' : 'letra'); db.setPref('showChords', true); };
   $('#cols').onchange = (e) => db.setPref('columns', e.target.checked);
   $('#diagramas').onchange = (e) => { db.setPref('diagramas', e.target.checked); toast(e.target.checked ? 'Desenho dos acordes ligado' : 'Desenho dos acordes desligado'); };
   $('#destaque').onclick = (e) => {
