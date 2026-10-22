@@ -20,7 +20,7 @@ import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } fro
 import { partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { NOVIDADES, novidadesNaoVistas } from './lib/novidades.js';
 import { baseDoServidor, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
-import { buscarNaWikipedia, criarIndice as criarIndiceDuvidas, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
+import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -107,7 +107,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-222';
+export const APP_VERSAO = '2026.10.22-223';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1921,7 +1921,7 @@ function viewHome() {
   setTab('inicio');
   setTint('#1e3264');
   setHeader('Início', { actions: [
-    { icon: 'sparkles', label: 'Tirar dúvidas', href: '#/duvidas' },
+    { icon: 'sparkles', label: 'Lumen, o assistente litúrgico', href: '#/duvidas' },
     { icon: 'upload', label: 'Importar arquivos', onClick: openImport },
     { icon: 'settings', label: 'Ajustes', href: '#/ajustes' },
   ] });
@@ -2166,12 +2166,12 @@ async function videoDaMusica(titulo, artista, source) {
   return vs.find((v) => videoCombina(v.titulo, titulo)) || null;
 }
 
-async function abrirPrevia(content, source, back, videoJa = null) {
+async function abrirPrevia(content, source, back, videoJa = null, { espera = 3000 } = {}) {
   const novo = { id: 'previa', content, source, transpose: 0, capo: capoDaCifra(content), back }; // capo da cifra (Cifra Club)
   const m = renderSong(content).meta;
   if (!youtubeId(m.youtube) && !String(source || '').startsWith('cnbb:')) {
     const busca = (videoJa ? videoJa.then((vs) => vs[0] || null) : videoDaMusica(m.title, m.artist, source)).catch(() => null);
-    const v = await Promise.race([busca, new Promise((r) => setTimeout(() => r(undefined), 3000))]);
+    const v = await Promise.race([busca, new Promise((r) => setTimeout(() => r(undefined), espera))]);
     if (v) novo.content = definirMeta(content, 'youtube', v.url);
     else if (v === null) novo.semVideo = true; // procurou e não achou
     novo.videoProcurado = v !== undefined;
@@ -2795,11 +2795,12 @@ function linhaMusicaAcervo(m, i, { pasta = true } = {}) {
     <div class="info"><div class="t">${esc(m.titulo)}</div><div class="s">${m.tipo === 'cifra' ? 'Cifra' : m.tipo === 'partitura' ? 'Partitura' : 'Letra'}${m.tipo !== 'partitura' && /x_partitura/.test(m.chordpro) ? ' · <span class="tag-partitura">Partitura</span>' : ''}${m.parte ? ` · ${esc(m.parte)}` : ''}${m.autor ? ` · ${esc(m.autor)}` : ''}${onde ? ` · ${esc(onde)}` : ''}</div></div>
     <span class="acts">${salva ? `<span class="chip sm" title="Na sua biblioteca">${icon('check', 14)}</span>` : ''}<button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 }
-// abre a música do acervo como música do app (a salva, se já estiver na biblioteca)
-function abrirMusicaAcervo(m, voltar = location.hash) {
+// abre a música do acervo como música do app (a salva, se já estiver na biblioteca); naHora: abre já, sem esperar
+// a busca do vídeo (ela segue com a página aberta)
+function abrirMusicaAcervo(m, voltar = location.hash, { naHora = false } = {}) {
   const salva = db.songBySource(m.fonte);
   if (salva) { location.hash = '#/musica/' + salva.id; return; }
-  abrirPrevia(m.chordpro, m.fonte, voltar);
+  abrirPrevia(m.chordpro, m.fonte, voltar, null, naHora ? { espera: 0 } : undefined);
 }
 // lista de músicas agrupada pela coleção de origem, com busca dentro dela
 function desenharMusicas(box, lista, { filtro = '', vazio = 'Nada encontrado.', agrupar = true, pasta = true } = {}) {
@@ -8083,7 +8084,7 @@ function viewConectarYoutube() {
   };
 }
 
-// ---------------------------------------------------------------- Tirar dúvidas
+// ---------------------------------------------------------------- Lumen, o assistente litúrgico (tirar dúvidas)
 // Como o NotebookLM: a pergunta vai para o servidor da IA, que responde primeiro pelos arquivos do acervo litúrgico
 // (citando cada um: [1], [2]…) e, se eles não trazem a resposta, busca na internet. A conversa fica na tela (dá para
 // perguntar "e no ofertório?") e as fontes do acervo abrem no app.
@@ -8117,6 +8118,11 @@ const pedeLiturgiaDoDia = (q) => {
 // o ditado da pergunta: o reconhecimento de voz do próprio navegador (Chrome, Edge, Safari), em português
 const ReconhecerVoz = window.SpeechRecognition || window.webkitSpeechRecognition;
 let vozDuvidas = null;
+// o nome do site, para mostrar e falar: o que vem depois do "|" no título ("… | Católicos Orantes") ou o endereço
+const nomeDoSite = (w) => {
+  const fim = String(w.titulo || '').split(/\s[|–—-]\s/).slice(1).pop()?.trim();
+  return fim && fim.length <= 40 && !/\.\.\.|…/.test(fim) ? fim : w.site;
+};
 // a resposta dita em voz alta na conversa ao vivo: o que achou, de onde, em frases curtas
 const falaDaResposta = (m) => {
   const partes = [];
@@ -8124,7 +8130,9 @@ const falaDaResposta = (m) => {
   if (m.cantos?.length) partes.push(`Achei ${m.cantos.length === 1 ? 'este canto' : 'estes cantos'} no acervo: ${m.cantos.slice(0, 4).map((a) => a.titulo).join(', ')}.`);
   const [a] = m.acervo || [];
   if (a) partes.push(`No acervo, em ${a.titulo}: ${a.frases.join(' ')}`);
-  if (m.wiki) partes.push(`${a ? 'E na internet' : 'No acervo não achei, mas na internet'}, na Wikipédia: ${m.wiki.frases.join(' ')}`);
+  const [w] = m.web || [];
+  if (w) partes.push(`${a ? 'E na internet' : 'No acervo não achei, mas na internet'}, no site ${nomeDoSite(w).replace(/\.(com\.br|org\.br|com|org|br|pt)$/, '')}: ${w.frases.join(' ')}`);
+  else if (m.wiki) partes.push(`${a ? 'E na internet' : 'No acervo não achei, mas na internet'}, na Wikipédia: ${m.wiki.frases.join(' ')}`);
   if (!partes.length) partes.push('Não achei nada sobre isso no acervo nem na internet. Tente perguntar com outras palavras.');
   return partes.join(' ');
 };
@@ -8152,6 +8160,7 @@ const realcar = (texto, pergunta) => {
 const textoDaResposta = (m) => [
   ...(m.cantos || []).map((a) => `${a.titulo} (${a.caminho})`),
   ...(m.acervo || []).map((a) => `${a.titulo} (${a.caminho}): ${a.frases.join(' ')}`),
+  ...(m.web || []).map((w) => `${w.titulo}: ${w.frases.join(' ')} (${w.url})`),
   ...(m.wiki ? [`Wikipédia — ${m.wiki.titulo}: ${m.wiki.frases.join(' ')} (${m.wiki.url})`] : []),
 ].join('\n\n');
 function viewDuvidas() {
@@ -8160,7 +8169,7 @@ function viewDuvidas() {
   conversaDuvidas = conversaDuvidas.filter((m) => m.carregando || Date.now() - (m.t || 0) < DIA);
   setTab('inicio');
   setTint('#2a3a6b');
-  setHeader('Tirar dúvidas', { back: '#/', eyebrow: 'Acervo litúrgico + internet', actions: [...(ReconhecerVoz ? [{ icon: 'som', label: 'Conversa ao vivo', onClick: () => abrirVivo() }] : []), ...(conversaDuvidas.length ? [{ icon: 'trash', label: 'Apagar conversa', onClick: async () => { if (await ask({ title: 'Apagar a conversa?', text: 'As perguntas e respostas saem deste aparelho. (Elas também somem sozinhas depois de 24 horas.)', ok: 'Apagar', danger: true })) { conversaDuvidas = []; guardarConversa(); viewDuvidas(); } } }] : [])] });
+  setHeader('Lumen', { back: '#/', eyebrow: 'Seu assistente litúrgico', actions: [...(ReconhecerVoz ? [{ icon: 'som', label: 'Conversa ao vivo', onClick: () => abrirVivo() }] : []), ...(conversaDuvidas.length ? [{ icon: 'trash', label: 'Apagar conversa', onClick: async () => { if (await ask({ title: 'Apagar a conversa?', text: 'As perguntas e respostas saem deste aparelho. (Elas também somem sozinhas depois de 24 horas.)', ok: 'Apagar', danger: true })) { conversaDuvidas = []; guardarConversa(); viewDuvidas(); } } }] : [])] });
   const avatar = `<span class="dv-avatar" aria-hidden="true">${icon('sparkles', 18)}</span>`;
   view.innerHTML = `<div class="chat">
     <div class="chat-rolo" id="dv-conversa"></div>
@@ -8171,12 +8180,13 @@ function viewDuvidas() {
         ${ReconhecerVoz ? `<button class="chat-mic" type="button" aria-label="Falar a pergunta" aria-pressed="false" title="Falar a pergunta">${icon('mic', 20)}</button>` : ''}
         <button class="chat-enviar" type="submit" aria-label="Enviar" disabled>${icon('enviar', 20)}</button>
       </div>
-      <small class="chat-rodape">Acervo litúrgico + Wikipédia · a conversa se apaga em 24 horas</small>
+      <small class="chat-rodape">Acervo litúrgico + internet · a conversa se apaga em 24 horas</small>
     </form></div>`;
   const caixa = $('#dv-conversa');
   const boasVindas = () => `<div class="chat-vazio">
       <div class="dv-hero"><span class="dv-avatar grande">${icon('sparkles', 30)}</span></div>
-      <h2>Como posso ajudar o seu ministério?</h2>
+      <h2>Olá, eu sou o Lumen</h2>
+      <p class="dv-lema">Como posso ajudar o seu ministério hoje?</p>
       <p>Pergunte sobre a missa, os tempos litúrgicos ou que canto escolher${ReconhecerVoz ? ' — digitando ou <b>falando</b>, pelo microfone' : ''}. Procuro primeiro no <b>acervo litúrgico</b> e depois na internet.</p>
       ${ReconhecerVoz ? `<button type="button" class="dv-vivo-entrar" data-vivo>${icon('som', 18)}<span><b>Conversar ao vivo</b><small>Fale e ouça a resposta, sem tocar na tela</small></span></button>` : ''}
       <div class="chat-sugestoes">${SUGESTOES_DUVIDAS.map(([ic, q]) => `<button type="button" class="chat-sugestao" data-q="${esc(q)}"><span class="dv-ico">${icon(ic, 18)}</span><span>${esc(q)}</span></button>`).join('')}</div></div>`;
@@ -8201,19 +8211,24 @@ function viewDuvidas() {
           ${outros.map((a, n) => `<p class="dv-texto">${a.frases.map((f) => realcar(f, m.pergunta)).join(' ')}</p>${fonte(a, n + 1)}`).join('')}</details>`);
       }
     }
-    if (m.wiki) {
-      partes.push(`${primeiro ? '<h4 class="dv-sub">Na internet</h4>' : '<p class="dv-aviso">Não achei nos arquivos do acervo. Achei isto na internet:</p>'}
-        <p class="dv-texto">${m.wiki.frases.map((f) => realcar(f, m.pergunta)).join(' ')}</p>
-        <a class="dv-fonte" href="${esc(m.wiki.url)}" target="_blank" rel="noopener">${icon('search', 14)}<span><b>${esc(m.wiki.titulo)}</b><small>Wikipédia</small></span></a>`);
+    // a internet: o resumo do site que mais responde, com o link; os outros sites (e a Wikipédia) embaixo, como links
+    const link = (w, nome) => `<a class="dv-fonte" href="${esc(w.url)}" target="_blank" rel="noopener">${icon('external', 14)}<span><b>${esc(w.titulo)}</b><small>${esc(nome)}</small></span></a>`;
+    const sites = [...(m.web || []).map((w) => ({ ...w, nome: nomeDoSite(w) })), ...(m.wiki ? [{ ...m.wiki, nome: 'Wikipédia' }] : [])];
+    if (sites.length) {
+      const [melhor, ...mais] = sites;
+      partes.push(`${primeiro || m.cantos?.length ? '<h4 class="dv-sub">Na internet</h4>' : '<p class="dv-aviso">Não achei nos arquivos do acervo. Achei isto na internet:</p>'}
+        <p class="dv-texto">${melhor.frases.map((f) => realcar(f, m.pergunta)).join(' ')}</p>${link(melhor, melhor.nome)}
+        ${mais.length ? `<details class="dv-mais"><summary>Mais ${mais.length === 1 ? '1 site' : `${mais.length} sites`}</summary>
+          ${mais.map((w) => `<p class="dv-texto">${w.frases.map((f) => realcar(f, m.pergunta)).join(' ')}</p>${link(w, w.nome)}`).join('')}</details>` : ''}`);
     }
-    if (!partes.length) partes.push(`<div class="dv-nada">${icon('search', 20)}<p>Não achei nada sobre isso no acervo nem na Wikipédia. Tente com outras palavras ou pesquise no Google.</p></div>`);
+    if (!partes.length) partes.push(`<div class="dv-nada">${icon('search', 20)}<p>Não achei nada sobre isso no acervo nem na internet. Tente com outras palavras ou pesquise no Google.</p></div>`);
     return partes.join('');
   };
   const msg = (m, k) => (m.role === 'user'
     ? `<div class="chat-msg eu"><div class="chat-bolha">${esc(m.content)}</div><small class="chat-hora">${horaCurta(m.t)}</small></div>`
-    : `<div class="chat-msg ia"><div class="chat-corpo"><div class="chat-nome">${avatar}<span>Assistente litúrgico</span><small class="chat-hora">${horaCurta(m.t)}</small></div>
+    : `<div class="chat-msg ia"><div class="chat-corpo"><div class="chat-nome">${avatar}<span>Lumen</span><small class="chat-hora">${horaCurta(m.t)}</small></div>
         <div class="chat-bolha">${corpo(m, k)}</div>
-        ${!m.carregando ? `<div class="chat-acoes">${m.acervo?.length || m.cantos?.length || m.wiki ? `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>` : ''}
+        ${!m.carregando ? `<div class="chat-acoes">${m.acervo?.length || m.cantos?.length || m.web?.length || m.wiki ? `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>` : ''}
           ${m.pergunta ? `<a href="${esc(google(m.pergunta))}" target="_blank" rel="noopener">${icon('search', 14)} Pesquisar no Google</a>` : ''}</div>` : ''}</div></div>`);
   const desenhar = () => {
     caixa.innerHTML = conversaDuvidas.length ? conversaDuvidas.map(msg).join('') : boasVindas();
@@ -8233,8 +8248,10 @@ function viewDuvidas() {
     const resp = { role: 'assistant', pergunta: q, carregando: true, t: Date.now() };
     conversaDuvidas.push(resp);
     desenhar();
-    // primeiro o acervo (no aparelho); a Wikipédia vai junto, mas sem segurar a resposta se a internet falhar
+    // primeiro o acervo (no aparelho); a internet (sites católicos pelo DuckDuckGo, e a Wikipédia) vai junto, mas sem
+    // segurar a resposta se ela falhar
     const canto = pedeCanto(q);
+    const naWeb = buscarNaWeb(q).catch(() => []);
     const naWiki = canto ? Promise.resolve(null) : buscarNaWikipedia(q).catch(() => null);
     const todos = (await indiceDasDuvidas().then((ix) => ix.buscar(q, canto ? 12 : 8)).catch(() => []))
       .filter((a, n, lista) => a.cobre >= 0.5 && a.nota >= lista[0].nota * 0.45);
@@ -8246,7 +8263,8 @@ function viewDuvidas() {
       .filter((a) => a.frases.length && termosEm(a.frases.join(' '), q) >= Math.min(2, palavrasDuvida(q).length)).slice(0, 3);
     resp.etapa = 'Procurando na internet…';
     if (location.hash === '#/duvidas') desenhar();
-    Object.assign(resp, { acervo: achados, cantos, wiki: await naWiki, carregando: false, t: Date.now() });
+    const [web, wiki] = await Promise.all([naWeb, naWiki]);
+    Object.assign(resp, { acervo: achados, cantos, web, wiki, carregando: false, t: Date.now() });
     guardarConversa();
     if (location.hash === '#/duvidas') viewDuvidas();
     return resp;
@@ -8302,11 +8320,11 @@ function viewDuvidas() {
     if (!a) return;
     if (a.tipo === 'canto') {
       const c = (await carregarCantos()).find((x) => x.id === a.id && x.i === a.i);
-      if (c) { abrirMusicaAcervo({ fonte: `acervo:${c.id}:${c.i}`, chordpro: c.chordpro }, '#/duvidas'); return; }
+      if (c) { abrirMusicaAcervo({ fonte: `acervo:${c.id}:${c.i}`, chordpro: c.chordpro }, '#/duvidas', { naHora: true }); return; }
     }
     if (a.tipo === 'hinario') {
       const cad = (await carregarHinario()).find((x) => x.id === a.id);
-      if (cad?.cantos[a.i]) { abrirMusicaAcervo({ fonte: sourceHinario(cad, a.i), chordpro: cad.cantos[a.i].chordpro }, '#/duvidas'); return; }
+      if (cad?.cantos[a.i]) { abrirMusicaAcervo({ fonte: sourceHinario(cad, a.i), chordpro: cad.cantos[a.i].chordpro }, '#/duvidas', { naHora: true }); return; }
     }
     toast(`${a.titulo} — ${a.caminho}`);
   };
@@ -8319,7 +8337,7 @@ function viewDuvidas() {
 
   // Conversa ao vivo (como o DJ do Spotify): a pessoa fala, a resposta vem em voz alta e nos cartões (trechos do
   // acervo, links da internet) e ele volta a ouvir sozinho. Tudo no aparelho: o ditado e a voz do próprio navegador
-  // e a busca de sempre (acervo + Wikipédia), sem gastar o servidor da IA
+  // e a busca de sempre (acervo + internet), sem gastar o servidor da IA
   function abrirVivo() {
     if (document.querySelector('.dv-vivo')) return;
     const r0 = vozDuvidas; vozDuvidas = null; r0?.abort();
@@ -8328,8 +8346,8 @@ function viewDuvidas() {
     const el = document.createElement('div');
     el.className = 'dv-vivo';
     el.setAttribute('role', 'dialog');
-    el.setAttribute('aria-label', 'Conversa ao vivo');
-    el.innerHTML = `<div class="dv-vivo-topo"><span class="dv-vivo-selo"><i></i>Ao vivo</span>
+    el.setAttribute('aria-label', 'Conversa ao vivo com o Lumen');
+    el.innerHTML = `<div class="dv-vivo-topo"><span class="dv-vivo-selo"><i></i>Lumen ao vivo</span>
         <button type="button" class="dv-vivo-fechar" aria-label="Encerrar a conversa">${icon('x', 22)}</button></div>
       <div class="dv-vivo-palco">
         <button type="button" class="dv-orbe"><span class="dv-orbe-anel"></span><span class="dv-orbe-anel"></span><span class="dv-orbe-nucleo">${icon('mic', 34)}</span></button>
@@ -8430,7 +8448,7 @@ function viewDuvidas() {
       tocarResposta(e);
     });
     estado('falando', 'Olá!');
-    falar('Olá! Pode perguntar sobre a liturgia e os cantos.').then(() => { if (aberto && el.dataset.estado === 'falando') ouvir(); });
+    falar('Olá, eu sou o Lumen! Pode perguntar sobre a liturgia e os cantos.').then(() => { if (aberto && el.dataset.estado === 'falando') ouvir(); });
   }
 }
 

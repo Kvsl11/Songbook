@@ -2524,6 +2524,7 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 .dv-avatar.grande { position: relative; width: 68px; height: 68px; border-radius: 24px; }
 .dv-avatar.grande .ic { width: 30px; height: 30px; }
 .chat-vazio h2 { margin: 0; text-align: center; font-size: clamp(22px, 5vw, 30px); letter-spacing: -0.02em; line-height: 1.15; }
+.chat-vazio .dv-lema { margin-top: -4px; font-size: 17px; font-weight: 700; color: var(--text); }
 .chat-vazio p { max-width: 500px; margin: 0; line-height: 1.5; color: var(--muted); }
 .chat-vazio p b { color: var(--text); }
 .chat-sugestoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; margin-top: 16px; }
@@ -2643,7 +2644,7 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 }
 @media (max-width: 600px) and (max-height: 780px) {
   .dv-hero { display: none; }
-  .chat-vazio p { display: none; }
+  .chat-vazio p:not(.dv-lema) { display: none; }
 }
 /* Tirar dúvidas: a resposta (texto corrido) e a fonte embaixo, como uma etiqueta */
 .dv-texto { margin: 0 0 10px; font-size: 15.5px; line-height: 1.65; }
@@ -2653,7 +2654,7 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 .chat-bolha .dv-fonte b { color: var(--text); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dv-sub { margin: 14px 0 6px !important; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px !important;
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.dv-aviso { display: inline-block; margin: 0 0 10px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--muted); background: var(--surface-3); }
+.dv-aviso { display: inline-block; margin: 0 0 10px; padding: 5px 12px; border-radius: 12px; font-size: 12px; font-weight: 700; color: var(--muted); background: var(--surface-3); }
 .dv-mais { margin-top: 8px; }
 .dv-mais summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); padding: 4px 0; }
 .dv-mais[open] summary { margin-bottom: 8px; }

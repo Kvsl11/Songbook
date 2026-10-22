@@ -3,6 +3,14 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 223, data: '2026-10-22', titulo: 'Lumen, o seu assistente litúrgico',
+    itens: [
+      { tipo: 'novo', texto: 'O Tirar dúvidas agora se chama Lumen (“luz”, em latim): é o seu assistente litúrgico, por escrito ou ao vivo, por voz.' },
+      { tipo: 'melhoria', texto: 'O Lumen não fica mais preso à Wikipédia: busca também em sites católicos (Missário, CNBB, liturgia.pt, blogs de música litúrgica…) e mostra o resumo do site que melhor responde, com o link, e outros sites em “Mais sites”.' },
+      { tipo: 'correcao', texto: 'Tocar num canto ou arquivo do acervo na resposta do Lumen abre na hora (antes esperava alguns segundos procurando o vídeo; agora o vídeo é procurado com a página já aberta).' },
+    ],
+  },
+  {
     versao: 222, data: '2026-10-22', titulo: 'Conversa ao vivo no Tirar dúvidas',
     itens: [
       { tipo: 'novo', texto: 'Conversar ao vivo, como o DJ do Spotify: em Tirar dúvidas, toque em “Conversar ao vivo” (ou no 🔊 do topo), fale a pergunta e ouça a resposta em voz alta. Na tela aparecem os trechos do acervo e os links da internet, e ele volta a ouvir sozinho, sem tocar em nada. A música tocando pausa enquanto vocês conversam.' },
