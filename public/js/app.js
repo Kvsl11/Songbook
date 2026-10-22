@@ -107,7 +107,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-228';
+export const APP_VERSAO = '2026.10.22-229';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -5659,7 +5659,7 @@ function viewSong(id, ctx = {}) {
     <div id="aviso-video"></div>
     <div class="song-toolbar ${comCifra ? '' : 'sem-cifra'}" id="tools">
       <div class="seg modos" role="group" aria-label="Ver a música como">
-        <button data-act="modo" data-modo="letra" aria-pressed="${!comCifra}" title="${semCifra ? 'Esta música só tem a letra' : 'Só a letra, sem os acordes'}">${icon('text', 15)}<span>Letra</span></button>
+        <button data-act="modo" data-modo="letra" aria-pressed="${!comCifra}" title="${semCifra ? 'Esta música só tem a letra' : 'Só a letra, sem os acordes'}">${icon('text', 15)}<span>Letra</span>${semCifra ? '<small class="seg-nota">sem cifra</small>' : ''}</button>
         ${semCifra ? '' : `<button data-act="modo" data-modo="cifra" aria-pressed="${comCifra}" title="Letra com os acordes">${icon('chord', 15)}<span>Cifra</span></button>`}
         ${paginasDaPartitura(song.content).length || (!isPreview && db.song(song.id)?.partitura) ? `<a class="seg-link" id="btn-partitura" href="#/musica/${isPreview ? 'previa' : song.id}/partitura" title="Ver a partitura (na desenhada, dá para ensaiar ouvindo cada voz)">${icon('score', 15)}<span>Partitura</span></a>` : ''}
       </div>
@@ -5765,8 +5765,8 @@ function viewSong(id, ctx = {}) {
   const avisoFalta = () => {
     const box = $('#aviso-video');
     if (!box) return;
+    // a falta da cifra não entra aqui: ela já aparece na aba "Letra · sem cifra" (o aviso só ocupava espaço)
     const falta = [];
-    if (semCifra && !procuraCifra()) falta.push('cifra');
     if (!linhasDaLetra(song.content).length) falta.push('letra');
     if (!song.youtube && (!isPreview || preview.semVideo || String(song.source || '').startsWith('cnbb:'))) falta.push('vídeo');
     box.innerHTML = falta.length ? `<div class="aviso">${icon('info', 18)}<span>Esta música não tem ${falta.length > 1 ? falta.slice(0, -1).join(', ') + ' nem ' + falta[falta.length - 1] : falta[0]}.</span></div>` : '';
