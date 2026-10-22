@@ -1,3 +1,7 @@
+__pycache__/
+.pytest_cache/
 .venv/
+tests/
+textos-acervo.jsonl.bak
 bin/
 dados/
