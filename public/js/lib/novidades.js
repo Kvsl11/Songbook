@@ -5,7 +5,7 @@ export const NOVIDADES = [
   {
     versao: 233, data: '2026-10-22', titulo: 'O logo do Lumen',
     itens: [
-      { tipo: 'novo', texto: 'O Lumen ganhou logo próprio: a “cruz de luz” (lumen é luz, em latim), uma estrela com o braço de baixo mais longo, formando a cruz, no degradê azul, roxo, rosa e dourado. Ele aparece no atalho do Início, no centro da tela do Lumen, nas respostas e na conversa ao vivo.' },
+      { tipo: 'novo', texto: 'O Lumen ganhou logo próprio: o monograma L, arredondado, com a estrela de luz ao lado (lumen é luz, em latim), no degradê azul, roxo, rosa e dourado. Ele aparece no atalho do Início, no centro da tela do Lumen, nas respostas e na conversa ao vivo.' },
     ],
   },
   {

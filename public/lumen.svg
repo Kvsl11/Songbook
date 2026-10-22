@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 48 48">
   <title>Lumen</title>
   <defs>
-    <linearGradient id="g" x1="0.15" y1="0" x2="0.85" y2="1">
-      <stop offset="0" stop-color="#4f8cff"/><stop offset="0.42" stop-color="#9b72ff"/><stop offset="0.72" stop-color="#ff6fa8"/><stop offset="1" stop-color="#ffb84d"/>
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="10" y1="5" x2="40" y2="41">
+      <stop offset="0" stop-color="#4f8cff"/><stop offset="0.45" stop-color="#9b72ff"/><stop offset="0.75" stop-color="#ff6fa8"/><stop offset="1" stop-color="#ffb84d"/>
     </linearGradient>
     <radialGradient id="c" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff" stop-opacity="0.95"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
   </defs>
-  <path fill="url(#g)" d="M24 3C24.9 12.5 29.5 17.6 40 19 29.5 20.4 24.9 25.5 24 45 23.1 25.5 18.5 20.4 8 19 18.5 17.6 23.1 12.5 24 3Z"/>
-  <path fill="url(#g)" d="M38 2C38.3 4.8 39.2 5.7 42 6 39.2 6.3 38.3 7.2 38 10 37.7 7.2 36.8 6.3 34 6 36.8 5.7 37.7 4.8 38 2Z"/>
-  <circle cx="24" cy="19" r="6.5" fill="url(#c)"/>
+  <path fill="url(#g)" d="M14.5 6A4.5 4.5 0 0 1 19 10.5V31H34.5A4.5 4.5 0 0 1 34.5 40H14.5A4.5 4.5 0 0 1 10 35.5V10.5A4.5 4.5 0 0 1 14.5 6Z"/>
+  <path fill="url(#g)" d="M31.5 5C32.1 11.6 34.9 14.4 41.5 15 34.9 15.6 32.1 18.4 31.5 25 30.9 18.4 28.1 15.6 21.5 15 28.1 14.4 30.9 11.6 31.5 5Z"/>
+  <circle cx="31.5" cy="15" r="4.5" fill="url(#c)"/>
 </svg>
