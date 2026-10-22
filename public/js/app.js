@@ -19,12 +19,13 @@ import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib
 import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } from './lib/alinhamento.js';
 import { duracaoDoAviso, partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { baseDoServidor, casarLinhas, chamar, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
+import { buscarNaWikipedia, criarIndice as criarIndiceDuvidas, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
-// celular: a tela fica em pé (tablet e computador giram à vontade). A trava vale no app instalado e em tela cheia;
-// no navegador comum, que não deixa travar, um aviso pede para virar o celular (html.celular, no CSS)
+// celular: a tela fica em pé (tablet e computador giram à vontade). O navegador só deixa travar no app instalado
+// (tela inicial) e em tela cheia; a trava é pedida de novo sempre que o app volta para a frente ou a tela gira
 const ehCelular = () => Math.min(screen.width, screen.height) < 600 && matchMedia('(pointer: coarse)').matches;
 const travarEmPe = () => {
   if (!ehCelular()) return;
@@ -35,15 +36,17 @@ const travarEmPe = () => {
 document.documentElement.classList.toggle('celular', ehCelular());
 travarEmPe();
 document.addEventListener('fullscreenchange', travarEmPe);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) travarEmPe(); });
+screen.orientation?.addEventListener?.('change', travarEmPe);
 // o servidor da IA vem junto com o app: a publicação grava o endereço em data/servidor-ia.json (sem ele, a partitura
 // é gerada no aparelho e as telas que precisam do servidor não aparecem). Quem usa não configura nada
 let SERVIDOR_IA = { url: '', chave: '' };
 const servidorIA = () => SERVIDOR_IA;
-fetch(new URL('data/servidor-ia.json', document.baseURI)).then((r) => (r.ok ? r.json() : null)).then((d) => {
+const servidorCarregado = fetch(new URL('data/servidor-ia.json', document.baseURI)).then((r) => (r.ok ? r.json() : null)).then((d) => {
   if (!d?.url) return;
   SERVIDOR_IA = { url: baseDoServidor(d.url), chave: d.chave || '' };
   // a tela que já abriu sem saber do servidor é desenhada de novo
-  if (/^#\/(duvidas|musica\/[^/]+\/compor\/ia)/.test(location.hash)) route();
+  if (/^#\/musica\/[^/]+\/compor\/ia/.test(location.hash)) route();
   // o servidor gratuito dorme quando ninguém usa: um "bom dia" já o acorda para quando precisar
   fetch(SERVIDOR_IA.url + '/saude').catch(() => {});
 }).catch(() => {});
@@ -78,7 +81,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-191';
+export const APP_VERSAO = '2026.10.22-192';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4988,7 +4991,8 @@ async function gerarComIA(song, titulo) {
     previa();
   }
   // áudio que chegou pelo "Compartilhar" do celular: vai direto para a IA
-  if (audioCompartilhado) { const a = audioCompartilhado; audioCompartilhado = null; lerArquivo(a); } else telaFontes();
+  // com o servidor da IA e o vídeo da música, a partitura começa sozinha pelo vídeo (sem escolher arquivo nem colar link)
+  if (audioCompartilhado) { const a = audioCompartilhado; audioCompartilhado = null; lerArquivo(a); } else if (servidorIA().url && song.youtube) lerNoServidor({ url: `https://youtu.be/${song.youtube}` }); else telaFontes();
 }
 
 // "Compartilhar → Songbook" no Android: o service worker guarda o áudio (cache COMPARTILHADO do sw.js) e abre
@@ -5632,19 +5636,25 @@ function viewSong(id, ctx = {}) {
     if (!player.desta(song.youtube)) tocar();
     player.irPara(Math.max(0, sinc.tempos[k].inicio - 0.3));
   });
-  $('#btn-sincronizar')?.addEventListener('click', async () => {
-    $('#menu-mais').hidden = true;
+  const sincronizarLetra = async ({ sozinho = false } = {}) => {
     const cantadas = linhasCantadas(song.content).map(linhaSemCifra).filter(Boolean);
-    if (!cantadas.length) { toast('Esta música não tem letra para sincronizar'); return; }
-    toast('Sincronizando a letra com o vídeo… (leva uns minutos)');
+    if (!cantadas.length) { if (!sozinho) toast('Esta música não tem letra para sincronizar'); return; }
+    if (!sozinho) toast('Sincronizando a letra com o vídeo… (leva uns minutos)');
+    tentouSincronizar.add(song.youtube);
     try {
       const r = await chamar(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: cantadas } });
       const sinc = { video: song.youtube, linhas: cantadas, tempos: r.linhas.map((x) => ({ inicio: x.inicio, fim: x.fim })) };
       song.sincronia = sinc;
       mapa = null;
       if (isPreview) preview.sincronia = sinc; else db.updateSong(song.id, { sincronia: sinc });
-      toast(`Letra sincronizada: ${r.achadas} de ${r.total} linhas ouvidas no vídeo. Toque numa linha para ir até ela`);
-    } catch (e) { toast(e.message); }
+      toast(sozinho ? 'Letra sincronizada com o vídeo: dê play e ela acompanha' : `Letra sincronizada: ${r.achadas} de ${r.total} linhas ouvidas no vídeo. Toque numa linha para ir até ela`);
+    } catch (e) { if (!sozinho) toast(e.message); }
+  };
+  $('#btn-sincronizar')?.addEventListener('click', () => { $('#menu-mais').hidden = true; sincronizarLetra(); });
+  // a música com vídeo e sem letra sincronizada: sincroniza sozinha, em segundo plano (uma tentativa por vídeo a cada
+  // vez que o app abre; depois fica guardada na música)
+  servidorCarregado.then(() => {
+    if (song.youtube && servidorIA().url && !sincronia() && !tentouSincronizar.has(song.youtube)) sincronizarLetra({ sozinho: true });
   });
   // música vinda da busca sem vídeo: procura no YouTube sozinho e já vincula (se não achar, o aviso diz)
   if (isPreview && !song.youtube && !String(song.source || '').startsWith('cnbb:') && !preview.semVideo && !preview.videoProcurado) {
@@ -7492,8 +7502,11 @@ async function viewFontes() {
 // Como o NotebookLM: a pergunta vai para o servidor da IA, que responde primeiro pelos arquivos do acervo litúrgico
 // (citando cada um: [1], [2]…) e, se eles não trazem a resposta, busca na internet. A conversa fica na tela (dá para
 // perguntar "e no ofertório?") e as fontes do acervo abrem no app.
-// a conversa fica guardada neste aparelho (volta ao abrir de novo); "Nova conversa" limpa
-let conversaDuvidas = (() => { try { return JSON.parse(localStorage.getItem('songbook.duvidas') || '[]').filter((m) => !m.carregando); } catch { return []; } })();
+// os vídeos que já tentaram sincronizar a letra sozinhos desde que o app abriu (não repete a cada visita)
+const tentouSincronizar = new Set();
+// a conversa fica guardada neste aparelho por 24 horas (depois some sozinha); "Apagar conversa" limpa na hora
+const DIA = 24 * 3600e3;
+let conversaDuvidas = (() => { try { return JSON.parse(localStorage.getItem('songbook.duvidas') || '[]').filter((m) => !m.carregando && Date.now() - (m.t || 0) < DIA); } catch { return []; } })();
 const guardarConversa = () => { try { localStorage.setItem('songbook.duvidas', JSON.stringify(conversaDuvidas.filter((m) => !m.carregando).slice(-40))); } catch { /* sem espaço: só não guarda */ } };
 const SUGESTOES_DUVIDAS = [
   ['music', 'Qual a função do cantor na hora da comunhão?'],
@@ -7512,19 +7525,43 @@ function htmlDaResposta(texto) {
   }).join('');
 }
 const horaCurta = (t) => (t ? new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
+// o índice das dúvidas: o texto de cada canto do acervo e de cada canto do Hinário (feito uma vez, na 1ª pergunta)
+let indiceDuvidas = null;
+async function indiceDasDuvidas() {
+  if (indiceDuvidas) return indiceDuvidas;
+  const [cantos, cadernos] = await Promise.all([carregarCantos(), carregarHinario()]);
+  const trechos = [
+    ...cantos.map((c) => ({ titulo: c.titulo, caminho: [...(c.caminho || []), c.arquivo].filter(Boolean).join(' / '), texto: textoSemCifra(c.chordpro), id: c.id, i: c.i, tipo: 'canto' })),
+    ...cadernos.flatMap((cad) => cad.cantos.map((c, i) => ({ titulo: c.titulo, caminho: `Hinário Litúrgico / ${cad.celebracao || cad.nome}`, texto: `${c.parte || ''}\n${textoSemCifra(c.chordpro)}`, id: cad.id, i, tipo: 'hinario' }))),
+  ];
+  indiceDuvidas = criarIndiceDuvidas(trechos);
+  return indiceDuvidas;
+}
+// quantas palavras diferentes da pergunta aparecem no texto
+const termosEm = (texto, pergunta) => { const t = new Set(palavrasDuvida(pergunta).map(raizDuvida)); return new Set(palavrasDuvida(texto).map(raizDuvida).filter((p) => t.has(p))).size; };
+// as palavras da pergunta em negrito no trecho
+const realcar = (texto, pergunta) => {
+  const termos = new Set(palavrasDuvida(pergunta).map(raizDuvida));
+  return esc(texto).replace(/[\p{L}\d]+/gu, (p) => (termos.has(raizDuvida(palavrasDuvida(p)[0] || '')) ? `<b>${p}</b>` : p));
+};
+// a resposta em texto (para copiar)
+const textoDaResposta = (m) => [
+  ...(m.cantos || []).map((a) => `${a.titulo} (${a.caminho})`),
+  ...(m.acervo || []).map((a) => `${a.titulo} (${a.caminho}): ${a.frases.join(' ')}`),
+  ...(m.wiki ? [`Wikipédia — ${m.wiki.titulo}: ${m.wiki.frases.join(' ')} (${m.wiki.url})`] : []),
+].join('\n\n');
 function viewDuvidas() {
+  conversaDuvidas = conversaDuvidas.filter((m) => m.carregando || Date.now() - (m.t || 0) < DIA);
   setTab('inicio');
   setTint('#2a3a6b');
-  setHeader('Tirar dúvidas', { back: '#/', eyebrow: 'Assistente litúrgico', actions: conversaDuvidas.length ? [{ icon: 'edit', label: 'Nova conversa', onClick: () => { conversaDuvidas = []; guardarConversa(); viewDuvidas(); } }] : [] });
-  const temServidor = !!servidorIA().url;
+  setHeader('Tirar dúvidas', { back: '#/', eyebrow: 'Acervo litúrgico + internet', actions: conversaDuvidas.length ? [{ icon: 'trash', label: 'Apagar conversa', onClick: async () => { if (await ask({ title: 'Apagar a conversa?', text: 'As perguntas e respostas saem deste aparelho. (Elas também somem sozinhas depois de 24 horas.)', ok: 'Apagar', danger: true })) { conversaDuvidas = []; guardarConversa(); viewDuvidas(); } } }] : [] });
   const avatar = `<span class="dv-avatar" aria-hidden="true">${icon('sparkles', 18)}</span>`;
   view.innerHTML = `<div class="chat">
     <div class="chat-rolo" id="dv-conversa"></div>
     <form class="chat-barra" id="dv-form">
-      ${temServidor ? '' : `<div class="chat-aviso">${icon('info', 16)}<span>O assistente está sendo preparado. Tente de novo daqui a pouco.</span></div>`}
-      <div class="chat-campo"><textarea name="q" rows="1" placeholder="Pergunte sobre liturgia e canto…" aria-label="Sua pergunta" ${temServidor ? '' : 'disabled'}></textarea>
+      <div class="chat-campo"><textarea name="q" rows="1" placeholder="Pergunte sobre liturgia e canto…" aria-label="Sua pergunta"></textarea>
         <button class="chat-enviar" type="submit" aria-label="Enviar" disabled>${icon('next', 20)}</button></div>
-      <small class="chat-rodape">Responde pelos arquivos do acervo litúrgico e, se não achar, pela internet. Confira sempre as fontes.</small>
+      <small class="chat-rodape">Mostra o que está nos arquivos do acervo litúrgico e, se não achar, na Wikipédia. A conversa se apaga sozinha em 24 horas.</small>
     </form></div>`;
   const caixa = $('#dv-conversa');
   const boasVindas = () => `<div class="chat-vazio">
@@ -7532,35 +7569,70 @@ function viewDuvidas() {
       <h2>Olá! Como posso ajudar o seu ministério?</h2>
       <p class="muted">Pergunte sobre a missa, os tempos litúrgicos, a função de cada parte ou que canto escolher. Eu procuro primeiro nos <b>arquivos do acervo</b> e, se não achar, <b>na internet</b>.</p>
       <div class="chat-sugestoes">${SUGESTOES_DUVIDAS.map(([ic, q]) => `<button type="button" class="chat-sugestao" data-q="${esc(q)}"><span>${icon(ic, 18)}</span>${esc(q)}</button>`).join('')}</div></div>`;
+  const google = (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+  const corpo = (m, k) => {
+    if (m.carregando) return `<div class="chat-digitando" aria-label="Procurando a resposta"><i></i><i></i><i></i><span>${esc(m.etapa || 'Procurando no acervo…')}</span></div>`;
+    if (m.content && !m.acervo) return htmlDaResposta(m.content); // conversa guardada da versão anterior
+    // a resposta: o trecho que mais responde, em texto corrido, com a fonte embaixo; os outros trechos recolhidos
+    const fonte = (a, n) => `<button type="button" class="dv-fonte" data-k="${k}" data-n="${n}">${icon('library', 14)}<span><b>${esc(a.titulo)}</b><small>${esc(a.caminho)}</small></span></button>`;
+    const partes = [];
+    if (m.cantos?.length) {
+      partes.push(`<p class="dv-texto">Achei estes cantos nos arquivos do acervo:</p><div class="dv-cantos">${m.cantos.map((a, n) => `<button type="button" class="dv-fonte" data-k="${k}" data-n="${n}" data-lista="cantos">${icon('music', 14)}<span><b>${esc(a.titulo)}</b><small>${esc(a.caminho)}</small></span></button>`).join('')}</div>`);
+    }
+    const [primeiro, ...outros] = m.acervo || [];
+    if (primeiro) {
+      partes.push(`<p class="dv-texto">${primeiro.frases.map((f) => realcar(f, m.pergunta)).join(' ')}</p>`, fonte(primeiro, 0));
+      if (outros.length) {
+        partes.push(`<details class="dv-mais"><summary>Mais ${outros.length === 1 ? '1 trecho' : `${outros.length} trechos`} do acervo</summary>
+          ${outros.map((a, n) => `<p class="dv-texto">${a.frases.map((f) => realcar(f, m.pergunta)).join(' ')}</p>${fonte(a, n + 1)}`).join('')}</details>`);
+      }
+    }
+    if (m.wiki) {
+      partes.push(`${primeiro ? '<h4 class="dv-sub">Na internet</h4>' : '<p class="dv-aviso">Não achei nos arquivos do acervo. Achei isto na internet:</p>'}
+        <p class="dv-texto">${m.wiki.frases.map((f) => realcar(f, m.pergunta)).join(' ')}</p>
+        <a class="dv-fonte" href="${esc(m.wiki.url)}" target="_blank" rel="noopener">${icon('search', 14)}<span><b>${esc(m.wiki.titulo)}</b><small>Wikipédia</small></span></a>`);
+    }
+    if (!partes.length) partes.push('<p class="dv-texto">Não achei nada sobre isso nos arquivos do acervo nem na Wikipédia. Tente com outras palavras ou pesquise no Google.</p>');
+    return partes.join('');
+  };
   const msg = (m, k) => (m.role === 'user'
     ? `<div class="chat-msg eu"><div class="chat-bolha">${esc(m.content)}</div><small class="chat-hora">${horaCurta(m.t)}</small></div>`
     : `<div class="chat-msg ia">${avatar}<div class="chat-corpo"><div class="chat-nome">Assistente litúrgico <small class="chat-hora">${horaCurta(m.t)}</small></div>
-        <div class="chat-bolha">${m.carregando ? `<div class="chat-digitando" aria-label="Procurando a resposta"><i></i><i></i><i></i><span>${esc(m.etapa || 'Procurando no acervo…')}</span></div>`
-          : m.erro ? `<p class="chat-erro">${icon('info', 16)} ${esc(m.erro)}</p>` : htmlDaResposta(m.content)}
-        ${m.fontes?.length ? `<div class="dv-fontes"><b>${icon('library', 14)} Do acervo</b>${m.fontes.map((f) => `<button type="button" class="dv-fonte" data-k="${k}" data-n="${f.n}"><sup class="dv-cita">${f.n}</sup><span><b>${esc(f.titulo)}</b><small>${esc(f.caminho)}</small></span></button>`).join('')}</div>` : ''}
-        ${m.web?.length ? `<div class="dv-fontes web"><b>${icon('search', 14)} Da internet</b>${m.web.map((w) => `<a class="dv-fonte" href="${esc(w.url)}" target="_blank" rel="noopener"><span><b>${esc(w.titulo)}</b><small>${esc(host(w.url))}</small></span></a>`).join('')}</div>` : ''}</div>
-        ${!m.carregando ? `<div class="chat-acoes">${m.erro ? `<button type="button" data-repetir="${k}">${icon('refresh', 14)} Tentar de novo</button>` : `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>`}</div>` : ''}</div></div>`);
+        <div class="chat-bolha">${corpo(m, k)}</div>
+        ${!m.carregando ? `<div class="chat-acoes">${m.acervo?.length || m.cantos?.length || m.wiki ? `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>` : ''}
+          ${m.pergunta ? `<a href="${esc(google(m.pergunta))}" target="_blank" rel="noopener">${icon('search', 14)} Pesquisar no Google</a>` : ''}</div>` : ''}</div></div>`);
   const desenhar = () => {
     caixa.innerHTML = conversaDuvidas.length ? conversaDuvidas.map(msg).join('') : boasVindas();
     // com conversa, vai para a última mensagem; vazia, fica no começo (o "Olá" não pode sair cortado no celular)
-    requestAnimationFrame(() => { view.scrollTop = conversaDuvidas.length ? view.scrollHeight : 0; });
+    // a resposta nova aparece do começo (a pergunta no alto da tela), para ler de cima para baixo
+    requestAnimationFrame(() => {
+      if (!conversaDuvidas.length) { view.scrollTop = 0; return; }
+      const ultima = [...caixa.querySelectorAll('.chat-msg.eu')].pop() || caixa.lastElementChild;
+      view.scrollTop = Math.max(0, ultima.offsetTop - 12);
+    });
   };
   desenhar();
   const perguntar = async (q) => {
     q = q.trim();
-    if (!q || !temServidor || conversaDuvidas.some((m) => m.carregando)) return;
-    const historico = conversaDuvidas.filter((m) => !m.erro && !m.carregando).map((m) => ({ role: m.role, content: m.content }));
+    if (!q || conversaDuvidas.some((m) => m.carregando)) return;
     conversaDuvidas.push({ role: 'user', content: q, t: Date.now() });
-    const resp = { role: 'assistant', content: '', carregando: true, t: Date.now() };
+    const resp = { role: 'assistant', pergunta: q, carregando: true, t: Date.now() };
     conversaDuvidas.push(resp);
     desenhar();
-    // enquanto espera, conta o que está fazendo (o acervo é rápido; a busca na web leva mais)
-    const etapas = setTimeout(() => { resp.etapa = 'Não achei tudo no acervo: buscando na internet…'; if (location.hash === '#/duvidas') desenhar(); }, 9000);
-    try {
-      const r = await chamar(servidorIA(), '/duvida', { json: { pergunta: q, historico }, tempo: 4 * 60e3 });
-      Object.assign(resp, { content: r.resposta, fontes: r.fontes, web: r.web, carregando: false, t: Date.now() });
-    } catch (e) { Object.assign(resp, { erro: e.message, carregando: false, pergunta: q }); }
-    clearTimeout(etapas);
+    // primeiro o acervo (no aparelho); a Wikipédia vai junto, mas sem segurar a resposta se a internet falhar
+    const canto = pedeCanto(q);
+    const naWiki = canto ? Promise.resolve(null) : buscarNaWikipedia(q).catch(() => null);
+    const todos = (await indiceDasDuvidas().then((ix) => ix.buscar(q, canto ? 12 : 8)).catch(() => []))
+      .filter((a, n, lista) => a.cobre >= 0.5 && a.nota >= lista[0].nota * 0.45);
+    // pedido de canto: os cantos achados, pelo título; dúvida: só texto que explica (letra de canto não responde)
+    const cantos = canto ? todos.slice(0, 6).map((a) => ({ titulo: a.titulo, caminho: a.caminho, id: a.id, i: a.i, tipo: a.tipo })) : [];
+    const achados = canto ? [] : todos
+      .map((a) => ({ titulo: a.titulo, caminho: a.caminho, id: a.id, i: a.i, tipo: a.tipo, frases: melhoresFrases(a.texto, q, 3, { soExplicacao: true }) }))
+      // o trecho tem de falar do assunto: pelo menos 2 palavras da pergunta nas frases mostradas (uma só é coincidência)
+      .filter((a) => a.frases.length && termosEm(a.frases.join(' '), q) >= Math.min(2, palavrasDuvida(q).length)).slice(0, 3);
+    resp.etapa = 'Procurando na internet…';
+    if (location.hash === '#/duvidas') desenhar();
+    Object.assign(resp, { acervo: achados, cantos, wiki: await naWiki, carregando: false, t: Date.now() });
     guardarConversa();
     if (location.hash === '#/duvidas') viewDuvidas();
   };
@@ -7571,36 +7643,25 @@ function viewDuvidas() {
   campo.addEventListener('input', ajustar);
   campo.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && innerWidth > 700) { e.preventDefault(); form.requestSubmit(); } });
   form.onsubmit = (e) => { e.preventDefault(); const q = campo.value; campo.value = ''; ajustar(); perguntar(q); };
-  if (temServidor && innerWidth > 700) campo.focus();
+  if (innerWidth > 700) campo.focus();
   caixa.addEventListener('click', async (e) => {
     const sug = e.target.closest('[data-q]');
     if (sug) { perguntar(sug.dataset.q); return; }
     const cop = e.target.closest('[data-copiar]');
-    if (cop) { try { await navigator.clipboard.writeText(conversaDuvidas[cop.dataset.copiar].content); toast('Resposta copiada'); } catch { toast('Não consegui copiar'); } return; }
-    const rep = e.target.closest('[data-repetir]');
-    if (rep) {
-      const k = Number(rep.dataset.repetir);
-      const q = conversaDuvidas[k]?.pergunta;
-      conversaDuvidas.splice(k - 1, 2);
-      perguntar(q || '');
-      return;
-    }
-    // a fonte do acervo abre no app (o canto ou o caderno do Hinário); os outros arquivos mostram só o caminho
+    if (cop) { try { const m = conversaDuvidas[cop.dataset.copiar]; await navigator.clipboard.writeText(m.content && !m.acervo ? m.content : textoDaResposta(m)); toast('Resposta copiada'); } catch { toast('Não consegui copiar'); } return; }
+    // o trecho do acervo abre o canto no app (do acervo ou do caderno do Hinário)
     const b = e.target.closest('button.dv-fonte');
-    if (!b) return;
-    const f = conversaDuvidas[b.dataset.k]?.fontes?.find((x) => String(x.n) === b.dataset.n);
-    if (!f) return;
-    if (f.tipo === 'canto') {
-      const cantos = await carregarCantos();
-      const c = cantos.find((x) => x.id === f.id && x.titulo === f.titulo) || cantos.find((x) => x.id === f.id);
+    const a = b && conversaDuvidas[b.dataset.k]?.[b.dataset.lista || 'acervo']?.[b.dataset.n];
+    if (!a) return;
+    if (a.tipo === 'canto') {
+      const c = (await carregarCantos()).find((x) => x.id === a.id && x.i === a.i);
       if (c) { abrirMusicaAcervo({ fonte: `acervo:${c.id}:${c.i}`, chordpro: c.chordpro }, '#/duvidas'); return; }
     }
-    if (f.tipo === 'hinario') {
-      const cad = (await carregarHinario()).find((x) => x.id === f.id);
-      const i = cad?.cantos.findIndex((c) => c.titulo === f.titulo) ?? -1;
-      if (i >= 0) { abrirMusicaAcervo({ fonte: sourceHinario(cad, i), chordpro: cad.cantos[i].chordpro }, '#/duvidas'); return; }
+    if (a.tipo === 'hinario') {
+      const cad = (await carregarHinario()).find((x) => x.id === a.id);
+      if (cad?.cantos[a.i]) { abrirMusicaAcervo({ fonte: sourceHinario(cad, a.i), chordpro: cad.cantos[a.i].chordpro }, '#/duvidas'); return; }
     }
-    toast(`${f.titulo} — ${f.caminho}`);
+    toast(`${a.titulo} — ${a.caminho}`);
   });
 }
 

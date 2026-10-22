@@ -2490,15 +2490,6 @@ dialog.lista-dlg[open] { display: flex; flex-direction: column; overflow: hidden
 .song.sincronizada .line.agora .lyric { color: var(--accent, #06b6d4); }
 @media (hover: hover) { .song.sincronizada .line:not(.chords-only):hover { opacity: 1; } }
 
-/* ---------------------------------------------------------------- celular sempre em pé
-   onde o navegador não deixa travar a tela (fora do app instalado), o celular deitado mostra o aviso para virar */
-@media (orientation: landscape) and (max-height: 500px) {
-  html.celular body::after {
-    content: "↻  Vire o celular: o Songbook fica em pé"; position: fixed; inset: 0; z-index: 2147483000;
-    display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center;
-    background: var(--bg, #121212); color: var(--text, #fff); font: 700 18px/1.4 Figtree, sans-serif;
-  }
-}
 
 /* ---------------------------------------------------------------- Tirar dúvidas: tela de chat */
 .chat { --chat-max: 820px; min-height: 100%; display: flex; flex-direction: column; }
@@ -2585,3 +2576,19 @@ dialog.lista-dlg[open] { display: flex; flex-direction: column; overflow: hidden
   .chat-vazio p { display: none; }
   .chat-vazio h2 { margin-top: 0; }
 }
+/* Tirar dúvidas: a resposta (texto corrido) e a fonte embaixo, como uma etiqueta */
+.dv-texto { margin: 0 0 10px; font-size: 15.5px; line-height: 1.65; }
+.dv-texto b { font-weight: 700; color: inherit; background: color-mix(in srgb, var(--accent, #06b6d4) 18%, transparent); border-radius: 4px; padding: 0 2px; }
+.chat-bolha .dv-fonte { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; margin: 0 0 4px; padding: 6px 10px 6px 8px; border-radius: 10px; font-size: 13px; color: var(--accent, #06b6d4); }
+.chat-bolha .dv-fonte span { min-width: 0; }
+.chat-bolha .dv-fonte b { color: var(--text, #fff); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dv-sub { margin: 14px 0 6px !important; padding-top: 12px; border-top: 1px solid var(--surface-3, rgb(255 255 255 / 0.08)); font-size: 12px !important;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2, rgb(255 255 255 / 0.6)); }
+.dv-aviso { margin: 0 0 8px; font-size: 13px; color: var(--text-2, rgb(255 255 255 / 0.65)); }
+.dv-mais { margin-top: 8px; }
+.dv-mais summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--text-2, rgb(255 255 255 / 0.7)); padding: 4px 0; }
+.dv-mais[open] summary { margin-bottom: 8px; }
+.dv-mais .dv-texto { font-size: 14.5px; }
+.chat-acoes a { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; color: var(--text-2, rgb(255 255 255 / 0.6)); font-size: 12px; font-weight: 600; text-decoration: none; }
+.chat-acoes a:hover { background: var(--surface-2, rgb(255 255 255 / 0.06)); color: var(--text, #fff); }
+.dv-cantos { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
