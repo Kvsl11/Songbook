@@ -3,6 +3,14 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 221, data: '2026-10-22', titulo: 'Tirar dúvidas de cara nova, com microfone',
+    itens: [
+      { tipo: 'novo', texto: 'Tirar dúvidas: toque no microfone e fale a pergunta. O que você fala vai aparecendo no campo, e dá para corrigir antes de enviar.' },
+      { tipo: 'melhoria', texto: 'Tirar dúvidas de visual novo: respostas em cartões de largura toda, sugestões em cartões e caixa de pergunta maior. Perguntou sobre a liturgia de hoje? A resposta traz o atalho para a página da Liturgia.' },
+      { tipo: 'melhoria', texto: 'A página da música ficou mais limpa: sincronizar a letra fica só no menu ⋯, e o aviso fixo de “cifra completada” saiu de cima da letra (o app avisa uma vez, na hora).' },
+    ],
+  },
+  {
     versao: 220, data: '2026-10-22', titulo: 'Servidor da IA em modo econômico',
     itens: [
       { tipo: 'melhoria', texto: 'A letra não sincroniza mais sozinha ao abrir a música: toque no ✦ da barra da música (ou em “Sincronizar a letra com o vídeo” no menu ⋯). Só abrir as músicas gastava o crédito grátis do servidor e fazia ele parar no meio do mês.' },
