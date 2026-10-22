@@ -85,7 +85,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-204';
+export const APP_VERSAO = '2026.10.22-205';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -2955,10 +2955,16 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
   const nPl = FILTROS[2][2];
   const acao = ehPl ? ['lib-nova-pl', 'disc', 'Nova playlist'] : ehRep ? ['lib-novo-rep', 'plus', 'Novo repertório'] : ['lib-nova-mus', 'edit', 'Criar música'];
   const busca = sessionStorage.getItem('buscaBib') || '';
+  // o topo mostra as capas das últimas músicas salvas, com a cor da mais recente
+  const recentes = db.recentSongs(4);
+  const ultima = recentes[0];
   view.innerHTML = `
-    <section class="bib-hero">
-      <div class="kind">Sua biblioteca</div><h2>Suas músicas e repertórios</h2>
-      <div class="part-numeros"><span><b>${todas.length}</b> música${todas.length === 1 ? '' : 's'}</span><span><b>${nRep}</b> repertório${nRep === 1 ? '' : 's'}</span><span><b>${nPl}</b> playlist${nPl === 1 ? '' : 's'}</span></div>
+    <section class="bib-hero" style="--cor:${ultima ? corDe(ultima) : 'var(--tint)'}">
+      <div class="bib-hero-txt"><div class="kind">Sua biblioteca</div><h2>Suas músicas e repertórios</h2>
+        ${ultima ? `<a class="bib-ultima" href="#/musica/${ultima.id}"><small>Salva por último</small><b>${esc(ultima.title)}</b>${ultima.artist ? `<span>${esc(ultima.artist)}</span>` : ''}</a>`
+          : '<p class="bib-hero-dica">Salve cantos da busca ou da liturgia e eles aparecem aqui.</p>'}
+        <div class="part-numeros"><span><b>${todas.length}</b> música${todas.length === 1 ? '' : 's'}</span><span><b>${nRep}</b> repertório${nRep === 1 ? '' : 's'}</span><span><b>${nPl}</b> playlist${nPl === 1 ? '' : 's'}</span></div></div>
+      ${recentes.length ? `<div class="bib-capas n${recentes.length}" aria-hidden="true">${recentes.map((x, i) => `<span style="--i:${i}">${capa(x)}</span>`).join('')}</div>` : ''}
     </section>
     <nav class="bib-filtros chips" aria-label="Filtrar a biblioteca">${FILTROS.map(([k, n, c]) => `<a class="chip" href="#/biblioteca/${k}" aria-pressed="${k === filtro}">${n}<b>${c}</b></a>`).join('')}</nav>
     <div class="bib-barra">
@@ -4488,23 +4494,18 @@ function viewPartituras() {
       ${miniPauta({ clave: 'G', ev }, [4, 4])}<span class="part-pagina-linhas"></span><span class="part-pagina-selo">${mxlDaPartitura(s.content) ? 'Editável' : 'Imagem'}</span></div>
       <b>${esc(s.title)}</b><small>${mxlDaPartitura(s.content) ? 'Pronta · dá para editar' : 'Em imagem'}</small></a>`;
   };
+  // o topo mostra as suas partituras de verdade (as 3 mexidas por último), em folhas empilhadas; sem nenhuma, uma folha em branco
+  const ultimas = [...proprias].sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0)).slice(0, 3);
+  const palco = ultimas.length
+    ? ultimas.map((x, i) => `<a class="part-palco-folha" href="#/musica/${x.id}/partitura" style="--i:${i}" ${i ? 'tabindex="-1" aria-hidden="true"' : ''}><b>${esc(x.title)}</b><small>${esc(nomeDoTom(x.partitura.fifths, x.partitura.modo))}</small>${miniPauta(x.partitura.pautas[0], x.partitura.compasso)}</a>`).reverse().join('')
+    : `<button class="part-palco-folha vazia" data-vazia="part-nova" style="--i:0"><b>Sua primeira partitura</b><small>toque para começar</small>${miniPauta({ clave: 'G', ev: [] }, [4, 4])}<i class="part-cursor"></i></button>`;
   view.innerHTML = `
-    <section class="part-hero">
+    <section class="part-hero" style="--cor:${ultimas[0] ? corDe(ultimas[0]) : 'var(--tint)'}">
       <div class="part-hero-txt"><div class="kind">Partituras</div>
         <h2><span class="h-escreva">Escreva,</span> <span class="h-ensaie">ensaie</span> e <span class="h-ia">gere com IA</span></h2>
         <p>Partitura de qualquer música da sua biblioteca: nota por nota, com letra, cifras e vozes — ou deixe a IA ouvir e escrever a melodia.</p>
-        <div class="part-passos">
-          <span class="escreva">${icon('edit', 16)}<b>Escreva</b><small>nota por nota</small></span>
-          <span class="ensaie">${icon('play', 16)}<b>Ensaie</b><small>ouvindo cada voz</small></span>
-          <span class="ia">${icon('sparkles', 16)}<b>Gere com IA</b><small>ouvindo a música</small></span>
-        </div>
         <div class="part-numeros"><span><b>${proprias.length}</b> sua${proprias.length === 1 ? '' : 's'}</span><span><b>${prontas.length}</b> pronta${prontas.length === 1 ? '' : 's'} no app</span></div></div>
-      <div class="part-palco" aria-hidden="true">
-        <div class="part-palco-folha atras">${miniPauta({ clave: 'F', ev: [['C3', 16], ['G2', 16], ['A2', 16], ['E2', 16], ['F2', 16], ['C3', 16]].map(([n, d]) => ({ a: [n], d })) }, [4, 4])}</div>
-        <div class="part-palco-folha"><b>Ave Maria</b><small>Soprano</small>${miniPauta({ clave: 'G', ev: [['G4', 8], ['G4', 8], ['A4', 16], ['G4', 8], ['C5', 8], ['B4', 16], ['G4', 8], ['G4', 8], ['D5', 16], ['C5', 8]].map(([n, d]) => ({ a: [n], d })) }, [4, 4])}${miniPauta({ clave: 'G', ev: [['E4', 16], ['F4', 8], ['G4', 8], ['E4', 16], ['D4', 16], ['C4', 32]].map(([n, d]) => ({ a: [n], d })) }, [4, 4])}</div>
-        <div class="part-palco-vozes">${['S', 'C', 'T', 'B'].map((v, i) => `<span><i style="--i:${i}"></i><b>${v}</b></span>`).join('')}</div>
-        <div class="part-palco-ia">${icon('sparkles', 18)}</div>
-      </div>
+      <div class="part-palco">${palco}</div>
     </section>
     <div class="part-acoes">
       <button class="part-acao nova" id="part-nova">
