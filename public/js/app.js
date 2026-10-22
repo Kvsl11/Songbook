@@ -90,7 +90,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-210';
+export const APP_VERSAO = '2026.10.22-211';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -5456,8 +5456,8 @@ function viewSong(id, ctx = {}) {
     <div id="aviso-video"></div>
     <div class="song-toolbar ${comCifra ? '' : 'sem-cifra'}" id="tools">
       <div class="seg modos" role="group" aria-label="Ver a música como">
-        ${semCifra ? '' : `<button data-act="modo" data-modo="cifra" aria-pressed="${comCifra}" title="Letra com os acordes">${icon('chord', 15)}<span>Cifra</span></button>`}
         <button data-act="modo" data-modo="letra" aria-pressed="${!comCifra}" title="${semCifra ? 'Esta música só tem a letra' : 'Só a letra, sem os acordes'}">${icon('text', 15)}<span>Letra</span></button>
+        ${semCifra ? '' : `<button data-act="modo" data-modo="cifra" aria-pressed="${comCifra}" title="Letra com os acordes">${icon('chord', 15)}<span>Cifra</span></button>`}
         ${paginasDaPartitura(song.content).length || (!isPreview && db.song(song.id)?.partitura) ? `<a class="seg-link" id="btn-partitura" href="#/musica/${isPreview ? 'previa' : song.id}/partitura" title="Ver a partitura (na desenhada, dá para ensaiar ouvindo cada voz)">${icon('score', 15)}<span>Partitura</span></a>` : ''}
       </div>
       <div class="ferramentas">
@@ -7804,7 +7804,18 @@ function viewConectarYoutube() {
   desenharArquivo();
   const estado = $('#cy-estado');
   const verEstado = () => chamar(servidorIA(), '/saude', { tempo: 60e3 })
-    .then((r) => { estado.className = `cy-estado ${r.cookies ? 'ok' : 'nao'}`; estado.innerHTML = `<i></i>${r.cookies ? 'Conectado' : 'Ainda não conectado'}`; })
+    .then((r) => {
+      estado.className = `cy-estado ${r.cookies ? 'ok' : 'nao'}`;
+      estado.innerHTML = `<i></i>${r.cookies ? 'Conectado' : 'Ainda não conectado'}`;
+      // a conexão fica no servidor e vale para todos os aparelhos: enviada de outro, o resumo vem de lá
+      const info = r.cookiesInfo;
+      if (r.cookies && info?.em && !cookiesSalvos()?.enviado) {
+        $('#cy-arq').innerHTML = `<div class="cy-arq"><span class="cy-arq-ic">${icon('file', 20)}</span>
+          <div><b>Arquivo enviado de outro aparelho</b><small>${info.n ? `${info.n} cookies · ` : ''}enviado em ${quando(info.em * 1000)}</small></div></div>`;
+        $('#cy-conectar').lastChild.textContent = ' Conectar de novo';
+        $('.cy-como').open = false;
+      }
+    })
     .catch((e) => { estado.className = 'cy-estado erro'; estado.innerHTML = `<i></i>${esc(e.message)}`; });
   servidorCarregado.then(verEstado);
   // escolher ou arrastar o arquivo: o texto aparece no campo, fica guardado e já envia

@@ -7,9 +7,11 @@ O áudio fica na pasta temporária de quem chamou, que a apaga assim que a parti
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import tempfile
+import time
 from urllib.parse import parse_qs, urlparse
 
 PASTA = os.path.dirname(os.path.abspath(__file__))
@@ -66,14 +68,35 @@ def conectar(texto: str) -> None:
     if not cookies_validos(texto):
         raise ValueError("isso não parece o arquivo de cookies do YouTube (cookies.txt)")
     guarda = _guarda()
+    info = {"em": int(time.time()), "n": sum(1 for l in texto.splitlines()
+                                              if (not l.startswith("#") or l.startswith("#HttpOnly_")) and len(l.split("\t")) >= 7)}
     if guarda is not None:
         guarda["yt_cookies"] = texto
+        guarda["yt_cookies_info"] = info
     else:
+        with open(_arquivo_info(), "w", encoding="utf-8") as f:
+            json.dump(info, f)
         with open(os.environ.get("IA_COOKIES") or os.path.join(PASTA, "cookies.txt"), "w", encoding="utf-8") as f:
             f.write(texto)
     caminho = os.path.join(tempfile.gettempdir(), "songbook-cookies.txt")
     if os.path.isfile(caminho):
         os.remove(caminho)  # a cópia temporária antiga sai: a próxima vez usa os novos
+
+
+def _arquivo_info() -> str:
+    return (os.environ.get("IA_COOKIES") or os.path.join(PASTA, "cookies.txt")) + ".info.json"
+
+
+def info_dos_cookies() -> dict | None:
+    """Quando a conta foi conectada e quantos cookies vieram (para todos os aparelhos mostrarem; os cookies não saem)."""
+    guarda = _guarda()
+    try:
+        if guarda is not None:
+            return guarda.get("yt_cookies_info")
+        with open(_arquivo_info(), encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 
 def arquivo_de_cookies() -> str | None:
