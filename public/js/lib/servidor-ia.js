@@ -81,6 +81,8 @@ export async function chamarComEtapas(cfg, rota, { json, form, sinal, tempo = 20
 
 // o erro do servidor em português para quem usa o app (o YouTube que bloqueia o download do servidor é o mais comum)
 export function erroExplicado(e) {
+  // com a conta já conectada, o servidor diz que ela foi recusada (os cookies venceram): vale o texto dele
+  if (e?.status === 403 && /conta conectada/i.test(e.message || '')) return 'O YouTube recusou a conta conectada (a conexão venceu). Exporte o arquivo de cookies de novo, numa janela anônima, e conecte outra vez.';
   if (e?.status === 403) return 'O YouTube pediu login para o servidor baixar o áudio. Conecte a conta do YouTube (uma vez só) ou, por agora, escolha um arquivo de áudio da música.';
   if (e?.status === 503) return 'O servidor está ocupado com outra música. Tente de novo em alguns minutos.';
   return e?.message || 'Não deu certo agora. Tente de novo.';

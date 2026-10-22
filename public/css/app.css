@@ -2813,3 +2813,15 @@ a.nt-txt span { text-decoration: underline; text-decoration-color: color-mix(in 
 .cy-passos a { color: var(--accent-ink); font-weight: 700; }
 .cy-nota { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 0 4px; font-size: 13px; line-height: 1.45; }
 .cy-nota svg { flex: none; margin-top: 2px; }
+
+/* sincronizar a letra: o andamento logo acima da letra (carregando com a etapa, deu certo ou o erro e o que fazer) */
+.sinc-status { --cor: var(--accent); display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 10px 10px 10px 12px; border-radius: 14px;
+  background: color-mix(in srgb, var(--cor) 16%, var(--surface)); border: 1px solid color-mix(in srgb, var(--cor) 35%, transparent); animation: pop 0.2s ease; }
+.sinc-status[data-tipo="ok"] { --cor: #22c55e; }
+.sinc-status[data-tipo="erro"] { --cor: var(--danger); flex-wrap: wrap; }
+.sinc-ic { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--cor); background: color-mix(in srgb, var(--cor) 20%, transparent); }
+.sinc-ic .spin { width: 16px; height: 16px; }
+.sinc-txt { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; line-height: 1.35; }
+.sinc-status[data-tipo="erro"] .sinc-txt { flex-basis: calc(100% - 90px); }
+.sinc-status .btn { flex: none; }
+.sinc-status .icon-btn { flex: none; width: 32px; height: 32px; }

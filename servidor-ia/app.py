@@ -158,8 +158,10 @@ def baixar(video: str, pasta: str) -> dict:
         raise HTTPException(422, str(e))
     except Exception as e:
         log.warning("yt-dlp falhou: %s", e)
-        msg = str(e).lower()
-        if any(x in msg for x in ("sign in", "age-restricted", "confirm your age", "cookies", "login")):
+        if youtube.pede_login(e):
+            if youtube.arquivo_de_cookies():
+                raise HTTPException(403, "o YouTube recusou a conta conectada (os cookies venceram). Exporte o arquivo de "
+                                         "novo, numa janela anônima, e conecte outra vez")
             raise HTTPException(403, "o YouTube bloqueou o download pelo servidor (pede login)")
         # o motivo do yt-dlp vai junto (a última linha, sem o "ERROR: [youtube] id:"), para saber o que corrigir
         motivo = re.sub(r"^(ERROR:\s*)?(\[[^\]]+\]\s*)?([\w-]{11}:\s*)?", "", str(e).strip().splitlines()[-1] if str(e).strip() else "")
