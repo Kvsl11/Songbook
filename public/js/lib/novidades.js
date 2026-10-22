@@ -3,6 +3,13 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 218, data: '2026-10-22', titulo: 'Sincronizar a letra de novo, com mais precisão',
+    itens: [
+      { tipo: 'novo', texto: 'Letra sincronizada errada, pulando partes? O botão ↻ na barra da música (e “Sincronizar a letra de novo” no menu ⋯) refaz a sincronia com um reconhecimento de voz maior e mais preciso.' },
+      { tipo: 'correcao', texto: 'Sincronizar de novo devolvia a mesma sincronia de antes: agora o servidor ouve a música outra vez.' },
+    ],
+  },
+  {
     versao: 217, data: '2026-10-22', titulo: 'Vídeo de referência firme na rolagem',
     itens: [
       { tipo: 'correcao', texto: 'O vídeo de referência não treme mais ao rolar a página da música (celular e tablet).' },

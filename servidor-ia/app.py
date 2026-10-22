@@ -226,6 +226,7 @@ class PedidoLetra(BaseModel):
     url: str
     linhas: list[str]
     separar: bool = True
+    refazer: bool = False  # "sincronizar de novo": não usa a resposta guardada e ouve com o Whisper maior
 
 
 _letras: dict[str, dict] = {}  # a mesma letra no mesmo vídeo: a resposta guardada (não baixa nem ouve de novo)
@@ -242,7 +243,7 @@ def letra_sincronizada(pedido: PedidoLetra, etapas: bool = Query(False)):
     if not any(l.strip() for l in pedido.linhas):
         raise HTTPException(400, "a música não tem letra")
     chave = hashlib.sha1(json.dumps([video, pedido.linhas, pedido.separar]).encode()).hexdigest()
-    if chave in _letras:
+    if chave in _letras and not pedido.refazer:
         return com_etapas(lambda etapa: _letras[chave], etapas)
     pasta = tempfile.mkdtemp(prefix="songbook-letra-")
 
@@ -250,7 +251,8 @@ def letra_sincronizada(pedido: PedidoLetra, etapas: bool = Query(False)):
         y, cortado, _ = audio_do_video(video, pasta, etapa)
         esperar_vaga(etapa)
         try:
-            r = letra.sincronizar(None, pedido.linhas, separar_voz=pedido.separar, etapa=etapa, audio=(y, cortado), video=video)
+            r = letra.sincronizar(None, pedido.linhas, separar_voz=pedido.separar, etapa=etapa, audio=(y, cortado), video=video,
+                                 preciso=pedido.refazer)
         except ValueError as e:
             raise HTTPException(422, str(e))
         finally:

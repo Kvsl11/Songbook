@@ -91,7 +91,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-217';
+export const APP_VERSAO = '2026.10.22-218';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -5627,7 +5627,7 @@ function viewSong(id, ctx = {}) {
           ${isPreview ? `<button role="menuitem" id="btn-edit-prev">${icon('edit', 18)}<span>Editar cifra</span></button>`
             : `<a role="menuitem" href="#/editar/${song.id}">${icon('edit', 18)}<span>Editar cifra</span></a>`}
           <button role="menuitem" id="btn-pdf">${icon('file', 18)}<span>Exportar PDF</span></button>
-          ${song.youtube && servidorIA().url ? `<button role="menuitem" id="btn-sincronizar">${icon('sparkles', 18)}<span>${song.sincronia?.video === song.youtube ? 'Sincronizar a letra de novo' : 'Sincronizar a letra com o vídeo'}</span></button>` : ''}
+          ${song.youtube ? `<button role="menuitem" id="btn-sincronizar">${icon('sparkles', 18)}<span>${song.sincronia?.video === song.youtube ? 'Sincronizar a letra de novo' : 'Sincronizar a letra com o vídeo'}</span></button>` : ''}
           ${(() => {
             const propria = !isPreview && db.song(song.id)?.partitura;
             const pronta = mxlDaPartitura(song.content);
@@ -5650,6 +5650,7 @@ function viewSong(id, ctx = {}) {
         <div class="seg so-cifra" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
         <div class="seg"><button data-act="f-" aria-label="Diminuir letra" title="Diminuir letra">A−</button><button data-act="f+" aria-label="Aumentar letra" title="Aumentar letra">A+</button></div>
         <div class="seg"><button data-act="scroll" aria-pressed="false" aria-label="Rolagem automática" title="Rolagem automática (ajuste a velocidade na barra)" id="btn-scroll">${icon('gauge', 18)}</button></div>
+        ${song.youtube ? `<div class="seg"><button data-act="ressinc" aria-label="Sincronizar a letra de novo" title="Letra sincronizada errada (pulando partes)? Sincronizar de novo, com mais precisão">${icon('refresh', 17)}</button></div>` : ''}
         <div class="seg so-largo"><button data-act="cols" aria-pressed="${prefs.columns !== false}" title="Letra em duas colunas (telas largas)" aria-label="Duas colunas">${icon('columns', 17)}</button></div>
       </div>
     </div>
@@ -6058,29 +6059,36 @@ function viewSong(id, ctx = {}) {
     const titulo = tipo === 'carregando' ? 'Letra sincronizada' : tipo === 'ok' ? 'Pronto' : 'Letra sincronizada';
     box.innerHTML = `<span class="sinc-ic">${ic}</span>
       <span class="sinc-txt"><small>${titulo}</small>${esc(texto)}</span>${acao}${tipo === 'carregando' ? '<i class="sinc-fio" aria-hidden="true"></i>' : `<button class="icon-btn" data-sinc="fechar" aria-label="Fechar">${icon('x', 16)}</button>`}`;
-    if (tipo === 'ok') fecharSinc = setTimeout(() => { box.hidden = true; }, 6000);
+    if (tipo === 'ok') fecharSinc = setTimeout(() => { box.hidden = true; }, 15000); // dá tempo de tocar no "Refazer"
   };
   $('#sinc-status').addEventListener('click', (e) => {
     const b = e.target.closest('[data-sinc]');
     if (!b) return;
     if (b.dataset.sinc === 'fechar') $('#sinc-status').hidden = true;
-    if (b.dataset.sinc === 'de-novo') sincronizarLetra();
+    if (b.dataset.sinc === 'de-novo') sincronizarLetra({ refazer: b.dataset.refazer === '1' });
     if (b.dataset.sinc === 'youtube') location.hash = '#/youtube';
   });
-  const sincronizarLetra = async ({ sozinho = false } = {}) => {
+  // refazer: o "sincronizar de novo" (a sincronia veio errada, pulando partes): o servidor não devolve a guardada e
+  // ouve com o Whisper maior, mais preciso (demora um pouco mais)
+  let sincronizando = false;
+  const sincronizarLetra = async ({ sozinho = false, refazer = false } = {}) => {
+    if (sincronizando) return;
     const cantadas = linhasCantadas(song.content).map(linhaSemCifra).filter(Boolean);
     if (!cantadas.length) { if (!sozinho) statusSinc('erro', 'Esta música não tem letra para sincronizar'); return; }
-    statusSinc('carregando', 'Sincronizando a letra com o vídeo…');
+    if (!servidorIA().url) { if (!sozinho) statusSinc('erro', 'O servidor da IA não está disponível agora. Tente de novo daqui a pouco.'); return; }
+    sincronizando = true;
+    statusSinc('carregando', refazer ? 'Sincronizando de novo, com mais precisão…' : 'Sincronizando a letra com o vídeo…');
     tentouSincronizar.add(song.youtube);
     const aqui = isPreview ? '' : `#/musica/${song.id}`;
     try {
-      const r = await chamarComEtapas(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: cantadas } },
+      const r = await chamarComEtapas(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: cantadas, refazer } },
         (etapa, p) => statusSinc('carregando', etapa === 'baixando' && p !== null && p < 1 ? `Baixando o áudio do vídeo… ${Math.round(p * 100)}%` : etapa === 'baixando' && p >= 1 ? 'Áudio baixado. Preparando…' : ETAPAS_SINC[etapa] || 'Sincronizando a letra…'));
       const sinc = { video: song.youtube, linhas: cantadas, tempos: r.linhas.map((x) => ({ inicio: x.inicio, fim: x.fim })) };
       song.sincronia = sinc;
       mapa = null;
       if (isPreview) preview.sincronia = sinc; else db.updateSong(song.id, { sincronia: sinc });
-      statusSinc('ok', `Letra sincronizada: ${r.achadas} de ${r.total} linhas. Dê play e ela acompanha.`);
+      statusSinc('ok', `Letra sincronizada: ${r.achadas} de ${r.total} linhas. Dê play e ela acompanha.`,
+        refazer ? '' : `<button class="btn small" data-sinc="de-novo" data-refazer="1">${icon('refresh', 14)} Ficou errada? Refazer</button>`);
       notificar(`${r.achadas} de ${r.total} linhas ouvidas no vídeo. Dê play: a letra acompanha, e tocar numa linha vai até ela.`, { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
     } catch (e) {
       const motivo = erroExplicado(e);
@@ -6093,9 +6101,10 @@ function viewSong(id, ctx = {}) {
       // servidor ocupado (com a partitura ou a letra de outra música) ou sem resposta: não foi culpa desta música,
       // então tenta de novo da próxima vez que ela abrir (antes ficava sem sincronizar até fechar e abrir o app)
       if (e.status === 503 || !e.status) tentouSincronizar.delete(song.youtube);
-    }
+    } finally { sincronizando = false; }
   };
-  $('#btn-sincronizar')?.addEventListener('click', () => { $('#menu-mais').hidden = true; sincronizarLetra(); });
+  // pelo menu ⋯: a música já sincronizada sincroniza de novo com mais precisão (a guardada não volta)
+  $('#btn-sincronizar')?.addEventListener('click', () => { $('#menu-mais').hidden = true; sincronizarLetra({ refazer: Boolean(sincronia()) }); });
   // a música com vídeo e sem letra sincronizada: sincroniza sozinha, em segundo plano (uma tentativa por vídeo a cada
   // vez que o app abre; depois fica guardada na música)
   servidorCarregado.then(() => {
@@ -6234,6 +6243,10 @@ function viewSong(id, ctx = {}) {
       }
       case 'scroll':
         if (scrollTimer) { stopScroll(); setScrollBtn(false); } else { setScrollBtn(true); tick(); }
+        return;
+      case 'ressinc':
+        sincronizarLetra({ refazer: true });
+        $('#sinc-status')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
     }
     draw();
