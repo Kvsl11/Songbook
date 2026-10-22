@@ -2653,7 +2653,7 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 .chat-bolha .dv-fonte b { color: var(--text); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dv-sub { margin: 14px 0 6px !important; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px !important;
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.dv-aviso { display: inline-block; margin: 0 0 10px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--muted); background: var(--surface-3); }
+.dv-aviso { display: inline-block; margin: 0 0 10px; padding: 5px 12px; border-radius: 12px; font-size: 12px; font-weight: 700; color: var(--muted); background: var(--surface-3); }
 .dv-mais { margin-top: 8px; }
 .dv-mais summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); padding: 4px 0; }
 .dv-mais[open] summary { margin-bottom: 8px; }
