@@ -17,6 +17,7 @@ const P = {
   library: '<path d="M4 3v18M9 3v18"/><path d="M14 4l5 16"/>',
   external: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14L21 3"/>',
   video: '<rect x="2" y="5" width="15" height="14" rx="2"/><path d="M17 10l5-3v10l-5-3z"/>',
+  lumen: '<path d="M12 1.5C12.45 6.25 14.75 8.8 20 9.5 14.75 10.2 12.45 12.75 12 22.5 11.55 12.75 9.25 10.2 4 9.5 9.25 8.8 11.55 6.25 12 1.5Z" fill="currentColor" stroke="none"/><path d="M19 1C19.15 2.4 19.6 2.85 21 3 19.6 3.15 19.15 3.6 19 5 18.85 3.6 18.4 3.15 17 3 18.4 2.85 18.85 2.4 19 1Z" fill="currentColor" stroke="none"/>',
   onda: '<path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/>',
   enviar: '<path d="M12 19V5M5 12l7-7 7 7"/>',
   mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/>',
@@ -103,6 +104,22 @@ export function icon(name, size = 20, extra = '') {
 }
 
 // Logo do app: livro de cifras aberto com nota musical e cruz, na cor de destaque.
+// Logo do Lumen (o assistente litúrgico): a "cruz de luz" (lumen = luz) — uma estrela de quatro pontas com o braço
+// de baixo mais longo, formando a cruz — e um brilho pequeno ao lado, no degradê azul → roxo → rosa → dourado, com o
+// centro aceso. O mesmo desenho em public/lumen.svg.
+let nLumen = 0;
+export function logoLumen(size = 32) {
+  const id = 'lm' + ++nLumen;
+  return `<svg class="logo-lumen" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true">
+    <defs><linearGradient id="${id}g" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#4f8cff"/><stop offset="0.42" stop-color="#9b72ff"/><stop offset="0.72" stop-color="#ff6fa8"/><stop offset="1" stop-color="#ffb84d"/></linearGradient>
+      <radialGradient id="${id}c" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff" stop-opacity="0.95"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+    <path fill="url(#${id}g)" d="M24 3C24.9 12.5 29.5 17.6 40 19 29.5 20.4 24.9 25.5 24 45 23.1 25.5 18.5 20.4 8 19 18.5 17.6 23.1 12.5 24 3Z"/>
+    <path fill="url(#${id}g)" d="M38 2C38.3 4.8 39.2 5.7 42 6 39.2 6.3 38.3 7.2 38 10 37.7 7.2 36.8 6.3 34 6 36.8 5.7 37.7 4.8 38 2Z"/>
+    <circle cx="24" cy="19" r="6.5" fill="url(#${id}c)"/>
+  </svg>`;
+}
+
 let nLogo = 0;
 export function logo(size = 32) {
   // palheta branca com a cruz recortada, sobre fundo preto (um contorno leve separa do fundo escuro do app)
