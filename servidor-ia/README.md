@@ -1,13 +1,3 @@
----
-title: Songbook IA
-emoji: 🎼
-colorFrom: indigo
-colorTo: blue
-sdk: docker
-app_port: 7860
-pinned: false
----
-
 # Servidor da IA da partitura (Python)
 
 Transforma áudio em notas para a partitura do Songbook, com mais fidelidade que o modelo que roda no celular:
@@ -25,19 +15,19 @@ Transforma áudio em notas para a partitura do Songbook, com mais fidelidade que
 Medido em 11 trechos de músicas reais (MUSDB18, voz isolada como gabarito): a melodia certa passou de **34%** do
 tempo (a música inteira junta, como no celular) para **70%** (voz separada + limpeza).
 
-## Publicar de graça (Hugging Face Spaces)
+## Publicar de graça (Modal)
 
-O workflow `.github/workflows/servidor-ia.yml` cria e atualiza o Space sozinho; o app acha o endereço sozinho
-(a publicação do app grava `data/servidor-ia.json`). Só uma vez, à mão:
+O workflow `.github/workflows/servidor-ia.yml` publica o servidor no [Modal](https://modal.com) (US$ 30 de uso
+grátis por mês, https, liga só quando alguém usa) e a publicação do app grava o endereço em `data/servidor-ia.json`:
+quem usa o app não configura nada. Só uma vez, à mão:
 
-1. Crie a conta em <https://huggingface.co/join> (grátis, sem cartão).
-2. Gere um token de escrita em <https://huggingface.co/settings/tokens> → **Create new token** → tipo **Write**.
-3. No GitHub do app: **Settings → Secrets and variables → Actions → New repository secret**, nome `HF_TOKEN`,
-   valor = o token. (Opcional: `ANTHROPIC_API_KEY` para o "Tirar dúvidas" e `YT_COOKIES` com o conteúdo do
-   cookies.txt.)
-4. Em **Actions**, rode **Publicar o servidor da IA** e depois **Publicar no GitHub Pages** (ou só faça um push).
-
-O servidor gratuito dorme depois de uns dias sem uso; o app o acorda ao abrir (a primeira resposta demora ~1 min).
+1. Entre em <https://modal.com/signup> com a conta do GitHub.
+2. Crie um token em <https://modal.com/settings/tokens> → **New token** (aparecem dois valores: ID e Secret).
+3. No GitHub do app: **Settings → Secrets and variables → Actions → New repository secret**:
+   `MODAL_TOKEN_ID` (o ID) e `MODAL_TOKEN_SECRET` (o Secret). Opcionais: `ANTHROPIC_API_KEY` ("Tirar dúvidas") e
+   `YT_COOKIES` (o conteúdo do cookies.txt).
+4. Em **Actions**, rode **Publicar o servidor da IA** (a primeira montagem leva uns 15 minutos); a publicação do app
+   roda sozinha em seguida.
 
 ## Rodar no seu computador
 

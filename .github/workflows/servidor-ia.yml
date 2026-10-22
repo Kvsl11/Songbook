@@ -1,8 +1,9 @@
-# Publica o servidor da IA (pasta servidor-ia/) no Hugging Face Spaces, de graça: 2 CPUs, 16 GB de memória e
-# endereço https. Cria o Space na primeira vez (seu-usuario/songbook-ia) e atualiza a cada mudança na pasta.
-# Antes do primeiro uso, uma vez: crie a conta em huggingface.co, gere um token de escrita
-# (huggingface.co/settings/tokens → New token → Write) e guarde no GitHub em
-# Settings → Secrets and variables → Actions → New repository secret, com o nome HF_TOKEN.
+# Publica o servidor da IA (pasta servidor-ia/) no Modal (modal.com): US$ 30 de uso grátis por mês, endereço https,
+# liga só quando alguém usa. Publica de novo a cada mudança na pasta; no fim, a publicação do app (GitHub Pages)
+# roda sozinha e grava o endereço para o app achar o servidor.
+# Antes do primeiro uso, uma vez: entre em modal.com com a conta do GitHub, crie um token em
+# modal.com/settings/tokens → New token e guarde os dois valores no GitHub em
+# Settings → Secrets and variables → Actions → New repository secret: MODAL_TOKEN_ID e MODAL_TOKEN_SECRET.
 # Opcionais, no mesmo lugar: ANTHROPIC_API_KEY (liga o "Tirar dúvidas") e YT_COOKIES (o conteúdo do cookies.txt,
 # para vídeos do YouTube com restrição de idade).
 name: Publicar o servidor da IA
@@ -20,36 +21,31 @@ concurrency:
 jobs:
   publicar:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     env:
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       YT_COOKIES: ${{ secrets.YT_COOKIES }}
     steps:
       - uses: actions/checkout@v4
-      - name: Sem o token do Hugging Face
-        if: env.HF_TOKEN == ''
-        run: echo "::notice::Guarde o token do Hugging Face no secret HF_TOKEN para publicar o servidor da IA (veja o topo deste arquivo)."
+      - name: Sem o token do Modal
+        if: env.MODAL_TOKEN_ID == '' || env.MODAL_TOKEN_SECRET == ''
+        run: echo "::notice::Guarde o token do Modal nos secrets MODAL_TOKEN_ID e MODAL_TOKEN_SECRET para publicar o servidor da IA (veja o topo deste arquivo)."
       - uses: actions/setup-python@v5
-        if: env.HF_TOKEN != ''
+        if: env.MODAL_TOKEN_ID != '' && env.MODAL_TOKEN_SECRET != ''
         with:
           python-version: '3.11'
-      - name: Criar (na primeira vez) e atualizar o Space
-        if: env.HF_TOKEN != ''
+      - name: Publicar no Modal
+        if: env.MODAL_TOKEN_ID != '' && env.MODAL_TOKEN_SECRET != ''
+        working-directory: servidor-ia
         run: |
-          pip install -q "huggingface_hub>=0.25"
-          python - <<'PY'
-          import os
-          from huggingface_hub import HfApi
-          api = HfApi(token=os.environ["HF_TOKEN"])
-          dono = api.whoami()["name"]
-          repo = f"{dono}/songbook-ia"
-          api.create_repo(repo, repo_type="space", space_sdk="docker", exist_ok=True)
-          for nome in ("ANTHROPIC_API_KEY", "YT_COOKIES"):
-              if os.environ.get(nome):
-                  api.add_space_secret(repo, nome, os.environ[nome])
-          api.upload_folder(repo_id=repo, repo_type="space", folder_path="servidor-ia",
-                            ignore_patterns=["tests/*", "**/__pycache__/*", ".pytest_cache/*"],
-                            commit_message="Servidor da IA do Songbook")
-          url = f"https://{dono.lower().replace('_', '-').replace('.', '-')}-songbook-ia.hf.space"
-          print(f"::notice::Servidor da IA publicado: {url} (a primeira montagem leva uns 15 minutos)")
-          PY
+          pip install -q modal
+          # os segredos do servidor (o Modal pede pelo menos um valor)
+          args=(IA_PUBLICADO=1)
+          [ -n "$ANTHROPIC_API_KEY" ] && args+=("ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
+          [ -n "$YT_COOKIES" ] && args+=("YT_COOKIES=$YT_COOKIES")
+          modal secret create songbook-ia "${args[@]}" --force > /dev/null
+          modal deploy modal_app.py
+          url=$(python -c "import modal; print(modal.Function.from_name('songbook-ia', 'web').get_web_url())")
+          echo "::notice::Servidor da IA no ar: $url"

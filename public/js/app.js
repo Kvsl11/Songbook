@@ -78,7 +78,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-190';
+export const APP_VERSAO = '2026.10.22-191';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -7542,7 +7542,8 @@ function viewDuvidas() {
         ${!m.carregando ? `<div class="chat-acoes">${m.erro ? `<button type="button" data-repetir="${k}">${icon('refresh', 14)} Tentar de novo</button>` : `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>`}</div>` : ''}</div></div>`);
   const desenhar = () => {
     caixa.innerHTML = conversaDuvidas.length ? conversaDuvidas.map(msg).join('') : boasVindas();
-    requestAnimationFrame(() => { view.scrollTop = view.scrollHeight; });
+    // com conversa, vai para a última mensagem; vazia, fica no começo (o "Olá" não pode sair cortado no celular)
+    requestAnimationFrame(() => { view.scrollTop = conversaDuvidas.length ? view.scrollHeight : 0; });
   };
   desenhar();
   const perguntar = async (q) => {

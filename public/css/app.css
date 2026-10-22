@@ -2568,3 +2568,20 @@ dialog.lista-dlg[open] { display: flex; flex-direction: column; overflow: hidden
 @keyframes chat-entra { from { opacity: 0; transform: translateY(6px); } }
 @keyframes chat-ponto { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .chat-msg, .chat-vazio { animation: none; } .chat-digitando i { animation: none; } }
+/* celular: a tela inicial do chat cabe inteira, sem rolar (sugestões em lista enxuta) */
+@media (max-width: 600px) {
+  .chat-rolo { padding: 12px 14px 4px; gap: 14px; }
+  .chat-vazio { margin: 0; padding: 4px 0 8px; gap: 6px; }
+  .chat-vazio .dv-avatar.grande { width: 48px; height: 48px; border-radius: 16px; }
+  .chat-vazio h2 { font-size: 20px; margin-top: 4px; }
+  .chat-vazio p { font-size: 14px; }
+  .chat-sugestoes { grid-template-columns: 1fr; gap: 8px; margin-top: 8px; }
+  .chat-sugestao { padding: 10px 12px; border-radius: 14px; font-size: 14px; align-items: center; }
+  .chat-barra { padding: 8px 12px 10px; }
+  .chat-rodape { font-size: 10.5px; }
+}
+@media (max-width: 600px) and (max-height: 780px) {
+  .chat-vazio .dv-avatar.grande { display: none; }
+  .chat-vazio p { display: none; }
+  .chat-vazio h2 { margin-top: 0; }
+}
