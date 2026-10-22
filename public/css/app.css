@@ -2553,6 +2553,7 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
   transition: background 0.15s, transform 0.15s, border-color 0.15s; }
 .chat-sugestao .dv-ico { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; color: var(--accent);
   background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.chat-sugestao .dv-curto { display: none; }
 .chat-sugestao:hover { border-color: color-mix(in srgb, var(--accent) 55%, transparent); transform: translateY(-2px); }
 .chat-sugestao:active { transform: scale(0.98); }
 /* as mensagens */
@@ -2663,11 +2664,15 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
   .dv-recursos b { font-size: 14px; }
   .dv-recursos small { font-size: 12.5px; }
   .dv-rotulo { margin-top: 10px; font-size: 11px; }
-  .chat-sugestoes { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 30px; gap: 8px; margin: 2px -30px 0; padding: 0 30px 4px; width: calc(100% + 60px);
-    scrollbar-width: none; }
-  .chat-sugestoes::-webkit-scrollbar { display: none; }
-  .chat-sugestao { flex: 0 0 62%; scroll-snap-align: start; padding: 10px 12px; gap: 6px; font-size: 13.5px; border-radius: 16px; }
-  .chat-sugestao .dv-ico { width: 28px; height: 28px; border-radius: 9px; }
+  /* as sugestões viram pílulas com o nome curto, que quebram linha e aparecem inteiras */
+  .chat-sugestoes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 2px; }
+  .chat-sugestao { flex-direction: row; align-items: center; gap: 8px; min-height: 44px; padding: 6px 10px 6px 6px; border-radius: 14px; font-size: 13px; line-height: 1.2; }
+  .chat-sugestao .dv-ico { flex: none; width: 28px; height: 28px; border-radius: 50%; }
+  .chat-sugestao .dv-ico .ic { width: 15px; height: 15px; }
+  .chat-sugestao .dv-longo { display: none; }
+  .chat-sugestao .dv-curto { display: inline; overflow-wrap: anywhere; }
+  /* com o player de música aberto sobra menos altura: o ícone do topo sai */
+  body.com-player .dv-hero { display: none; }
   .chat-msg.ia .chat-bolha { padding: 14px 15px; }
   .chat-barra { padding: 8px 12px; }
   .chat-rodape { display: none; }

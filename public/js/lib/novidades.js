@@ -6,7 +6,7 @@ export const NOVIDADES = [
     versao: 225, data: '2026-10-22', titulo: 'Lumen cabe inteiro na tela',
     itens: [
       { tipo: 'correcao', texto: 'A caixa de pergunta do Lumen flutuava alta, longe do menu de baixo: agora fica logo acima dele.' },
-      { tipo: 'melhoria', texto: 'A tela inicial do Lumen cabe inteira no celular, sem nada cortado: “Conversar ao vivo” virou a última linha do cartão de apresentação, e as sugestões de perguntas ficam numa faixa que desliza para o lado.' },
+      { tipo: 'melhoria', texto: 'A tela inicial do Lumen cabe inteira no celular, sem nada cortado: “Conversar ao vivo” virou a última linha do cartão de apresentação, e as sugestões de perguntas aparecem inteiras, em duas colunas, com nomes curtos.' },
     ],
   },
   {
