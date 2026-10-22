@@ -3,6 +3,12 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 228, data: '2026-10-22', titulo: 'Lumen respeita a data pedida',
+    itens: [
+      { tipo: 'correcao', texto: 'Pedindo “o salmo do dia 25/10/2026”, o Lumen trazia o salmo de hoje. Agora traz o do dia pedido (vale 25/10, 25/10/2026, “25 de outubro” e “dia 25”), e tocar em “Liturgia de…” abre a Liturgia nessa data.' },
+    ],
+  },
+  {
     versao: 227, data: '2026-10-22', titulo: 'Lumen traz a liturgia do dia, só a parte que você pediu',
     itens: [
       { tipo: 'novo', texto: 'Peça ao Lumen “o salmo de hoje”, “o evangelho de domingo”, “a segunda leitura de amanhã” ou “a coleta de hoje”: ele traz só aquela parte, da mesma liturgia do app (CNBB e Pocket Terço), com a referência, o refrão do salmo destacado e o atalho para a Liturgia. Na conversa ao vivo, ele lê a parte em voz alta.' },

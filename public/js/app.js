@@ -107,7 +107,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-227';
+export const APP_VERSAO = '2026.10.22-228';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -8164,7 +8164,7 @@ async function partesDaLiturgia({ partes, data }) {
   if (!achadas.length) return null;
   return {
     data,
-    titulo: data === hojeISO() ? 'Liturgia de hoje' : `Liturgia de ${fmtData(data)}`,
+    titulo: data === hojeISO() ? 'Liturgia de hoje' : `Liturgia de ${new Date(`${data}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', ...(data.slice(0, 4) !== hojeISO().slice(0, 4) && { year: 'numeric' }) })}`,
     celebracao: lit?.celebracao || pocket?.titulo || '',
     partes: achadas,
     fontes: [...new Set(achadas.map((p) => p.fonte))],
