@@ -14,6 +14,8 @@ test('letra sincronizada: a linha que se canta em cada instante', () => {
   assert.equal(linhaNoTempo(t, 2), -1);
   assert.equal(linhaNoTempo(t, 10.5), 0);
   assert.equal(linhaNoTempo(t, 13.95), 1); // um pouquinho antes: a linha acende junto com a voz
+  assert.equal(linhaNoTempo(t, 13.65), 1);
+  assert.equal(linhaNoTempo(t, 13.4), 0);
   assert.equal(linhaNoTempo(t, 30), 2);
 });
 

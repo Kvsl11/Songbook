@@ -26,3 +26,21 @@ def test_etapas_vem_uma_por_linha(monkeypatch):
     r = TestClient(app.app).post("/transcrever?etapas=1", files={"arquivo": ("a.wav", b"RIFF", "audio/wav")})
     linhas = [l for l in r.text.strip().split("\n") if '"vivo"' not in l]
     assert linhas == ['{"etapa": "separando"}', '{"etapa": "notas"}', '{"resultado": {"notas": [1]}}']
+
+
+def test_youtube_manda_a_porcentagem_do_download_e_avisa_a_fila(monkeypatch):
+    import youtube
+
+    def baixar_falso(video, pasta, progresso=lambda p: None):
+        for p in (0.25, 1.0):
+            progresso(p)
+        return {"caminho": os.path.join(pasta, "audio.wav"), "titulo": "t", "duracao": 1}
+    monkeypatch.setattr(youtube, "baixar_audio", baixar_falso)
+    monkeypatch.setattr(transcricao, "transcrever", lambda caminho, separar_voz, etapa: {"notas": [1]})
+    import threading
+    app.vagas.acquire()  # outra música ocupando o servidor: esta espera na fila
+    threading.Timer(0.3, app.vagas.release).start()
+    r = TestClient(app.app).post("/youtube?etapas=1", json={"url": "https://youtu.be/dQw4w9WgXcQ"})
+    linhas = [l for l in r.text.strip().split("\n") if '"vivo"' not in l]
+    assert linhas[:4] == ['{"etapa": "baixando", "progresso": 0}', '{"etapa": "baixando", "progresso": 0.25}',
+                          '{"etapa": "baixando", "progresso": 1.0}', '{"etapa": "fila"}']

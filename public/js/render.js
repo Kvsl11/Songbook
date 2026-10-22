@@ -41,16 +41,33 @@ export function renderSong(content, { transpose = 0, capo = 0, key = '' } = {}) 
       const onlyChords = line.segments.every((s) => !s.text.trim());
       const noChords = line.segments.every((s) => s.chord === null);
       html.push(`<div class="line${onlyChords ? ' chords-only' : ''}${noChords ? ' lyrics-only' : ''}${ehInstrumental(textoDe(line)) ? ' instr' : ''}">`);
+      const pedacos = [];
       for (const seg of line.segments) {
         const chord = seg.chord === null ? '' : transposeChord(seg.chord, shift, flats);
         // espaço no fim do trecho vira separador visível entre acordes colados
-        const text = seg.text || (chord ? ' ' : '');
+        // os espaços em fila da cifra copiada (que alinhavam os acordes no texto puro) viram um só: na tela o acorde
+        // já fica sobre a sílaba, e sobravam buracos entre as palavras
+        const text = (onlyChords ? seg.text : seg.text.replace(/\s{2,}/g, ' ')) || (chord ? ' ' : '');
         // o acorde fica só sobre a primeira palavra; as outras palavras quebram a linha uma a uma
         // (como na letra sem cifra), em vez de o trecho inteiro descer junto
         const [primeira, ...resto] = noChords ? [text] : text.match(/\s*\S+\s*|\s+/g) || [text];
-        html.push(`<span class="chunk"><span class="chord">${esc(chord)}</span><span class="lyric">${esc(primeira)}</span></span>`);
-        for (const p of resto) html.push(`<span class="chunk"><span class="chord"></span><span class="lyric">${esc(p)}</span></span>`);
+        pedacos.push({ chord, text: primeira });
+        for (const p of resto) pedacos.push({ chord: '', text: p });
       }
+      // acorde no meio da palavra ("m[G]ãe", "pro[D]tege"): os pedaços da mesma palavra ficam juntos numa
+      // .palavra, que não quebra no meio (antes o "ãe" descia sozinho para a linha de baixo)
+      let palavra = [];
+      const fecharPalavra = () => {
+        if (palavra.length > 1) html.push(`<span class="palavra">${palavra.join('')}</span>`);
+        else html.push(...palavra);
+        palavra = [];
+      };
+      pedacos.forEach((p, i) => {
+        palavra.push(`<span class="chunk"><span class="chord">${esc(p.chord)}</span><span class="lyric">${esc(p.text)}</span></span>`);
+        const prox = pedacos[i + 1];
+        if (!prox || /\s$/.test(p.text) || !p.text || /^\s/.test(prox.text) || !prox.text.trim()) fecharPalavra();
+      });
+      fecharPalavra();
       html.push('</div>');
     }
     html.push('</div>');

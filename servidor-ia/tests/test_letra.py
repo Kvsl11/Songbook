@@ -39,3 +39,12 @@ def test_linha_nao_ouvida_fica_entre_as_vizinhas():
 def test_sem_nada_ouvido_divide_a_musica():
     t = tempos_das_linhas(["a b", "c d"], [], 10.0)
     assert [x["inicio"] for x in t] == [0.0, 5.0]
+
+
+def test_linha_cujo_comeco_nao_foi_ouvido_comeca_antes_da_primeira_achada():
+    linhas = ["um dois tres quatro", "cinco seis sete oito"]
+    # o Whisper não ouviu "cinco": a linha começa antes de "seis" (que veio em 10.4), não nele
+    ouvidas = palavras("um dois tres quatro", 0.0) + palavras("seis sete oito", 10.4)
+    t = tempos_das_linhas(linhas, ouvidas, 20.0)
+    assert t[0]["inicio"] == 0.0
+    assert 9.7 <= t[1]["inicio"] < 10.4

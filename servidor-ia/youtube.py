@@ -140,12 +140,35 @@ def guardar_cookies_renovados(caminho: str, antes: str | None) -> None:
         pass
 
 
-def baixar_audio(video: str, pasta: str) -> dict:
-    """Baixa só o áudio do vídeo para pasta/audio.wav. Devolve o caminho, o título e a duração."""
+def baixar_audio(video: str, pasta: str, progresso=lambda p: None) -> dict:
+    """Baixa só o áudio do vídeo para pasta/audio.wav. Devolve o caminho, o título e a duração. progresso(p), de 0
+    a 1, a cada 1% baixado (o app mostra a porcentagem e passa para a etapa seguinte quando chega a 100%)"""
     import yt_dlp
     from yt_dlp.utils import match_filter_func
 
+    ultimo = [-1]
+
+    def andamento(d):
+        if d.get("status") == "finished":
+            pct = 100
+        elif d.get("status") == "downloading":
+            total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+            pct = min(99, int(100 * (d.get("downloaded_bytes") or 0) / total)) if total else None
+        else:
+            return
+        if pct is not None and pct > ultimo[0]:
+            ultimo[0] = pct
+            try:
+                progresso(pct / 100)
+            except Exception:  # quem ouve o andamento não derruba o download
+                pass
+
     opcoes = {
+        "progress_hooks": [andamento],
+        # sem resposta do YouTube por 20 s: desiste dessa conexão e tenta de novo (antes podia ficar parado para sempre)
+        "socket_timeout": 20,
+        "retries": 3,
+        "fragment_retries": 3,
         "format": "bestaudio/best",
         "outtmpl": os.path.join(pasta, "audio.%(ext)s"),
         "noplaylist": True,
@@ -175,6 +198,7 @@ def baixar_audio(video: str, pasta: str) -> dict:
             break
         except yt_dlp.utils.DownloadError as e:
             erros.append(e)
+            ultimo[0] = -1  # o próximo aparelho começa do 0%
             for f in os.listdir(pasta):  # o pedaço baixado pela metade não fica para a próxima tentativa
                 os.remove(os.path.join(pasta, f))
     if cookies:
