@@ -5,3 +5,5 @@ tests/
 textos-acervo.jsonl.bak
 bin/
 dados/
+python/
+.uv-cache/
