@@ -17,7 +17,7 @@ import {
 import { corCss, corDominante } from './lib/cores.js';
 import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
 import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } from './lib/alinhamento.js';
-import { duracaoDoAviso, partesDoAviso, tipoDoAviso } from './lib/avisos.js';
+import { partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { baseDoServidor, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWikipedia, criarIndice as criarIndiceDuvidas, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
@@ -85,7 +85,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-196';
+export const APP_VERSAO = '2026.10.22-197';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -148,50 +148,19 @@ const aoSair = (fn) => limpezas.push(fn);
 
 // ------------------------------------------------------------------ util
 
-// avisos: cartões empilhados (até 3), com ícone e cor pelo tipo (sucesso, erro, IA, carregando, informação),
-// título e detalhe, e a barra do tempo que falta. Tocar fecha; arrastar para o lado também.
-// opcoes: número (ms) ou { tipo, titulo (o texto vira o detalhe), ms }
+// avisos: não aparecem mais na tela; vão para as notificações do sininho, com ícone e cor pelo tipo
+// (sucesso, erro, IA, informação) e título e detalhe. O "carregando…" não vira notificação.
+// opcoes: número (ms, ignorado) ou { tipo, titulo (o texto vira o detalhe) }
 const ICONE_AVISO = { sucesso: 'check', erro: 'alerta', ia: 'sparkles', info: 'info', atualizacao: 'download' };
-function fecharAviso(card, ja = false) {
-  if (!card || card.classList.contains('saindo')) return;
-  clearTimeout(card.timer);
-  card.classList.add('saindo');
-  setTimeout(() => card.remove(), ja ? 0 : 260);
-}
 function toast(msg, opcoes = {}) {
-  if (typeof opcoes === 'number') opcoes = { ms: opcoes };
-  const caixa = $('#toast');
+  if (typeof opcoes === 'number') opcoes = {};
   const tipo = opcoes.tipo || tipoDoAviso(msg);
+  if (tipo === 'carregando') return;
   const { titulo, detalhe } = opcoes.titulo ? { titulo: opcoes.titulo, detalhe: msg } : partesDoAviso(msg);
-  const ms = Math.max(opcoes.ms || 0, duracaoDoAviso(tipo, msg));
-  // o "carregando…" sai quando chega o aviso seguinte; o mesmo texto de novo não empilha
-  caixa.querySelectorAll('.aviso-card').forEach((c) => { if (c.dataset.tipo === 'carregando' || c.dataset.msg === msg) fecharAviso(c, true); });
-  const card = document.createElement('div');
-  card.className = 'aviso-card';
-  card.dataset.tipo = tipo;
-  card.dataset.msg = msg;
-  card.setAttribute('role', tipo === 'erro' ? 'alert' : 'status');
-  card.innerHTML = `<span class="aviso-ic">${tipo === 'carregando' ? '<span class="spin"></span>' : icon(ICONE_AVISO[tipo] || 'info', 18)}</span>
-    <div class="aviso-txt"><b>${esc(titulo)}</b>${detalhe ? `<small>${esc(detalhe)}</small>` : ''}</div>
-    <button class="aviso-x" aria-label="Fechar aviso">${icon('x', 15)}</button>
-    ${tipo === 'carregando' ? '' : `<i class="aviso-tempo" style="animation-duration:${ms}ms"></i>`}`;
-  // arrastar para o lado fecha (no celular)
-  let x0 = null;
-  card.addEventListener('pointerdown', (e) => { x0 = e.clientX; card.setPointerCapture?.(e.pointerId); });
-  card.addEventListener('pointermove', (e) => { if (x0 !== null) { const dx = e.clientX - x0; card.style.transform = `translateX(${dx}px)`; card.style.opacity = String(1 - Math.min(0.8, Math.abs(dx) / 200)); } });
-  card.addEventListener('pointerup', (e) => {
-    const dx = x0 === null ? 0 : e.clientX - x0;
-    x0 = null;
-    if (Math.abs(dx) > 70) { card.style.transition = 'transform 0.2s, opacity 0.2s'; card.style.transform = `translateX(${Math.sign(dx) * 120}%)`; card.style.opacity = '0'; fecharAviso(card); return; }
-    card.style.transform = '';
-    card.style.opacity = '';
-    if (Math.abs(dx) < 6) fecharAviso(card); // um toque
-  });
-  caixa.append(card);
-  const abertos = [...caixa.querySelectorAll('.aviso-card:not(.saindo)')];
-  for (const c of abertos.slice(0, Math.max(0, abertos.length - 3))) fecharAviso(c);
-  requestAnimationFrame(() => card.classList.add('show'));
-  card.timer = setTimeout(() => fecharAviso(card), ms);
+  // o mesmo aviso de novo, logo em seguida, não empilha
+  const ultima = notificacoes[0];
+  if (ultima && !ultima.lida && ultima.titulo === titulo && ultima.texto === detalhe && Date.now() - ultima.t < 10000) return;
+  notificar(detalhe, { tipo, titulo });
 }
 
 // ---------------------------------------------------------------- notificações (o sininho do topo)
