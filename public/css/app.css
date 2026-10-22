@@ -2642,7 +2642,7 @@ html.tablet #player .pl-linhas p { margin: 0 0 12px; font-size: 21px; font-weigh
 html.tablet #player .pl-letra.sincronizada .pl-linhas p { color: rgb(0 0 0 / 0.55); cursor: pointer; transition: color 0.25s; }
 html.tablet #player .pl-letra.sincronizada .pl-linhas p.cantada { color: rgb(255 255 255 / 0.55); }
 html.tablet #player .pl-letra.sincronizada .pl-linhas p.agora { color: #fff; }
-#player .pl-cab, #player .pl-letra { display: none; }
+#player .pl-cab, #player .pl-letra, #player .pl-salva { display: none; }
 html.tablet #player .pl-cab { display: flex; }
 
 /* ---------------------------------------------------------------- Gerar com IA pelo servidor: as etapas */
@@ -2688,14 +2688,16 @@ html.tablet body.painel-recolhido #player .pl-txt b { font-size: 17px; white-spa
 html.tablet body.painel-recolhido #player .pl-txt small { font-size: 14.5px; margin-top: 3px; }
 html.tablet body.painel-recolhido #player .pl-ctrl { flex: none; padding: 0; gap: 2px; }
 html.tablet body.painel-recolhido #player .pl-modo { display: none; }
-html.tablet body.painel-recolhido #player .pl-play { width: 48px; height: 48px; }
-html.tablet body.painel-recolhido #player .pl-pulo { width: 40px; height: 40px; }
+html.tablet body.painel-recolhido #player .pl-play { width: 44px; height: 44px; background: none; color: #fff; border-radius: 50%; }
+html.tablet body.painel-recolhido #player .pl-play svg { width: 28px; height: 28px; }
+html.tablet body.painel-recolhido #player .pl-salva { display: inline-grid; width: 30px; height: 30px; margin-right: 6px; border-color: rgb(255 255 255 / 0.7); color: #fff; }
+html.tablet body.painel-recolhido #player .pl-salva.salva { border-color: var(--accent); color: var(--on-accent); }
+html.tablet body.painel-recolhido #player .pl-pulo { display: none; }
 html.tablet body.painel-recolhido #player { cursor: pointer; }
 html.tablet body.painel-recolhido #pl-tela:not(.no-palco) { pointer-events: none; } /* tocar na capinha do vídeo também abre o painel */
 html.tablet body.painel-recolhido #player .pl-lado { display: none; }
-/* em pé a linha é estreita: o mini player fica com a capa, o nome, o cantor e o tocar */
+/* em pé a linha é estreita: o menu fica mais junto */
 @media (orientation: portrait) {
-  html.tablet body.painel-recolhido #player .pl-pulo { display: none; }
   html.tablet body.com-player.painel-recolhido .nav { padding: 0 4px; }
 }
 /* tela inteira: a música ocupa tudo (deitado, o vídeo e os controles de um lado e a letra grande do outro) */

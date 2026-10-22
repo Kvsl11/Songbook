@@ -85,7 +85,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-203';
+export const APP_VERSAO = '2026.10.22-204';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -662,6 +662,7 @@ const player = (() => {
     <div class="pl-video"></div>
     <button class="pl-info" data-pl="abrir" title="Abrir a música"><span class="pl-txt"><b></b><small></small></span></button>
     <div class="pl-ctrl">
+      <button class="salvar-btn pl-salva" data-pl="salva" hidden></button>
       <button class="icon-btn pl-modo pl-aleat" data-pl="aleatorio" aria-pressed="false" aria-label="Aleatório" title="Aleatório">${icon('shuffle', 18)}</button>
       <button class="icon-btn pl-pulo" data-pl="anterior" aria-label="Música anterior" title="Anterior">${icon('skipBack', 18)}</button>
       <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button>
@@ -745,6 +746,16 @@ const player = (() => {
     // o tempo vai junto do artista no celular; no computador ele fica na barra de tempo, no centro
     $('.pl-txt small', el).innerHTML = esc([atual.parte, atual.artista].filter(Boolean).join(' · ')) + (duracao ? `<span class="pl-tmini">${atual.parte || atual.artista ? ' · ' : ''}${fmt(tempo)} / ${fmt(duracao)}</span>` : '');
     $('.pl-play', el).innerHTML = icon(estado === 'tocando' ? 'pause' : 'play', 20);
+    // a bolinha de salva (na barrinha recolhida do tablet): ✓ se a música está na biblioteca, + se não
+    const salva = Boolean(atual.songId && db.song(atual.songId));
+    const bs = $('.pl-salva', el);
+    if (bs.hidden || bs.classList.contains('salva') !== salva) {
+      bs.hidden = false;
+      bs.classList.toggle('salva', salva);
+      bs.innerHTML = icon(salva ? 'check' : 'plus', 16);
+      bs.title = salva ? 'Na sua biblioteca: adicionar a um repertório' : 'Abrir para salvar na biblioteca';
+      bs.setAttribute('aria-label', bs.title);
+    }
     $('.pl-prog i', el).style.width = duracao ? `${Math.min(100, (tempo / duracao) * 100)}%` : '0';
     sessaoDeMidia();
     // voltar/pular: só numa música de repertório (como numa playlist)
@@ -1003,6 +1014,12 @@ const player = (() => {
     }
     if (!b) return;
     if (b.dataset.pl === 'play') api.alternar();
+    if (b.dataset.pl === 'salva' && atual) {
+      // salva: adicionar a um repertório (como o ✓ do Spotify); não salva: abre a música, que tem o botão de salvar
+      if (atual.songId && db.song(atual.songId)) addToSetDialog(atual.songId, atual.parte || '');
+      else if (atual.href && location.hash !== atual.href) location.hash = atual.href;
+      else if (!atual.href && atual.abrir) atual.abrir();
+    }
     if (b.dataset.pl === 'proxima') pular(1);
     if (b.dataset.pl === 'aleatorio') {
       aleatorio = !aleatorio;
