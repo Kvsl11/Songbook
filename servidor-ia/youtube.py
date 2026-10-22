@@ -73,8 +73,24 @@ def baixar_audio(video: str, pasta: str) -> dict:
     cookies = arquivo_de_cookies()
     if cookies:
         opcoes["cookiefile"] = cookies
-    with yt_dlp.YoutubeDL(opcoes) as ydl:
-        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video}", download=True)
+    # o YouTube pede login ("confirme que não é um robô") a quem baixa de servidor na nuvem; alguns aparelhos (a TV,
+    # o Safari, o celular, os óculos de realidade virtual) ainda passam sem login: tenta um por um até um baixar
+    info, erro = None, None
+    for clientes in (None, ["tv"], ["web_safari"], ["android_vr"], ["mweb"], ["tv_embedded"]):
+        tentativa = dict(opcoes)
+        if clientes:
+            tentativa["extractor_args"] = {"youtube": {"player_client": clientes}}
+        try:
+            with yt_dlp.YoutubeDL(tentativa) as ydl:
+                info = ydl.extract_info(f"https://www.youtube.com/watch?v={video}", download=True)
+            erro = None
+            break
+        except yt_dlp.utils.DownloadError as e:
+            erro = e
+            for f in os.listdir(pasta):  # o pedaço baixado pela metade não fica para a próxima tentativa
+                os.remove(os.path.join(pasta, f))
+    if erro is not None:
+        raise erro
     if not info:
         raise ValueError("vídeo longo demais (mais de %d min)" % (MAX_VIDEO // 60))
     caminho = os.path.join(pasta, "audio.wav")
