@@ -2470,3 +2470,15 @@ dialog.lista-dlg[open] { display: flex; flex-direction: column; overflow: hidden
 @media (max-width: 699px), (orientation: landscape) and (max-height: 500px) and (max-width: 1099px) {
   .song-toolbar .so-largo, .setting.so-largo { display: none; }
 }
+
+/* ---------------------------------------------------------------- servidor da IA (Ajustes e Gerar com IA) */
+.aj-ia-campos { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; margin-top: 10px; }
+.aj-ia-campos .input { flex: 1 1 220px; min-width: 0; }
+.aj-ia-estado { width: 100%; margin: 8px 0 0; font-size: 13px; }
+.ia-yt { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; margin-top: 14px; padding: 14px 16px;
+  border-radius: 16px; background: var(--surface-2, rgb(255 255 255 / 0.05)); border: 1px solid var(--surface-3, rgb(255 255 255 / 0.08)); }
+.ia-yt-ic { color: #ff4e45; display: flex; }
+.ia-yt-txt { display: flex; flex-direction: column; gap: 2px; }
+.ia-yt-txt small { color: var(--text-2, rgb(255 255 255 / 0.65)); }
+.ia-yt-campo { grid-column: 1 / -1; display: flex; gap: 8px; }
+.ia-yt-campo .input { flex: 1; min-width: 0; }

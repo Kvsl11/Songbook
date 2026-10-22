@@ -18,10 +18,13 @@ import { corCss, corDominante } from './lib/cores.js';
 import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
 import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } from './lib/alinhamento.js';
 import { duracaoDoAviso, partesDoAviso, tipoDoAviso } from './lib/avisos.js';
+import { baseDoServidor, casarLinhas, chamar, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
+// o servidor da IA configurado nos Ajustes ({ url, chave }; url vazia: só a IA do aparelho)
+const servidorIA = () => ({ url: '', chave: '', ...(db.prefs().servidorIA || {}) });
 const view = $('#view');
 const titleEl = $('#title');
 const eyebrowEl = $('#eyebrow');
@@ -53,7 +56,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-186';
+export const APP_VERSAO = '2026.10.22-187';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4608,7 +4611,13 @@ async function gerarComIA(song, titulo) {
       <button class="ia-solte" id="ia-arquivo"><span class="ia-solte-ic">${icon('upload', 28)}</span>
         <b>Escolher o áudio da música</b><small>MP3, M4A, WAV, OGG… até 6 minutos. Fica melhor com voz e violão do que com banda completa.</small>
         <span class="btn primary">${icon('upload', 16)} Escolher arquivo</span></button>
+      ${servidorIA().url ? `<form class="ia-yt" id="ia-yt"><span class="ia-yt-ic">${icon('youtube', 22)}</span>
+        <div class="ia-yt-txt"><b>Ou cole o link do YouTube</b><small>O servidor baixa só o áudio, gera a partitura e apaga o áudio.</small></div>
+        <div class="ia-yt-campo"><input class="input" name="url" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${song.youtube ? `https://youtu.be/${esc(song.youtube)}` : ''}" required>
+          <button class="btn primary" type="submit">${icon('sparkles', 16)} Gerar</button></div></form>
+        <p class="ia-dica-compartilhar">${icon('sparkles', 16)}<span>Pelo <b>servidor da IA</b>: a voz é separada dos instrumentos antes de virar nota (mais fiel, sem vozes emboladas).</span></p>` : ''}
       <p class="ia-dica-compartilhar">${icon('info', 16)}<span>No Android, dá para baixar o áudio em outro app e tocar em <b>Compartilhar → Songbook</b>: ele já chega aqui.</span></p>`;
+    $('#ia-yt')?.addEventListener('submit', (e) => { e.preventDefault(); lerNoServidor({ url: e.target.url.value }); });
     const solte = $('#ia-arquivo');
     solte.onclick = () => {
       const inp = document.createElement('input');
@@ -4717,7 +4726,41 @@ async function gerarComIA(song, titulo) {
     $('#ia-status').textContent = estado.texto;
   }
 
-  async function lerArquivo(arquivo) {
+  // com o servidor da IA, o áudio vai inteiro para ele (a voz separada da banda, mais fiel) e as notas voltam prontas;
+  // se ele não responde, o arquivo é lido aqui mesmo, no aparelho
+  const lerArquivo = (arquivo) => (servidorIA().url ? lerNoServidor({ arquivo }) : lerNoAparelho(arquivo));
+  async function lerNoServidor({ arquivo, url }) {
+    telaLeitura();
+    const ctrl = new AbortController();
+    $('#ia-cancelar').onclick = () => { ctrl.abort(); telaFontes(); };
+    const leitor = { notas: [], analisados: 0, segundos: 0 };
+    const t0 = Date.now();
+    const andando = setInterval(() => {
+      const seg = (Date.now() - t0) / 1000;
+      const texto = seg < 6 ? (url ? 'Baixando o áudio do vídeo' : 'Enviando o áudio') : 'Separando a voz e ouvindo nota por nota';
+      // sem saber quanto falta, a barra anda rápido no começo e cada vez mais devagar
+      animar(leitor, { nivel: 0.5, ouvindo: true, texto, pct: Math.min(95, Math.round(100 * (1 - Math.exp(-seg / 70)))) });
+    }, 200);
+    try {
+      const form = arquivo ? new FormData() : null;
+      if (form) { form.append('arquivo', arquivo, arquivo.name || 'audio'); form.append('separar', 'true'); }
+      const r = await chamar(servidorIA(), arquivo ? '/transcrever' : '/youtube', arquivo ? { form, sinal: ctrl.signal } : { json: { url }, sinal: ctrl.signal });
+      clearInterval(andando);
+      if (!view.contains(passo)) return;
+      if (r.cortado) toast('Usei só os primeiros 6 minutos');
+      notas = r.notas || [];
+      if (!notas.length) { telaFontes('A IA não encontrou notas neste áudio. Tente de novo ou use outro arquivo de áudio da música.'); return; }
+      resultado();
+    } catch (e) {
+      clearInterval(andando);
+      if (ctrl.signal.aborted || !view.contains(passo)) return;
+      console.error(e);
+      // servidor fora do ar: o arquivo ainda dá para ler no aparelho; o link do YouTube, não
+      if (arquivo && !e.status) { toast('Servidor da IA fora do ar: lendo no aparelho'); lerNoAparelho(arquivo); return; }
+      telaFontes(e.message || FALHOU_IA);
+    }
+  }
+  async function lerNoAparelho(arquivo) {
     telaLeitura();
     $('#ia-status').textContent = 'Gerando a partitura…';
     let leitor;
@@ -6935,7 +6978,7 @@ function viewSettings() {
   const nRepertorios = db.sets().length;
   const nVideos = db.songs().filter((s) => s.youtube).length;
   // seção com título, ícone e uma linha explicando; o atalho do topo leva até ela
-  const SECOES = [['aparencia', 'palette', 'Aparência'], ['cifras', 'chord', 'Cifras'], ['musica', 'music', 'Música'], ['pptx', 'grid', 'PowerPoint'], ['dados', 'database', 'Dados'], ['sobre', 'info', 'Sobre']];
+  const SECOES = [['aparencia', 'palette', 'Aparência'], ['cifras', 'chord', 'Cifras'], ['musica', 'music', 'Música'], ['ia', 'sparkles', 'IA'], ['pptx', 'grid', 'PowerPoint'], ['dados', 'database', 'Dados'], ['sobre', 'info', 'Sobre']];
   const secao = (id, sub, corpo) => {
     const [, ic, nome] = SECOES.find(([k]) => k === id);
     return `<section class="aj-sec" id="aj-${id}"><h3 class="aj-titulo"><span class="aj-titulo-ic">${icon(ic, 16)}</span>${nome}</h3>${sub ? `<p class="aj-sub">${sub}</p>` : ''}${corpo}</section>`;
@@ -6986,6 +7029,15 @@ function viewSettings() {
     ${jaInstalado() ? '' : `<div class="settings-group">
       <div class="setting acao"><span class="ico" style="background:none">${logo(36)}</span><div class="grow"><div class="t">Instalar o Songbook</div><div class="s">Ícone na tela inicial, abre em tela cheia e funciona sem internet</div></div><div class="setting-acoes"><button class="btn small primary" id="instalar">Instalar</button></div></div>
     </div>`}`)}
+
+    ${secao('ia', 'O servidor da IA (o seu, em Python): partitura mais fiel, partitura pelo link do YouTube, letra que segue a música e Tirar dúvidas', `
+    <div class="settings-group aj-ia">
+      <div class="setting wrap"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Endereço do servidor</div><div class="s">Ex.: https://meu-servidor.com:8000. Sem ele, a partitura é gerada no próprio aparelho</div></div>
+        <div class="aj-ia-campos"><input class="input" id="ia-url" type="url" inputmode="url" autocomplete="off" placeholder="https://…" value="${esc(servidorIA().url)}">
+          <input class="input" id="ia-chave" type="password" autocomplete="off" placeholder="Chave (se o servidor pedir)" value="${esc(servidorIA().chave)}">
+          <button class="btn small" id="ia-testar">${icon('refresh', 15)} Testar</button></div>
+        <p class="aj-ia-estado muted" id="ia-estado"></p></div>
+    </div>`)}
 
     ${secao('pptx', 'O arquivo do seu grupo: no repertório, “PowerPoint” gera os slides com as letras', `
     <div class="settings-group"><div class="aj-pptx" id="pptx"><div class="aj-pptx-vazio muted">Verificando…</div></div></div>`)}
@@ -7064,6 +7116,21 @@ function viewSettings() {
     $('#destaque').querySelectorAll('[data-v]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   };
   $('#video-fundo').onchange = (e) => db.setPref('videoFundo', e.target.checked);
+  // servidor da IA: guarda ao sair do campo e mostra o que ele tem (separação da voz, YouTube, letra, dúvidas)
+  const guardarIA = () => db.setPref('servidorIA', { url: baseDoServidor($('#ia-url').value), chave: $('#ia-chave').value.trim() });
+  $('#ia-url').onchange = guardarIA;
+  $('#ia-chave').onchange = guardarIA;
+  $('#ia-testar').onclick = async () => {
+    guardarIA();
+    const est = $('#ia-estado');
+    if (!servidorIA().url) { est.textContent = 'Sem servidor: a IA roda no aparelho.'; return; }
+    est.textContent = 'Testando…';
+    try {
+      const r = await chamar(servidorIA(), '/saude', { tempo: 15e3 });
+      const sim = (v, t) => `${v ? '✓' : '✗'} ${t}`;
+      est.textContent = ['Conectado', sim(r.separacao, 'voz separada da banda'), sim(r.youtube, 'YouTube'), sim(r.letra, 'letra sincronizada'), sim(r.duvidas, 'Tirar dúvidas')].join(' · ');
+    } catch (e) { est.textContent = e.message; }
+  };
   $('#exp').onclick = () => download(`songbook-backup-${hojeISO()}.json`, db.exportAll(), 'application/json');
   $('#imp').onclick = openImport;
   $('#clr').onclick = async () => {

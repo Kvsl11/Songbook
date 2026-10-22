@@ -20,3 +20,7 @@ yt-dlp>=2025.1.1       # mantenha atualizado (pip install -U yt-dlp): o YouTube 
 demucs==4.0.1
 torchcrepe>=0.0.23
 faster-whisper>=1.0
+
+# Tirar dúvidas: a IA (Claude) responde pelos arquivos do acervo e pela web (precisa de ANTHROPIC_API_KEY)
+anthropic>=2.1
+pypdf>=4.0              # indexar_acervo.py: o texto dos PDFs do acervo

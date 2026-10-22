@@ -10,6 +10,7 @@ Variáveis:
     IA_COOKIES   arquivo cookies.txt para os vídeos com restrição (padrão: cookies.txt nesta pasta)
     IA_SEM_SEPARACAO  desliga a separação da voz (Demucs), mesmo instalada
     IA_WHISPER   modelo do Whisper para a letra sincronizada (padrão: small; base é mais rápido, medium acerta mais)
+    ANTHROPIC_API_KEY  liga o "Tirar dúvidas" (a IA que responde pelos arquivos do acervo e pela web)
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadF
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+import duvidas
 import letra
 import transcricao
 import youtube
@@ -72,6 +74,7 @@ def saude():
         "youtube": shutil.which("ffmpeg") is not None,
         "cookies": youtube.arquivo_de_cookies() is not None,
         "letra": letra.tem_whisper(),
+        "duvidas": bool(os.environ.get("ANTHROPIC_API_KEY")),
         "chave": bool(os.environ.get("IA_CHAVE")),
         "maxSegundos": transcricao.MAX_SEGUNDOS,
     }
@@ -161,3 +164,28 @@ def letra_sincronizada(pedido: PedidoLetra):
         _letras.pop(next(iter(_letras)))
     _letras[chave] = r
     return r
+
+
+class PedidoDuvida(BaseModel):
+    pergunta: str
+    historico: list[dict] = []
+
+
+@app.post("/duvida", dependencies=[Depends(conferir_chave)])
+def tirar_duvida(pedido: PedidoDuvida):
+    """Resposta pelos arquivos do acervo e, se eles não bastam, pela web (com as fontes)."""
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise HTTPException(501, "este servidor não tem a chave da IA (ANTHROPIC_API_KEY)")
+    import anthropic
+
+    try:
+        return duvidas.responder(pedido.pergunta, pedido.historico)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except anthropic.RateLimitError:
+        raise HTTPException(503, "a IA está ocupada, tente de novo em instantes")
+    except anthropic.APIStatusError as e:
+        log.warning("IA respondeu %s: %s", e.status_code, e.message)
+        raise HTTPException(502, "a IA não respondeu agora, tente de novo")
+    except anthropic.APIConnectionError:
+        raise HTTPException(502, "sem conexão com a IA, tente de novo")
