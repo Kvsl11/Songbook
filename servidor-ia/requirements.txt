@@ -13,7 +13,10 @@ scipy>=1.10
 pretty_midi>=0.2.10
 mir_eval>=0.7
 resampy>=0.4.2
-yt-dlp>=2025.1.1       # mantenha atualizado (pip install -U yt-dlp): o YouTube muda sempre
+yt-dlp[default]>=2026.10.21  # mantenha atualizado (pip install -U yt-dlp): o YouTube muda sempre
+# o YouTube só entrega o áudio a quem resolve os desafios em JavaScript da página: o yt-dlp usa o Deno para isso
+# (sem ele, com a conta conectada, o download falha)
+deno>=2
 
 # Fidelidade (recomendado): separação da voz (Demucs), afinação da voz (CREPE) e letra sincronizada (Whisper).
 # O torch para CPU: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu

@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import queue
+import re
 import shutil
 import tempfile
 import threading
@@ -160,7 +161,9 @@ def baixar(video: str, pasta: str) -> dict:
         msg = str(e).lower()
         if any(x in msg for x in ("sign in", "age-restricted", "confirm your age", "cookies", "login")):
             raise HTTPException(403, "o YouTube bloqueou o download pelo servidor (pede login)")
-        raise HTTPException(502, "não consegui baixar o áudio deste vídeo")
+        # o motivo do yt-dlp vai junto (a última linha, sem o "ERROR: [youtube] id:"), para saber o que corrigir
+        motivo = re.sub(r"^(ERROR:\s*)?(\[[^\]]+\]\s*)?([\w-]{11}:\s*)?", "", str(e).strip().splitlines()[-1] if str(e).strip() else "")
+        raise HTTPException(502, "não consegui baixar o áudio deste vídeo" + (f" ({motivo[:160]})" if motivo else ""))
 
 
 @app.post("/youtube", dependencies=[Depends(conferir_chave)])
