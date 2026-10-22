@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buscarNaWeb, criarIndice, explica, hifenizar, pedidoLiturgico, lerResultadosDuckDuckGo, melhoresFrases, pedeCanto, semCifra } from '../public/js/lib/duvidas.js';
+import { buscarNaWeb, criarIndice, explica, hifenizar, pedidoLiturgico, pedidoSugestao, lerResultadosDuckDuckGo, melhoresFrases, pedeCanto, semCifra } from '../public/js/lib/duvidas.js';
 
 const IGMR = 'O Glória é um hino antiquíssimo e venerável, pelo qual a Igreja glorifica a Deus. É cantado aos domingos fora do Advento e da Quaresma, nas solenidades e festas.';
 
@@ -114,4 +114,15 @@ test('tirar dúvidas: reconhece o pedido de uma parte da liturgia e o dia', () =
   // dúvida sobre o salmo (sem dia, sem pedido) não é pedido da liturgia
   assert.equal(pedidoLiturgico('Como o salmista deve proclamar o salmo responsorial?', hoje), null);
   assert.equal(pedidoLiturgico('O que a liturgia nos traz hj', hoje), null);
+});
+
+test('tirar dúvidas: reconhece o pedido de sugestão de cantos para partes da missa de um dia', () => {
+  const hoje = '2026-10-23'; // sexta-feira
+  assert.deepEqual(pedidoSugestao('Traga uma sujestão Litúrgica da entrada e ofertório do dia 29/01/2027', hoje), { partes: ['entrada', 'oferendas'], data: '2027-01-29' });
+  assert.deepEqual(pedidoSugestao('que canto de comunhão para domingo?', hoje), { partes: ['comunhao'], data: '2026-10-25' });
+  assert.equal(pedidoSugestao('monte um repertório para a missa de amanhã', hoje).data, '2026-10-24');
+  // pedido da leitura (sem canto), tempo litúrgico sem dia e dúvida não são sugestão para um dia
+  assert.equal(pedidoSugestao('Traga o salmo de hoje', hoje), null);
+  assert.equal(pedidoSugestao('Qual canto de comunhão para o Advento, ano A?', hoje), null);
+  assert.equal(pedidoSugestao('Quando se canta o Glória?', hoje), null);
 });

@@ -20,7 +20,7 @@ import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } fro
 import { partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { NOVIDADES, novidadesNaoVistas } from './lib/novidades.js';
 import { baseDoServidor, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
-import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
+import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -107,7 +107,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-229';
+export const APP_VERSAO = '2026.10.22-230';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -8170,6 +8170,34 @@ async function partesDaLiturgia({ partes, data }) {
     fontes: [...new Set(achadas.map((p) => p.fonte))],
   };
 }
+// Pedido de sugestão de cantos ("entrada e ofertório do dia 29/01/2027"): as mesmas sugestões da tela da Liturgia,
+// só das partes pedidas. Primeiro as da Missa litúrgica (acervo e Hinário da CNBB, que combinam com o tempo e a
+// celebração do dia), depois as da Missa popular (Cindy Ferrarezi e Músicas para Missa). Null se a liturgia do dia
+// não abrir (sem internet ou data sem liturgia publicada).
+const FONTES_CANTO = { hinario: 'Hinário Litúrgico – CNBB', acervo: 'Acervo litúrgico', mpm: 'Músicas para Missa', cindy: 'Cindy Ferrarezi' };
+async function sugestoesDaMissa({ partes, data }) {
+  const missa = missaCache.get(data) || await getMissa(data).then((m) => { missaCache.set(data, m); return m; }).catch(() => null);
+  if (!missa?.liturgia) return null;
+  const liturgica = await missaLiturgica(missa, data).catch(() => null);
+  const lit = missa.liturgia;
+  const achadas = partes.map((chave) => {
+    const daLiturgica = liturgica?.partes.find((p) => p.chave === chave);
+    const daPopular = missa.partes.find((p) => p.chave === chave);
+    const nome = daLiturgica?.nome || daPopular?.nome || chave;
+    const vistos = new Set();
+    const cantos = [...(daLiturgica?.cantos || []).slice(0, 4), ...(daPopular?.cantos || []).slice(0, 3).map((c) => ({ ...c, fonte: c.fonte || 'cindy' }))]
+      .filter((c) => { const t = normalizar(c.titulo); if (vistos.has(t)) return false; vistos.add(t); return true; })
+      .map(({ titulo, url, fonte }) => ({ titulo, url, fonte }));
+    return { chave, nome, cantos };
+  });
+  return {
+    data,
+    titulo: data === hojeISO() ? 'Missa de hoje' : `Missa de ${new Date(`${data}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', ...(data.slice(0, 4) !== hojeISO().slice(0, 4) && { year: 'numeric' }) })}`,
+    celebracao: [lit.celebracao, lit.ano].filter(Boolean).join(', '),
+    partes: achadas,
+  };
+}
+const textoDasSugestoes = (S) => [S.titulo + (S.celebracao ? ` — ${S.celebracao}` : ''), ...S.partes.map((p) => `${p.nome}:\n${p.cantos.length ? p.cantos.map((c) => `• ${c.titulo} (${FONTES_CANTO[c.fonte] || c.fonte})`).join('\n') : '(sem sugestão)'}`)].join('\n\n');
 // a liturgia em texto (para copiar e para a voz)
 const textoDaLiturgia = (L) => [L.titulo + (L.celebracao ? ` — ${L.celebracao}` : ''), ...L.partes.map((p) => [
   p.titulo + (p.referencia ? ` (${p.referencia})` : ''), p.introducao, p.refrao && `R. ${p.refrao}`,
@@ -8182,6 +8210,12 @@ const nomeDoSite = (w) => {
 };
 // a resposta dita em voz alta na conversa ao vivo: o que achou, de onde, em frases curtas
 const falaDaResposta = (m) => {
+  if (m.sugestoes) {
+    const S = m.sugestoes;
+    return [`Sugestões para a ${S.titulo.toLowerCase()}${S.celebracao ? `, ${S.celebracao}` : ''}.`, ...S.partes.map((p) => (p.cantos.length
+      ? `${p.nome}: ${p.cantos.slice(0, 3).map((c) => c.titulo).join('; ')}.`
+      : `${p.nome}: não achei sugestão.`))].join(' ');
+  }
   if (m.liturgia) {
     const L = m.liturgia;
     return [`${L.titulo}${L.celebracao ? `, ${L.celebracao}` : ''}.`, ...L.partes.map((p) => [
@@ -8222,7 +8256,7 @@ const realcar = (texto, pergunta) => {
   return esc(texto).replace(/[\p{L}\d]+/gu, (p) => (termos.has(raizDuvida(palavrasDuvida(p)[0] || '')) ? `<b>${hifenizar(p)}</b>` : hifenizar(p)));
 };
 // a resposta em texto (para copiar)
-const textoDaResposta = (m) => (m.liturgia ? textoDaLiturgia(m.liturgia) : [
+const textoDaResposta = (m) => (m.sugestoes ? textoDasSugestoes(m.sugestoes) : m.liturgia ? textoDaLiturgia(m.liturgia) : [
   ...(m.cantos || []).map((a) => `${a.titulo} (${a.caminho})`),
   ...(m.acervo || []).map((a) => `${a.titulo} (${a.caminho}): ${a.frases.join(' ')}`),
   ...(m.web || []).map((w) => `${w.titulo}: ${w.frases.join(' ')} (${w.url})`),
@@ -8266,6 +8300,17 @@ function viewDuvidas() {
     // a resposta: o trecho que mais responde, em texto corrido, com a fonte embaixo; os outros trechos recolhidos
     const fonte = (a, n) => `<button type="button" class="dv-fonte" data-k="${k}" data-n="${n}">${icon('library', 14)}<span><b>${esc(a.titulo)}</b><small>${esc(a.caminho)}</small></span></button>`;
     const partes = [];
+    if (m.sugestoes) {
+      const S = m.sugestoes;
+      return `<div class="dv-lit">
+        <a class="dv-lit-cab" href="#/liturgia/${S.data}">${icon('cross', 18)}<span><b>${esc(S.titulo)}</b>${S.celebracao ? `<small>${esc(S.celebracao)}</small>` : ''}</span>${icon('next', 16)}</a>
+        ${S.partes.map((p, n) => `<section class="dv-lit-parte">
+          <h4>${esc(p.nome)}</h4>
+          ${p.cantos.length ? `<div class="dv-cantos">${p.cantos.map((c, i) => `<button type="button" class="dv-fonte" data-k="${k}" data-sug="${n}:${i}">${icon('music', 14)}<span><b>${esc(c.titulo)}</b><small>${esc(FONTES_CANTO[c.fonte] || c.fonte)}</small></span></button>`).join('')}</div>`
+            : '<p class="dv-aviso">Não achei sugestão para esta parte.</p>'}
+        </section>`).join('')}
+      </div>`;
+    }
     if (m.liturgia) {
       const L = m.liturgia;
       const fonteLit = { cnbb: ['cnbb.org.br', 'Liturgia Diária – CNBB', 'https://www.cnbb.org.br/liturgia-diaria/'], pocket: ['pocketterco.com.br', 'Pocket Terço', 'https://pocketterco.com.br/liturgia'] };
@@ -8314,7 +8359,7 @@ function viewDuvidas() {
     ? `<div class="chat-msg eu"><div class="chat-bolha">${esc(m.content)}</div><small class="chat-hora">${horaCurta(m.t)}</small></div>`
     : `<div class="chat-msg ia"><div class="chat-corpo"><div class="chat-nome">${avatar}<span>Lumen</span><small class="chat-hora">${horaCurta(m.t)}</small></div>
         <div class="chat-bolha">${corpo(m, k)}</div>
-        ${!m.carregando ? `<div class="chat-acoes">${m.liturgia || m.acervo?.length || m.cantos?.length || m.web?.length || m.wiki ? `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>` : ''}
+        ${!m.carregando ? `<div class="chat-acoes">${m.sugestoes || m.liturgia || m.acervo?.length || m.cantos?.length || m.web?.length || m.wiki ? `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>` : ''}
           ${m.pergunta ? `<a href="${esc(google(m.pergunta))}" target="_blank" rel="noopener">${icon('search', 14)} Pesquisar no Google</a>` : ''}</div>` : ''}</div></div>`);
   const desenhar = () => {
     caixa.innerHTML = conversaDuvidas.length ? conversaDuvidas.map(msg).join('') : boasVindas();
@@ -8334,6 +8379,19 @@ function viewDuvidas() {
     const resp = { role: 'assistant', pergunta: q, carregando: true, t: Date.now() };
     conversaDuvidas.push(resp);
     desenhar();
+    // pedido de sugestão de cantos para partes da missa de um dia: as sugestões da tela da Liturgia
+    const pedidoCantos = pedidoSugestao(q, hojeISO());
+    if (pedidoCantos) {
+      resp.etapa = 'Buscando as sugestões da missa do dia…';
+      if (location.hash === '#/duvidas') desenhar();
+      const sugestoes = await sugestoesDaMissa(pedidoCantos).catch(() => null);
+      if (sugestoes) {
+        Object.assign(resp, { sugestoes, acervo: [], cantos: [], web: [], wiki: null, carregando: false, t: Date.now() });
+        guardarConversa();
+        if (location.hash === '#/duvidas') viewDuvidas();
+        return resp;
+      }
+    }
     // pedido de uma parte da liturgia ("o salmo de hoje"): só aquela parte, da liturgia da CNBB / Pocket Terço
     const pedido = pedidoLiturgico(q, hojeISO());
     if (pedido) {
@@ -8413,6 +8471,22 @@ function viewDuvidas() {
   const tocarResposta = async (e) => {
     const cop = e.target.closest('[data-copiar]');
     if (cop) { try { const m = conversaDuvidas[cop.dataset.copiar]; await navigator.clipboard.writeText(m.content && !m.acervo ? m.content : textoDaResposta(m)); toast('Resposta copiada'); } catch { toast('Não consegui copiar'); } return; }
+    // canto sugerido para a missa: do acervo/Hinário (já no app) ou da Cindy/Músicas para Missa (lido na hora)
+    const sb = e.target.closest('button[data-sug]');
+    if (sb) {
+      const [n, i] = sb.dataset.sug.split(':').map(Number);
+      const c = conversaDuvidas[sb.dataset.k]?.sugestoes?.partes[n]?.cantos[i];
+      if (!c) return;
+      if (c.fonte === 'acervo' || c.fonte === 'hinario') {
+        const mus = (await acervoClassificado()).musicas.find((x) => x.fonte === c.url);
+        if (mus) abrirMusicaAcervo({ fonte: mus.fonte, chordpro: mus.chordpro }, '#/duvidas', { naHora: true });
+        else toast('Não achei esse canto no acervo', { tipo: 'erro' });
+        return;
+      }
+      sb.classList.add('abrindo');
+      try { const canto = await getCanto(c.url); await abrirPrevia(canto.chordpro, canto.url, '#/duvidas', null, { espera: 0 }); } catch (err) { toast('Não consegui abrir: ' + err.message, { tipo: 'erro' }); sb.classList.remove('abrindo'); }
+      return;
+    }
     // o trecho do acervo abre o canto no app (do acervo ou do caderno do Hinário)
     const b = e.target.closest('button.dv-fonte');
     const a = b && conversaDuvidas[b.dataset.k]?.[b.dataset.lista || 'acervo']?.[b.dataset.n];

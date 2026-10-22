@@ -2714,6 +2714,7 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 /* as leituras vêm em linhas curtas, como no lecionário: alinhadas à esquerda (justificar abria buracos nelas) */
 .dv-lit-parte .dv-texto { text-align: left; }
 .dv-lit-estrofe { margin: 0 0 10px; font-size: 15.5px; line-height: 1.6; }
+.dv-fonte.abrindo { opacity: 0.55; pointer-events: none; }
 .dv-lit-fontes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .dv-favicon { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: #fff; overflow: hidden; }
 .dv-favicon img { width: 18px; height: 18px; object-fit: contain; }
