@@ -2641,7 +2641,8 @@ html.tablet #player .pl-cab small { font-size: 12px; color: rgb(255 255 255 / 0.
 html.tablet #player .pl-cab b { font-size: 15px; font-weight: 800; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html.tablet #player .pl-cab .icon-btn { color: rgb(255 255 255 / 0.85); }
 html.tablet #player .pl-lado { display: none; }
-html.tablet #player .pl-abrir-painel { display: none; }
+/* o botão de abrir o painel "Tocando agora" só existe no tablet (no celular e no computador não há painel) */
+#player .pl-abrir-painel { display: none; }
 html.tablet #player .pl-video { order: 1; width: 100%; margin: 0; border-radius: 12px; box-shadow: 0 12px 30px rgb(0 0 0 / 0.4); flex: none; }
 html.tablet #player .pl-info { order: 2; padding: 4px 2px 0; margin: 0; }
 html.tablet #player .pl-txt b { font-size: 22px; letter-spacing: -0.01em; white-space: normal; }

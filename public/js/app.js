@@ -85,7 +85,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-195';
+export const APP_VERSAO = '2026.10.22-196';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -7920,6 +7920,9 @@ function route() {
   view.scrollTop = 0;
   topbar.classList.remove('scrolled');
   desenharLateral();
+  // o sininho das notificações só aparece na página inicial
+  sino.hidden = a !== undefined;
+  if (sino.hidden) $('#notificacoes')?.remove();
   switch (a) {
     case undefined: return viewHome();
     case 'buscar': return b === 'categoria' ? viewCategoria(c, d || 'Seção') : viewSearch();
