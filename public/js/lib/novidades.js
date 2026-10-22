@@ -3,6 +3,12 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 233, data: '2026-10-22', titulo: 'O logo do Lumen',
+    itens: [
+      { tipo: 'novo', texto: 'O Lumen ganhou logo próprio: a “cruz de luz” (lumen é luz, em latim), uma estrela com o braço de baixo mais longo, formando a cruz, no degradê azul, roxo, rosa e dourado. Ele aparece no atalho do Início, no centro da tela do Lumen, nas respostas e na conversa ao vivo.' },
+    ],
+  },
+  {
     versao: 232, data: '2026-10-22', titulo: 'Lumen com a cara do Gemini',
     itens: [
       { tipo: 'melhoria', texto: 'O Lumen ficou com a cara do Gemini: a estrela e “Pode perguntar!” no meio, as sugestões em linhas simples e a caixa de pergunta em pílula, com o microfone e o botão azul da conversa ao vivo (vira a seta de enviar quando você digita).' },

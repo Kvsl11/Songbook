@@ -1,7 +1,7 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
 import { definirMeta, semInvisiveis, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasCantadas, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
-import { icon, iconeMenu, logo } from './icons.js';
+import { icon, iconeMenu, logo, logoLumen } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
 import { apagarModelo, carregarJSZip, gerarPowerPoint, gerarPowerPointSimples, lerModelo, salvarModelo, sugerirCantos } from './powerpoint.js';
@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-232';
+export const APP_VERSAO = '2026.10.22-233';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -254,10 +254,10 @@ function setHeader(title, { back = null, actions = [], eyebrow = '' } = {}) {
   document.title = `${title} · Songbook`;
   backBtn.hidden = !back;
   backBtn.onclick = back ? () => (typeof back === 'string' ? (location.hash = back) : back()) : null;
-  actionsEl.replaceChildren(...actions.map(({ icon: ic, label, onClick, href }) => {
+  actionsEl.replaceChildren(...actions.map(({ icon: ic, html, label, onClick, href }) => {
     const b = document.createElement(href ? 'a' : 'button');
     b.className = 'icon-btn';
-    b.innerHTML = icon(ic, 18);
+    b.innerHTML = html || icon(ic, 18); // html: um desenho próprio no lugar do ícone (o logo do Lumen)
     b.title = label;
     b.setAttribute('aria-label', label);
     if (href) b.href = href; else b.onclick = onClick;
@@ -1922,7 +1922,7 @@ function viewHome() {
   setTab('inicio');
   setTint('#1e3264');
   setHeader('Início', { actions: [
-    { icon: 'sparkles', label: 'Lumen, o assistente litúrgico', href: '#/duvidas' },
+    { html: logoLumen(22), label: 'Lumen, o assistente litúrgico', href: '#/duvidas' },
     { icon: 'upload', label: 'Importar arquivos', onClick: openImport },
     { icon: 'settings', label: 'Ajustes', href: '#/ajustes' },
   ] });
@@ -8314,7 +8314,7 @@ function viewDuvidas() {
   setTab('inicio');
   setTint('#0b1020');
   setHeader('Lumen', { back: '#/', eyebrow: 'Seu assistente litúrgico', actions: [...(conversaDuvidas.length ? [{ icon: 'trash', label: 'Apagar conversa', onClick: async () => { if (await ask({ title: 'Apagar a conversa?', text: 'As perguntas e respostas saem deste aparelho. (Elas também somem sozinhas depois de 24 horas.)', ok: 'Apagar', danger: true })) { conversaDuvidas = []; guardarConversa(); viewDuvidas(); } } }] : [])] });
-  const avatar = `<span class="dv-avatar" aria-hidden="true">${icon('sparkles', 18)}</span>`;
+  const avatar = `<span class="dv-avatar" aria-hidden="true">${logoLumen(20)}</span>`;
   view.innerHTML = `<div class="chat">
     <div class="chat-rolo" id="dv-conversa"></div>
     <form class="chat-barra" id="dv-form">
@@ -8331,12 +8331,9 @@ function viewDuvidas() {
   // a tela vazia, como a do Gemini: a estrela e a saudação no meio, as sugestões em linhas simples embaixo
   const hora = new Date().getHours();
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
-  const estrela = `<svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="dv-estrela-cor" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#4f8cff"/><stop offset="0.45" stop-color="#9b72ff"/><stop offset="0.75" stop-color="#ff6fa8"/><stop offset="1" stop-color="#ffb84d"/></linearGradient></defs>
-    <path fill="url(#dv-estrela-cor)" d="M12 0C12.6 6.4 17.6 11.4 24 12 17.6 12.6 12.6 17.6 12 24 11.4 17.6 6.4 12.6 0 12 6.4 11.4 11.4 6.4 12 0Z"/></svg>`;
   const boasVindas = () => `<div class="chat-vazio">
       <div class="dv-boas">
-        <span class="dv-estrela">${estrela}</span>
+        <span class="dv-estrela">${logoLumen(56)}</span>
         <h2>Pode perguntar!</h2>
         <p class="dv-sub-boas">${saudacao}! Eu sou o Lumen, o seu assistente litúrgico.</p>
       </div>
@@ -8613,7 +8610,7 @@ function viewDuvidas() {
     el.setAttribute('aria-label', 'Conversa ao vivo com o Lumen');
     // como a conversa ao vivo do Gemini: a resposta em letra grande no alto (as fontes num cartão, pelo botão), o que
     // a pessoa falou embaixo, "Toque para interromper" e a barra: fontes · a pílula que brilha · microfone · encerrar
-    el.innerHTML = `<div class="dv-vivo-topo"><span class="dv-vivo-selo"><i></i>Lumen ao vivo</span></div>
+    el.innerHTML = `<div class="dv-vivo-topo"><span class="dv-vivo-selo">${logoLumen(20)}Lumen ao vivo<i></i></span></div>
       <div class="dv-vivo-meio">
         <p class="dv-vivo-estado" aria-live="polite"></p>
         <div class="dv-vivo-resposta chat-bolha" hidden></div>

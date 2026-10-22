@@ -2516,9 +2516,9 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
    em bolha à direita e a caixa de escrever flutuando embaixo, com o microfone (ditado) e o enviar */
 .chat { --chat-max: 780px; --dv-roxo: #7c5cff; min-height: 100%; display: flex; flex-direction: column; }
 .chat-rolo { flex: 1; width: 100%; max-width: var(--chat-max); margin: 0 auto; padding: 24px 16px 8px; display: flex; flex-direction: column; gap: 22px; }
-.dv-avatar { flex: none; width: 26px; height: 26px; border-radius: 9px; display: grid; place-items: center; color: #fff;
-  background: linear-gradient(135deg, var(--accent), var(--dv-roxo)); box-shadow: 0 4px 14px color-mix(in srgb, var(--dv-roxo) 40%, transparent); }
-.dv-avatar .ic { width: 15px; height: 15px; }
+/* o logo do Lumen (a cruz de luz) como avatar das respostas */
+.dv-avatar { flex: none; width: 26px; height: 26px; display: grid; place-items: center; }
+.dv-avatar svg { width: 100%; height: 100%; filter: drop-shadow(0 2px 6px rgb(124 92 255 / 0.45)); }
 /* as mensagens */
 .chat-msg { display: flex; animation: chat-entra 0.25s ease both; }
 .chat-msg.eu { flex-direction: column; align-items: flex-end; }
@@ -2625,7 +2625,7 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 :root[data-theme="light"] .chat::before { background: radial-gradient(120% 75% at 50% 100%, rgb(66 133 244 / 0.18), transparent 75%); }
 .chat-vazio { flex: 1; display: flex; flex-direction: column; min-height: 100%; animation: chat-entra 0.4s ease both; }
 .dv-boas { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; padding: 24px 0; }
-.dv-estrela { width: 46px; height: 46px; animation: dv-brilha 5s ease-in-out infinite; }
+.dv-estrela { width: 60px; height: 60px; animation: dv-brilha 4s ease-in-out infinite; }
 .dv-estrela svg { width: 100%; height: 100%; display: block; }
 .chat-vazio h2 { margin: 0; font-size: clamp(30px, 8.5vw, 42px); font-weight: 500; letter-spacing: -0.02em; line-height: 1.1; }
 .dv-sub-boas { margin: -8px 0 0; font-size: 14px; color: var(--muted); }
@@ -2635,7 +2635,7 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 .dv-sug > .ic { flex: none; color: var(--muted); }
 .dv-sug:hover, .dv-sug:focus-visible { background: rgb(255 255 255 / 0.06); }
 :root[data-theme="light"] .dv-sug:hover { background: rgb(0 0 0 / 0.05); }
-@keyframes dv-brilha { 50% { transform: rotate(18deg) scale(1.08); filter: drop-shadow(0 0 10px rgb(66 133 244 / 0.6)); } }
+@keyframes dv-brilha { 0%, 100% { filter: drop-shadow(0 0 6px rgb(124 92 255 / 0.35)); } 50% { transform: scale(1.06); filter: drop-shadow(0 0 16px rgb(124 92 255 / 0.75)); } }
 /* a caixa de pergunta do Gemini: pílula escura, microfone e, sem texto, o botão azul da conversa ao vivo; com texto,
    o enviar no lugar dele */
 .chat-barra { background: none; }
@@ -2697,6 +2697,8 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 .dv-ia ul { padding-left: 20px; }
 .dv-ia li { margin: 4px 0; }
 .dv-ia h4 { margin: 14px 0 6px; font-size: 15px; }
+.icon-btn .logo-lumen { display: block; filter: drop-shadow(0 0 6px rgb(124 92 255 / 0.5)); }
+.dv-vivo-selo .logo-lumen { flex: none; }
 .dv-favicon { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: #fff; overflow: hidden; }
 .dv-favicon img { width: 18px; height: 18px; object-fit: contain; }
 .dv-favicon .ic { display: none; }
