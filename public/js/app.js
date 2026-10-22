@@ -90,7 +90,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-212';
+export const APP_VERSAO = '2026.10.22-213';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -764,12 +764,13 @@ const player = (() => {
     }
     $('.pl-prog i', el).style.width = duracao ? `${Math.min(100, (tempo / duracao) * 100)}%` : '0';
     sessaoDeMidia();
-    // voltar/pular: só numa música de repertório (como numa playlist)
-    const noRepertorio = Boolean(atual.setId && db.set(atual.setId));
-    if (filaDe !== (atual.setId || '')) { filaDe = atual.setId || ''; tocadas = new Set([atual.index]); historico = []; }
-    el.classList.toggle('com-fila', noRepertorio);
-    $('[data-pl="anterior"]', el).disabled = !noRepertorio || (anteriorIndice() < 0 && tempo < 3);
-    $('[data-pl="proxima"]', el).disabled = !noRepertorio || proximoIndice() < 0;
+    // voltar, pular e aleatório: numa música do repertório ou da biblioteca (a fila)
+    const f = fila();
+    const deQual = f ? atual.setId || 'biblioteca' : '';
+    if (filaDe !== deQual) { filaDe = deQual; tocadas = new Set(f ? [f.i] : []); historico = []; }
+    el.classList.toggle('com-fila', Boolean(f));
+    $('[data-pl="anterior"]', el).disabled = !f || (anteriorIndice() < 0 && tempo < 3);
+    $('[data-pl="proxima"]', el).disabled = !f || proximoIndice() < 0;
     desenharModos();
     $('.pl-t0', el).textContent = duracao ? fmt(tempo) : '';
     $('.pl-t1', el).textContent = duracao ? fmt(duracao) : '';
@@ -886,44 +887,53 @@ const player = (() => {
       avisar();
     },
   };
-  // ao terminar, no repertório, segue para a próxima música que tiver vídeo
-  // a música com vídeo antes/depois desta no repertório (ou -1)
-  const vizinha = (lado) => {
+  // a fila: as músicas do repertório de onde veio a música; fora de um repertório, as da biblioteca (na ordem da lista
+  // Músicas). i = a posição da música que toca. Música que não está na biblioteca (a prévia de uma busca): sem fila
+  const fila = () => {
     const set = atual?.setId && db.set(atual.setId);
-    if (!set) return -1;
-    for (let i = atual.index + lado; i >= 0 && i < set.items.length; i += lado) if (db.song(set.items[i].songId)?.youtube) return i;
+    if (set) return { set, ids: set.items.map((it) => it.songId), i: atual.index };
+    if (!atual?.songId || !db.song(atual.songId)) return null;
+    const ids = db.songs().filter((x) => x.youtube).map((x) => x.id);
+    return { set: null, ids, i: ids.indexOf(atual.songId) };
+  };
+  const temVideo = (f, i) => Boolean(db.song(f.ids[i])?.youtube);
+  // ao terminar, segue para a próxima música da fila que tiver vídeo; a música com vídeo antes/depois desta (ou -1)
+  const vizinha = (lado) => {
+    const f = fila();
+    if (!f || f.i < 0) return -1;
+    for (let i = f.i + lado; i >= 0 && i < f.ids.length; i += lado) if (temVideo(f, i)) return i;
     return -1;
   };
-  // aleatório e repetir (como no Spotify; ficam guardados): repetir = 'nao' | 'todas' (o repertório) | 'uma' (a música)
+  // aleatório e repetir (como no Spotify; ficam guardados): repetir = 'nao' | 'todas' (a fila) | 'uma' (a música)
   let aleatorio = Boolean(db.prefs().aleatorio);
   let repetir = ['nao', 'todas', 'uma'].includes(db.prefs().repetir) ? db.prefs().repetir : 'nao';
-  let tocadas = new Set(); // no aleatório: as músicas do repertório que já tocaram nesta volta
+  let tocadas = new Set(); // no aleatório: as músicas da fila que já tocaram nesta volta
   let historico = []; // no aleatório: de onde veio, para o voltar
   let filaDe = '';
-  const comVideo = (set) => set.items.map((it, i) => (db.song(it.songId)?.youtube ? i : -1)).filter((i) => i >= 0);
+  const comVideo = (f) => f.ids.map((_, i) => (temVideo(f, i) ? i : -1)).filter((i) => i >= 0);
   const proximoIndice = () => {
-    const set = atual?.setId && db.set(atual.setId);
-    if (!set) return -1;
+    const f = fila();
+    if (!f || f.i < 0) return -1;
     if (aleatorio) {
-      const outras = comVideo(set).filter((i) => i !== atual.index);
+      const outras = comVideo(f).filter((i) => i !== f.i);
       let livres = outras.filter((i) => !tocadas.has(i));
-      if (!livres.length && repetir === 'todas') { tocadas = new Set([atual.index]); livres = outras; }
+      if (!livres.length && repetir === 'todas') { tocadas = new Set([f.i]); livres = outras; }
       return livres.length ? livres[Math.floor(Math.random() * livres.length)] : -1;
     }
     const i = vizinha(1);
-    return i >= 0 || repetir !== 'todas' ? i : comVideo(set)[0] ?? -1; // no fim, repetindo o repertório: volta à primeira
+    return i >= 0 || repetir !== 'todas' ? i : comVideo(f)[0] ?? -1; // no fim, repetindo a fila: volta à primeira
   };
   const anteriorIndice = () => (aleatorio && historico.length ? historico[historico.length - 1] : vizinha(-1));
   const pular = (lado) => {
+    const f = fila();
     const i = lado > 0 ? proximoIndice() : anteriorIndice();
-    if (i < 0) return false;
-    if (lado > 0) historico.push(atual.index); else if (aleatorio && historico.length) historico.pop();
+    if (!f || i < 0) return false;
+    if (lado > 0) historico.push(f.i); else if (aleatorio && historico.length) historico.pop();
     tocadas.add(i);
-    const set = db.set(atual.setId);
-    const s = db.song(set.items[i].songId);
+    const s = db.song(f.ids[i]);
     const mesmoVideo = s.youtube === atual.youtube;
-    api.tocar(itemDoPlayer(s, set, i));
-    if (mesmoVideo) api.irPara(0); // outra música do repertório com o mesmo vídeo: começa do início
+    api.tocar(itemDoPlayer(s, f.set, f.set ? i : -1));
+    if (mesmoVideo) api.irPara(0); // outra música da fila com o mesmo vídeo: começa do início
     toast(`Tocando: ${s.title}`);
     return true;
   };
@@ -949,7 +959,7 @@ const player = (() => {
       acao('seekto', (d) => { if (typeof d.seekTime === 'number') api.irPara(d.seekTime); });
       acao('seekbackward', (d) => api.irPara(Math.max(0, tempo - (d.seekOffset || 10))));
       acao('seekforward', (d) => api.irPara(Math.min(duracao || Infinity, tempo + (d.seekOffset || 10))));
-      const naFila = Boolean(atual.setId && db.set(atual.setId));
+      const naFila = Boolean(fila());
       acao('previoustrack', naFila ? () => { if (tempo > 3 || anteriorIndice() < 0) api.irPara(0); else pular(-1); } : null);
       acao('nexttrack', naFila ? () => pular(1) : null);
     }
@@ -958,7 +968,7 @@ const player = (() => {
   };
   // a música acabou: repete, vai para a próxima (na ordem ou aleatória) ou para
   const fimDaMusica = () => {
-    if (repetir === 'uma' || (repetir === 'todas' && !atual?.setId)) { api.irPara(0); return true; }
+    if (repetir === 'uma' || (repetir === 'todas' && !fila())) { api.irPara(0); return true; }
     return pular(1);
   };
   const desenharModos = () => {
@@ -970,7 +980,7 @@ const player = (() => {
     bR.classList.toggle('ligado', repetir !== 'nao');
     bR.classList.toggle('uma', repetir === 'uma');
     bR.setAttribute('aria-pressed', String(repetir !== 'nao'));
-    bR.title = repetir === 'uma' ? 'Repetindo esta música' : repetir === 'todas' ? 'Repetindo o repertório' : 'Repetir';
+    bR.title = repetir === 'uma' ? 'Repetindo esta música' : repetir === 'todas' ? (atual?.setId ? 'Repetindo o repertório' : 'Repetindo a biblioteca') : 'Repetir';
   };
   window.addEventListener('message', (e) => {
     let h = '';
@@ -1030,17 +1040,17 @@ const player = (() => {
     if (b.dataset.pl === 'aleatorio') {
       aleatorio = !aleatorio;
       db.setPref('aleatorio', aleatorio);
-      tocadas = new Set([atual?.index]);
+      tocadas = new Set(fila() ? [fila().i] : []);
       historico = [];
       toast(aleatorio ? 'Aleatório ligado' : 'Aleatório desligado');
       desenhar();
     }
     if (b.dataset.pl === 'repetir') {
-      // sem repertório só faz sentido repetir a música: desligado ↔ esta música
-      const ordem = atual?.setId ? ['nao', 'todas', 'uma'] : ['nao', 'uma'];
+      // sem fila (música fora da biblioteca) só faz sentido repetir a música: desligado ↔ esta música
+      const ordem = fila() ? ['nao', 'todas', 'uma'] : ['nao', 'uma'];
       repetir = ordem[(ordem.indexOf(repetir) + 1) % ordem.length];
       db.setPref('repetir', repetir);
-      toast(repetir === 'uma' ? 'Repetindo esta música' : repetir === 'todas' ? 'Repetindo o repertório' : 'Repetir desligado');
+      toast(repetir === 'uma' ? 'Repetindo esta música' : repetir === 'todas' ? (atual?.setId ? 'Repetindo o repertório' : 'Repetindo a biblioteca') : 'Repetir desligado');
       desenhar();
     }
     // voltar, como no Spotify: depois dos 3 primeiros segundos volta ao começo da música; antes, vai para a anterior
