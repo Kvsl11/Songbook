@@ -44,17 +44,33 @@ document.addEventListener('fullscreenchange', travarEmPe);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) travarEmPe(); });
 screen.orientation?.addEventListener?.('change', travarEmPe);
 // o servidor da IA vem junto com o app: a publicação grava o endereço em data/servidor-ia.json (sem ele, a partitura
-// é gerada no aparelho e as telas que precisam do servidor não aparecem). Quem usa não configura nada
+// é gerada no aparelho e as telas que precisam do servidor não aparecem). Quem usa não configura nada.
+// O servidor no computador de quem usa (servidor-ia/docker-compose.yml) vem primeiro, quando responde: o QR code da
+// página dele abre o app com ?ia=<endereço> e o endereço fica guardado (Ajustes → Servidor no seu computador)
 let SERVIDOR_IA = { url: '', chave: '' };
 const servidorIA = () => SERVIDOR_IA;
-const servidorCarregado = fetch(new URL('data/servidor-ia.json', document.baseURI)).then((r) => (r.ok ? r.json() : null)).then((d) => {
-  if (!d?.url) return;
-  SERVIDOR_IA = { url: baseDoServidor(d.url), chave: d.chave || '' };
+const doLink = new URLSearchParams(location.search).get('ia');
+if (doLink !== null) {
+  db.setPref('servidorPc', baseDoServidor(doLink));
+  history.replaceState(null, '', location.pathname + location.hash);
+}
+const responde = (url) => fetch(url + '/saude', { signal: AbortSignal.timeout(8000) }).then((r) => r.ok).catch(() => false);
+const servidorCarregado = (async () => {
+  const pc = baseDoServidor(db.prefs().servidorPc);
+  if (pc && await responde(pc)) {
+    SERVIDOR_IA = { url: pc, chave: '', pc: true };
+    if (doLink) setTimeout(() => toast('Servidor do seu computador conectado'), 500);
+  } else {
+    if (pc && doLink) setTimeout(() => toast('O servidor do computador não respondeu. Ele está ligado?'), 500);
+    const d = await fetch(new URL('data/servidor-ia.json', document.baseURI)).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (!d?.url) return;
+    SERVIDOR_IA = { url: baseDoServidor(d.url), chave: d.chave || '' };
+    // o servidor gratuito dorme quando ninguém usa: um "bom dia" já o acorda para quando precisar
+    fetch(SERVIDOR_IA.url + '/saude').catch(() => {});
+  }
   // a tela que já abriu sem saber do servidor é desenhada de novo
   if (/^#\/musica\/[^/]+\/compor\/ia/.test(location.hash)) route();
-  // o servidor gratuito dorme quando ninguém usa: um "bom dia" já o acorda para quando precisar
-  fetch(SERVIDOR_IA.url + '/saude').catch(() => {});
-}).catch(() => {});
+})().catch(() => {});
 const view = $('#view');
 const titleEl = $('#title');
 const eyebrowEl = $('#eyebrow');
@@ -7580,6 +7596,8 @@ function viewSettings() {
     ${secao('musica', 'A página de cada música', `
     <div class="settings-group">
       <a class="setting" href="#/youtube"><span class="ico">${icon('youtube', 18)}</span><div class="grow"><div class="t">Conta do YouTube</div><div class="s">Para o app baixar o áudio dos vídeos sozinho: partitura e letra sincronizada</div></div>${icon('next', 18)}</a>
+      <div class="setting wrap" id="servidor-pc"><span class="ico">${icon('database', 18)}</span><div class="grow"><div class="t">Servidor no seu computador</div><div class="s" id="servidor-pc-estado">${p.servidorPc ? 'Verificando…' : 'Partitura e letra sincronizada pelo seu PC, de graça. Ligue o servidor no PC e leia o QR code da página dele'}</div></div>
+        <form class="aj-servidor" id="servidor-pc-form"><input type="url" class="input" id="servidor-pc-url" placeholder="https://….trycloudflare.com" value="${esc(p.servidorPc || '')}" aria-label="Endereço do servidor"><button class="btn small primary">Salvar</button>${p.servidorPc ? '<button type="button" class="btn small" id="servidor-pc-tirar">Tirar</button>' : ''}</form></div>
       <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo no topo da música</div><div class="s">Quadros do clipe passam sem som atrás do título, como no Spotify (o vídeo toca nas Referências). Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
     </div>
     ${jaInstalado() ? '' : `<div class="settings-group">
@@ -7663,6 +7681,17 @@ function viewSettings() {
     $('#destaque').querySelectorAll('[data-v]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   };
   $('#video-fundo').onchange = (e) => db.setPref('videoFundo', e.target.checked);
+  // servidor no computador: diz se responde agora; salvar ou tirar vale na próxima vez que o app abrir
+  const estadoPc = $('#servidor-pc-estado');
+  if (p.servidorPc) Promise.all([responde(p.servidorPc), servidorCarregado]).then(([ok]) => { estadoPc.textContent = ok ? `Ligado: ${SERVIDOR_IA.pc ? 'o app está usando ele' : 'reabra o app para usar'}` : 'Não responde. O PC está ligado? Ao religar, o endereço muda: leia o QR code de novo'; });
+  $('#servidor-pc-form').onsubmit = (e) => {
+    e.preventDefault();
+    const url = baseDoServidor($('#servidor-pc-url').value);
+    if (!url) { toast('Cole o endereço que aparece na página do servidor no PC'); return; }
+    db.setPref('servidorPc', url);
+    location.reload();
+  };
+  $('#servidor-pc-tirar')?.addEventListener('click', () => { db.setPref('servidorPc', ''); location.reload(); });
   $('#exp').onclick = () => download(`songbook-backup-${hojeISO()}.json`, db.exportAll(), 'application/json');
   $('#imp').onclick = openImport;
   $('#clr').onclick = async () => {

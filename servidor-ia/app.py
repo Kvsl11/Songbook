@@ -29,11 +29,12 @@ import threading
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 import duvidas
 import letra
+import pc
 import transcricao
 import youtube
 
@@ -131,6 +132,16 @@ def com_etapas(trabalho, etapas: bool, pasta: str | None = None):
     # e o tipo text/event-stream: é o que o Modal manda entregar na hora, sem juntar (o app lê as linhas do mesmo jeito)
     return StreamingResponse(linhas(), media_type="text/event-stream", headers={
         "Content-Encoding": "identity", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
+
+
+@app.get("/", response_class=HTMLResponse)
+def inicio():
+    """No PC (docker compose): o QR code que liga o celular a este servidor."""
+    return pc.pagina()
+
+
+if pc.TUNEL:
+    threading.Thread(target=pc.anunciar, daemon=True).start()
 
 
 @app.get("/saude")

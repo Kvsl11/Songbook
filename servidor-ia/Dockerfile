@@ -11,6 +11,8 @@ RUN useradd -m -u 1000 user
 USER user
 ENV HOME=/home/user PATH=/home/user/.local/bin:$PATH PYTHONUNBUFFERED=1
 WORKDIR /home/user/app
+# o que fica guardado entre uma vez e outra no PC (docker-compose.yml): o áudio de cada vídeo e a conta do YouTube
+RUN mkdir -p /home/user/dados
 
 COPY --chown=user requirements.txt .
 RUN pip install --no-cache-dir --user torch torchaudio --index-url https://download.pytorch.org/whl/cpu \

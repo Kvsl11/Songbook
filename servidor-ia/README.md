@@ -15,6 +15,23 @@ Transforma áudio em notas para a partitura do Songbook, com mais fidelidade que
 Medido em 11 trechos de músicas reais (MUSDB18, voz isolada como gabarito): a melodia certa passou de **34%** do
 tempo (a música inteira junta, como no celular) para **70%** (voz separada + limpeza).
 
+## No seu computador, de graça (recomendado)
+
+Sem crédito para acabar e sem fila de ninguém: o servidor roda no seu PC e um túnel grátis da Cloudflare (sem conta)
+dá o endereço https que o celular alcança de qualquer lugar. De quebra, o YouTube quase não bloqueia a internet de casa.
+
+1. Instale o [Docker Desktop](https://www.docker.com/products/docker-desktop/) (grátis para uso pessoal) e abra-o.
+   O PC precisa de uns 8 GB de memória livre.
+2. Baixe o projeto (no GitHub: **Code → Download ZIP**) e descompacte.
+3. Na pasta `servidor-ia`: dois cliques em **`iniciar-windows.bat`** (Windows) ou rode `./iniciar.sh` (Mac/Linux).
+   A primeira vez monta tudo e leva uns 15 minutos; as outras, segundos.
+4. Abre a página <http://localhost:7860> com um QR code: leia com a câmera do celular. O Songbook abre já usando o PC
+   (fica em **Ajustes → Servidor no seu computador**).
+
+Deixe o PC ligado enquanto usa. O servidor volta sozinho quando o Docker Desktop abre, mas o endereço do túnel muda a
+cada vez: abra <http://localhost:7860> e leia o QR code de novo. Com o PC desligado, o app volta para o servidor da
+nuvem (abaixo), se houver. Parar: `docker compose down` nesta pasta. Ver o que está fazendo: `docker compose logs -f ia`.
+
 ## Publicar de graça (Modal)
 
 O workflow `.github/workflows/servidor-ia.yml` publica o servidor no [Modal](https://modal.com) (US$ 30 de uso
