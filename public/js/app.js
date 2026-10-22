@@ -8212,8 +8212,10 @@ function viewDuvidas() {
       }
     }
     // a internet: o resumo do site que mais responde, com o link; os outros sites (e a Wikipédia) embaixo, como links
-    const link = (w, nome) => `<a class="dv-fonte" href="${esc(w.url)}" target="_blank" rel="noopener">${icon('external', 14)}<span><b>${esc(w.titulo)}</b><small>${esc(nome)}</small></span></a>`;
-    const sites = [...(m.web || []).map((w) => ({ ...w, nome: nomeDoSite(w) })), ...(m.wiki ? [{ ...m.wiki, nome: 'Wikipédia' }] : [])];
+    // o ícone do próprio site (o do DuckDuckGo, que guarda o de cada site); sem ele, o ícone de link
+    const favicon = (site) => `<span class="dv-favicon"><img src="https://external-content.duckduckgo.com/ip3/${encodeURIComponent(site)}.ico" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('sem')">${icon('external', 14)}</span>`;
+    const link = (w, nome) => `<a class="dv-fonte" href="${esc(w.url)}" target="_blank" rel="noopener">${favicon(w.site)}<span><b>${esc(w.titulo)}</b><small>${esc(nome)}</small></span></a>`;
+    const sites = [...(m.web || []).map((w) => ({ ...w, nome: nomeDoSite(w) })), ...(m.wiki ? [{ ...m.wiki, site: 'pt.wikipedia.org', nome: 'Wikipédia' }] : [])];
     if (sites.length) {
       const [melhor, ...mais] = sites;
       partes.push(`${primeiro || m.cantos?.length ? '<h4 class="dv-sub">Na internet</h4>' : '<p class="dv-aviso">Não achei nos arquivos do acervo. Achei isto na internet:</p>'}
