@@ -2563,7 +2563,7 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
    (em pé e deitado) sem menu lateral: o menu flutua embaixo, numa pílula, e o "Tocando agora" (vídeo, controles e a
    letra que acompanha a música) fica num painel à direita enquanto algo toca. html.tablet vem do app (tela de toque
    com 600 px ou mais no lado menor); o computador continua com o menu lateral e a barra do player embaixo */
-html.tablet { --nav-h: 84px; --base-rodape: calc(var(--nav-h) + env(safe-area-inset-bottom)); --col-esq: 0px; --painel-w: 0px; --folga-pe: 32px; }
+html.tablet { --nav-h: 96px; --nav-alt: 76px; --base-rodape: calc(var(--nav-h) + env(safe-area-inset-bottom)); --col-esq: 0px; --painel-w: 0px; --folga-pe: 32px; }
 html.tablet body.com-player { --painel-w: clamp(320px, 38vw, 460px); --rodape: var(--base-rodape); }
 html.tablet .shell { gap: 8px; padding: 8px; }
 html.tablet .main-col { border-radius: var(--radius); container-type: normal; transition: margin 0.25s; }
@@ -2574,7 +2574,7 @@ html.tablet .brand-row, html.tablet .side-lib { display: none !important; }
 html.tablet .nav {
   position: fixed; z-index: 30; top: auto; bottom: calc(14px + env(safe-area-inset-bottom));
   left: calc(8px + (100vw - 16px) / 2); transform: translateX(-50%);
-  width: min(600px, calc(100vw - 64px - var(--painel-w))); height: 64px; padding: 0 10px; overflow: visible;
+  width: min(820px, calc(100vw - 64px - var(--painel-w))); height: var(--nav-alt); padding: 0 12px; overflow: visible;
   display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; gap: 0;
   border-radius: 14px; border: 1px solid rgb(255 255 255 / 0.08);
   background: rgb(36 36 36 / 0.82); backdrop-filter: blur(22px) saturate(1.4); -webkit-backdrop-filter: blur(22px) saturate(1.4);
@@ -2582,10 +2582,26 @@ html.tablet .nav {
 }
 html.tablet body.com-player .nav { left: calc(8px + (100vw - 24px - var(--painel-w)) / 2); }
 :root[data-theme="light"].tablet .nav { background: rgb(255 255 255 / 0.85); border-color: rgb(0 0 0 / 0.08); }
-html.tablet .nav a { flex-direction: column; justify-content: center; gap: 3px; height: calc(100% - 10px); padding: 0; font-size: 12px; font-weight: 700; border-radius: 10px; }
+html.tablet .nav a { flex-direction: column; justify-content: center; gap: 4px; height: calc(100% - 12px); padding: 0; font-size: 14px; font-weight: 700; border-radius: 12px; }
+html.tablet .nav a svg { width: 28px; height: 28px; }
 html.tablet .nav a em { display: block; }
 html.tablet .nav a.active { color: var(--text); }
 html.tablet .topbar { padding: 12px 24px; }
+/* no tablet a tela fica mais longe dos olhos: botões, filtros, listas e textos um pouco maiores (como no Spotify) */
+html.tablet .chip { height: 38px; padding: 0 16px; font-size: 14.5px; gap: 8px; }
+html.tablet .chip.sm { height: 26px; padding: 0 10px; font-size: 13px; }
+html.tablet .btn { height: 46px; padding: 0 22px; font-size: 15.5px; gap: 8px; }
+html.tablet .btn.small { height: 38px; padding: 0 16px; font-size: 14px; }
+html.tablet .btn svg { width: 18px; height: 18px; }
+html.tablet .icon-btn { width: 44px; height: 44px; }
+html.tablet .topbar .icon-btn { width: 40px; height: 40px; }
+html.tablet .track .cover { width: 56px; height: 56px; }
+html.tablet .track .t { font-size: 17px; }
+html.tablet .track .s { font-size: 14.5px; }
+html.tablet .tile b { font-size: 16px; }
+html.tablet .tile small { font-size: 14.5px; }
+html.tablet .shelf-head h2 { font-size: 26px; }
+html.tablet .shelf-head a { font-size: 14.5px; }
 /* o painel "Tocando agora" */
 html.tablet #player {
   position: fixed; z-index: 25; top: 8px; right: 8px; bottom: 8px; left: auto; width: var(--painel-w); height: auto;
@@ -2659,7 +2675,7 @@ html.tablet body.painel-recolhido .main-col { margin-right: 0; }
 html.tablet body.com-player.painel-recolhido .nav { left: 16px; transform: none; width: calc(var(--linha-w) * 0.56); }
 html.tablet body.painel-recolhido #player {
   top: auto; left: auto; right: 16px; transform: none; bottom: calc(14px + env(safe-area-inset-bottom));
-  width: calc(var(--linha-w) * 0.44); height: 64px; flex-direction: row; align-items: center; gap: 8px; padding: 7px 8px 7px 7px;
+  width: calc(var(--linha-w) * 0.44); height: var(--nav-alt); flex-direction: row; align-items: center; gap: 10px; padding: 8px 10px 8px 8px;
   border-radius: 14px; overflow: hidden; border: 1px solid rgb(255 255 255 / 0.08);
   background: color-mix(in srgb, var(--cor-musica, var(--tint)) 72%, #000); box-shadow: 0 12px 34px rgb(0 0 0 / 0.45);
 }
@@ -2668,21 +2684,22 @@ html.tablet body.painel-recolhido #player .pl-cab, html.tablet body.painel-recol
 html.tablet body.painel-recolhido #player .pl-tempo { display: block; position: absolute; left: 10px; right: 10px; bottom: 2px; margin: 0; }
 html.tablet body.painel-recolhido #player .pl-t0, html.tablet body.painel-recolhido #player .pl-t1 { display: none; }
 html.tablet body.painel-recolhido #player .pl-prog { height: 2px; }
-html.tablet body.painel-recolhido #player .pl-video { width: 50px; height: 50px; aspect-ratio: 1; flex: none; border-radius: 6px; box-shadow: none; overflow: hidden; }
+html.tablet body.painel-recolhido #player .pl-video { width: 60px; height: 60px; aspect-ratio: 1; flex: none; border-radius: 6px; box-shadow: none; overflow: hidden; }
 html.tablet body.painel-recolhido #player .pl-info { flex: 1; min-width: 0; padding: 0; }
-html.tablet body.painel-recolhido #player .pl-txt b { font-size: 14px; white-space: nowrap; }
-html.tablet body.painel-recolhido #player .pl-txt small { font-size: 12px; }
+html.tablet body.painel-recolhido #player .pl-txt b { font-size: 16px; white-space: nowrap; }
+html.tablet body.painel-recolhido #player .pl-txt small { font-size: 13.5px; }
 html.tablet body.painel-recolhido #player .pl-ctrl { flex: none; padding: 0; gap: 0; }
 html.tablet body.painel-recolhido #player .pl-modo { display: none; }
-html.tablet body.painel-recolhido #player .pl-play { width: 44px; height: 44px; }
-html.tablet body.painel-recolhido #player .pl-pulo { width: 36px; height: 36px; }
-html.tablet body.painel-recolhido #player .pl-abrir-painel { display: grid; order: 9; color: #fff; width: 38px; height: 38px; }
+html.tablet body.painel-recolhido #player .pl-play { width: 48px; height: 48px; }
+html.tablet body.painel-recolhido #player .pl-pulo { width: 40px; height: 40px; }
+html.tablet body.painel-recolhido #player .pl-abrir-painel { display: grid; order: 9; color: #fff; width: 42px; height: 42px; }
 html.tablet body.painel-recolhido #player .pl-lado { display: none; }
 /* em pé a linha é estreita: o mini player fica com a capa, o nome, o tocar e o abrir */
 @media (orientation: portrait) {
   html.tablet body.painel-recolhido #player .pl-pulo { display: none; }
   html.tablet body.com-player.painel-recolhido .nav { padding: 0 4px; }
-  html.tablet body.com-player.painel-recolhido .nav a { font-size: 11px; }
+  html.tablet body.com-player.painel-recolhido .nav a { font-size: 12.5px; }
+  html.tablet body.com-player.painel-recolhido .nav a svg { width: 26px; height: 26px; }
 }
 /* tela inteira: a música ocupa tudo (deitado, o vídeo e os controles de um lado e a letra grande do outro) */
 html.tablet body.painel-cheio #player { left: 8px; width: auto; z-index: 40; padding: 20px 24px 24px; }
