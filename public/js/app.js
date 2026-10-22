@@ -5061,10 +5061,52 @@ async function gerarComIA(song, titulo) {
       li.querySelector('.ia-etapa-barra b').style.width = `${pct}%`;
     } else li.querySelector('.ia-etapa-st').textContent = '';
   }
+  // as etapas aparecem uma por uma: cada mudança de etapa fica pelo menos um instante na tela (mesmo as que o servidor
+  // faz num piscar ou que chegam juntas), e no fim as que faltam (a afinação, que só existe com voz, por exemplo)
+  // acendem e ganham o ✓ em sequência antes da partitura aparecer
+  function etapasEmSequencia() {
+    const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+    const fila = [];
+    let atual = null;
+    let livreEm = 0;
+    let rodando = null;
+    const andar = async () => {
+      while (fila.length) {
+        const [id, p] = fila.shift();
+        if (id !== atual) {
+          const espera = livreEm - Date.now();
+          if (espera > 0) await esperar(espera);
+          atual = id;
+          livreEm = Date.now() + 500;
+        }
+        if (!view.contains(passo)) { fila.length = 0; break; }
+        marcarEtapa(id, p);
+      }
+      rodando = null;
+    };
+    return {
+      avisar(id, p = null) { fila.push([id, p]); rodando ||= andar(); },
+      async concluir() {
+        await rodando;
+        const itens = [...passo.querySelectorAll('.ia-etapas li')];
+        const k = Math.max(0, itens.findIndex((li) => !li.classList.contains('feita')));
+        for (let i = k; i < itens.length; i++) {
+          if (!view.contains(passo)) return;
+          itens.forEach((li, j) => { li.classList.toggle('feita', j < i); li.classList.toggle('agora', j === i); li.classList.remove('com-pct'); });
+          itens[i].querySelector('.ia-etapa-st').textContent = '';
+          itens[i].querySelector('.ia-etapa-sub').textContent = '';
+          await esperar(i === k ? Math.max(0, livreEm - Date.now()) + 200 : 450);
+        }
+        itens.forEach((li) => { li.classList.remove('agora'); li.classList.add('feita'); });
+        await esperar(600);
+      },
+    };
+  }
   async function lerNoServidor({ arquivo, url }) {
     // a etapa de afinação só existe com a voz separada; ela aparece se o servidor avisar
     telaEtapas(ETAPAS_IA.filter(([id]) => id !== (arquivo ? 'baixando' : 'enviando')));
-    marcarEtapa(arquivo ? 'enviando' : 'baixando', 0);
+    const etapas = etapasEmSequencia();
+    etapas.avisar(arquivo ? 'enviando' : 'baixando', 0);
     const ctrl = new AbortController();
     $('#ia-cancelar').onclick = () => { ctrl.abort(); telaFontes(); };
     const t0 = Date.now();
@@ -5072,10 +5114,11 @@ async function gerarComIA(song, titulo) {
     try {
       const form = arquivo ? new FormData() : null;
       if (form) { form.append('arquivo', arquivo, arquivo.name || 'audio'); form.append('separar', 'true'); }
-      const r = await chamarComEtapas(servidorIA(), arquivo ? '/transcrever' : '/youtube', arquivo ? { form, sinal: ctrl.signal } : { json: { url }, sinal: ctrl.signal }, marcarEtapa);
+      const r = await chamarComEtapas(servidorIA(), arquivo ? '/transcrever' : '/youtube', arquivo ? { form, sinal: ctrl.signal } : { json: { url }, sinal: ctrl.signal }, etapas.avisar);
       clearInterval(relogio);
       if (!view.contains(passo)) return;
-      passo.querySelectorAll('.ia-etapas li').forEach((li) => { li.classList.remove('agora'); li.classList.add('feita'); });
+      await etapas.concluir();
+      if (!view.contains(passo) || ctrl.signal.aborted) return;
       if (r.cortado) toast('Usei só os primeiros 6 minutos');
       notas = r.notas || [];
       if (!notas.length) { telaFontes('A IA não encontrou notas neste áudio. Tente de novo ou use outro arquivo de áudio da música.'); return; }
