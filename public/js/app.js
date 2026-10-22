@@ -73,6 +73,11 @@ $('#btn-side').addEventListener('click', () => {
   $('#btn-side').setAttribute('aria-label', v ? 'Expandir menu' : 'Recolher menu');
 });
 view.addEventListener('scroll', () => topbar.classList.toggle('scrolled', view.scrollTop > 120), { passive: true });
+// a linha do andamento da música, no pé da faixa do topo (na página da música, ao rolar)
+const topoProg = document.createElement('i');
+topoProg.className = 'topo-prog';
+topoProg.innerHTML = '<b></b>';
+topbar.append(topoProg);
 
 // imagens de capa que falharem viram capa gerada
 document.addEventListener('error', (e) => {
@@ -85,7 +90,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-204';
+export const APP_VERSAO = '2026.10.22-206';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -675,9 +680,8 @@ const player = (() => {
       <button class="icon-btn" data-pl="fechar" aria-label="Fechar o player" title="Fechar">${icon('x', 18)}</button>
     </div>
     <div class="pl-cab"><button class="icon-btn" data-pl="recolher" aria-label="Recolher o painel" title="Recolher">${icon('sidebar', 20)}</button>
-      <span><small>Tocando agora</small><b></b></span>
-      <button class="icon-btn" data-pl="cheio" aria-label="Tela inteira" title="Tela inteira">${icon('expand', 18)}</button></div>
-    <section class="pl-letra" hidden><div class="pl-letra-cab"><h3>Letra</h3><button class="icon-btn" data-pl="cheio" aria-label="Letra em tela inteira" title="Tela inteira">${icon('expand', 16)}</button></div><div class="pl-linhas"></div></section>`;
+      <span><small>Tocando agora</small><b></b></span><i class="pl-cab-vazio"></i></div>
+    <section class="pl-letra" hidden><div class="pl-letra-cab"><h3>Letra</h3><button class="icon-btn" data-pl="cheio" aria-label="Abrir a música na tela toda" title="Abrir a música na tela toda">${icon('expand', 16)}</button></div><div class="pl-linhas"></div></section>`;
   // no tablet o player é o painel "Tocando agora" à direita, fora da coluna principal (que não o corta)
   const casa = ehTablet() ? document.body : $('.main-col');
   document.body.classList.toggle('painel-recolhido', Boolean(db.prefs().painelRecolhido));
@@ -1039,19 +1043,16 @@ const player = (() => {
     }
     // voltar, como no Spotify: depois dos 3 primeiros segundos volta ao começo da música; antes, vai para a anterior
     if (b.dataset.pl === 'anterior') { if (tempo > 3 || anteriorIndice() < 0) api.irPara(0); else pular(-1); }
-    if (b.dataset.pl === 'fechar') { document.body.classList.remove('painel-cheio'); api.fechar(); }
-    // tablet: recolher o painel (vira uma barrinha acima do menu) ou abrir de novo; tela inteira e voltar
-    if (b.dataset.pl === 'recolher') { document.body.classList.toggle('painel-recolhido'); document.body.classList.remove('painel-cheio'); db.setPref('painelRecolhido', document.body.classList.contains('painel-recolhido')); }
-    if (b.dataset.pl === 'cheio') {
-      const cheio = document.body.classList.toggle('painel-cheio');
-      el.querySelectorAll('[data-pl="cheio"]').forEach((x) => { x.innerHTML = icon(cheio ? 'shrink' : 'expand', 18); });
-    }
+    if (b.dataset.pl === 'fechar') api.fechar();
+    // tablet: recolher o painel (vira uma barrinha acima do menu) ou abrir de novo
+    if (b.dataset.pl === 'recolher') { document.body.classList.toggle('painel-recolhido'); db.setPref('painelRecolhido', document.body.classList.contains('painel-recolhido')); }
     if (b.dataset.pl === 'trocar') {
       const s = db.song(atual?.songId);
       if (s) escolherVideo(s).then((url) => { if (!url) return; db.saveSong({ ...db.song(s.id), content: definirMeta(db.song(s.id).content, 'youtube', url) }); api.tocar({ ...atual, youtube: youtubeId(url) }); route(); });
     }
     if (b.dataset.pl === 'ampliar') { el.classList.toggle('grande'); b.innerHTML = icon(el.classList.contains('grande') ? 'shrink' : 'expand', 18); }
-    if (b.dataset.pl === 'abrir' && atual) {
+    // abrir a música (o nome no player, ou expandir a letra): a página dela, na tela toda
+    if ((b.dataset.pl === 'abrir' || b.dataset.pl === 'cheio') && atual) {
       if (atual.href && location.hash !== atual.href) location.hash = atual.href;
       else if (!atual.href && atual.abrir) atual.abrir();
     }
@@ -2151,6 +2152,13 @@ async function buscarMusicas(termo) {
 const tileArtista = (a) => `<a class="tile tile-artista" href="#/artista/${encodeURIComponent(a.slug)}/${encodeURIComponent(a.nome)}">
   <div class="cover">${a.capa ? `<img src="${esc(a.capa)}" alt="" loading="lazy">` : icon('mic', 40)}</div><b>${esc(a.nome)}</b><small>Artista</small></a>`;
 const artistaCerto = (lista, nome) => lista.find((a) => mesmoNome(a.nome, nome)) || null;
+// a foto de um artista pelo nome (a do Cifra Club); guardada na sessão, para não buscar de novo a cada música
+const fotosArtistas = new Map();
+function fotoDoArtista(nome) {
+  const k = normalizar(nome);
+  if (!fotosArtistas.has(k)) fotosArtistas.set(k, buscarArtistasCifraClub(nome).then((l) => artistaCerto(l, nome)?.capa || '').catch(() => ''));
+  return fotosArtistas.get(k);
+}
 
 // ---- salvar na biblioteca (como o "curtir" do Spotify): círculo com +; salva, fica preenchido na cor de destaque
 // a música da busca já está na biblioteca? (pelo link da cifra/letra ou pelo título e artista)
@@ -2955,10 +2963,16 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
   const nPl = FILTROS[2][2];
   const acao = ehPl ? ['lib-nova-pl', 'disc', 'Nova playlist'] : ehRep ? ['lib-novo-rep', 'plus', 'Novo repertório'] : ['lib-nova-mus', 'edit', 'Criar música'];
   const busca = sessionStorage.getItem('buscaBib') || '';
+  // o topo mostra as capas das últimas músicas salvas, com a cor da mais recente
+  const recentes = db.recentSongs(4);
+  const ultima = recentes[0];
   view.innerHTML = `
-    <section class="bib-hero">
-      <div class="kind">Sua biblioteca</div><h2>Suas músicas e repertórios</h2>
-      <div class="part-numeros"><span><b>${todas.length}</b> música${todas.length === 1 ? '' : 's'}</span><span><b>${nRep}</b> repertório${nRep === 1 ? '' : 's'}</span><span><b>${nPl}</b> playlist${nPl === 1 ? '' : 's'}</span></div>
+    <section class="bib-hero" style="--cor:${ultima ? corDe(ultima) : 'var(--tint)'}">
+      <div class="bib-hero-txt"><div class="kind">Sua biblioteca</div><h2>Suas músicas e repertórios</h2>
+        ${ultima ? `<a class="bib-ultima" href="#/musica/${ultima.id}"><small>Salva por último</small><b>${esc(ultima.title)}</b>${ultima.artist ? `<span>${esc(ultima.artist)}</span>` : ''}</a>`
+          : '<p class="bib-hero-dica">Salve cantos da busca ou da liturgia e eles aparecem aqui.</p>'}
+        <div class="part-numeros"><span><b>${todas.length}</b> música${todas.length === 1 ? '' : 's'}</span><span><b>${nRep}</b> repertório${nRep === 1 ? '' : 's'}</span><span><b>${nPl}</b> playlist${nPl === 1 ? '' : 's'}</span></div></div>
+      ${recentes.length ? `<div class="bib-capas n${recentes.length}" aria-hidden="true">${recentes.map((x, i) => `<span style="--i:${i}">${capa(x)}</span>`).join('')}</div>` : ''}
     </section>
     <nav class="bib-filtros chips" aria-label="Filtrar a biblioteca">${FILTROS.map(([k, n, c]) => `<a class="chip" href="#/biblioteca/${k}" aria-pressed="${k === filtro}">${n}<b>${c}</b></a>`).join('')}</nav>
     <div class="bib-barra">
@@ -4488,23 +4502,18 @@ function viewPartituras() {
       ${miniPauta({ clave: 'G', ev }, [4, 4])}<span class="part-pagina-linhas"></span><span class="part-pagina-selo">${mxlDaPartitura(s.content) ? 'Editável' : 'Imagem'}</span></div>
       <b>${esc(s.title)}</b><small>${mxlDaPartitura(s.content) ? 'Pronta · dá para editar' : 'Em imagem'}</small></a>`;
   };
+  // o topo mostra as suas partituras de verdade (as 3 mexidas por último), em folhas empilhadas; sem nenhuma, uma folha em branco
+  const ultimas = [...proprias].sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0)).slice(0, 3);
+  const palco = ultimas.length
+    ? ultimas.map((x, i) => `<a class="part-palco-folha" href="#/musica/${x.id}/partitura" style="--i:${i}" ${i ? 'tabindex="-1" aria-hidden="true"' : ''}><b>${esc(x.title)}</b><small>${esc(nomeDoTom(x.partitura.fifths, x.partitura.modo))}</small>${miniPauta(x.partitura.pautas[0], x.partitura.compasso)}</a>`).reverse().join('')
+    : `<button class="part-palco-folha vazia" data-vazia="part-nova" style="--i:0"><b>Sua primeira partitura</b><small>toque para começar</small>${miniPauta({ clave: 'G', ev: [] }, [4, 4])}<i class="part-cursor"></i></button>`;
   view.innerHTML = `
-    <section class="part-hero">
+    <section class="part-hero" style="--cor:${ultimas[0] ? corDe(ultimas[0]) : 'var(--tint)'}">
       <div class="part-hero-txt"><div class="kind">Partituras</div>
         <h2><span class="h-escreva">Escreva,</span> <span class="h-ensaie">ensaie</span> e <span class="h-ia">gere com IA</span></h2>
         <p>Partitura de qualquer música da sua biblioteca: nota por nota, com letra, cifras e vozes — ou deixe a IA ouvir e escrever a melodia.</p>
-        <div class="part-passos">
-          <span class="escreva">${icon('edit', 16)}<b>Escreva</b><small>nota por nota</small></span>
-          <span class="ensaie">${icon('play', 16)}<b>Ensaie</b><small>ouvindo cada voz</small></span>
-          <span class="ia">${icon('sparkles', 16)}<b>Gere com IA</b><small>ouvindo a música</small></span>
-        </div>
         <div class="part-numeros"><span><b>${proprias.length}</b> sua${proprias.length === 1 ? '' : 's'}</span><span><b>${prontas.length}</b> pronta${prontas.length === 1 ? '' : 's'} no app</span></div></div>
-      <div class="part-palco" aria-hidden="true">
-        <div class="part-palco-folha atras">${miniPauta({ clave: 'F', ev: [['C3', 16], ['G2', 16], ['A2', 16], ['E2', 16], ['F2', 16], ['C3', 16]].map(([n, d]) => ({ a: [n], d })) }, [4, 4])}</div>
-        <div class="part-palco-folha"><b>Ave Maria</b><small>Soprano</small>${miniPauta({ clave: 'G', ev: [['G4', 8], ['G4', 8], ['A4', 16], ['G4', 8], ['C5', 8], ['B4', 16], ['G4', 8], ['G4', 8], ['D5', 16], ['C5', 8]].map(([n, d]) => ({ a: [n], d })) }, [4, 4])}${miniPauta({ clave: 'G', ev: [['E4', 16], ['F4', 8], ['G4', 8], ['E4', 16], ['D4', 16], ['C4', 32]].map(([n, d]) => ({ a: [n], d })) }, [4, 4])}</div>
-        <div class="part-palco-vozes">${['S', 'C', 'T', 'B'].map((v, i) => `<span><i style="--i:${i}"></i><b>${v}</b></span>`).join('')}</div>
-        <div class="part-palco-ia">${icon('sparkles', 18)}</div>
-      </div>
+      <div class="part-palco">${palco}</div>
     </section>
     <div class="part-acoes">
       <button class="part-acao nova" id="part-nova">
@@ -5558,6 +5567,17 @@ function viewSong(id, ctx = {}) {
   };
   avisoCifra();
 
+  // ao rolar, a faixa do topo ganha a linha do andamento da música (como no Spotify), se é ela que está tocando
+  let quadroProg = 0;
+  const andar = () => {
+    quadroProg = requestAnimationFrame(andar);
+    const vale = Boolean(song.youtube && player.atual?.youtube === song.youtube && player.duracao);
+    topbar.classList.toggle('com-prog', vale);
+    if (vale) topoProg.style.setProperty('--p', Math.min(1, player.tempoAgora / player.duracao).toFixed(4));
+  };
+  andar();
+  aoSair(() => { cancelAnimationFrame(quadroProg); topbar.classList.remove('com-prog'); });
+
   // modo "só a letra" (tela cheia)
   function entrarPalco() {
     document.body.classList.add('performance');
@@ -5687,8 +5707,9 @@ function viewSong(id, ctx = {}) {
   const iniciais = (n) => n.split(/\s+/).filter((x) => /^\p{L}/u.test(x)).slice(0, 2).map((x) => x[0]).join('').toUpperCase() || '♪';
   const corDaPessoa = (n) => `hsl(${[...n].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)} 45% 38%)`;
   const papeisCurtos = (p) => p.papeis[0] + (p.papeis.length > 1 ? ` + ${p.papeis.length - 1}` : '');
-  const roda = pessoas.length ? `<section class="ref-cartao ref-pessoas" style="--cor-cartao:${corDaPessoa(pessoas[0].nome)}">
-    <div class="ref-rodas">${pessoas.slice(0, 2).map((p) => `<div class="ref-roda"><span class="ref-avatar" style="background:${corDaPessoa(p.nome)}">${esc(iniciais(p.nome))}</span>
+  // o cartão tem a cor do fundo da letra; cada pessoa, a foto dela (do Cifra Club) quando houver, senão as iniciais
+  const roda = pessoas.length ? `<section class="ref-cartao ref-pessoas">
+    <div class="ref-rodas">${pessoas.slice(0, 2).map((p, i) => `<div class="ref-roda"><span class="ref-avatar" data-foto="${i}" style="background:${corDaPessoa(p.nome)}">${esc(iniciais(p.nome))}</span>
       <b>${esc(p.nome)}</b><small>${esc(papeisCurtos(p))}</small></div>`).join('')}</div>
     <div class="ref-pessoas-pe"><span class="grow"><b>${esc(song.title)}</b><small>${pessoas.length} ${pessoas.length === 1 ? 'pessoa' : 'pessoas'} nos créditos</small></span></div>
     <p>Conheça quem está por trás da música.</p></section>` : '';
@@ -5696,6 +5717,13 @@ function viewSong(id, ctx = {}) {
     ${isPreview ? '' : `<a class="ref-mais" href="#/editar/${song.id}">Editar</a>`}</div>
     ${pessoas.map((p, i) => `<div class="ref-linha"><span class="grow"><b>${esc(p.nome)}</b><small>${esc(p.papeis.join(' • '))}</small></span>${i === 0 ? verArtista : ''}</div>`).join('')}
     ${detalhes.map(([k, v, html]) => `<div class="ref-linha"><span class="grow"><b>${html ? v : esc(v)}</b><small>${esc(k)}</small></span></div>`).join('')}</section>` : '';
+  pessoas.slice(0, 2).forEach((p, i) => fotoDoArtista(p.nome).then((url) => {
+    const av = $(`#creditos [data-foto="${i}"]`);
+    if (!url || !av) return;
+    const img = new Image();
+    img.onload = () => { av.textContent = ''; av.classList.add('com-foto'); av.style.backgroundImage = `url("${url}")`; };
+    img.src = url;
+  }));
 
   // vídeo do YouTube: escolher/trocar e tocar no player do app
   const salvarVideo = (url) => {
@@ -6113,8 +6141,8 @@ function viewEditor(id, setId) {
         <label>Tom<input class="input" id="f-key" value="${esc(meta.key)}" placeholder="Ex.: G, Em, Bb" autocomplete="off"></label>
         <label>Composição<input class="input" id="f-composer" value="${esc(meta.composer)}" placeholder="Quem compôs (opcional)"></label>
         <label class="full">Vídeo de referência (YouTube)<span class="input-btn"><input class="input" id="f-yt" value="${esc(meta.youtube)}" placeholder="https://www.youtube.com/watch?v=…"><button class="btn small" type="button" id="f-yt-buscar" title="Procurar o vídeo no YouTube">${icon('search', 15)} Procurar</button></span></label>
-        <label class="full">Parte da missa (para que momento é)<select class="input" id="f-parte">
-          <option value="">(nenhuma)</option>${[...new Set([...PARTES_MISSA.filter((n) => n !== 'Outro'), meta.parte].filter(Boolean))].map((n) => `<option ${n === meta.parte ? 'selected' : ''}>${esc(n)}</option>`).join('')}<option value="__outra">Outra…</option></select></label>
+        <label class="full">Parte da missa (para que momento é)<input type="hidden" id="f-parte" value="${esc(meta.parte || '')}">
+          <button type="button" class="input escolha-campo${meta.parte ? '' : ' vazio'}" id="f-parte-btn"><span>${esc(meta.parte || 'Nenhuma')}</span>${icon('down', 16)}</button></label>
       </div></details>
       <section class="ed-card">
         <div class="ed-barra">
@@ -6161,7 +6189,7 @@ function viewEditor(id, setId) {
   };
   const montar = () => juntarMeta({
     title: campo('title').value.trim(), artist: campo('artist').value.trim(), key: campo('key').value.trim(), youtube: campo('yt').value.trim(),
-    composer: campo('composer').value.trim(), parte: campo('parte').value === '__outra' ? '' : campo('parte').value, extras: meta.extras,
+    composer: campo('composer').value.trim(), parte: campo('parte').value, extras: meta.extras,
   }, corpoPro());
   // guia "Como escrever" de cada jeito de editar, como uma tabelinha: o que se digita (no bloco de código, com os
   // acordes e as partes coloridos) e, ao lado, para que serve; nos colchetes, também como fica na música
@@ -6228,7 +6256,7 @@ function viewEditor(id, setId) {
     // cabeçalho: capa, resumo
     const yt = youtubeId(campo('yt').value);
     $('#ed-capa').innerHTML = capa({ title: campo('title').value.trim() || 'Nova música', youtube: yt });
-    const parteMissa = campo('parte').value === '__outra' ? '' : campo('parte').value;
+    const parteMissa = campo('parte').value;
     $('#ed-resumo').innerHTML = [
       tomDoEditor() && `<span>${icon('music', 13)} Tom ${esc(tomDoEditor())}</span>`,
       parteMissa && `<span>${icon('book', 13)} ${esc(parteMissa)}</span>`,
@@ -6417,16 +6445,15 @@ function viewEditor(id, setId) {
   };
   $('#ed-cheio').onclick = () => alternarCheio();
   aoSair(() => document.body.classList.remove('editando-cheio'));
-  // "Outra…": nome livre para a parte da missa
-  campo('parte').addEventListener('change', async (e) => {
-    if (e.target.value !== '__outra') return;
-    const nome = await ask({ title: 'Parte da missa', text: 'Escreva o momento (ex.: Canto de meditação)', value: '', ok: 'Usar' });
-    if (!nome) { e.target.value = meta.parte || ''; return; }
-    const opt = document.createElement('option');
-    opt.textContent = nome;
-    e.target.insertBefore(opt, e.target.querySelector('[value="__outra"]'));
-    e.target.value = nome;
-  });
+  // parte da missa: a janela do app (as partes em botões e um nome livre), no lugar da lista do sistema
+  $('#f-parte-btn').onclick = async () => {
+    const parte = await escolherParte(campo('parte').value, campo('title').value.trim());
+    if (parte === null) return;
+    campo('parte').value = parte;
+    $('#f-parte-btn span').textContent = parte || 'Nenhuma';
+    $('#f-parte-btn').classList.toggle('vazio', !parte);
+    marcarMudanca();
+  };
   $('#ed-cancelar').onclick = () => sair();
   // atalhos: Ctrl+S salva, Ctrl+Z desfaz, Ctrl+Shift+Z ou Ctrl+Y refaz
   view.querySelector('.editor').addEventListener('keydown', (e) => {
@@ -6458,7 +6485,7 @@ function viewEditor(id, setId) {
   } catch { /* sem armazenamento */ }
   $('#save').onclick = () => {
     if (!campo('title').value.trim()) { toast('Dê um título à música'); campo('title').focus(); return; }
-    const parte = campo('parte').value === '__outra' ? '' : campo('parte').value;
+    const parte = campo('parte').value;
     const saved = db.saveSong({ ...song, content: montar() });
     apagarRascunho();
     mudou = false;
@@ -7952,6 +7979,7 @@ function route() {
   const [a, b, c, d, e] = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   view.scrollTop = 0;
   topbar.classList.remove('scrolled');
+  document.body.classList.toggle('na-musica', a === 'musica' || (a === 'repertorio' && c !== undefined));
   desenharLateral();
   // o sininho das notificações só aparece na página inicial
   sino.hidden = a !== undefined;
