@@ -43,7 +43,7 @@ def id_do_video(texto: str) -> str | None:
 
 
 def arquivo_de_cookies() -> str | None:
-    # no Hugging Face o cookies.txt vem pelo segredo YT_COOKIES (o conteúdo do arquivo): vira um arquivo temporário
+    # publicado (Modal), o cookies.txt vem pelo segredo YT_COOKIES (o conteúdo do arquivo): vira um arquivo temporário
     conteudo = os.environ.get("YT_COOKIES")
     if conteudo:
         caminho = os.path.join(tempfile.gettempdir(), "songbook-cookies.txt")

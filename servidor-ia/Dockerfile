@@ -1,12 +1,12 @@
-# O servidor da IA pronto para o Hugging Face Spaces (grátis: 2 CPUs, 16 GB de memória, endereço https)
-# ou qualquer lugar que rode Docker. A porta é a 7860 (a do Hugging Face); outra: -e PORT=8000
+# O servidor da IA em Docker, para rodar em qualquer lugar (um VPS, o seu computador). A porta padrão é a 7860;
+# outra: -e PORT=8000. No Modal (o jeito grátis), quem monta é modal_app.py.
 ARG BASE=python:3.11-slim
 FROM ${BASE}
 
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-# o Hugging Face roda como o usuário 1000
+# roda como um usuário comum (1000), não como root
 RUN useradd -m -u 1000 user
 USER user
 ENV HOME=/home/user PATH=/home/user/.local/bin:$PATH PYTHONUNBUFFERED=1

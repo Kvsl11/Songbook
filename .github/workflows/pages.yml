@@ -8,6 +8,9 @@ on:
   push:
     branches: [main, master, ccr-59dd75f2-oirnca]
   workflow_dispatch:
+  workflow_run: # depois de publicar o servidor da IA: grava o endereço dele no app
+    workflows: [Publicar o servidor da IA]
+    types: [completed]
   schedule:
     - cron: '23 7 * * *' # todo dia às 04h23 (Brasília)
 
@@ -64,46 +67,47 @@ jobs:
         timeout-minutes: 25
         run: node scripts/liturgia-sync.mjs --dias 21
       - name: Indexar o acervo litúrgico (pasta do Google Drive)
-        if: github.event_name != 'push' # os dados do acervo ficam salvos no repositório: só na atualização diária
+        if: github.event_name != 'push' && github.event_name != 'workflow_run' # os dados do acervo ficam salvos no repositório: só na atualização diária
         continue-on-error: true
         timeout-minutes: 20
         run: node scripts/acervo-sync.mjs
       - name: Cache das letras do Hinário Litúrgico da CNBB
-        if: github.event_name != 'push' # os dados do acervo ficam salvos no repositório: só na atualização diária
+        if: github.event_name != 'push' && github.event_name != 'workflow_run' # os dados do acervo ficam salvos no repositório: só na atualização diária
         uses: actions/cache@v4
         with:
           path: .hinario-cache
           key: hinario-${{ github.run_id }}
           restore-keys: hinario-
       - name: Letras do Hinário Litúrgico da CNBB (cadernos do acervo)
-        if: github.event_name != 'push' # os dados do acervo ficam salvos no repositório: só na atualização diária
+        if: github.event_name != 'push' && github.event_name != 'workflow_run' # os dados do acervo ficam salvos no repositório: só na atualização diária
         continue-on-error: true
         timeout-minutes: 25
         run: |
           command -v pdftotext || (sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils)
           node scripts/hinario-sync.mjs
       - name: Cache das músicas do acervo
-        if: github.event_name != 'push' # os dados do acervo ficam salvos no repositório: só na atualização diária
+        if: github.event_name != 'push' && github.event_name != 'workflow_run' # os dados do acervo ficam salvos no repositório: só na atualização diária
         uses: actions/cache@v4
         with:
           path: .acervo-cache
           key: acervo-${{ github.run_id }}
           restore-keys: acervo-
       - name: Músicas e partituras dos arquivos do acervo
-        if: github.event_name != 'push' # os dados do acervo ficam salvos no repositório: só na atualização diária
+        if: github.event_name != 'push' && github.event_name != 'workflow_run' # os dados do acervo ficam salvos no repositório: só na atualização diária
         continue-on-error: true
         timeout-minutes: 60
         run: |
           command -v pdftoppm || (sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils)
           node scripts/cantos-sync.mjs
-      - name: Endereço do servidor da IA (Hugging Face), para o app achar sozinho
+      - name: Endereço do servidor da IA (Modal), para o app achar sozinho
         continue-on-error: true
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
         run: |
-          [ -n "$HF_TOKEN" ] || exit 0
-          dono=$(curl -sf -H "Authorization: Bearer $HF_TOKEN" https://huggingface.co/api/whoami-v2 | python3 -c "import json,sys; print(json.load(sys.stdin)['name'])")
-          [ -n "$dono" ] && python3 -c "import json,sys; d=sys.argv[1].lower().replace('_','-').replace('.','-'); json.dump({'url': f'https://{d}-songbook-ia.hf.space'}, open('public/data/servidor-ia.json','w'))" "$dono"
+          [ -n "$MODAL_TOKEN_ID" ] || exit 0
+          pip install -q modal
+          python3 -c "import json, modal; json.dump({'url': modal.Function.from_name('songbook-ia', 'web').get_web_url()}, open('public/data/servidor-ia.json', 'w'))"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

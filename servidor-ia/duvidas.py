@@ -25,7 +25,7 @@ PASTA = os.path.dirname(os.path.abspath(__file__))
 DADOS = os.environ.get("IA_DADOS") or os.path.join(PASTA, "..", "public", "data")
 TEXTOS = os.environ.get("IA_TEXTOS") or os.path.join(PASTA, "textos-acervo.jsonl")
 MODELO = os.environ.get("IA_MODELO", "claude-opus-5-5")
-# sem a pasta public/data ao lado (o servidor publicado sozinho, no Hugging Face): os mesmos arquivos, do app no ar
+# sem a pasta public/data ao lado (o servidor publicado sozinho, no Modal): os mesmos arquivos, do app no ar
 DADOS_URL = os.environ.get("IA_DADOS_URL", "https://kvsl11.github.io/Songbook/data/")
 
 VAZIAS = set("""a o e os as um uma uns umas de do da dos das no na nos nas em por para pra com sem que se ao aos à às

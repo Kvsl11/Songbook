@@ -113,7 +113,7 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   ♩ = 130, tudo em colcheias, volta a ♩ = 65 com as figuras dobradas), trocar por *Só a melodia* ou escolher outro compasso (e
   voltar para o *Automático*). É um rascunho: funciona melhor com voz e violão (ou o coral sozinho) do que com banda
   completa.
-- **Servidor da IA (`servidor-ia/`, Python, no Hugging Face de graça)**: o app acha o servidor sozinho (ninguém configura nada) e o *Gerar com IA* manda o
+- **Servidor da IA (`servidor-ia/`, Python, no Modal, de graça)**: o app acha o servidor sozinho (ninguém configura nada) e o *Gerar com IA* manda o
   áudio para o servidor, que separa a **voz da banda** (Demucs) antes de ouvir as notas (Basic Pitch) e confere a
   afinação (CREPE): em trechos de músicas reais a melodia certa passou de 34% para 70% do tempo. Dá também para colar
   o **link do YouTube** (o yt-dlp baixa só o áudio e o apaga no fim). Sem servidor, tudo continua no aparelho.
