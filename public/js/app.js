@@ -68,7 +68,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-188';
+export const APP_VERSAO = '2026.10.22-189';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -7506,9 +7506,16 @@ async function viewFontes() {
 // Como o NotebookLM: a pergunta vai para o servidor da IA, que responde primeiro pelos arquivos do acervo litúrgico
 // (citando cada um: [1], [2]…) e, se eles não trazem a resposta, busca na internet. A conversa fica na tela (dá para
 // perguntar "e no ofertório?") e as fontes do acervo abrem no app.
-let conversaDuvidas = [];
-const SUGESTOES_DUVIDAS = ['Qual a função do cantor na hora da comunhão?', 'Quando se canta o Glória?', 'Qual canto de comunhão para o Advento, ano A?', 'Como o salmista deve proclamar o salmo?'];
-// a resposta (markdown simples) em HTML: parágrafos, listas, **negrito** e as citações [n] em bolinhas
+// a conversa fica guardada neste aparelho (volta ao abrir de novo); "Nova conversa" limpa
+let conversaDuvidas = (() => { try { return JSON.parse(localStorage.getItem('songbook.duvidas') || '[]').filter((m) => !m.carregando); } catch { return []; } })();
+const guardarConversa = () => { try { localStorage.setItem('songbook.duvidas', JSON.stringify(conversaDuvidas.filter((m) => !m.carregando).slice(-40))); } catch { /* sem espaço: só não guarda */ } };
+const SUGESTOES_DUVIDAS = [
+  ['music', 'Qual a função do cantor na hora da comunhão?'],
+  ['cross', 'Quando se canta o Glória e quando ele fica de fora?'],
+  ['library', 'Qual canto de comunhão para o Advento, ano A?'],
+  ['text', 'Como o salmista deve proclamar o salmo responsorial?'],
+];
+// a resposta (markdown simples) em HTML: parágrafos, listas, títulos, **negrito** e as citações [n] em bolinhas
 function htmlDaResposta(texto) {
   const linha = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\[(\d+)\]/g, '<sup class="dv-cita">$1</sup>');
   return String(texto || '').split(/\n{2,}/).map((bloco) => {
@@ -7518,59 +7525,87 @@ function htmlDaResposta(texto) {
     return `<p>${itens.map(linha).join('<br>')}</p>`;
   }).join('');
 }
+const horaCurta = (t) => (t ? new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
 function viewDuvidas() {
   setTab('inicio');
   setTint('#2a3a6b');
-  setHeader('Tirar dúvidas', { back: '#/', eyebrow: 'Acervo litúrgico + internet' });
+  setHeader('Tirar dúvidas', { back: '#/', eyebrow: 'Assistente litúrgico', actions: conversaDuvidas.length ? [{ icon: 'edit', label: 'Nova conversa', onClick: () => { conversaDuvidas = []; guardarConversa(); viewDuvidas(); } }] : [] });
   const temServidor = !!servidorIA().url;
-  view.innerHTML = `<div class="duvidas">
-    <section class="dv-topo"><span class="dv-ic">${icon('sparkles', 26)}</span><div><h2>Tire suas dúvidas</h2>
-      <p class="muted">A IA procura primeiro nos <b>arquivos do acervo litúrgico</b> (hinários, subsídios e cantos) e, se não achar, <b>na internet</b>. Cada resposta mostra de onde veio.</p></div></section>
-    ${temServidor ? '' : `<div class="aviso">${icon('info', 18)}<span>Para perguntar, configure o <a href="#/ajustes">servidor da IA nos Ajustes</a>.</span></div>`}
-    <div class="dv-conversa" id="dv-conversa"></div>
-    <div class="dv-sugestoes" id="dv-sugestoes">${SUGESTOES_DUVIDAS.map((q) => `<button class="chip" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
-    <form class="dv-form" id="dv-form"><textarea class="input" name="q" rows="1" placeholder="Pergunte sobre liturgia, canto, a missa…" ${temServidor ? '' : 'disabled'}></textarea>
-      <button class="btn primary round" type="submit" aria-label="Perguntar" ${temServidor ? '' : 'disabled'}>${icon('next', 20)}</button></form>
-    ${conversaDuvidas.length ? `<button class="link-btn dv-limpar" id="dv-limpar">${icon('trash', 14)} Começar outra conversa</button>` : ''}</div>`;
+  const avatar = `<span class="dv-avatar" aria-hidden="true">${icon('sparkles', 18)}</span>`;
+  view.innerHTML = `<div class="chat">
+    <div class="chat-rolo" id="dv-conversa"></div>
+    <form class="chat-barra" id="dv-form">
+      ${temServidor ? '' : `<div class="chat-aviso">${icon('info', 16)}<span>Para conversar, configure o <a href="#/ajustes">servidor da IA nos Ajustes</a>.</span></div>`}
+      <div class="chat-campo"><textarea name="q" rows="1" placeholder="Pergunte sobre liturgia e canto…" aria-label="Sua pergunta" ${temServidor ? '' : 'disabled'}></textarea>
+        <button class="chat-enviar" type="submit" aria-label="Enviar" disabled>${icon('next', 20)}</button></div>
+      <small class="chat-rodape">Responde pelos arquivos do acervo litúrgico e, se não achar, pela internet. Confira sempre as fontes.</small>
+    </form></div>`;
   const caixa = $('#dv-conversa');
+  const boasVindas = () => `<div class="chat-vazio">
+      <span class="dv-avatar grande">${icon('sparkles', 30)}</span>
+      <h2>Olá! Como posso ajudar o seu ministério?</h2>
+      <p class="muted">Pergunte sobre a missa, os tempos litúrgicos, a função de cada parte ou que canto escolher. Eu procuro primeiro nos <b>arquivos do acervo</b> e, se não achar, <b>na internet</b>.</p>
+      <div class="chat-sugestoes">${SUGESTOES_DUVIDAS.map(([ic, q]) => `<button type="button" class="chat-sugestao" data-q="${esc(q)}"><span>${icon(ic, 18)}</span>${esc(q)}</button>`).join('')}</div></div>`;
+  const msg = (m, k) => (m.role === 'user'
+    ? `<div class="chat-msg eu"><div class="chat-bolha">${esc(m.content)}</div><small class="chat-hora">${horaCurta(m.t)}</small></div>`
+    : `<div class="chat-msg ia">${avatar}<div class="chat-corpo"><div class="chat-nome">Assistente litúrgico <small class="chat-hora">${horaCurta(m.t)}</small></div>
+        <div class="chat-bolha">${m.carregando ? `<div class="chat-digitando" aria-label="Procurando a resposta"><i></i><i></i><i></i><span>${esc(m.etapa || 'Procurando no acervo…')}</span></div>`
+          : m.erro ? `<p class="chat-erro">${icon('info', 16)} ${esc(m.erro)}</p>` : htmlDaResposta(m.content)}
+        ${m.fontes?.length ? `<div class="dv-fontes"><b>${icon('library', 14)} Do acervo</b>${m.fontes.map((f) => `<button type="button" class="dv-fonte" data-k="${k}" data-n="${f.n}"><sup class="dv-cita">${f.n}</sup><span><b>${esc(f.titulo)}</b><small>${esc(f.caminho)}</small></span></button>`).join('')}</div>` : ''}
+        ${m.web?.length ? `<div class="dv-fontes web"><b>${icon('search', 14)} Da internet</b>${m.web.map((w) => `<a class="dv-fonte" href="${esc(w.url)}" target="_blank" rel="noopener"><span><b>${esc(w.titulo)}</b><small>${esc(host(w.url))}</small></span></a>`).join('')}</div>` : ''}</div>
+        ${!m.carregando ? `<div class="chat-acoes">${m.erro ? `<button type="button" data-repetir="${k}">${icon('refresh', 14)} Tentar de novo</button>` : `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>`}</div>` : ''}</div></div>`);
   const desenhar = () => {
-    caixa.innerHTML = conversaDuvidas.map((m, k) => (m.role === 'user' ? `<div class="dv-msg eu">${esc(m.content)}</div>`
-      : `<div class="dv-msg ia">${m.carregando ? '<div class="loading-note"><span class="spin"></span>Procurando no acervo…</div>' : m.erro ? `<p class="muted">${esc(m.erro)}</p>` : htmlDaResposta(m.content)}
-        ${m.fontes?.length ? `<div class="dv-fontes"><b>${icon('library', 14)} Do acervo</b>${m.fontes.map((f) => `<button class="dv-fonte" data-k="${k}" data-n="${f.n}"><sup class="dv-cita">${f.n}</sup><span><b>${esc(f.titulo)}</b><small>${esc(f.caminho)}</small></span></button>`).join('')}</div>` : ''}
-        ${m.web?.length ? `<div class="dv-fontes web"><b>${icon('search', 14)} Da internet</b>${m.web.map((w) => `<a class="dv-fonte" href="${esc(w.url)}" target="_blank" rel="noopener"><span><b>${esc(w.titulo)}</b><small>${esc(host(w.url))}</small></span></a>`).join('')}</div>` : ''}</div>`)).join('');
-    $('#dv-sugestoes').hidden = conversaDuvidas.length > 0;
-    caixa.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    caixa.innerHTML = conversaDuvidas.length ? conversaDuvidas.map(msg).join('') : boasVindas();
+    requestAnimationFrame(() => { view.scrollTop = view.scrollHeight; });
   };
   desenhar();
   const perguntar = async (q) => {
     q = q.trim();
-    if (!q || !temServidor) return;
+    if (!q || !temServidor || conversaDuvidas.some((m) => m.carregando)) return;
     const historico = conversaDuvidas.filter((m) => !m.erro && !m.carregando).map((m) => ({ role: m.role, content: m.content }));
-    conversaDuvidas.push({ role: 'user', content: q });
-    const resp = { role: 'assistant', content: '', carregando: true };
+    conversaDuvidas.push({ role: 'user', content: q, t: Date.now() });
+    const resp = { role: 'assistant', content: '', carregando: true, t: Date.now() };
     conversaDuvidas.push(resp);
     desenhar();
+    // enquanto espera, conta o que está fazendo (o acervo é rápido; a busca na web leva mais)
+    const etapas = setTimeout(() => { resp.etapa = 'Não achei tudo no acervo: buscando na internet…'; if (location.hash === '#/duvidas') desenhar(); }, 9000);
     try {
       const r = await chamar(servidorIA(), '/duvida', { json: { pergunta: q, historico }, tempo: 4 * 60e3 });
-      Object.assign(resp, { content: r.resposta, fontes: r.fontes, web: r.web, carregando: false });
-    } catch (e) { Object.assign(resp, { erro: e.message, carregando: false }); }
+      Object.assign(resp, { content: r.resposta, fontes: r.fontes, web: r.web, carregando: false, t: Date.now() });
+    } catch (e) { Object.assign(resp, { erro: e.message, carregando: false, pergunta: q }); }
+    clearTimeout(etapas);
+    guardarConversa();
     if (location.hash === '#/duvidas') viewDuvidas();
   };
   const form = $('#dv-form');
   const campo = form.q;
-  campo.addEventListener('input', () => { campo.style.height = 'auto'; campo.style.height = Math.min(160, campo.scrollHeight) + 'px'; });
-  campo.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
-  form.onsubmit = (e) => { e.preventDefault(); const q = campo.value; campo.value = ''; perguntar(q); };
-  $('#dv-sugestoes').onclick = (e) => { const b = e.target.closest('[data-q]'); if (b) perguntar(b.dataset.q); };
-  $('#dv-limpar')?.addEventListener('click', () => { conversaDuvidas = []; viewDuvidas(); });
-  // a fonte do acervo abre no app (o canto ou o caderno do Hinário); os outros arquivos mostram só o caminho
+  const enviar = form.querySelector('.chat-enviar');
+  const ajustar = () => { campo.style.height = 'auto'; campo.style.height = Math.min(180, campo.scrollHeight) + 'px'; enviar.disabled = !campo.value.trim(); };
+  campo.addEventListener('input', ajustar);
+  campo.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && innerWidth > 700) { e.preventDefault(); form.requestSubmit(); } });
+  form.onsubmit = (e) => { e.preventDefault(); const q = campo.value; campo.value = ''; ajustar(); perguntar(q); };
+  if (temServidor && innerWidth > 700) campo.focus();
   caixa.addEventListener('click', async (e) => {
+    const sug = e.target.closest('[data-q]');
+    if (sug) { perguntar(sug.dataset.q); return; }
+    const cop = e.target.closest('[data-copiar]');
+    if (cop) { try { await navigator.clipboard.writeText(conversaDuvidas[cop.dataset.copiar].content); toast('Resposta copiada'); } catch { toast('Não consegui copiar'); } return; }
+    const rep = e.target.closest('[data-repetir]');
+    if (rep) {
+      const k = Number(rep.dataset.repetir);
+      const q = conversaDuvidas[k]?.pergunta;
+      conversaDuvidas.splice(k - 1, 2);
+      perguntar(q || '');
+      return;
+    }
+    // a fonte do acervo abre no app (o canto ou o caderno do Hinário); os outros arquivos mostram só o caminho
     const b = e.target.closest('button.dv-fonte');
     if (!b) return;
     const f = conversaDuvidas[b.dataset.k]?.fontes?.find((x) => String(x.n) === b.dataset.n);
     if (!f) return;
     if (f.tipo === 'canto') {
-      const c = (await carregarCantos()).find((x) => x.id === f.id && x.titulo === f.titulo) || (await carregarCantos()).find((x) => x.id === f.id);
+      const cantos = await carregarCantos();
+      const c = cantos.find((x) => x.id === f.id && x.titulo === f.titulo) || cantos.find((x) => x.id === f.id);
       if (c) { abrirMusicaAcervo({ fonte: `acervo:${c.id}:${c.i}`, chordpro: c.chordpro }, '#/duvidas'); return; }
     }
     if (f.tipo === 'hinario') {
