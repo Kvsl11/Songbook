@@ -13,6 +13,9 @@ on:
     branches: [main, master, ccr-59dd75f2-oirnca]
     paths: ['servidor-ia/**', '.github/workflows/servidor-ia.yml']
   workflow_dispatch:
+  # toda semana: lê os PDFs novos do acervo e publica de novo (o Lumen passa a saber o que entrou no Drive)
+  schedule:
+    - cron: '23 6 * * 1'
 
 concurrency:
   group: servidor-ia
@@ -36,6 +39,24 @@ jobs:
         if: env.MODAL_TOKEN_ID != '' && env.MODAL_TOKEN_SECRET != ''
         with:
           python-version: '3.11'
+      # o texto dos PDFs do acervo do Drive, para o Lumen responder com o que está dentro deles: fica guardado entre as
+      # publicações (cache) e cada vez lê até 800 arquivos novos, então os ~2 mil do acervo entram em poucas rodadas
+      - name: Texto guardado dos PDFs do acervo
+        if: env.MODAL_TOKEN_ID != '' && env.MODAL_TOKEN_SECRET != ''
+        uses: actions/cache@v4
+        with:
+          path: servidor-ia/textos-acervo.jsonl
+          key: textos-acervo-${{ github.run_id }}
+          restore-keys: textos-acervo-
+      - name: Ler o texto dos PDFs do acervo (Drive)
+        if: env.MODAL_TOKEN_ID != '' && env.MODAL_TOKEN_SECRET != '' && env.ANTHROPIC_API_KEY != ''
+        continue-on-error: true
+        timeout-minutes: 30
+        working-directory: servidor-ia
+        run: |
+          pip install -q pypdf
+          python indexar_acervo.py --max 800 2>&1 | tail -5
+          [ -f textos-acervo.jsonl ] && echo "::notice::$(wc -l < textos-acervo.jsonl) arquivos do acervo com o texto lido"
       - name: Publicar no Modal
         if: env.MODAL_TOKEN_ID != '' && env.MODAL_TOKEN_SECRET != ''
         working-directory: servidor-ia

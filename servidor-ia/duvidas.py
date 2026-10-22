@@ -24,7 +24,8 @@ from dataclasses import dataclass
 PASTA = os.path.dirname(os.path.abspath(__file__))
 DADOS = os.environ.get("IA_DADOS") or os.path.join(PASTA, "..", "public", "data")
 TEXTOS = os.environ.get("IA_TEXTOS") or os.path.join(PASTA, "textos-acervo.jsonl")
-MODELO = os.environ.get("IA_MODELO", "claude-opus-5-5")
+# o Sonnet: responde bem citando o acervo, por uma fração do preço do Opus (dá para trocar com IA_MODELO)
+MODELO = os.environ.get("IA_MODELO", "claude-sonnet-5-5")
 # sem a pasta public/data ao lado (o servidor publicado sozinho, no Modal): os mesmos arquivos, do app no ar
 DADOS_URL = os.environ.get("IA_DADOS_URL", "https://kvsl11.github.io/Songbook/data/")
 
@@ -186,9 +187,14 @@ def indice() -> Indice:
         return _indice
 
 
-SISTEMA = """Você ajuda ministérios de música católica (cantores, instrumentistas, equipes de liturgia) a tirar dúvidas \
-sobre liturgia, canto litúrgico e a missa. Responda em português do Brasil, claro e direto, como quem explica para \
-o grupo antes do ensaio.
+SISTEMA = """Você é o Lumen, o assistente litúrgico do app Songbook Litúrgico. Você ajuda ministérios de música \
+católica (cantores, instrumentistas, equipes de liturgia) com liturgia, canto litúrgico, a missa e o próprio app. \
+Responda em português do Brasil, claro e direto, como quem explica para o grupo antes do ensaio. Use listas curtas \
+quando ajudarem; nada de enrolação.
+
+A mensagem pode trazer, em <app>, o que está no app de quem pergunta: a data de hoje, a liturgia do dia pedido \
+(CNBB), as músicas da biblioteca e os repertórios. Use isso para responder sobre "hoje", "domingo", "minhas \
+músicas", "meu repertório" etc.
 
 Primeiro use os trechos do acervo litúrgico do grupo que vêm na mensagem (arquivos do Google Drive: hinários e \
 subsídios da CNBB, cantos, documentos). Cite cada informação tirada deles com o número do trecho entre colchetes, \
@@ -197,24 +203,26 @@ como [2]. Se os trechos não respondem à pergunta (ou só em parte), use a busc
 internet. Não invente: se não achar, diga que não achou."""
 
 
-def montar_pergunta(pergunta: str, achados: list[tuple[float, Trecho]]) -> str:
+def montar_pergunta(pergunta: str, achados: list[tuple[float, Trecho]], contexto: str = "") -> str:
     blocos = [f"[{k}] {t.titulo} — {t.caminho}\n{t.texto}" for k, (_, t) in enumerate(achados, 1)]
     acervo = "\n\n".join(blocos) if blocos else "(nenhum trecho do acervo tem as palavras da pergunta)"
-    return f"<acervo>\n{acervo}\n</acervo>\n\nPergunta: {pergunta}"
+    app = f"<app>\n{contexto.strip()}\n</app>\n\n" if contexto.strip() else ""
+    return f"{app}<acervo>\n{acervo}\n</acervo>\n\nPergunta: {pergunta}"
 
 
-def responder(pergunta: str, historico: list[dict] | None = None) -> dict:
+def responder(pergunta: str, historico: list[dict] | None = None, contexto: str = "") -> dict:
     import anthropic
 
     pergunta = pergunta.strip()[:1000]
     if not pergunta:
         raise ValueError("escreva a pergunta")
-    achados = indice().buscar(pergunta)
+    achados = indice().buscar(pergunta, 10)
     mensagens = []
     for m in (historico or [])[-6:]:  # as últimas perguntas e respostas: dá para perguntar "e no ofertório?"
         if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str):
             mensagens.append({"role": m["role"], "content": m["content"][:4000]})
-    mensagens.append({"role": "user", "content": montar_pergunta(pergunta, achados)})
+    # o contexto do app (liturgia, biblioteca) vem do aparelho: limitado, para a conta não crescer sem controle
+    mensagens.append({"role": "user", "content": montar_pergunta(pergunta, achados, (contexto or "")[:20000])})
     cliente = anthropic.Anthropic()
     ferramentas = [{"type": "web_search_20260209", "name": "web_search", "max_uses": 4}]
     conteudo = []

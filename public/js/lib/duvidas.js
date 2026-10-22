@@ -277,6 +277,8 @@ export function pedidoLiturgico(pergunta, hoje) {
   if (!dia && !VERBO_PEDIDO.test(t)) return null;
   return { partes, data: dataDoPedido(t, hoje) };
 }
+// o dia de que a pergunta fala (25/10, amanhã, domingo…); sem nenhum, hoje
+export const dataDaPergunta = (pergunta, hoje) => dataDoPedido(sem(pergunta), hoje);
 // o dia do pedido: a data escrita vale mais que as palavras ("do dia 25/10" é o dia 25, não hoje)
 function dataDoPedido(t, hoje) {
   const escrita = dataEscrita(t, hoje);
@@ -303,7 +305,14 @@ const PARTES_CANTO = [
   ['comunhao', /\bcomunhao\b/],
   ['final', /\b(final|envio|saida|despedida)\b/],
 ];
-const PEDE_CANTO = /\b(sugest\w*|sujest\w*|sugir\w*|indic\w*|cantos?|musicas?|hinos?|cantar|repertorio)\b/;
+// pedido de canto: "sugestão/sugira/indique", "qual canto…", "canto de/para…", "monte um repertório" ("o que tem no
+// meu repertório?" é pergunta sobre o app, não pedido de sugestão)
+const PEDE_CANTO = new RegExp([
+  '\\b(sugest\\w*|sujest\\w*|sugir\\w*|sugere|indic\\w*)\\b',
+  '\\b(qual|quais|que)\\b.*\\b(cantos?|musicas?|hinos?)\\b',
+  '\\b(cantos?|musicas?|hinos?) (de|da|do|para|pra)\\b',
+  '\\b(monte|montar|monta|faca|fazer)\\b.*\\brepertorio\\b',
+].join('|'));
 export function pedidoSugestao(pergunta, hoje) {
   const t = sem(pergunta);
   if (!PEDE_CANTO.test(t)) return null;

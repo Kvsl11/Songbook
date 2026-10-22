@@ -125,4 +125,6 @@ test('tirar dúvidas: reconhece o pedido de sugestão de cantos para partes da m
   assert.equal(pedidoSugestao('Traga o salmo de hoje', hoje), null);
   assert.equal(pedidoSugestao('Qual canto de comunhão para o Advento, ano A?', hoje), null);
   assert.equal(pedidoSugestao('Quando se canta o Glória?', hoje), null);
+  // pergunta sobre o app (o meu repertório) não é pedido de sugestão
+  assert.equal(pedidoSugestao('Quando se canta o Glória e o que tem no meu repertório?', hoje), null);
 });

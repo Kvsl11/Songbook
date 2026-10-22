@@ -40,9 +40,11 @@ def test_responder_usa_o_acervo_e_devolve_as_fontes(monkeypatch):
 
     import anthropic
     monkeypatch.setattr(anthropic, "Anthropic", Cliente)
-    r = duvidas.responder("onde o salmista canta?")
+    r = duvidas.responder("onde o salmista canta?", contexto="Hoje: 22/10/2026\nSalmo do dia: Sl 32")
     assert r["resposta"] == "Do ambão [1]." and r["fontes"][0]["id"] == "id1" and not r["usouWeb"]
     kw = pedidos[0]
-    assert kw["model"] == "claude-opus-5-5" and kw["fallbacks"] == "default"
+    assert kw["model"] == "claude-sonnet-5-5" and kw["fallbacks"] == "default"
     assert "Guia do salmista" in kw["messages"][-1]["content"]
+    # o que está no app (liturgia do dia, biblioteca) vai junto, antes do acervo
+    assert "<app>\nHoje: 22/10/2026\nSalmo do dia: Sl 32\n</app>" in kw["messages"][-1]["content"]
     assert kw["tools"][0]["type"] == "web_search_20260209"
