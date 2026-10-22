@@ -90,7 +90,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-206';
+export const APP_VERSAO = '2026.10.22-207';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -2152,6 +2152,28 @@ async function buscarMusicas(termo) {
 const tileArtista = (a) => `<a class="tile tile-artista" href="#/artista/${encodeURIComponent(a.slug)}/${encodeURIComponent(a.nome)}">
   <div class="cover">${a.capa ? `<img src="${esc(a.capa)}" alt="" loading="lazy">` : icon('mic', 40)}</div><b>${esc(a.nome)}</b><small>Artista</small></a>`;
 const artistaCerto = (lista, nome) => lista.find((a) => mesmoNome(a.nome, nome)) || null;
+// as pessoas dos créditos, cada uma com os papéis dela: o artista principal, quem participa (o "feat." do nome do
+// artista ou do título: "Lady Gaga feat. Bruno Mars", "Die With A Smile (part. Bruno Mars)"), a composição e a letra
+const FEAT = /\s*(?:\(|\[|-\s)?\s*\b(?:feat\.?|ft\.?|featuring|part\.?|participa[çc][ãa]o(?: especial)?(?: de)?|com|with)\s+/i;
+function pessoasDosCreditos({ artista = '', titulo = '', compositor = '', letrista = '' } = {}) {
+  const lista = (t, sep) => String(t || '').replace(/[)\]]/g, '').split(sep).map((x) => x.trim()).filter(Boolean);
+  const [principal, ...feats] = String(artista || '').split(FEAT);
+  const doTitulo = /[([]\s*(?:feat\.?|ft\.?|featuring|part\.?|participa[çc][ãa]o(?: especial)?(?: de)?|com|with)\s+([^)\]]+)[)\]]/i.exec(titulo || '')?.[1] || '';
+  const pessoas = [];
+  const juntar = (nome, papel) => {
+    const ja = pessoas.find((x) => normalizar(x.nome) === normalizar(nome));
+    if (ja) { if (!ja.papeis.includes(papel)) ja.papeis.push(papel); } else pessoas.push({ nome, papeis: [papel] });
+  };
+  // artistas e participações: separados por vírgula, "&", "/" ou " x " (uma dupla como "Zezé Di Camargo e Luciano" fica junta)
+  const SEP_ARTISTA = /\s*(?:[,;&/]|\sx\s)\s*/i;
+  lista(principal, SEP_ARTISTA).forEach((n) => juntar(n, 'Artista principal'));
+  [...feats, doTitulo].flatMap((f) => lista(f, SEP_ARTISTA)).forEach((n) => juntar(n, 'Participação'));
+  // compositores: também separados por " e "
+  const SEP_NOMES = /\s*(?:[,;&/]|\se\s)\s*/i;
+  lista(compositor, SEP_NOMES).forEach((n) => juntar(n, 'Composição'));
+  lista(letrista, SEP_NOMES).forEach((n) => juntar(n, 'Letra'));
+  return pessoas;
+}
 // a foto de um artista pelo nome (a do Cifra Club); guardada na sessão, para não buscar de novo a cada música
 const fotosArtistas = new Map();
 function fotoDoArtista(nome) {
@@ -5687,13 +5709,7 @@ function viewSong(id, ctx = {}) {
   // créditos (como no Spotify): primeiro as pessoas por trás da música (cada uma com todos os papéis dela: "Composição
   // • Letra"), em bolinhas e em linhas com o nome em cima e o papel embaixo; depois os detalhes (álbum, ano, tom, fonte)
   const metaR = renderSong(song.content).meta;
-  const pessoas = [];
-  for (const [papel, nomes] of [['Intérprete', song.artist], ['Composição', metaR.composer], ['Letra', metaR.lyricist]]) {
-    for (const nome of String(nomes || '').split(/\s*[,;&/]\s*/).map((x) => x.trim()).filter(Boolean)) {
-      const ja = pessoas.find((x) => x.nome.toLowerCase() === nome.toLowerCase());
-      if (ja) { if (!ja.papeis.includes(papel)) ja.papeis.push(papel); } else pessoas.push({ nome, papeis: [papel] });
-    }
-  }
+  const pessoas = pessoasDosCreditos({ artista: song.artist, titulo: song.title, compositor: metaR.composer, letrista: metaR.lyricist });
   const detalhes = [
     ['Álbum', metaR.album],
     ['Ano', metaR.year],
