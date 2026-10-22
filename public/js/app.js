@@ -107,7 +107,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-221';
+export const APP_VERSAO = '2026.10.22-222';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -918,6 +918,7 @@ const player = (() => {
     get tempoInformado() { return tempo; },
     get duracao() { return duracao; },
     tocandoAgora: (youtube) => desta(youtube) && estado === 'tocando',
+    tocandoAlgo: () => Boolean(atual) && estado === 'tocando',
     desta,
     ouvir(fn) { ouvintes.add(fn); return () => ouvintes.delete(fn); },
     tocar(item) {
@@ -8116,6 +8117,17 @@ const pedeLiturgiaDoDia = (q) => {
 // o ditado da pergunta: o reconhecimento de voz do próprio navegador (Chrome, Edge, Safari), em português
 const ReconhecerVoz = window.SpeechRecognition || window.webkitSpeechRecognition;
 let vozDuvidas = null;
+// a resposta dita em voz alta na conversa ao vivo: o que achou, de onde, em frases curtas
+const falaDaResposta = (m) => {
+  const partes = [];
+  if (pedeLiturgiaDoDia(m.pergunta)) partes.push('A liturgia de hoje está na página da Liturgia. Deixei o atalho aqui na tela.');
+  if (m.cantos?.length) partes.push(`Achei ${m.cantos.length === 1 ? 'este canto' : 'estes cantos'} no acervo: ${m.cantos.slice(0, 4).map((a) => a.titulo).join(', ')}.`);
+  const [a] = m.acervo || [];
+  if (a) partes.push(`No acervo, em ${a.titulo}: ${a.frases.join(' ')}`);
+  if (m.wiki) partes.push(`${a ? 'E na internet' : 'No acervo não achei, mas na internet'}, na Wikipédia: ${m.wiki.frases.join(' ')}`);
+  if (!partes.length) partes.push('Não achei nada sobre isso no acervo nem na internet. Tente perguntar com outras palavras.');
+  return partes.join(' ');
+};
 const horaCurta = (t) => (t ? new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
 // o índice das dúvidas: o texto de cada canto do acervo e de cada canto do Hinário (feito uma vez, na 1ª pergunta)
 let indiceDuvidas = null;
@@ -8148,7 +8160,7 @@ function viewDuvidas() {
   conversaDuvidas = conversaDuvidas.filter((m) => m.carregando || Date.now() - (m.t || 0) < DIA);
   setTab('inicio');
   setTint('#2a3a6b');
-  setHeader('Tirar dúvidas', { back: '#/', eyebrow: 'Acervo litúrgico + internet', actions: conversaDuvidas.length ? [{ icon: 'trash', label: 'Apagar conversa', onClick: async () => { if (await ask({ title: 'Apagar a conversa?', text: 'As perguntas e respostas saem deste aparelho. (Elas também somem sozinhas depois de 24 horas.)', ok: 'Apagar', danger: true })) { conversaDuvidas = []; guardarConversa(); viewDuvidas(); } } }] : [] });
+  setHeader('Tirar dúvidas', { back: '#/', eyebrow: 'Acervo litúrgico + internet', actions: [...(ReconhecerVoz ? [{ icon: 'som', label: 'Conversa ao vivo', onClick: () => abrirVivo() }] : []), ...(conversaDuvidas.length ? [{ icon: 'trash', label: 'Apagar conversa', onClick: async () => { if (await ask({ title: 'Apagar a conversa?', text: 'As perguntas e respostas saem deste aparelho. (Elas também somem sozinhas depois de 24 horas.)', ok: 'Apagar', danger: true })) { conversaDuvidas = []; guardarConversa(); viewDuvidas(); } } }] : [])] });
   const avatar = `<span class="dv-avatar" aria-hidden="true">${icon('sparkles', 18)}</span>`;
   view.innerHTML = `<div class="chat">
     <div class="chat-rolo" id="dv-conversa"></div>
@@ -8166,6 +8178,7 @@ function viewDuvidas() {
       <div class="dv-hero"><span class="dv-avatar grande">${icon('sparkles', 30)}</span></div>
       <h2>Como posso ajudar o seu ministério?</h2>
       <p>Pergunte sobre a missa, os tempos litúrgicos ou que canto escolher${ReconhecerVoz ? ' — digitando ou <b>falando</b>, pelo microfone' : ''}. Procuro primeiro no <b>acervo litúrgico</b> e depois na internet.</p>
+      ${ReconhecerVoz ? `<button type="button" class="dv-vivo-entrar" data-vivo>${icon('som', 18)}<span><b>Conversar ao vivo</b><small>Fale e ouça a resposta, sem tocar na tela</small></span></button>` : ''}
       <div class="chat-sugestoes">${SUGESTOES_DUVIDAS.map(([ic, q]) => `<button type="button" class="chat-sugestao" data-q="${esc(q)}"><span class="dv-ico">${icon(ic, 18)}</span><span>${esc(q)}</span></button>`).join('')}</div></div>`;
   const google = (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
   const corpo = (m, k) => {
@@ -8215,7 +8228,7 @@ function viewDuvidas() {
   desenhar();
   const perguntar = async (q) => {
     q = q.trim();
-    if (!q || conversaDuvidas.some((m) => m.carregando)) return;
+    if (!q || conversaDuvidas.some((m) => m.carregando)) return null;
     conversaDuvidas.push({ role: 'user', content: q, t: Date.now() });
     const resp = { role: 'assistant', pergunta: q, carregando: true, t: Date.now() };
     conversaDuvidas.push(resp);
@@ -8236,6 +8249,7 @@ function viewDuvidas() {
     Object.assign(resp, { acervo: achados, cantos, wiki: await naWiki, carregando: false, t: Date.now() });
     guardarConversa();
     if (location.hash === '#/duvidas') viewDuvidas();
+    return resp;
   };
   const form = $('#dv-form');
   const campo = form.q;
@@ -8278,9 +8292,8 @@ function viewDuvidas() {
   campo.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && innerWidth > 700) { e.preventDefault(); form.requestSubmit(); } });
   form.onsubmit = (e) => { e.preventDefault(); const voz = vozDuvidas; vozDuvidas = null; voz?.abort(); const q = campo.value; campo.value = ''; ajustar(); perguntar(q); };
   if (innerWidth > 700) campo.focus();
-  caixa.addEventListener('click', async (e) => {
-    const sug = e.target.closest('[data-q]');
-    if (sug) { perguntar(sug.dataset.q); return; }
+  // o toque numa resposta (na conversa ou na tela ao vivo): copiar, abrir o canto ou o trecho do acervo
+  const tocarResposta = async (e) => {
     const cop = e.target.closest('[data-copiar]');
     if (cop) { try { const m = conversaDuvidas[cop.dataset.copiar]; await navigator.clipboard.writeText(m.content && !m.acervo ? m.content : textoDaResposta(m)); toast('Resposta copiada'); } catch { toast('Não consegui copiar'); } return; }
     // o trecho do acervo abre o canto no app (do acervo ou do caderno do Hinário)
@@ -8296,7 +8309,129 @@ function viewDuvidas() {
       if (cad?.cantos[a.i]) { abrirMusicaAcervo({ fonte: sourceHinario(cad, a.i), chordpro: cad.cantos[a.i].chordpro }, '#/duvidas'); return; }
     }
     toast(`${a.titulo} — ${a.caminho}`);
+  };
+  caixa.addEventListener('click', (e) => {
+    const sug = e.target.closest('[data-q]');
+    if (sug) { perguntar(sug.dataset.q); return; }
+    if (e.target.closest('[data-vivo]')) { abrirVivo(); return; }
+    tocarResposta(e);
   });
+
+  // Conversa ao vivo (como o DJ do Spotify): a pessoa fala, a resposta vem em voz alta e nos cartões (trechos do
+  // acervo, links da internet) e ele volta a ouvir sozinho. Tudo no aparelho: o ditado e a voz do próprio navegador
+  // e a busca de sempre (acervo + Wikipédia), sem gastar o servidor da IA
+  function abrirVivo() {
+    if (document.querySelector('.dv-vivo')) return;
+    const r0 = vozDuvidas; vozDuvidas = null; r0?.abort();
+    // a música tocando pausa: o microfone ouviria ela, e ela cobriria a voz da resposta
+    if (player.tocandoAlgo()) player.alternar();
+    const el = document.createElement('div');
+    el.className = 'dv-vivo';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', 'Conversa ao vivo');
+    el.innerHTML = `<div class="dv-vivo-topo"><span class="dv-vivo-selo"><i></i>Ao vivo</span>
+        <button type="button" class="dv-vivo-fechar" aria-label="Encerrar a conversa">${icon('x', 22)}</button></div>
+      <div class="dv-vivo-palco">
+        <button type="button" class="dv-orbe"><span class="dv-orbe-anel"></span><span class="dv-orbe-anel"></span><span class="dv-orbe-nucleo">${icon('mic', 34)}</span></button>
+        <p class="dv-vivo-estado" aria-live="polite"></p>
+        <p class="dv-vivo-fala"></p>
+      </div>
+      <div class="dv-vivo-resposta chat-bolha" hidden></div>`;
+    document.body.append(el);
+    requestAnimationFrame(() => el.classList.add('aberto'));
+    const orbe = el.querySelector('.dv-orbe');
+    const estadoEl = el.querySelector('.dv-vivo-estado');
+    const falaEl = el.querySelector('.dv-vivo-fala');
+    const respEl = el.querySelector('.dv-vivo-resposta');
+    let aberto = true;
+    let rec = null;
+    let silencios = 0;
+    const estado = (qual, texto) => {
+      el.dataset.estado = qual;
+      estadoEl.textContent = texto;
+      orbe.setAttribute('aria-label', { ouvindo: 'Parar de ouvir', falando: 'Interromper e perguntar', pensando: 'Procurando', parado: 'Falar' }[qual]);
+    };
+    // a voz: em frases curtas (o Chrome corta a fala comprida no meio); termina quando a última frase acaba
+    const falar = (texto) => new Promise((pronto) => {
+      if (!('speechSynthesis' in window)) { pronto(); return; }
+      speechSynthesis.cancel();
+      const vozes = speechSynthesis.getVoices();
+      const voz = vozes.find((v) => /^pt[-_]BR/i.test(v.lang)) || vozes.find((v) => /^pt/i.test(v.lang));
+      const frases = texto.match(/[^.!?…]+[.!?…]*/g) || [texto];
+      // reserva: há aparelhos em que o fim da fala não avisa
+      const reserva = setTimeout(pronto, 4000 + texto.length * 90);
+      frases.forEach((f, n) => {
+        const u = new SpeechSynthesisUtterance(f.trim());
+        u.lang = 'pt-BR';
+        if (voz) u.voice = voz;
+        u.rate = 1.05;
+        if (n === frases.length - 1) u.onend = u.onerror = () => { clearTimeout(reserva); pronto(); };
+        speechSynthesis.speak(u);
+      });
+    });
+    const ouvir = () => {
+      if (!aberto) return;
+      if ('speechSynthesis' in window) speechSynthesis.cancel();
+      const antigo = rec; rec = null; antigo?.abort();
+      const r = new ReconhecerVoz();
+      rec = r;
+      r.lang = 'pt-BR';
+      r.interimResults = true;
+      r.continuous = false;
+      let erro = '';
+      estado('ouvindo', 'Ouvindo… pode perguntar');
+      falaEl.textContent = '';
+      r.onresult = (e) => { if (rec === r) falaEl.textContent = [...e.results].map((x) => x[0].transcript).join('').trim(); };
+      r.onerror = (e) => { erro = e.error; };
+      r.onend = () => {
+        if (rec !== r || !aberto) return;
+        rec = null;
+        const q = falaEl.textContent.trim();
+        if (q) { silencios = 0; responder(q); return; }
+        // ficou em silêncio: tenta ouvir mais uma vez antes de parar
+        if (erro === 'no-speech' && ++silencios < 2) { ouvir(); return; }
+        silencios = 0;
+        estado('parado', /not-allowed/.test(erro) ? 'Permita o microfone para conversar' : erro === 'network' ? 'O ditado precisa de internet' : 'Toque no microfone para falar');
+      };
+      try { r.start(); } catch { estado('parado', 'Toque no microfone para falar'); }
+    };
+    const responder = async (q) => {
+      estado('pensando', 'Procurando no acervo…');
+      const m = await perguntar(q);
+      if (!aberto) return;
+      if (!m) { ouvir(); return; }
+      respEl.innerHTML = corpo(m, conversaDuvidas.indexOf(m));
+      respEl.hidden = false;
+      respEl.scrollTop = 0;
+      estado('falando', 'Respondendo… toque para interromper');
+      await falar(falaDaResposta(m));
+      if (aberto && el.dataset.estado === 'falando') ouvir();
+    };
+    const fechar = () => {
+      if (!aberto) return;
+      aberto = false;
+      const r = rec; rec = null; r?.abort();
+      if ('speechSynthesis' in window) speechSynthesis.cancel();
+      document.removeEventListener('keydown', teclas);
+      el.remove();
+    };
+    const teclas = (e) => { if (e.key === 'Escape') fechar(); };
+    document.addEventListener('keydown', teclas);
+    aoSair(fechar);
+    el.querySelector('.dv-vivo-fechar').onclick = fechar;
+    orbe.onclick = () => {
+      const agora = el.dataset.estado;
+      if (agora === 'ouvindo') rec?.stop();
+      else if (agora !== 'pensando') ouvir();
+    };
+    respEl.addEventListener('click', (e) => {
+      // abrir um canto ou a Liturgia sai da conversa ao vivo; o link da internet abre noutra aba e ela continua
+      if (e.target.closest('button.dv-fonte, a[href^="#"]')) fechar();
+      tocarResposta(e);
+    });
+    estado('falando', 'Olá!');
+    falar('Olá! Pode perguntar sobre a liturgia e os cantos.').then(() => { if (aberto && el.dataset.estado === 'falando') ouvir(); });
+  }
 }
 
 function viewArquivo(url, titulo, voltar = '') {
@@ -8541,5 +8676,7 @@ function viewNovidades(versao) {
       <h3>${esc(n.titulo)}</h3>
       <ul>${n.itens.map((it) => { const [nome, ic] = TIPO_NOVIDADE[it.tipo] || TIPO_NOVIDADE.melhoria; return `<li data-tipo="${it.tipo}"><span class="nv-ic">${icon(ic, 14)}</span><span><b>${nome}</b> ${esc(it.texto)}</span></li>`; }).join('')}</ul>
     </section>`).join('')}</div>`;
-  if (versao) requestAnimationFrame(() => $(`#nv-${CSS.escape(versao)}`)?.scrollIntoView({ block: 'start' }));
+  // a versão pedida (pela notificação) aparece na tela; a mais nova já está no alto, com o título: não rola (rolar
+  // levava o título "Novidades do app" para baixo da barra do topo, cortado)
+  if (versao && String(versao) !== String(NOVIDADES[0]?.versao)) requestAnimationFrame(() => $(`#nv-${CSS.escape(versao)}`)?.scrollIntoView({ block: 'start' }));
 }

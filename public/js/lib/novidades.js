@@ -3,6 +3,13 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 222, data: '2026-10-22', titulo: 'Conversa ao vivo no Tirar dúvidas',
+    itens: [
+      { tipo: 'novo', texto: 'Conversar ao vivo, como o DJ do Spotify: em Tirar dúvidas, toque em “Conversar ao vivo” (ou no 🔊 do topo), fale a pergunta e ouça a resposta em voz alta. Na tela aparecem os trechos do acervo e os links da internet, e ele volta a ouvir sozinho, sem tocar em nada. A música tocando pausa enquanto vocês conversam.' },
+      { tipo: 'correcao', texto: 'Ao abrir as Novidades pela notificação, o título “Novidades do app” ficava cortado embaixo da barra do topo.' },
+    ],
+  },
+  {
     versao: 221, data: '2026-10-22', titulo: 'Tirar dúvidas de cara nova, com microfone',
     itens: [
       { tipo: 'novo', texto: 'Tirar dúvidas: toque no microfone e fale a pergunta. O que você fala vai aparecendo no campo, e dá para corrigir antes de enviar.' },
