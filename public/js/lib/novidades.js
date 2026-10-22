@@ -3,6 +3,12 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 234, data: '2026-10-22', titulo: 'Novo logo do Lumen: o L',
+    itens: [
+      { tipo: 'melhoria', texto: 'O logo do Lumen agora é o monograma L, arredondado, com a estrela de luz ao lado, no mesmo degradê azul, roxo, rosa e dourado.' },
+    ],
+  },
+  {
     versao: 233, data: '2026-10-22', titulo: 'O logo do Lumen',
     itens: [
       { tipo: 'novo', texto: 'O Lumen ganhou logo próprio: a “cruz de luz” (lumen é luz, em latim), uma estrela com o braço de baixo mais longo, formando a cruz, no degradê azul, roxo, rosa e dourado. Ele aparece no atalho do Início, no centro da tela do Lumen, nas respostas e na conversa ao vivo.' },
