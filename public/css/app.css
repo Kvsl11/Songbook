@@ -2750,6 +2750,88 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
   .dv-vivo .dv-orbe-brilho, .dv-vivo-selo i { animation: none !important; }
 }
 
+/* ============================================================ as cores do Lumen
+   toda a tela dele (fundo, topo, textos, ícones e botões) usa as cores do logo: azul, roxo, rosa e dourado.
+   --accent vira o azul do Lumen dentro da tela, então tudo que já usava a cor de destaque acompanha */
+.main-col:has(.chat), .dv-vivo {
+  --lm-azul: #6f9bff; --lm-roxo: #a88bff; --lm-rosa: #ff7eb3; --lm-ouro: #ffc266;
+  --lm-grad: linear-gradient(120deg, #4f8cff, #9b72ff 45%, #ff6fa8 80%, #ffb84d);
+  --lm-grad-btn: linear-gradient(135deg, #4f8cff, #8a6bff 60%, #c86bd8);
+  --lm-fundo: #0a0b1a; --lm-campo: #17182e; --lm-borda: rgb(155 114 255 / 0.22);
+}
+.main-col:has(.chat) { --accent: var(--lm-azul); --dv-roxo: var(--lm-roxo); --tint: #1d1548; background: var(--lm-fundo); }
+:root[data-theme="light"] .main-col:has(.chat) {
+  --lm-azul: #3d6be0; --lm-roxo: #7a55e8; --lm-rosa: #d9437f; --lm-ouro: #c27a12;
+  --lm-fundo: #f7f6ff; --lm-campo: #ecebfb; --lm-borda: rgb(122 85 232 / 0.22); --tint: #ddd3ff;
+}
+/* o fundo: um céu escuro com o brilho do logo subindo de baixo (azul, roxo e um toque de rosa) */
+.main-col:has(.chat) main { background: radial-gradient(90% 50% at 85% 0%, rgb(155 114 255 / 0.12), transparent 70%), var(--lm-fundo); }
+.chat::before { background: radial-gradient(70% 60% at 25% 100%, rgb(79 140 255 / 0.38), transparent 70%),
+  radial-gradient(60% 55% at 80% 100%, rgb(155 114 255 / 0.32), transparent 70%),
+  radial-gradient(40% 35% at 55% 100%, rgb(255 111 168 / 0.16), transparent 75%); }
+:root[data-theme="light"] .chat::before { background: radial-gradient(70% 60% at 25% 100%, rgb(79 140 255 / 0.2), transparent 70%),
+  radial-gradient(60% 55% at 80% 100%, rgb(155 114 255 / 0.18), transparent 70%); }
+:root[data-theme="light"] .main-col:has(.chat) main { background: radial-gradient(90% 50% at 85% 0%, rgb(155 114 255 / 0.1), transparent 70%), var(--lm-fundo); }
+/* o topo: o nome com o degradê e os botões com o fundo lilás */
+.main-col:has(.chat) .topbar.scrolled { background: color-mix(in srgb, var(--lm-campo) 85%, transparent); }
+.main-col:has(.chat) .topbar h1 { background: var(--lm-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.main-col:has(.chat) .topbar small { color: var(--lm-roxo); }
+.main-col:has(.chat) .topbar .icon-btn { background: color-mix(in srgb, var(--lm-roxo) 20%, rgb(0 0 0 / 0.45)); color: #fff; }
+:root[data-theme="light"] .main-col:has(.chat) .topbar .icon-btn { background: color-mix(in srgb, var(--lm-roxo) 16%, #fff); color: var(--lm-roxo); }
+/* a tela de boas-vindas: o título no degradê e cada sugestão com o ícone numa cor do logo */
+.chat-vazio h2 { background: var(--lm-grad); -webkit-background-clip: text; background-clip: text; color: transparent; padding-bottom: 0.08em; }
+.dv-sub-boas { color: color-mix(in srgb, var(--lm-roxo) 55%, var(--muted)); }
+.dv-sug { border: 1px solid transparent; }
+.dv-sug:hover, .dv-sug:focus-visible { background: color-mix(in srgb, var(--lm-roxo) 12%, transparent); border-color: var(--lm-borda); }
+:root[data-theme="light"] .dv-sug:hover { background: color-mix(in srgb, var(--lm-roxo) 9%, transparent); }
+.dv-sug:nth-child(4n+1) > .ic { color: var(--lm-azul); }
+.dv-sug:nth-child(4n+2) > .ic { color: var(--lm-roxo); }
+.dv-sug:nth-child(4n+3) > .ic { color: var(--lm-rosa); }
+.dv-sug:nth-child(4n+4) > .ic { color: var(--lm-ouro); }
+/* a conversa: a sua pergunta no degradê do Lumen, a resposta num cartão com a borda lilás */
+.chat-msg.eu .chat-bolha { background: var(--lm-grad-btn); color: #fff; box-shadow: 0 6px 20px rgb(110 90 255 / 0.3); }
+.chat-msg.ia .chat-bolha { background: linear-gradient(180deg, color-mix(in srgb, var(--lm-campo) 92%, var(--lm-roxo)), var(--lm-campo)); border-color: var(--lm-borda); }
+.chat-nome { color: var(--lm-roxo); }
+.chat-digitando i { background: var(--lm-azul); }
+.chat-digitando i:nth-child(2) { background: var(--lm-roxo); }
+.chat-digitando i:nth-child(3) { background: var(--lm-rosa); }
+.chat-acoes button, .chat-acoes a { border-color: var(--lm-borda); color: color-mix(in srgb, var(--lm-roxo) 60%, var(--muted)); }
+.chat-acoes button:hover, .chat-acoes a:hover { background: color-mix(in srgb, var(--lm-roxo) 14%, transparent); }
+.dv-cita { background: color-mix(in srgb, var(--lm-roxo) 25%, transparent); color: var(--lm-roxo); }
+.chat .dv-fonte { background: color-mix(in srgb, var(--lm-roxo) 8%, var(--lm-campo)); }
+.chat .dv-fonte:hover { background: color-mix(in srgb, var(--lm-roxo) 16%, var(--lm-campo)); }
+.dv-sub { border-top-color: var(--lm-borda) !important; color: var(--lm-roxo) !important; }
+.dv-aviso { background: color-mix(in srgb, var(--lm-ouro) 14%, transparent); color: var(--lm-ouro); }
+.dv-mais summary { color: var(--lm-roxo); }
+.dv-lit-parte h4 { color: var(--lm-azul); }
+.dv-lit-parte + .dv-lit-parte { border-top-color: var(--lm-borda); }
+.dv-lit-refrao b { color: var(--lm-rosa); }
+.dv-ia h4 { color: var(--lm-roxo); }
+.dv-ia a { color: var(--lm-azul); }
+.dv-texto b { background: color-mix(in srgb, var(--lm-ouro) 22%, transparent); }
+/* a caixa de pergunta: a pílula no tom do Lumen, o anel em degradê ao escrever e os botões coloridos */
+.chat-campo { background: var(--lm-campo); box-shadow: inset 0 0 0 1px var(--lm-borda); }
+:root[data-theme="light"] .chat-campo { background: var(--lm-campo); }
+.chat-campo:focus-within { box-shadow: inset 0 0 0 1px transparent, 0 0 0 2px color-mix(in srgb, var(--lm-roxo) 55%, transparent), 0 8px 30px rgb(110 90 255 / 0.25); }
+.chat-campo textarea::placeholder { color: color-mix(in srgb, var(--lm-roxo) 45%, var(--subtle)); }
+.chat-mic { color: var(--lm-roxo); }
+.chat-mic:hover { background: color-mix(in srgb, var(--lm-roxo) 16%, transparent); color: var(--lm-roxo); }
+.chat-enviar, .chat-vivo { background: var(--lm-grad-btn); color: #fff; box-shadow: 0 6px 18px rgb(110 90 255 / 0.35); }
+.chat-vivo:hover { background: var(--lm-grad-btn); filter: brightness(1.12); }
+.chat-rodape { color: color-mix(in srgb, var(--lm-roxo) 40%, var(--subtle)); }
+.chat-aviso { background: color-mix(in srgb, var(--lm-roxo) 14%, transparent); }
+/* o ao vivo: o céu do Lumen no fundo, a pílula com o brilho do logo e os botões lilases */
+.dv-vivo { background: radial-gradient(80% 45% at 50% 105%, rgb(110 90 255 / 0.28), transparent 75%), #05060f; }
+.dv-vivo-selo { color: var(--lm-roxo); }
+.dv-vivo-btn, .dv-vivo-interromper { background: #1a1a30; color: #e6e1ff; }
+.dv-vivo-btn:hover { background: #26264a; }
+.dv-vivo-btn[aria-pressed="true"] { background: var(--lm-grad-btn); color: #fff; }
+.dv-vivo-resposta { background: rgb(155 114 255 / 0.08); border-color: rgb(155 114 255 / 0.2); }
+.dv-orbe { background: #0a0820; }
+.dv-orbe-brilho { background: radial-gradient(65% 140% at 28% 115%, #4f8cff, transparent 75%),
+  radial-gradient(65% 140% at 72% 115%, #9b72ff, transparent 75%), radial-gradient(45% 100% at 50% 125%, #ff6fa8, transparent 80%); }
+.dv-vivo[data-estado="pensando"] .dv-orbe-brilho { background: linear-gradient(90deg, transparent, #4f8cff, #9b72ff, #ff6fa8, #ffb84d, transparent); background-size: 200% 100%; }
+
 /* ============================================================ tablet: como o Spotify no tablet
    (em pé e deitado) sem menu lateral: o menu flutua embaixo, numa pílula, e o "Tocando agora" (vídeo, controles e a
    letra que acompanha a música) fica num painel à direita enquanto algo toca. html.tablet vem do app (tela de toque

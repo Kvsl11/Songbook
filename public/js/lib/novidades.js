@@ -3,6 +3,13 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 235, data: '2026-10-22', titulo: 'O Lumen com as cores dele',
+    itens: [
+      { tipo: 'melhoria', texto: 'A tela do Lumen inteira agora usa as cores do logo: o fundo escuro com o brilho azul, roxo e rosa, o nome e o “Pode perguntar!” em degradê, os ícones das sugestões coloridos, a sua pergunta no balão em degradê e os botões de enviar, falar e conversar ao vivo no mesmo tom.' },
+      { tipo: 'melhoria', texto: 'A conversa ao vivo também ganhou o céu do Lumen e a pílula do meio brilha com as cores do logo.' },
+    ],
+  },
+  {
     versao: 234, data: '2026-10-22', titulo: 'Novo logo do Lumen: o L',
     itens: [
       { tipo: 'melhoria', texto: 'O logo do Lumen agora é o monograma L, arredondado, com a estrela de luz ao lado, no mesmo degradê azul, roxo, rosa e dourado.' },
