@@ -85,7 +85,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-199';
+export const APP_VERSAO = '2026.10.22-200';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -676,7 +676,6 @@ const player = (() => {
     <div class="pl-cab"><button class="icon-btn" data-pl="recolher" aria-label="Recolher o painel" title="Recolher">${icon('sidebar', 20)}</button>
       <span><small>Tocando agora</small><b></b></span>
       <button class="icon-btn" data-pl="cheio" aria-label="Tela inteira" title="Tela inteira">${icon('expand', 18)}</button></div>
-    <button class="icon-btn pl-abrir-painel" data-pl="recolher" aria-label="Abrir o painel Tocando agora" title="Abrir o painel">${icon('sidebar', 18)}</button>
     <section class="pl-letra" hidden><div class="pl-letra-cab"><h3>Letra</h3><button class="icon-btn" data-pl="cheio" aria-label="Letra em tela inteira" title="Tela inteira">${icon('expand', 16)}</button></div><div class="pl-linhas"></div></section>`;
   // no tablet o player é o painel "Tocando agora" à direita, fora da coluna principal (que não o corta)
   const casa = ehTablet() ? document.body : $('.main-col');
@@ -996,6 +995,12 @@ const player = (() => {
     const prog = e.target.closest('.pl-prog');
     if (prog && duracao) { const r = prog.getBoundingClientRect(); api.irPara(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * duracao); return; }
     const b = e.target.closest('[data-pl]');
+    // tablet: tocar na barrinha recolhida (fora dos botões) abre o painel "Tocando agora"; a tela inteira fica no topo dele
+    if (document.body.classList.contains('painel-recolhido') && ehTablet() && (!b || b.dataset.pl === 'abrir')) {
+      document.body.classList.remove('painel-recolhido');
+      db.setPref('painelRecolhido', false);
+      return;
+    }
     if (!b) return;
     if (b.dataset.pl === 'play') api.alternar();
     if (b.dataset.pl === 'proxima') pular(1);
