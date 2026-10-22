@@ -85,7 +85,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-197';
+export const APP_VERSAO = '2026.10.22-198';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -7627,47 +7627,89 @@ async function viewFontes() {
 // O YouTube só deixa o servidor baixar o áudio (partitura e letra sincronizada) se o pedido vier de uma conta logada.
 // Não existe "entrar com o Google" para isso: o jeito é o servidor usar a sessão de um navegador logado (o arquivo de
 // cookies). A pessoa exporta uma vez com uma extensão, cola aqui e o servidor guarda.
+// o arquivo de cookies fica guardado neste aparelho (nome, texto e quando foi enviado), para aparecer de novo na tela
+const YT_COOKIES = 'songbook.ytCookies';
+const cookiesSalvos = () => { try { return JSON.parse(localStorage.getItem(YT_COOKIES) || 'null'); } catch { return null; } };
+const salvarCookies = (c) => { try { localStorage.setItem(YT_COOKIES, JSON.stringify(c)); } catch { /* sem espaço: só não guarda */ } };
+// quantos cookies tem o texto (formato Netscape: uma linha com 7 campos separados por tab; "#HttpOnly_" também conta)
+const contarCookies = (t) => String(t || '').split('\n').filter((l) => (!l.startsWith('#') || l.startsWith('#HttpOnly_')) && l.split('\t').length >= 7).length;
 function viewConectarYoutube() {
   setTab('inicio');
   setTint('#5a1a1a');
   setHeader('Conectar o YouTube', { back: '#/ajustes' });
+  const salvo = cookiesSalvos();
   const passoN = (n, t, d) => `<li><span class="cy-n">${n}</span><div><b>${t}</b><small>${d}</small></div></li>`;
   view.innerHTML = `<div class="conectar-yt">
-    <section class="cy-topo"><span class="cy-ic">${icon('youtube', 30)}</span><div><h2>Conectar a conta do YouTube</h2>
-      <p class="muted">Para o app baixar o áudio dos vídeos sozinho (gerar a partitura e sincronizar a letra), o YouTube pede uma conta logada. Faça isto <b>uma vez</b>; se um dia ele pedir de novo, é só repetir.</p></div></section>
-    <div class="cy-estado" id="cy-estado">Verificando…</div>
-    <ol class="cy-passos">
-      ${passoN(1, 'Instale a extensão “Get cookies.txt LOCALLY”', 'No celular Android, use o <a href="https://addons.mozilla.org/firefox/addon/get-cookies-txt-locally/" target="_blank" rel="noopener">Firefox</a>; no computador, o <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener">Chrome</a> ou o Firefox.')}
-      ${passoN(2, 'Entre no youtube.com com uma conta Google', 'De preferência uma conta só para isso (não a principal). Abra qualquer vídeo para confirmar que está logado.')}
-      ${passoN(3, 'Exporte os cookies', 'Toque na extensão → <b>Export</b> (baixa o arquivo cookies.txt) ou <b>Copy</b> (copia o texto).')}
-      ${passoN(4, 'Mande para o app', 'Escolha o arquivo baixado ou cole o texto aqui embaixo e toque em Conectar.')}
-    </ol>
-    <div class="cy-form">
-      <button class="btn" id="cy-arquivo">${icon('upload', 16)} Escolher o arquivo cookies.txt</button>
-      <textarea class="input" id="cy-texto" rows="5" placeholder="…ou cole aqui o texto copiado pela extensão"></textarea>
+    <section class="cy-hero">
+      <span class="cy-ic">${icon('youtube', 30)}</span>
+      <span class="kind">Conta do YouTube</span>
+      <h2>Conecte uma vez, e o app faz o resto</h2>
+      <p>Com uma conta logada, o app baixa o áudio dos vídeos sozinho para gerar a partitura e sincronizar a letra.</p>
+      <div class="cy-estado" id="cy-estado"><i></i>Verificando…</div>
+    </section>
+    <section class="cy-card">
+      <div class="cy-card-cab"><h3>Arquivo de cookies</h3><small class="muted">cookies.txt exportado pela extensão</small></div>
+      <div id="cy-arq"></div>
+      <button class="cy-solta" id="cy-arquivo" type="button"><span class="cy-solta-ic">${icon('upload', 22)}</span>
+        <span><b id="cy-arquivo-txt">Escolher o arquivo cookies.txt</b><small>ou arraste o arquivo para cá</small></span></button>
+      <div class="cy-ou"><span>ou cole o texto</span></div>
+      <textarea class="input" id="cy-texto" rows="4" spellcheck="false" placeholder="# Netscape HTTP Cookie File…"></textarea>
       <button class="btn primary" id="cy-conectar">${icon('check', 16)} Conectar</button>
-    </div>
-    <p class="muted cy-nota">${icon('info', 14)} O arquivo vai só para o servidor do Songbook, que o usa apenas para baixar o áudio dos vídeos. Para desconectar, saia da conta nesse navegador ou troque a senha.</p></div>`;
+    </section>
+    <details class="cy-como"${salvo ? '' : ' open'}><summary>${icon('info', 16)}<b>Como pegar o arquivo</b><span class="muted">4 passos</span>${icon('down', 18)}</summary>
+      <ol class="cy-passos">
+        ${passoN(1, 'Instale a extensão “Get cookies.txt LOCALLY”', 'No celular Android, use o <a href="https://addons.mozilla.org/firefox/addon/get-cookies-txt-locally/" target="_blank" rel="noopener">Firefox</a>; no computador, o <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener">Chrome</a> ou o Firefox.')}
+        ${passoN(2, 'Entre no youtube.com com uma conta Google', 'De preferência uma conta só para isso (não a principal). Abra qualquer vídeo para confirmar que está logado.')}
+        ${passoN(3, 'Exporte os cookies', 'Toque na extensão → <b>Export</b> (baixa o arquivo cookies.txt) ou <b>Copy</b> (copia o texto).')}
+        ${passoN(4, 'Mande para o app', 'Escolha o arquivo baixado ou cole o texto acima e toque em Conectar. Se um dia o YouTube pedir de novo, é só repetir.')}
+      </ol></details>
+    <p class="muted cy-nota">${icon('info', 14)} O arquivo vai só para o servidor do Songbook, que o usa apenas para baixar o áudio dos vídeos, e fica guardado neste aparelho para você ver depois. Para desconectar, saia da conta nesse navegador ou troque a senha.</p></div>`;
+  const texto = $('#cy-texto');
+  const quando = (t) => new Date(t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  // o arquivo guardado: nome, quantos cookies e quando foi enviado
+  const desenharArquivo = () => {
+    const c = cookiesSalvos();
+    $('#cy-arq').innerHTML = c ? `<div class="cy-arq"><span class="cy-arq-ic">${icon('file', 20)}</span>
+      <div><b>${esc(c.nome || 'Texto colado')}</b><small>${contarCookies(c.texto)} cookies · ${c.enviado ? `enviado em ${quando(c.enviado)}` : 'ainda não enviado'}</small></div></div>` : '';
+    $('#cy-arquivo-txt').textContent = c ? 'Trocar o arquivo' : 'Escolher o arquivo cookies.txt';
+    $('#cy-conectar').lastChild.textContent = c?.enviado ? ' Conectar de novo' : ' Conectar';
+  };
+  if (salvo) texto.value = salvo.texto || '';
+  desenharArquivo();
   const estado = $('#cy-estado');
   const verEstado = () => chamar(servidorIA(), '/saude', { tempo: 60e3 })
-    .then((r) => { estado.className = `cy-estado ${r.cookies ? 'ok' : ''}`; estado.innerHTML = r.cookies ? `${icon('check', 16)} Conta do YouTube conectada` : `${icon('info', 16)} Ainda não conectado`; })
-    .catch((e) => { estado.textContent = e.message; });
+    .then((r) => { estado.className = `cy-estado ${r.cookies ? 'ok' : 'nao'}`; estado.innerHTML = `<i></i>${r.cookies ? 'Conectado' : 'Ainda não conectado'}`; })
+    .catch((e) => { estado.className = 'cy-estado erro'; estado.innerHTML = `<i></i>${esc(e.message)}`; });
   servidorCarregado.then(verEstado);
+  // escolher ou arrastar o arquivo: o texto aparece no campo, fica guardado e já envia
+  const usarArquivo = async (f) => {
+    if (!f) return;
+    texto.value = await f.text();
+    salvarCookies({ nome: f.name, texto: texto.value, enviado: 0 });
+    desenharArquivo();
+    $('#cy-conectar').click();
+  };
   $('#cy-arquivo').onclick = () => {
     const inp = document.createElement('input');
     inp.type = 'file';
     inp.accept = '.txt,text/plain';
-    inp.onchange = async () => { if (inp.files[0]) { $('#cy-texto').value = await inp.files[0].text(); $('#cy-conectar').click(); } };
+    inp.onchange = () => usarArquivo(inp.files[0]);
     inp.click();
   };
+  const solta = $('#cy-arquivo');
+  solta.addEventListener('dragover', (e) => { e.preventDefault(); solta.classList.add('sobre'); });
+  solta.addEventListener('dragleave', () => solta.classList.remove('sobre'));
+  solta.addEventListener('drop', (e) => { e.preventDefault(); solta.classList.remove('sobre'); usarArquivo(e.dataTransfer.files[0]); });
   $('#cy-conectar').onclick = async () => {
-    const texto = $('#cy-texto').value.trim();
-    if (!texto) { toast('Escolha o arquivo ou cole o texto dos cookies'); return; }
+    const t = texto.value.trim();
+    if (!t) { toast('Escolha o arquivo ou cole o texto dos cookies'); return; }
     const b = $('#cy-conectar');
     b.disabled = true;
     try {
-      await chamar(servidorIA(), '/youtube/conectar', { json: { cookies: texto }, tempo: 60e3 });
-      $('#cy-texto').value = '';
+      await chamar(servidorIA(), '/youtube/conectar', { json: { cookies: t }, tempo: 60e3 });
+      const ant = cookiesSalvos();
+      salvarCookies({ nome: ant?.texto?.trim() === t ? ant.nome : '', texto: t, enviado: Date.now() });
+      desenharArquivo();
       toast('YouTube conectado: agora a partitura e a letra baixam sozinhas', { tipo: 'sucesso' });
       notificacoes = notificacoes.filter((x) => x.href !== '#/youtube');
       guardarNotificacoes();
