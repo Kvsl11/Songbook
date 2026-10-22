@@ -119,6 +119,7 @@ def saude():
         "separacao": transcricao.tem_separacao(),
         "youtube": shutil.which("ffmpeg") is not None,
         "cookies": youtube.arquivo_de_cookies() is not None,
+        "cookiesInfo": youtube.info_dos_cookies(),
         "letra": letra.tem_whisper(),
         "duvidas": bool(os.environ.get("ANTHROPIC_API_KEY")),
         "chave": bool(os.environ.get("IA_CHAVE")),
