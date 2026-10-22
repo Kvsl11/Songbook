@@ -8,6 +8,8 @@ não acha o Python 3.11. Serve para o notebook corporativo, que não deixa insta
 from __future__ import annotations
 
 import os
+import shutil
+import ssl
 import subprocess
 import sys
 import urllib.request
@@ -19,9 +21,20 @@ ZIP = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip"
 GET_PIP = "https://bootstrap.pypa.io/get-pip.py"
 
 
+def contexto() -> ssl.SSLContext:
+    """Os certificados do sistema (no Windows, os do próprio Windows, que já confiam no da rede da empresa), sem a
+    checagem estrita do Python 3.13+: o certificado da inspeção de rede corporativa costuma não ter o "Authority Key
+    Identifier", e o Python novo o recusava (CERTIFICATE_VERIFY_FAILED). A verificação continua ligada."""
+    ctx = ssl.create_default_context()
+    ctx.verify_flags &= ~getattr(ssl, "VERIFY_X509_STRICT", 0)
+    return ctx
+
+
 def baixar(url: str, arquivo: str) -> None:
     print(f"Baixando {url.rsplit('/', 1)[-1]}…", flush=True)
-    urllib.request.urlretrieve(url, arquivo)
+    with urllib.request.urlopen(url, context=contexto()) as r, open(arquivo + ".parcial", "wb") as f:
+        shutil.copyfileobj(r, f)
+    os.replace(arquivo + ".parcial", arquivo)
 
 
 def main() -> None:

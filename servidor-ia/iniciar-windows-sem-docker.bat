@@ -36,10 +36,10 @@ if exist "%~dp0pronto.txt" goto ligar
 echo Primeira vez: instalando o servidor da IA. Demora uns 15 minutos, deixe a janela aberta...
 "%PY%" -m pip install --no-warn-script-location -U pip || goto erro
 "%PY%" -m pip install --no-warn-script-location torch torchaudio --index-url https://download.pytorch.org/whl/cpu || goto erro
-"%PY%" -m pip install --no-warn-script-location -r requirements.txt static-ffmpeg uvicorn || goto erro
+"%PY%" -m pip install --no-warn-script-location -r requirements.txt static-ffmpeg uvicorn truststore || goto erro
 "%PY%" -m pip install --no-warn-script-location --no-deps basic-pitch==0.4.0 || goto erro
 echo Baixando os modelos de IA...
-"%PY%" -c "import static_ffmpeg; static_ffmpeg.add_paths(); from demucs.pretrained import get_model; get_model('htdemucs'); from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')" || goto erro
+"%PY%" -c "import truststore; truststore.inject_into_ssl(); import static_ffmpeg; static_ffmpeg.add_paths(); from demucs.pretrained import get_model; get_model('htdemucs'); from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')" || goto erro
 echo ok> "%~dp0pronto.txt"
 
 :ligar

@@ -50,6 +50,14 @@ def cloudflared() -> str:
 def main() -> None:
     os.chdir(PASTA)
     sys.path.insert(0, PASTA)
+    try:
+        import truststore
+
+        # os downloads (cloudflared, ffmpeg, YouTube, modelos) usam os certificados do Windows: na rede da empresa,
+        # que inspeciona as conexões com um certificado próprio, os do Python davam CERTIFICATE_VERIFY_FAILED
+        truststore.inject_into_ssl()
+    except ImportError:
+        pass
     if not shutil.which("ffmpeg"):
         try:
             import static_ffmpeg
