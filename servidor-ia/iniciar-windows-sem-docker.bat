@@ -25,7 +25,18 @@ if not defined PYBASE (
 )
 echo Seu Python nao e o 3.11: vou baixar um Python 3.11 so para o servidor. O seu continua como esta.
 %PYBASE% -m pip install --user --upgrade uv || goto erro
-%PYBASE% -m uv venv --seed --python 3.11 .venv || goto erro
+rem o Python 3.11 e o cache do uv ficam aqui dentro, nao no AppData: la o antivirus ou as regras do PC
+rem travavam a pasta na hora de mover o Python baixado ("Acesso negado", os error 5)
+if not defined UV_PYTHON_INSTALL_DIR set "UV_PYTHON_INSTALL_DIR=%~dp0python"
+if not defined UV_CACHE_DIR set "UV_CACHE_DIR=%~dp0.uv-cache"
+set TENTATIVA=0
+:baixar_python
+set /a TENTATIVA+=1
+%PYBASE% -m uv venv --seed --python 3.11 .venv && goto instalar
+if %TENTATIVA% GEQ 3 goto erro
+echo Nao deu, tentando de novo em 10 segundos (o antivirus pode estar conferindo os arquivos)...
+timeout /t 10 >nul
+goto baixar_python
 
 :instalar
 if exist ".venv\pronto" goto ligar
