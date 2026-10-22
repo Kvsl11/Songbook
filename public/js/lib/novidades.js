@@ -3,6 +3,12 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 226, data: '2026-10-22', titulo: 'Sugestões do Lumen inteiras',
+    itens: [
+      { tipo: 'correcao', texto: 'No celular, as sugestões de perguntas do Lumen ficavam cortadas na borda da tela. Agora aparecem inteiras, em duas colunas, com nomes curtos (tocar ainda faz a pergunta completa).' },
+    ],
+  },
+  {
     versao: 225, data: '2026-10-22', titulo: 'Lumen cabe inteiro na tela',
     itens: [
       { tipo: 'correcao', texto: 'A caixa de pergunta do Lumen flutuava alta, longe do menu de baixo: agora fica logo acima dele.' },

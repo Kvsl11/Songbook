@@ -107,7 +107,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-225';
+export const APP_VERSAO = '2026.10.22-226';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -8094,11 +8094,12 @@ const tentouSincronizar = new Set();
 const DIA = 24 * 3600e3;
 let conversaDuvidas = (() => { try { return JSON.parse(localStorage.getItem('songbook.duvidas') || '[]').filter((m) => !m.carregando && Date.now() - (m.t || 0) < DIA); } catch { return []; } })();
 const guardarConversa = () => { try { localStorage.setItem('songbook.duvidas', JSON.stringify(conversaDuvidas.filter((m) => !m.carregando).slice(-40))); } catch { /* sem espaço: só não guarda */ } };
+// [ícone, pergunta, o nome curto (no celular as sugestões viram pílulas, que precisam caber inteiras)]
 const SUGESTOES_DUVIDAS = [
-  ['music', 'Qual a função do cantor na hora da comunhão?'],
-  ['cross', 'Quando se canta o Glória e quando ele fica de fora?'],
-  ['library', 'Qual canto de comunhão para o Advento, ano A?'],
-  ['text', 'Como o salmista deve proclamar o salmo responsorial?'],
+  ['music', 'Qual a função do cantor na hora da comunhão?', 'O cantor na comunhão'],
+  ['cross', 'Quando se canta o Glória e quando ele fica de fora?', 'Quando se canta o Glória'],
+  ['library', 'Qual canto de comunhão para o Advento, ano A?', 'Comunhão no Advento'],
+  ['text', 'Como o salmista deve proclamar o salmo responsorial?', 'Como proclamar o salmo'],
 ];
 // a resposta (markdown simples) em HTML: parágrafos, listas, títulos, **negrito** e as citações [n] em bolinhas
 function htmlDaResposta(texto) {
@@ -8194,7 +8195,7 @@ function viewDuvidas() {
         ${ReconhecerVoz ? `<li><button type="button" class="dv-recurso-vivo" data-vivo><span class="dv-ico">${icon('mic', 18)}</span><span><b>Conversar ao vivo</b><small>Pergunte falando e ouça a resposta</small></span>${icon('next', 18)}</button></li>` : ''}
       </ul>
       <h3 class="dv-rotulo">Experimente perguntar</h3>
-      <div class="chat-sugestoes">${SUGESTOES_DUVIDAS.map(([ic, q]) => `<button type="button" class="chat-sugestao" data-q="${esc(q)}"><span class="dv-ico">${icon(ic, 18)}</span><span>${esc(q)}</span></button>`).join('')}</div></div>`;
+      <div class="chat-sugestoes">${SUGESTOES_DUVIDAS.map(([ic, q, curto]) => `<button type="button" class="chat-sugestao" data-q="${esc(q)}" title="${esc(q)}"><span class="dv-ico">${icon(ic, 18)}</span><span class="dv-longo">${esc(q)}</span><span class="dv-curto">${esc(curto)}</span></button>`).join('')}</div></div>`;
   const google = (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
   const corpo = (m, k) => {
     if (m.carregando) return `<div class="chat-digitando" aria-label="Procurando a resposta"><i></i><i></i><i></i><span>${esc(m.etapa || 'Procurando no acervo…')}</span></div>`;
