@@ -1,5 +1,5 @@
 .venv/
 bin/
 dados/
-python/
-.uv-cache/
+python311/
+pronto.txt
