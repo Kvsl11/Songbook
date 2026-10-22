@@ -2524,6 +2524,15 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 .dv-avatar.grande { position: relative; width: 68px; height: 68px; border-radius: 24px; }
 .dv-avatar.grande .ic { width: 30px; height: 30px; }
 .chat-vazio h2 { margin: 0; text-align: center; font-size: clamp(22px, 5vw, 30px); letter-spacing: -0.02em; line-height: 1.15; }
+.dv-recursos { list-style: none; display: flex; flex-direction: column; gap: 2px; width: 100%; max-width: 460px; margin: 8px 0 0; padding: 6px;
+  border-radius: 18px; border: 1px solid var(--border); background: var(--surface); text-align: left; }
+.dv-recursos li { display: flex; align-items: center; gap: 12px; padding: 8px 10px; }
+.dv-recursos li + li { border-top: 1px solid var(--border); }
+.dv-recursos .dv-ico { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.dv-recursos li > span:last-child { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.dv-recursos b { font-size: 14.5px; }
+.dv-recursos small { font-size: 13px; line-height: 1.35; color: var(--muted); }
 .chat-vazio .dv-lema { margin-top: -4px; font-size: 17px; font-weight: 700; color: var(--text); }
 .chat-vazio p { max-width: 500px; margin: 0; line-height: 1.5; color: var(--muted); }
 .chat-vazio p b { color: var(--text); }
@@ -2644,11 +2653,12 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 }
 @media (max-width: 600px) and (max-height: 780px) {
   .dv-hero { display: none; }
-  .chat-vazio p:not(.dv-lema) { display: none; }
+  .chat-vazio p:not(.dv-lema), .dv-recursos small { display: none; }
 }
 /* Tirar dúvidas: a resposta (texto corrido) e a fonte embaixo, como uma etiqueta */
-.dv-texto { margin: 0 0 10px; font-size: 15.5px; line-height: 1.65; }
-.dv-texto b { font-weight: 700; color: inherit; background: color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 4px; padding: 0 2px; }
+.dv-texto { margin: 0 0 10px; font-size: 15.5px; line-height: 1.65; text-align: justify; text-justify: inter-word; hyphens: manual; -webkit-hyphens: manual; }
+.dv-texto b { font-weight: 700; color: inherit; background: color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 3px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .chat-bolha .dv-fonte { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; margin: 0 0 4px; padding: 6px 10px 6px 8px; border-radius: 10px; font-size: 13px; color: var(--accent); }
 .chat-bolha .dv-fonte span { min-width: 0; }
 .chat-bolha .dv-fonte b { color: var(--text); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2660,6 +2670,12 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 .dv-mais[open] summary { margin-bottom: 8px; }
 .dv-mais .dv-texto { font-size: 14.5px; }
 .dv-cantos { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.dv-favicon { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: #fff; overflow: hidden; }
+.dv-favicon img { width: 18px; height: 18px; object-fit: contain; }
+.dv-favicon .ic { display: none; }
+.dv-favicon.sem { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.dv-favicon.sem img { display: none; }
+.dv-favicon.sem .ic { display: block; color: var(--accent); }
 /* o botão de entrar na conversa ao vivo, na tela vazia */
 .dv-vivo-entrar { display: flex; align-items: center; gap: 12px; margin-top: 6px; padding: 10px 18px 10px 12px; border-radius: 999px; cursor: pointer; text-align: left;
   border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); color: var(--text); font: inherit;

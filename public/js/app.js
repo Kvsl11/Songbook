@@ -20,7 +20,7 @@ import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } fro
 import { partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { NOVIDADES, novidadesNaoVistas } from './lib/novidades.js';
 import { baseDoServidor, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
-import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
+import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -107,7 +107,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-223';
+export const APP_VERSAO = '2026.10.22-224';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -8151,10 +8151,11 @@ async function indiceDasDuvidas() {
 }
 // quantas palavras diferentes da pergunta aparecem no texto
 const termosEm = (texto, pergunta) => { const t = new Set(palavrasDuvida(pergunta).map(raizDuvida)); return new Set(palavrasDuvida(texto).map(raizDuvida).filter((p) => t.has(p))).size; };
-// as palavras da pergunta em negrito no trecho
+// as palavras da pergunta em negrito no trecho; as palavras longas ganham os pontos onde podem quebrar com hífen
+// (o texto é justificado: sem isso, abria buracos entre as palavras)
 const realcar = (texto, pergunta) => {
   const termos = new Set(palavrasDuvida(pergunta).map(raizDuvida));
-  return esc(texto).replace(/[\p{L}\d]+/gu, (p) => (termos.has(raizDuvida(palavrasDuvida(p)[0] || '')) ? `<b>${p}</b>` : p));
+  return esc(texto).replace(/[\p{L}\d]+/gu, (p) => (termos.has(raizDuvida(palavrasDuvida(p)[0] || '')) ? `<b>${hifenizar(p)}</b>` : hifenizar(p)));
 };
 // a resposta em texto (para copiar)
 const textoDaResposta = (m) => [
@@ -8187,7 +8188,11 @@ function viewDuvidas() {
       <div class="dv-hero"><span class="dv-avatar grande">${icon('sparkles', 30)}</span></div>
       <h2>Olá, eu sou o Lumen</h2>
       <p class="dv-lema">Como posso ajudar o seu ministério hoje?</p>
-      <p>Pergunte sobre a missa, os tempos litúrgicos ou que canto escolher${ReconhecerVoz ? ' — digitando ou <b>falando</b>, pelo microfone' : ''}. Procuro primeiro no <b>acervo litúrgico</b> e depois na internet.</p>
+      <ul class="dv-recursos">
+        <li><span class="dv-ico">${icon('library', 18)}</span><span><b>Acervo litúrgico</b><small>Procuro primeiro nos documentos e cantos do acervo</small></span></li>
+        <li><span class="dv-ico">${icon('search', 18)}</span><span><b>Sites católicos</b><small>Depois na internet, com o ícone e o link de cada fonte</small></span></li>
+        ${ReconhecerVoz ? `<li><span class="dv-ico">${icon('mic', 18)}</span><span><b>Por voz</b><small>Pergunte pelo microfone ou converse comigo ao vivo</small></span></li>` : ''}
+      </ul>
       ${ReconhecerVoz ? `<button type="button" class="dv-vivo-entrar" data-vivo>${icon('som', 18)}<span><b>Conversar ao vivo</b><small>Fale e ouça a resposta, sem tocar na tela</small></span></button>` : ''}
       <div class="chat-sugestoes">${SUGESTOES_DUVIDAS.map(([ic, q]) => `<button type="button" class="chat-sugestao" data-q="${esc(q)}"><span class="dv-ico">${icon(ic, 18)}</span><span>${esc(q)}</span></button>`).join('')}</div></div>`;
   const google = (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
@@ -8212,8 +8217,10 @@ function viewDuvidas() {
       }
     }
     // a internet: o resumo do site que mais responde, com o link; os outros sites (e a Wikipédia) embaixo, como links
-    const link = (w, nome) => `<a class="dv-fonte" href="${esc(w.url)}" target="_blank" rel="noopener">${icon('external', 14)}<span><b>${esc(w.titulo)}</b><small>${esc(nome)}</small></span></a>`;
-    const sites = [...(m.web || []).map((w) => ({ ...w, nome: nomeDoSite(w) })), ...(m.wiki ? [{ ...m.wiki, nome: 'Wikipédia' }] : [])];
+    // o ícone do próprio site (o do DuckDuckGo, que guarda o de cada site); sem ele, o ícone de link
+    const favicon = (site) => `<span class="dv-favicon"><img src="https://external-content.duckduckgo.com/ip3/${encodeURIComponent(site)}.ico" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('sem')">${icon('external', 14)}</span>`;
+    const link = (w, nome) => `<a class="dv-fonte" href="${esc(w.url)}" target="_blank" rel="noopener">${favicon(w.site)}<span><b>${esc(w.titulo)}</b><small>${esc(nome)}</small></span></a>`;
+    const sites = [...(m.web || []).map((w) => ({ ...w, nome: nomeDoSite(w) })), ...(m.wiki ? [{ ...m.wiki, site: 'pt.wikipedia.org', nome: 'Wikipédia' }] : [])];
     if (sites.length) {
       const [melhor, ...mais] = sites;
       partes.push(`${primeiro || m.cantos?.length ? '<h4 class="dv-sub">Na internet</h4>' : '<p class="dv-aviso">Não achei nos arquivos do acervo. Achei isto na internet:</p>'}

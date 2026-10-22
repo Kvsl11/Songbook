@@ -180,3 +180,41 @@ export async function buscarNaWeb(pergunta, { fetch: buscar = fetch, quantos = 3
       .map(({ titulo, url, site, texto }) => ({ titulo, url, site, frases: [texto.replace(/\s*\.\.\.$/, '…')] }));
   } finally { clearTimeout(t); }
 }
+
+// Onde a palavra pode quebrar no fim da linha (com hífen), pelas regras de divisão silábica do português: assim o
+// texto justificado não abre buracos entre as palavras em aparelhos sem hifenização própria. Devolve a palavra com
+// hifens invisíveis (U+00AD), que só aparecem quando a linha quebra ali. Regras: a consoante sozinha entre vogais
+// vai para a sílaba seguinte (ca-sa); ch, lh, nh, qu, gu e consoante + l/r (br, cl, pr…) não se separam (fi-lho,
+// li-vro); as outras consoantes juntas se separam (car-ro, mis-sa, ad-ven-to). Vogais juntas ficam juntas (sem
+// tratar os hiatos: na dúvida, não quebra).
+const VOGAL = /[aeiouáéíóúâêôãõàü]/i;
+const LR = /^[bcdfgkptv][lr]$/i;
+const DIGRAFO = /^([cln]h|[qg]u)$/i;
+export function hifenizar(palavra, { minimo = 6 } = {}) {
+  const p = String(palavra);
+  if (p.length < minimo || !/^[\p{L}]+$/u.test(p)) return p;
+  // o "u" de qu/gu antes de vogal faz parte da consoante (que-ro, guer-ra)
+  const vog = [...p].map((c, i) => VOGAL.test(c) && !(/u/i.test(c) && /[qg]/i.test(p[i - 1] || '') && VOGAL.test(p[i + 1] || '')));
+  const cortes = [];
+  let i = 0;
+  while (i < p.length && !vog[i]) i++; // consoantes do começo ficam com a 1ª sílaba
+  while (i < p.length) {
+    while (i < p.length && vog[i]) i++; // o grupo de vogais
+    let j = i;
+    while (j < p.length && !vog[j]) j++; // as consoantes até a próxima vogal
+    if (j >= p.length) break; // consoantes do fim ficam com a última sílaba
+    const n = j - i;
+    if (n === 1) cortes.push(i);
+    else if (n >= 2) {
+      const fim = p.slice(j - 2, j);
+      cortes.push(LR.test(fim) || DIGRAFO.test(fim) ? j - 2 : j - 1);
+    }
+    i = j;
+  }
+  // nem sílaba de uma letra sozinha no começo, nem menos de 3 letras indo para a outra linha
+  const bons = cortes.filter((c) => c >= 2 && p.length - c >= 3);
+  let out = '';
+  let ini = 0;
+  for (const c of bons) { out += `${p.slice(ini, c)}­`; ini = c; }
+  return out + p.slice(ini);
+}
