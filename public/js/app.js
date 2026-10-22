@@ -18,7 +18,7 @@ import { corCss, corDominante } from './lib/cores.js';
 import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
 import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } from './lib/alinhamento.js';
 import { duracaoDoAviso, partesDoAviso, tipoDoAviso } from './lib/avisos.js';
-import { baseDoServidor, casarLinhas, chamar, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
+import { baseDoServidor, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWikipedia, criarIndice as criarIndiceDuvidas, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
@@ -27,6 +27,10 @@ const $ = (sel, el = document) => el.querySelector(sel);
 // celular: a tela fica em pé (tablet e computador giram à vontade). O navegador só deixa travar no app instalado
 // (tela inicial) e em tela cheia; a trava é pedida de novo sempre que o app volta para a frente ou a tela gira
 const ehCelular = () => Math.min(screen.width, screen.height) < 600 && matchMedia('(pointer: coarse)').matches;
+// tablet (tela de toque de 600 px ou mais no lado menor): como o Spotify no tablet, sem menu lateral, com o menu
+// flutuando embaixo e o "Tocando agora" (vídeo, controles e a letra) num painel à direita, em pé e deitado
+const ehTablet = () => Math.min(screen.width, screen.height) >= 600 && matchMedia('(pointer: coarse)').matches;
+document.documentElement.classList.toggle('tablet', ehTablet());
 const travarEmPe = () => {
   if (!ehCelular()) return;
   // o vídeo em tela cheia pode deitar (assistir de lado); o resto do app, não
@@ -81,7 +85,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-192';
+export const APP_VERSAO = '2026.10.22-193';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -639,14 +643,22 @@ const player = (() => {
     <div class="pl-lado">
       <button class="icon-btn" data-pl="ampliar" aria-label="Ampliar o vídeo" title="Ampliar o vídeo">${icon('expand', 18)}</button>
       <button class="icon-btn" data-pl="fechar" aria-label="Fechar o player" title="Fechar">${icon('x', 18)}</button>
-    </div>`;
-  $('.main-col').append(el);
+    </div>
+    <div class="pl-cab"><button class="icon-btn" data-pl="recolher" aria-label="Recolher o painel" title="Recolher">${icon('sidebar', 20)}</button>
+      <span><small>Tocando agora</small><b></b></span>
+      <button class="icon-btn" data-pl="cheio" aria-label="Tela inteira" title="Tela inteira">${icon('expand', 18)}</button></div>
+    <button class="icon-btn pl-abrir-painel" data-pl="recolher" aria-label="Abrir o painel Tocando agora" title="Abrir o painel">${icon('sidebar', 18)}</button>
+    <section class="pl-letra" hidden><div class="pl-letra-cab"><h3>Letra</h3><button class="icon-btn" data-pl="cheio" aria-label="Letra em tela inteira" title="Tela inteira">${icon('expand', 16)}</button></div><div class="pl-linhas"></div></section>`;
+  // no tablet o player é o painel "Tocando agora" à direita, fora da coluna principal (que não o corta)
+  const casa = ehTablet() ? document.body : $('.main-col');
+  document.body.classList.toggle('painel-recolhido', Boolean(db.prefs().painelRecolhido));
+  casa.append(el);
   // O vídeo é UM só e nunca é recriado (recriar pausa e repete o anúncio): ele fica numa "tela"
   // solta e só muda de lugar, acompanhando a telinha da página da música ou o espaço do mini player.
   const tela = document.createElement('div');
   tela.id = 'pl-tela';
   tela.hidden = true;
-  $('.main-col').append(tela);
+  casa.append(tela);
   const mini = $('.pl-video', el); // espaço reservado no mini player
   // a música tocando é esta?
   const desta = (id) => Boolean(atual && id && atual.youtube === id);
@@ -716,7 +728,41 @@ const player = (() => {
     desenharModos();
     $('.pl-t0', el).textContent = duracao ? fmt(tempo) : '';
     $('.pl-t1', el).textContent = duracao ? fmt(duracao) : '';
+    $('.pl-cab b', el).textContent = atual.setId ? db.set(atual.setId)?.name || '' : atual.parte || '';
+    desenharLetra();
   };
+  // a letra da música tocando, no painel do tablet: na ordem em que se canta; com a letra sincronizada, a linha
+  // cantada acende e o painel rola junto (tocar numa linha leva o vídeo para ela)
+  let letraDe = '';
+  let tempos = null;
+  const desenharLetra = () => {
+    if (!document.documentElement.classList.contains('tablet')) return;
+    const song = atual?.songId && db.song(atual.songId);
+    const chave = `${atual?.youtube}|${song?.sincronia?.tempos?.length || 0}|${song?.content?.length || 0}`;
+    if (chave === letraDe) return;
+    letraDe = chave;
+    const sinc = song?.sincronia?.video === atual?.youtube ? song.sincronia : null;
+    const linhas = sinc ? sinc.linhas : song ? linhasCantadas(song.content).map(linhaSemCifra).filter(Boolean) : [];
+    tempos = sinc?.tempos || null;
+    $('.pl-letra', el).hidden = !linhas.length;
+    $('.pl-letra', el).classList.toggle('sincronizada', Boolean(tempos));
+    $('.pl-linhas', el).innerHTML = linhas.map((l, k) => `<p data-k="${k}">${esc(l)}</p>`).join('');
+  };
+  let linhaAcesa = -1;
+  setInterval(() => {
+    if (!tempos || !atual || el.hidden) return;
+    const k = linhaNoTempo(tempos, api.tempoAgora);
+    if (k === linhaAcesa) return;
+    linhaAcesa = k;
+    const caixa = $('.pl-linhas', el);
+    caixa.querySelectorAll('p').forEach((p, i) => { p.classList.toggle('agora', i === k); p.classList.toggle('cantada', i < k); });
+    const p = caixa.querySelector(`p[data-k="${k}"]`);
+    if (p) caixa.scrollTo({ top: p.offsetTop - caixa.clientHeight / 3, behavior: 'smooth' });
+  }, 250);
+  el.addEventListener('click', (e) => {
+    const p = e.target.closest('.pl-linhas p');
+    if (p && tempos?.[p.dataset.k]) api.irPara(Math.max(0, tempos[p.dataset.k].inicio - 0.3));
+  });
   // cria o vídeo (só quando muda de vídeo)
   const montar = () => {
     tela.innerHTML = `<iframe src="${esc(ytEmbed(atual.youtube))}" title="${esc(atual.titulo || 'Vídeo')}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
@@ -942,7 +988,13 @@ const player = (() => {
     }
     // voltar, como no Spotify: depois dos 3 primeiros segundos volta ao começo da música; antes, vai para a anterior
     if (b.dataset.pl === 'anterior') { if (tempo > 3 || anteriorIndice() < 0) api.irPara(0); else pular(-1); }
-    if (b.dataset.pl === 'fechar') api.fechar();
+    if (b.dataset.pl === 'fechar') { document.body.classList.remove('painel-cheio'); api.fechar(); }
+    // tablet: recolher o painel (vira uma barrinha acima do menu) ou abrir de novo; tela inteira e voltar
+    if (b.dataset.pl === 'recolher') { document.body.classList.toggle('painel-recolhido'); document.body.classList.remove('painel-cheio'); db.setPref('painelRecolhido', document.body.classList.contains('painel-recolhido')); }
+    if (b.dataset.pl === 'cheio') {
+      const cheio = document.body.classList.toggle('painel-cheio');
+      el.querySelectorAll('[data-pl="cheio"]').forEach((x) => { x.innerHTML = icon(cheio ? 'shrink' : 'expand', 18); });
+    }
     if (b.dataset.pl === 'trocar') {
       const s = db.song(atual?.songId);
       if (s) escolherVideo(s).then((url) => { if (!url) return; db.saveSong({ ...db.song(s.id), content: definirMeta(db.song(s.id).content, 'youtube', url) }); api.tocar({ ...atual, youtube: youtubeId(url) }); route(); });
@@ -4755,35 +4807,55 @@ async function gerarComIA(song, titulo) {
   // com o servidor da IA, o áudio vai inteiro para ele (a voz separada da banda, mais fiel) e as notas voltam prontas;
   // se ele não responde, o arquivo é lido aqui mesmo, no aparelho
   const lerArquivo = (arquivo) => (servidorIA().url ? lerNoServidor({ arquivo }) : lerNoAparelho(arquivo));
+  // com o servidor: uma tela por etapas, com o andamento que o servidor manda (baixar, separar a voz, ouvir as
+  // notas, conferir a afinação, escrever), cada uma marcada quando termina
+  const ETAPAS_IA = [
+    ['baixando', 'Baixando o áudio do vídeo', 'youtube'],
+    ['enviando', 'Enviando o áudio', 'upload'],
+    ['separando', 'Separando a voz dos instrumentos', 'mic'],
+    ['notas', 'Ouvindo as notas', 'music'],
+    ['afinacao', 'Conferindo a afinação da voz', 'chord'],
+    ['escrevendo', 'Escrevendo a partitura', 'score'],
+  ];
+  function telaEtapas(lista) {
+    passo.onclick = null;
+    passo.innerHTML = `<div class="ia-etapas">
+      <div class="ia-etapas-cab"><span class="ia-pulso"></span><div><b>Gerando a partitura</b><small id="ia-etapa-tempo">pode levar alguns minutos</small></div></div>
+      <ol>${lista.map(([id, nome, ic]) => `<li data-etapa="${id}"><span class="ia-etapa-ic">${icon(ic, 18)}</span><span class="ia-etapa-nome">${nome}</span><span class="ia-etapa-st"></span></li>`).join('')}</ol>
+      <div class="row ia-fim"><button class="btn ghost" id="ia-cancelar">${icon('x', 16)} Cancelar</button></div></div>`;
+  }
+  function marcarEtapa(id) {
+    const itens = [...passo.querySelectorAll('.ia-etapas li')];
+    const k = itens.findIndex((li) => li.dataset.etapa === id);
+    if (k < 0) return;
+    itens.forEach((li, i) => { li.classList.toggle('feita', i < k); li.classList.toggle('agora', i === k); });
+  }
   async function lerNoServidor({ arquivo, url }) {
-    telaLeitura();
+    // a etapa de afinação só existe com a voz separada; ela aparece se o servidor avisar
+    telaEtapas(ETAPAS_IA.filter(([id]) => id !== (arquivo ? 'baixando' : 'enviando')));
+    marcarEtapa(arquivo ? 'enviando' : 'baixando');
     const ctrl = new AbortController();
     $('#ia-cancelar').onclick = () => { ctrl.abort(); telaFontes(); };
-    const leitor = { notas: [], analisados: 0, segundos: 0 };
     const t0 = Date.now();
-    const andando = setInterval(() => {
-      const seg = (Date.now() - t0) / 1000;
-      const texto = seg < 6 ? (url ? 'Baixando o áudio do vídeo' : 'Enviando o áudio') : 'Separando a voz e ouvindo nota por nota';
-      // sem saber quanto falta, a barra anda rápido no começo e cada vez mais devagar
-      animar(leitor, { nivel: 0.5, ouvindo: true, texto, pct: Math.min(95, Math.round(100 * (1 - Math.exp(-seg / 70)))) });
-    }, 200);
+    const relogio = setInterval(() => { const t = $('#ia-etapa-tempo'); if (t) t.textContent = `${fmtSeg((Date.now() - t0) / 1000)} · pode levar alguns minutos`; }, 1000);
     try {
       const form = arquivo ? new FormData() : null;
       if (form) { form.append('arquivo', arquivo, arquivo.name || 'audio'); form.append('separar', 'true'); }
-      const r = await chamar(servidorIA(), arquivo ? '/transcrever' : '/youtube', arquivo ? { form, sinal: ctrl.signal } : { json: { url }, sinal: ctrl.signal });
-      clearInterval(andando);
+      const r = await chamarComEtapas(servidorIA(), arquivo ? '/transcrever' : '/youtube', arquivo ? { form, sinal: ctrl.signal } : { json: { url }, sinal: ctrl.signal }, marcarEtapa);
+      clearInterval(relogio);
       if (!view.contains(passo)) return;
+      passo.querySelectorAll('.ia-etapas li').forEach((li) => { li.classList.remove('agora'); li.classList.add('feita'); });
       if (r.cortado) toast('Usei só os primeiros 6 minutos');
       notas = r.notas || [];
       if (!notas.length) { telaFontes('A IA não encontrou notas neste áudio. Tente de novo ou use outro arquivo de áudio da música.'); return; }
       resultado();
     } catch (e) {
-      clearInterval(andando);
+      clearInterval(relogio);
       if (ctrl.signal.aborted || !view.contains(passo)) return;
       console.error(e);
       // servidor fora do ar: o arquivo ainda dá para ler no aparelho; o link do YouTube, não
       if (arquivo && !e.status) { toast('Servidor da IA fora do ar: lendo no aparelho'); lerNoAparelho(arquivo); return; }
-      telaFontes(e.message || FALHOU_IA);
+      telaFontes(erroExplicado(e));
     }
   }
   async function lerNoAparelho(arquivo) {
@@ -5642,13 +5714,14 @@ function viewSong(id, ctx = {}) {
     if (!sozinho) toast('Sincronizando a letra com o vídeo… (leva uns minutos)');
     tentouSincronizar.add(song.youtube);
     try {
-      const r = await chamar(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: cantadas } });
+      const NOMES = { baixando: 'baixando o áudio do vídeo', separando: 'separando a voz', ouvindo: 'ouvindo a letra', alinhando: 'acertando as linhas' };
+      const r = await chamarComEtapas(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: cantadas } }, (et) => { if (!sozinho && NOMES[et]) toast(`Sincronizando a letra: ${NOMES[et]}…`); });
       const sinc = { video: song.youtube, linhas: cantadas, tempos: r.linhas.map((x) => ({ inicio: x.inicio, fim: x.fim })) };
       song.sincronia = sinc;
       mapa = null;
       if (isPreview) preview.sincronia = sinc; else db.updateSong(song.id, { sincronia: sinc });
       toast(sozinho ? 'Letra sincronizada com o vídeo: dê play e ela acompanha' : `Letra sincronizada: ${r.achadas} de ${r.total} linhas ouvidas no vídeo. Toque numa linha para ir até ela`);
-    } catch (e) { if (!sozinho) toast(e.message); }
+    } catch (e) { if (!sozinho) toast(e.status === 403 ? 'O YouTube bloqueou o download do áudio pelo servidor (ele pede login): a letra não deu para sincronizar agora' : erroExplicado(e)); }
   };
   $('#btn-sincronizar')?.addEventListener('click', () => { $('#menu-mais').hidden = true; sincronizarLetra(); });
   // a música com vídeo e sem letra sincronizada: sincroniza sozinha, em segundo plano (uma tentativa por vídeo a cada
