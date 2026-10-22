@@ -90,7 +90,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-208';
+export const APP_VERSAO = '2026.10.22-209';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -2176,10 +2176,44 @@ function pessoasDosCreditos({ artista = '', titulo = '', compositor = '', letris
 }
 // a foto de um artista pelo nome (a do Cifra Club); guardada na sessão, para não buscar de novo a cada música
 const fotosArtistas = new Map();
+// (primeiro o Cifra Club; se não tiver, o Deezer, que tem a foto de quase todo artista; por fim a Wikipédia)
 function fotoDoArtista(nome) {
   const k = normalizar(nome);
-  if (!fotosArtistas.has(k)) fotosArtistas.set(k, buscarArtistasCifraClub(nome).then((l) => artistaCerto(l, nome)?.capa || '').catch(() => ''));
+  if (!fotosArtistas.has(k)) {
+    const cifraClub = () => buscarArtistasCifraClub(nome).then((l) => artistaCerto(l, nome)?.capa || '').catch(() => '');
+    fotosArtistas.set(k, cifraClub().then((f) => f || fotoDeezer(nome)).then((f) => f || fotoWikipedia(nome)));
+  }
   return fotosArtistas.get(k);
+}
+// o Deezer não libera a leitura direta (CORS), mas responde em JSONP: um <script> com a resposta
+let jsonpN = 0;
+function jsonp(url, tempo = 8000) {
+  return new Promise((ok) => {
+    const cb = `__jsonp${++jsonpN}`;
+    const tag = document.createElement('script');
+    const fim = (v) => { clearTimeout(t); delete window[cb]; tag.remove(); ok(v); };
+    const t = setTimeout(() => fim(null), tempo);
+    window[cb] = fim;
+    tag.onerror = () => fim(null);
+    tag.src = `${url}${url.includes('?') ? '&' : '?'}output=jsonp&callback=${cb}`;
+    document.head.append(tag);
+  });
+}
+async function fotoDeezer(nome) {
+  const r = await jsonp(`https://api.deezer.com/search/artist?q=${encodeURIComponent(nome)}&limit=5`);
+  const a = (r?.data || []).find((x) => mesmoNome(x.name, nome));
+  // sem foto, o Deezer devolve uma imagem genérica (o endereço fica com "/artist//")
+  return a?.picture_medium && !/\/artist\/\//.test(a.picture_medium) ? a.picture_big || a.picture_medium : '';
+}
+async function fotoWikipedia(nome) {
+  for (const lingua of ['pt', 'en']) {
+    try {
+      const r = await fetch(`https://${lingua}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(nome)}&redirects=1&prop=pageimages&piprop=thumbnail&pithumbsize=300&format=json&origin=*`).then((x) => x.json());
+      const pg = Object.values(r?.query?.pages || {})[0];
+      if (pg?.thumbnail?.source) return pg.thumbnail.source;
+    } catch { /* sem internet ou sem página */ }
+  }
+  return '';
 }
 
 // ---- salvar na biblioteca (como o "curtir" do Spotify): círculo com +; salva, fica preenchido na cor de destaque
