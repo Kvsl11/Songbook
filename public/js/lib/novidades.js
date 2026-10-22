@@ -3,6 +3,13 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 227, data: '2026-10-22', titulo: 'Lumen traz a liturgia do dia, só a parte que você pediu',
+    itens: [
+      { tipo: 'novo', texto: 'Peça ao Lumen “o salmo de hoje”, “o evangelho de domingo”, “a segunda leitura de amanhã” ou “a coleta de hoje”: ele traz só aquela parte, da mesma liturgia do app (CNBB e Pocket Terço), com a referência, o refrão do salmo destacado e o atalho para a Liturgia. Na conversa ao vivo, ele lê a parte em voz alta.' },
+      { tipo: 'melhoria', texto: 'Nas dúvidas, a busca na internet procura primeiro nos sites da CNBB e do Pocket Terço; só se eles não responderem, procura nos outros sites.' },
+    ],
+  },
+  {
     versao: 226, data: '2026-10-22', titulo: 'Sugestões do Lumen inteiras',
     itens: [
       { tipo: 'correcao', texto: 'No celular, as sugestões de perguntas do Lumen ficavam cortadas na borda da tela. Agora aparecem inteiras, em duas colunas, com nomes curtos (tocar ainda faz a pergunta completa).' },
