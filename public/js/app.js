@@ -5666,9 +5666,6 @@ function viewSong(id, ctx = {}) {
         <div class="seg so-cifra" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
         <div class="seg"><button data-act="f-" aria-label="Diminuir letra" title="Diminuir letra">A−</button><button data-act="f+" aria-label="Aumentar letra" title="Aumentar letra">A+</button></div>
         <div class="seg"><button data-act="scroll" aria-pressed="false" aria-label="Rolagem automática" title="Rolagem automática (ajuste a velocidade na barra)" id="btn-scroll">${icon('gauge', 18)}</button></div>
-        ${song.youtube ? (song.sincronia?.video === song.youtube
-          ? `<div class="seg"><button data-act="ressinc" aria-label="Sincronizar a letra de novo" title="Letra sincronizada errada (pulando partes)? Sincronizar de novo, com mais precisão">${icon('refresh', 17)}</button></div>`
-          : `<div class="seg"><button data-act="ressinc" aria-label="Sincronizar a letra com o vídeo" title="Sincronizar a letra com o vídeo: ao dar play, ela acompanha">${icon('sparkles', 17)}</button></div>`) : ''}
         <div class="seg so-largo"><button data-act="cols" aria-pressed="${prefs.columns !== false}" title="Letra em duas colunas (telas largas)" aria-label="Duas colunas">${icon('columns', 17)}</button></div>
       </div>
     </div>
@@ -5806,17 +5803,14 @@ function viewSong(id, ctx = {}) {
   };
 
   // estrofes sem acordes: o app repete sozinho a sequência da estrofe cifrada nelas (sem precisar tocar em nada),
-  // guarda e avisa
+  // guarda e avisa uma vez, num toast (o aviso fixo acima da letra só ocupava espaço)
   const avisoCifra = () => {
     const box = $('#aviso-cifra');
     if (!box) return;
-    const meta = renderSong(song.content).meta;
     const faltam = !semCifra && completarCifra(song.content).completadas;
     if (semCifra) {
       box.innerHTML = '';
       trazerCifraSozinho();
-    } else if (meta.x_cifra_completada) {
-      box.innerHTML = `<div class="aviso">${icon('sparkles', 18)}<span>A cifra original só tinha acordes em parte da música. Repeti a mesma sequência nas outras estrofes${song.youtube ? ' — confira ouvindo o vídeo' : ''}.</span></div>`;
     } else if (faltam) {
       const r = completarCifra(song.content);
       song.content = r.texto.replace(/(\n\n)/, `\n{x_cifra_completada: ${r.completadas}}$1`);
@@ -6124,7 +6118,7 @@ function viewSong(id, ctx = {}) {
   // pelo menu ⋯: a música já sincronizada sincroniza de novo com mais precisão (a guardada não volta)
   $('#btn-sincronizar')?.addEventListener('click', () => { $('#menu-mais').hidden = true; sincronizarLetra({ refazer: Boolean(sincronia()) }); });
   // a letra não sincroniza mais sozinha ao abrir a música: só abrir (e navegar entre as músicas) ligava o servidor
-  // várias vezes e acabava com o crédito grátis do Modal. Sincroniza pelo botão ✦ da barra (ou pelo menu ⋯), uma vez;
+  // várias vezes e acabava com o crédito grátis do Modal. Sincroniza pelo menu ⋯, uma vez;
   // depois fica guardada na música
   // música vinda da busca sem vídeo: procura no YouTube sozinho e já vincula (se não achar, o aviso diz)
   if (isPreview && !song.youtube && !String(song.source || '').startsWith('cnbb:') && !preview.semVideo && !preview.videoProcurado) {
@@ -6259,10 +6253,6 @@ function viewSong(id, ctx = {}) {
       }
       case 'scroll':
         if (scrollTimer) { stopScroll(); setScrollBtn(false); } else { setScrollBtn(true); tick(); }
-        return;
-      case 'ressinc':
-        sincronizarLetra({ refazer: Boolean(sincronia()) });
-        $('#sinc-status')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
     }
     draw();
