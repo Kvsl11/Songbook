@@ -18,10 +18,35 @@ import { corCss, corDominante } from './lib/cores.js';
 import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
 import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } from './lib/alinhamento.js';
 import { duracaoDoAviso, partesDoAviso, tipoDoAviso } from './lib/avisos.js';
+import { baseDoServidor, casarLinhas, chamar, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
+// celular: a tela fica em pé (tablet e computador giram à vontade). A trava vale no app instalado e em tela cheia;
+// no navegador comum, que não deixa travar, um aviso pede para virar o celular (html.celular, no CSS)
+const ehCelular = () => Math.min(screen.width, screen.height) < 600 && matchMedia('(pointer: coarse)').matches;
+const travarEmPe = () => {
+  if (!ehCelular()) return;
+  // o vídeo em tela cheia pode deitar (assistir de lado); o resto do app, não
+  if (/^(IFRAME|VIDEO)$/.test(document.fullscreenElement?.tagName || '')) screen.orientation?.unlock?.();
+  else screen.orientation?.lock?.('portrait').catch(() => {});
+};
+document.documentElement.classList.toggle('celular', ehCelular());
+travarEmPe();
+document.addEventListener('fullscreenchange', travarEmPe);
+// o servidor da IA vem junto com o app: a publicação grava o endereço em data/servidor-ia.json (sem ele, a partitura
+// é gerada no aparelho e as telas que precisam do servidor não aparecem). Quem usa não configura nada
+let SERVIDOR_IA = { url: '', chave: '' };
+const servidorIA = () => SERVIDOR_IA;
+fetch(new URL('data/servidor-ia.json', document.baseURI)).then((r) => (r.ok ? r.json() : null)).then((d) => {
+  if (!d?.url) return;
+  SERVIDOR_IA = { url: baseDoServidor(d.url), chave: d.chave || '' };
+  // a tela que já abriu sem saber do servidor é desenhada de novo
+  if (/^#\/(duvidas|musica\/[^/]+\/compor\/ia)/.test(location.hash)) route();
+  // o servidor gratuito dorme quando ninguém usa: um "bom dia" já o acorda para quando precisar
+  fetch(SERVIDOR_IA.url + '/saude').catch(() => {});
+}).catch(() => {});
 const view = $('#view');
 const titleEl = $('#title');
 const eyebrowEl = $('#eyebrow');
@@ -53,7 +78,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.21-185';
+export const APP_VERSAO = '2026.10.22-190';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -486,6 +511,14 @@ function ytEmbed(id, { inicio = 0, autoplay = true } = {}) {
   return `https://www.youtube.com/embed/${encodeURIComponent(id)}?${p}`;
 }
 
+// nome e canal de um vídeo do YouTube (para o cartão das Referências): pergunta uma vez e guarda enquanto
+// o app está aberto; sem internet devolve null (e pergunta de novo da próxima vez)
+const infosDeVideo = new Map();
+function infoDoVideo(id) {
+  if (!infosDeVideo.has(id)) infosDeVideo.set(id, youtubeOEmbed(`https://www.youtube.com/watch?v=${id}`).catch(() => { infosDeVideo.delete(id); return null; }));
+  return infosDeVideo.get(id);
+}
+
 // "Canvas" (como no Spotify) sem tocar o vídeo: quadros de verdade do clipe, que o YouTube publica como
 // imagens (de vários pontos do vídeo), passando com zoom lento e troca suave. Sem anúncio, sem botões
 // do player e com poucos dados. 'hd' = quadros em alta (nem todo vídeo tem); 'sd' = 640x480, com
@@ -616,41 +649,24 @@ const player = (() => {
   const desta = (id) => Boolean(atual && id && atual.youtube === id);
   const noPalco = () => Boolean(atual && palco?.isConnected && desta(palcoDe));
   const iframeAtual = () => tela.querySelector('iframe');
-  // Na página da música o vídeo toca no topo (como o Canvas do Spotify): enquanto carrega e passa o
-  // anúncio fica na frente (dá para pular o anúncio); quando o clipe começa, vai para trás do título.
-  // Nas Referências dá para escolher assistir com os controles do YouTube, na telinha.
-  let fundo = null; // topo da música (área do vídeo de fundo)
-  let verAqui = false; // o usuário pediu para ver na telinha
-  let modoAnterior = '';
+  // Na página da música o vídeo toca na telinha das Referências, com os controles do YouTube (dá para pular
+  // o anúncio). O topo da música não toca o vídeo: continua só com os quadros do clipe passando.
+  // Quando o vídeo sai da telinha (outra música tocando, player fechado), ela volta a mostrar a miniatura
+  // com o botão de tocar, como a página desenhou.
+  let telinhaParada = ''; // o que a telinha mostra sem o vídeo
+  let naTelinha = false;
+  const telinha = (comVideo) => {
+    if (comVideo === naTelinha || !palco?.isConnected) return;
+    naTelinha = comVideo;
+    palco.innerHTML = comVideo ? '<div class="video-embed pl-alvo"></div>' : telinhaParada;
+  };
   const alvo = () => {
     if (!atual) return null;
     if (noPalco()) {
-      const topo = fundo?.isConnected && !verAqui;
-      const modo = !topo ? 'telinha' : estado === 'tocando' && tempo <= 1.5 ? 'frente' : 'fundo';
-      if (modo !== modoAnterior) {
-        const mudouLugar = (modo === 'telinha') !== (modoAnterior === 'telinha') || !modoAnterior;
-        modoAnterior = modo;
-        fundo?.closest('.song-topo')?.classList.toggle('com-video', modo !== 'telinha');
-        if (mudouLugar) {
-          palco.innerHTML = modo === 'telinha' ? '<div class="video-embed pl-alvo"></div>'
-            : `<button class="video-card" data-ver-aqui aria-label="Assistir aqui"><img src="https://i.ytimg.com/vi/${esc(atual.youtube)}/hqdefault.jpg" alt="" loading="lazy">
-              <span class="vplay"><span>${icon('expand', 24)}</span></span><span class="vtitle">O vídeo está tocando no topo<small>Toque para assistir aqui, com os controles</small></span></button>`;
-          palco.querySelector('[data-ver-aqui]')?.addEventListener('click', () => { verAqui = true; });
-        }
-      }
-      tela.classList.toggle('na-frente', modo === 'frente');
-      if (modo === 'frente') {
-        // na frente (anúncio/começo), o vídeo cobre o topo só até acima dos botões: eles continuam à vista
-        const topoEl = fundo.closest('.song-topo');
-        let frente = topoEl?.querySelector('.canvas-frente');
-        if (topoEl && !frente) { topoEl.insertAdjacentHTML('afterbegin', '<div class="canvas-frente" aria-hidden="true"></div>'); frente = topoEl.querySelector('.canvas-frente'); }
-        const botoes = topoEl?.querySelector('.actions-row');
-        if (frente && botoes) frente.style.bottom = `${Math.max(0, topoEl.getBoundingClientRect().bottom - botoes.getBoundingClientRect().top + 6)}px`;
-        return frente || fundo;
-      }
-      return modo === 'telinha' ? palco.querySelector('.pl-alvo') : fundo;
+      telinha(true);
+      return palco.querySelector('.pl-alvo');
     }
-    modoAnterior = '';
+    telinha(false);
     return el.hidden ? null : mini;
   };
   // acompanha o lugar do vídeo a cada quadro (rolagem, troca de tela, ampliar)
@@ -666,7 +682,6 @@ const player = (() => {
     tela.style.width = r.width + 'px';
     tela.style.height = r.height + 'px';
     tela.classList.toggle('no-palco', noPalco());
-    tela.classList.toggle('no-fundo', a === fundo && !tela.classList.contains('na-frente'));
   };
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
   const avisar = () => ouvintes.forEach((fn) => fn());
@@ -753,16 +768,16 @@ const player = (() => {
       avisar();
     },
     // a página da música avisa onde fica a telinha do vídeo dela (box) — ou null ao sair da página
-    palco(box, youtube = '', topo = null) {
+    palco(box, youtube = '') {
       palco = box;
       palcoDe = box ? youtube : '';
-      fundo = topo;
-      verAqui = false;
-      modoAnterior = '';
+      telinhaParada = box ? box.innerHTML : '';
+      naTelinha = false;
       mostrarBarra();
       return noPalco();
     },
     fechar() {
+      telinha(false); // a telinha da página volta a mostrar a miniatura
       if ('mediaSession' in navigator) { navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none'; }
       sessaoDe = '';
       tela.innerHTML = '';
@@ -1669,6 +1684,7 @@ function viewHome() {
   setTab('inicio');
   setTint('#1e3264');
   setHeader('Início', { actions: [
+    { icon: 'sparkles', label: 'Tirar dúvidas', href: '#/duvidas' },
     { icon: 'upload', label: 'Importar arquivos', onClick: openImport },
     { icon: 'settings', label: 'Ajustes', href: '#/ajustes' },
   ] });
@@ -4618,7 +4634,13 @@ async function gerarComIA(song, titulo) {
       <button class="ia-solte" id="ia-arquivo"><span class="ia-solte-ic">${icon('upload', 28)}</span>
         <b>Escolher o áudio da música</b><small>MP3, M4A, WAV, OGG… até 6 minutos. Fica melhor com voz e violão do que com banda completa.</small>
         <span class="btn primary">${icon('upload', 16)} Escolher arquivo</span></button>
+      ${servidorIA().url ? `<form class="ia-yt" id="ia-yt"><span class="ia-yt-ic">${icon('youtube', 22)}</span>
+        <div class="ia-yt-txt"><b>Ou cole o link do YouTube</b><small>O servidor baixa só o áudio, gera a partitura e apaga o áudio.</small></div>
+        <div class="ia-yt-campo"><input class="input" name="url" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${song.youtube ? `https://youtu.be/${esc(song.youtube)}` : ''}" required>
+          <button class="btn primary" type="submit">${icon('sparkles', 16)} Gerar</button></div></form>
+        <p class="ia-dica-compartilhar">${icon('sparkles', 16)}<span>Pelo <b>servidor da IA</b>: a voz é separada dos instrumentos antes de virar nota (mais fiel, sem vozes emboladas).</span></p>` : ''}
       <p class="ia-dica-compartilhar">${icon('info', 16)}<span>No Android, dá para baixar o áudio em outro app e tocar em <b>Compartilhar → Songbook</b>: ele já chega aqui.</span></p>`;
+    $('#ia-yt')?.addEventListener('submit', (e) => { e.preventDefault(); lerNoServidor({ url: e.target.url.value }); });
     const solte = $('#ia-arquivo');
     solte.onclick = () => {
       const inp = document.createElement('input');
@@ -4727,7 +4749,41 @@ async function gerarComIA(song, titulo) {
     $('#ia-status').textContent = estado.texto;
   }
 
-  async function lerArquivo(arquivo) {
+  // com o servidor da IA, o áudio vai inteiro para ele (a voz separada da banda, mais fiel) e as notas voltam prontas;
+  // se ele não responde, o arquivo é lido aqui mesmo, no aparelho
+  const lerArquivo = (arquivo) => (servidorIA().url ? lerNoServidor({ arquivo }) : lerNoAparelho(arquivo));
+  async function lerNoServidor({ arquivo, url }) {
+    telaLeitura();
+    const ctrl = new AbortController();
+    $('#ia-cancelar').onclick = () => { ctrl.abort(); telaFontes(); };
+    const leitor = { notas: [], analisados: 0, segundos: 0 };
+    const t0 = Date.now();
+    const andando = setInterval(() => {
+      const seg = (Date.now() - t0) / 1000;
+      const texto = seg < 6 ? (url ? 'Baixando o áudio do vídeo' : 'Enviando o áudio') : 'Separando a voz e ouvindo nota por nota';
+      // sem saber quanto falta, a barra anda rápido no começo e cada vez mais devagar
+      animar(leitor, { nivel: 0.5, ouvindo: true, texto, pct: Math.min(95, Math.round(100 * (1 - Math.exp(-seg / 70)))) });
+    }, 200);
+    try {
+      const form = arquivo ? new FormData() : null;
+      if (form) { form.append('arquivo', arquivo, arquivo.name || 'audio'); form.append('separar', 'true'); }
+      const r = await chamar(servidorIA(), arquivo ? '/transcrever' : '/youtube', arquivo ? { form, sinal: ctrl.signal } : { json: { url }, sinal: ctrl.signal });
+      clearInterval(andando);
+      if (!view.contains(passo)) return;
+      if (r.cortado) toast('Usei só os primeiros 6 minutos');
+      notas = r.notas || [];
+      if (!notas.length) { telaFontes('A IA não encontrou notas neste áudio. Tente de novo ou use outro arquivo de áudio da música.'); return; }
+      resultado();
+    } catch (e) {
+      clearInterval(andando);
+      if (ctrl.signal.aborted || !view.contains(passo)) return;
+      console.error(e);
+      // servidor fora do ar: o arquivo ainda dá para ler no aparelho; o link do YouTube, não
+      if (arquivo && !e.status) { toast('Servidor da IA fora do ar: lendo no aparelho'); lerNoAparelho(arquivo); return; }
+      telaFontes(e.message || FALHOU_IA);
+    }
+  }
+  async function lerNoAparelho(arquivo) {
     telaLeitura();
     $('#ia-status').textContent = 'Gerando a partitura…';
     let leitor;
@@ -5192,6 +5248,7 @@ function viewSong(id, ctx = {}) {
           ${isPreview ? `<button role="menuitem" id="btn-edit-prev">${icon('edit', 18)}<span>Editar cifra</span></button>`
             : `<a role="menuitem" href="#/editar/${song.id}">${icon('edit', 18)}<span>Editar cifra</span></a>`}
           <button role="menuitem" id="btn-pdf">${icon('file', 18)}<span>Exportar PDF</span></button>
+          ${song.youtube && servidorIA().url ? `<button role="menuitem" id="btn-sincronizar">${icon('sparkles', 18)}<span>${song.sincronia?.video === song.youtube ? 'Sincronizar a letra de novo' : 'Sincronizar a letra com o vídeo'}</span></button>` : ''}
           ${(() => {
             const propria = !isPreview && db.song(song.id)?.partitura;
             const pronta = mxlDaPartitura(song.content);
@@ -5443,34 +5500,56 @@ function viewSong(id, ctx = {}) {
   $('#btn-fila')?.addEventListener('click', verFila);
   $('#btn-parte')?.addEventListener('click', async () => { if (await trocarParte(db.set(ctx.set.id), ctx.index)) viewSetSong(ctx.set.id, ctx.index); });
 
-  // referências: vídeo, fonte, partitura, outras versões
-  const refs = [];
+  // referências: um cartão com a telinha do vídeo (é nela que o vídeo toca nesta página), o nome e o canal
+  // do vídeo, trocar/abrir no YouTube e, embaixo, de onde veio a cifra, partitura e outras versões
+  const duracaoVideo = song.duracao > 0 ? fmtTempo(song.duracao) : '';
+  const video = song.youtube ? `
+    <div class="ref-video" id="ref-video">
+      <div class="video-ref" id="video-box"><button class="video-card" id="video-ref" aria-label="Tocar o vídeo aqui"><img src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt="" loading="lazy">
+        <span class="vplay"><span>${icon('play', 26)}</span></span>${duracaoVideo ? `<span class="vdur">${duracaoVideo}</span>` : ''}</button></div>
+      <div class="ref-video-info">
+        <span class="ref-yt" aria-hidden="true">${icon('youtube', 20)}</span>
+        <div class="grow"><b id="ref-video-titulo">${esc(song.title)}</b><small id="ref-video-canal">YouTube${duracaoVideo ? ' · ' + duracaoVideo : ''}</small></div>
+        <span class="ref-tocando" title="Tocando" aria-hidden="true"><i></i><i></i><i></i></span>
+      </div>
+      <div class="ref-acoes">
+        <button class="btn small" data-video title="Escolher outra versão no YouTube">${icon('refresh', 15)} Trocar vídeo</button>
+        <a class="btn small ghost" href="https://www.youtube.com/watch?v=${esc(song.youtube)}" target="_blank" rel="noopener">${icon('external', 15)} Abrir no YouTube</a>
+      </div>
+    </div>`
+    : `<button class="ref-sem-video" data-video><span class="ref-sem-video-ic">${icon('youtube', 26)}</span><b>Sem vídeo de referência</b>
+      <small>Escolha um vídeo no YouTube para ouvir como a música é cantada</small><span class="btn small primary">${icon('search', 15)} Escolher vídeo</span></button>`;
+  const links = [];
+  const linkRef = (href, ic, titulo, sub) => `<a class="ref-link" href="${esc(href)}" target="_blank" rel="noopener">${ic}<span class="grow"><b>${titulo}</b><small>${esc(sub)}</small></span>${icon('external', 16)}</a>`;
+  if (song.source && /^https?:/.test(song.source)) links.push(linkRef(song.source, song.cover ? capa(song) : `<span class="ico">${icon('link', 18)}</span>`, 'Cifra original', host(song.source)));
+  if (song.source?.startsWith('cnbb:')) links.push(linkRef('https://www.cnbb.org.br/liturgia-diaria/', `<span class="ico">${icon('cross', 18)}</span>`, 'Liturgia Diária', 'cnbb.org.br'));
+  if (song.pdf) links.push(linkRef(song.pdf, `<span class="ico">${icon('file', 18)}</span>`, 'Partitura', 'PDF'));
+  links.push(`<button class="ref-link" data-buscar-cifra title="Procura outras cifras desta música (Cifra Club e cantos litúrgicos)"><span class="ico">${icon('chord', 18)}</span><span class="grow"><b>Outras cifras</b><small>Cifra Club e cantos da missa</small></span>${icon('next', 16)}</button>`);
+  $('#refs').innerHTML = `<div class="ref-cartao">${video}<div class="ref-links">${links.join('')}</div></div>`;
+  // nome e canal do vídeo (do YouTube; sem internet, fica o nome da música)
   if (song.youtube) {
-    refs.push(`<div class="video-ref" id="video-box"><button class="video-card" id="video-ref" aria-label="Tocar o vídeo"><img src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt="" loading="lazy">
-      <span class="vplay"><span>${icon('play', 26)}</span></span><span class="vtitle">${esc(song.title)}<small>Toque para assistir aqui</small></span></button></div>`);
+    infoDoVideo(song.youtube).then((v) => {
+      if (!v || !$('#ref-video-titulo')) return;
+      if (v.titulo) $('#ref-video-titulo').textContent = v.titulo;
+      $('#ref-video-canal').textContent = [v.canal || 'YouTube', duracaoVideo].filter(Boolean).join(' · ');
+    });
   }
-  const cards = [];
-  cards.push(`<button class="ref-card" data-video><span class="ico">${icon('youtube', 22)}</span><span><b>${song.youtube ? 'Trocar vídeo' : 'Escolher vídeo'}</b><small>${song.youtube ? 'Outra versão no YouTube' : 'Procurar no YouTube'}</small></span></button>`);
-  if (song.source && /^https?:/.test(song.source)) cards.push(`<a class="ref-card" href="${esc(song.source)}" target="_blank" rel="noopener">${song.cover ? capa(song) : `<span class="ico">${icon('link', 22)}</span>`}<span><b>Cifra original</b><small>${esc(host(song.source))}</small></span></a>`);
-  if (song.source?.startsWith('cnbb:')) cards.push(`<a class="ref-card" href="https://www.cnbb.org.br/liturgia-diaria/" target="_blank" rel="noopener"><span class="ico">${icon('cross', 22)}</span><span><b>Liturgia Diária</b><small>cnbb.org.br</small></span></a>`);
-  if (song.pdf) cards.push(`<a class="ref-card" href="${esc(song.pdf)}" target="_blank" rel="noopener"><span class="ico">${icon('file', 22)}</span><span><b>Partitura</b><small>PDF</small></span></a>`);
-  cards.push(`<button class="ref-card" data-buscar-cifra title="Procura outras cifras desta música (Cifra Club e cantos litúrgicos)"><span class="ico">${icon('chord', 22)}</span><span><b>Outras cifras</b><small>Cifra Club e cantos da missa</small></span></button>`);
-  $('#refs').innerHTML = refs.join('') + `<div class="refs-grid">${cards.join('')}</div>`;
 
-  // créditos (como no Spotify): quem canta, quem compôs, de onde veio
+  // créditos (como no Spotify): quem canta, quem compôs, de onde veio — cada linha com o seu ícone
   const metaR = renderSong(song.content).meta;
   const creditos = [
-    ['Intérprete', song.artist],
-    ['Composição', metaR.composer],
-    ['Letra', metaR.lyricist],
-    ['Álbum', metaR.album],
-    ['Ano', metaR.year],
-    ['Tom original', tomBase],
-    [/letras\.mus\.br|lrclib|vagalume/.test(song.source || '') ? 'Fonte da letra' : /cifraclub/.test(song.source || '') ? 'Fonte da cifra' : 'Fonte', fonte && song.source ? `<a href="${esc(song.source)}" target="_blank" rel="noopener">${esc(fonte)}</a>` : esc(fonte), true],
-    ['Na biblioteca desde', !isPreview && song.createdAt ? new Date(song.createdAt).toLocaleDateString('pt-BR') : ''],
-  ].filter(([, v]) => v);
-  $('#creditos').innerHTML = creditos.length ? `<div class="creditos"><h3>Créditos</h3>${creditos.map(([k, v, html]) => `<div class="cred"><span>${esc(k)}</span><b>${html ? v : esc(v)}</b></div>`).join('')}
-    ${isPreview ? '' : `<a class="link-btn" href="#/editar/${song.id}">${icon('edit', 13)} Editar créditos</a>`}</div>` : '';
+    ['mic', 'Intérprete', song.artist],
+    ['edit', 'Composição', metaR.composer],
+    ['text', 'Letra', metaR.lyricist],
+    ['disc', 'Álbum', metaR.album],
+    ['calendar', 'Ano', metaR.year],
+    ['music', 'Tom original', tomBase],
+    ['link', /letras\.mus\.br|lrclib|vagalume/.test(song.source || '') ? 'Fonte da letra' : /cifraclub/.test(song.source || '') ? 'Fonte da cifra' : 'Fonte', fonte && song.source ? `<a href="${esc(song.source)}" target="_blank" rel="noopener">${esc(fonte)}</a>` : esc(fonte), true],
+    ['clock', 'Na biblioteca desde', !isPreview && song.createdAt ? new Date(song.createdAt).toLocaleDateString('pt-BR') : ''],
+  ].filter(([, , v]) => v);
+  $('#creditos').innerHTML = creditos.length ? `<div class="ref-creditos"><div class="ref-creditos-cab"><h3>Créditos</h3>
+    ${isPreview ? '' : `<a class="link-btn" href="#/editar/${song.id}">${icon('edit', 13)} Editar</a>`}</div>
+    ${creditos.map(([ic, k, v, html]) => `<div class="ref-cred"><span class="ico">${icon(ic, 16)}</span><span class="grow"><small>${esc(k)}</small><b>${html ? v : esc(v)}</b></span></div>`).join('')}</div>` : '';
 
   // vídeo do YouTube: escolher/trocar e tocar no player do app
   const salvarVideo = (url) => {
@@ -5487,13 +5566,86 @@ function viewSong(id, ctx = {}) {
     if (e.target.closest('[data-buscar-cifra]')) buscarCifraNoApp(song);
     if (e.target.closest('#video-ref')) tocar();
   });
-  const iconePlay = () => { const b = $('#btn-play'); if (b && song.youtube) b.innerHTML = icon(player.tocandoAgora(song.youtube) ? 'pause' : 'play', 24); };
+  // o botão de tocar e o "tocando" do cartão do vídeo (nas Referências) acompanham o player
+  const iconePlay = () => {
+    const tocando = player.tocandoAgora(song.youtube);
+    const b = $('#btn-play');
+    if (b && song.youtube) b.innerHTML = icon(tocando ? 'pause' : 'play', 24);
+    $('#ref-video')?.classList.toggle('tocando', tocando);
+  };
   aoSair(player.ouvir(iconePlay));
+  iconePlay();
+  // tocar: o vídeo toca na telinha das Referências (o topo continua com os quadros do clipe)
   $('#btn-play').onclick = () => {
     if (!song.youtube) { mudarVideo(); return; }
     if (player.desta(song.youtube)) player.alternar(); else tocar();
   };
   if (ctx.tocar && song.youtube) setTimeout(tocar, 60);
+
+  // letra sincronizada (como no Spotify): o servidor da IA ouve o vídeo e diz quando cada linha é cantada. Tocando o
+  // vídeo desta música, a linha cantada acende e a letra rola até ela; tocar numa linha leva o vídeo para ali
+  const sincronia = () => (song.sincronia?.video === song.youtube && song.sincronia.tempos?.length ? song.sincronia : null);
+  const linhasNaTela = () => [...songEl.querySelectorAll('.line:not(.chords-only)')].filter((l) => linhaSemCifra([...l.querySelectorAll('.lyric')].map((x) => x.textContent).join('')));
+  let mapa = null; // linha cantada → linha da tela (refeito quando a letra é desenhada de novo)
+  let telaDoMapa = null;
+  const linhasMapa = () => {
+    const tela = linhasNaTela();
+    if (!mapa || telaDoMapa?.[0] !== tela[0] || telaDoMapa.length !== tela.length) {
+      mapa = casarLinhas(sincronia().linhas, tela.map((l) => [...l.querySelectorAll('.lyric')].map((x) => x.textContent).join('')));
+      telaDoMapa = tela;
+    }
+    return tela;
+  };
+  let rolouEm = 0;
+  const marcarRolagem = () => { rolouEm = Date.now(); };
+  view.addEventListener('wheel', marcarRolagem, { passive: true });
+  view.addEventListener('touchmove', marcarRolagem, { passive: true });
+  let acesa = null;
+  const seguir = setInterval(() => {
+    const sinc = sincronia();
+    songEl.classList.toggle('sincronizada', !!sinc);
+    if (!sinc || !player.desta(song.youtube)) { acesa?.classList.remove('agora'); acesa = null; return; }
+    const tela = linhasMapa();
+    const k = linhaNoTempo(sinc.tempos, player.tempoAgora);
+    const linha = k >= 0 ? tela[mapa[k]] : null;
+    if (linha === acesa) return;
+    acesa?.classList.remove('agora');
+    acesa = linha;
+    if (!linha) return;
+    linha.classList.add('agora');
+    // a letra vai junto, a não ser que a pessoa tenha rolado com o dedo há pouco
+    if (player.estado === 'tocando' && Date.now() - rolouEm > 4000) linha.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 200);
+  aoSair(() => { clearInterval(seguir); view.removeEventListener('wheel', marcarRolagem); view.removeEventListener('touchmove', marcarRolagem); });
+  songEl.addEventListener('click', (e) => {
+    const sinc = sincronia();
+    if (!sinc || e.target.closest('.chord')) return;
+    const linha = e.target.closest('.line');
+    const tela = linhasMapa();
+    const n = tela.indexOf(linha);
+    if (n < 0) return;
+    // a linha pode ser cantada mais de uma vez (o refrão): vai para a próxima vez dela a partir de agora
+    const agora = player.desta(song.youtube) ? player.tempoAgora : 0;
+    const vezes = mapa.map((m, k) => (m === n ? k : -1)).filter((k) => k >= 0);
+    if (!vezes.length) return;
+    const k = vezes.find((x) => sinc.tempos[x].inicio >= agora - 1) ?? vezes[0];
+    if (!player.desta(song.youtube)) tocar();
+    player.irPara(Math.max(0, sinc.tempos[k].inicio - 0.3));
+  });
+  $('#btn-sincronizar')?.addEventListener('click', async () => {
+    $('#menu-mais').hidden = true;
+    const cantadas = linhasCantadas(song.content).map(linhaSemCifra).filter(Boolean);
+    if (!cantadas.length) { toast('Esta música não tem letra para sincronizar'); return; }
+    toast('Sincronizando a letra com o vídeo… (leva uns minutos)');
+    try {
+      const r = await chamar(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: cantadas } });
+      const sinc = { video: song.youtube, linhas: cantadas, tempos: r.linhas.map((x) => ({ inicio: x.inicio, fim: x.fim })) };
+      song.sincronia = sinc;
+      mapa = null;
+      if (isPreview) preview.sincronia = sinc; else db.updateSong(song.id, { sincronia: sinc });
+      toast(`Letra sincronizada: ${r.achadas} de ${r.total} linhas ouvidas no vídeo. Toque numa linha para ir até ela`);
+    } catch (e) { toast(e.message); }
+  });
   // música vinda da busca sem vídeo: procura no YouTube sozinho e já vincula (se não achar, o aviso diz)
   if (isPreview && !song.youtube && !String(song.source || '').startsWith('cnbb:') && !preview.semVideo && !preview.videoProcurado) {
     const esta = preview;
@@ -5540,9 +5692,9 @@ function viewSong(id, ctx = {}) {
     }
   }
 
-  // nesta página o vídeo toca aqui (Referências); ao sair, continua no mini player
+  // nesta página o vídeo toca aqui (Referências); o topo fica só com os quadros do clipe. Ao sair, continua no mini player
   if (song.youtube) {
-    player.palco($('#video-box'), song.youtube, view.querySelector('.canvas-fundo'));
+    player.palco($('#video-box'), song.youtube);
     aoSair(() => player.palco(null));
   }
 
@@ -5834,7 +5986,7 @@ function viewEditor(id, setId) {
           <div class="editor-prev" id="prev"><div class="song" id="prev-song"></div></div>
         </div>
         <div class="ed-status"><span id="ed-status"></span><span class="ed-salvo" id="ed-salvo"></span></div>
-        <p class="ed-dica" id="dica"></p>
+        <div class="ed-dica ed-guia" id="dica"></div>
       </section>
       <div class="ed-rodape"><button class="btn ghost" id="ed-cancelar">Cancelar</button><span class="spacer"></span><button class="btn primary" id="save">${icon('check', 18)} Salvar</button></div>
     </div>`;
@@ -5853,13 +6005,26 @@ function viewEditor(id, setId) {
     title: campo('title').value.trim(), artist: campo('artist').value.trim(), key: campo('key').value.trim(), youtube: campo('yt').value.trim(),
     composer: campo('composer').value.trim(), parte: campo('parte').value === '__outra' ? '' : campo('parte').value, extras: meta.extras,
   }, corpoPro());
-  const DICAS = {
-    acima: 'Toque em <b>Chorus</b> (refrão), <b>Verse</b> (estrofe) ou <b>Bridge</b> (ponte) na linha onde a parte começa: tudo dali para baixo pertence a ela, até a próxima. Escreva os acordes na linha de cima, alinhados com a sílaba:<br><code>[Chorus]<br>Am        G<br>Senhor, tende piedade</code>',
-    colchetes: 'Partes numa linha só: <code>[Chorus]</code>, <code>[Verse 2]</code>… Os acordes vão entre colchetes antes da sílaba: <code>[G]Senhor, tende pie[D]dade</code>.',
-    letra: 'Corrija ou reescreva só o texto, sem se preocupar com os acordes: ao salvar, cada acorde volta para a mesma sílaba. Linhas novas entram sem acordes.',
+  // guia "Como escrever" de cada jeito de editar, como uma tabelinha: o que se digita (no bloco de código, com os
+  // acordes e as partes coloridos) e, ao lado, para que serve; nos colchetes, também como fica na música
+  const ac = (c) => `<span class="g-ac">${c}</span>`;
+  const itemGuia = (codigo, titulo, texto, fica = '') => `<li class="ed-guia-item"><pre class="ed-guia-cod">${codigo}</pre>
+    <div class="ed-guia-txt"><b>${titulo}</b><span>${texto}</span>${fica}</div></li>`;
+  const ficaAssim = `<span class="ed-guia-fica"><small>Fica assim</small><span class="gc"><i>G</i>Senhor, tende pie</span><span class="gc"><i>D</i>dade</span></span>`;
+  const guiaParte = itemGuia('<span class="g-parte">[Chorus]</span>', 'Parte da música', 'Numa linha só, onde a parte começa: <b>Chorus</b> (refrão), <b>Verse</b> (estrofe), <b>Bridge</b> (ponte)… Vale até a próxima parte.');
+  const guiaExtras = itemGuia('<span class="g-parte">[Repeat Chorus]</span>', 'Repetir o refrão', 'Canta o refrão de novo neste ponto, sem escrever outra vez.')
+    + itemGuia('<span class="g-obs">(2x)</span>', 'Observação', 'Entre parênteses, numa linha só: (2x), (só as vozes), (solo)…');
+  const GUIAS = {
+    acima: { nome: 'Cifra', itens: guiaParte + itemGuia(`${ac('G'.padEnd(17))}${ac('D')}\nSenhor, tende piedade`, 'Acordes em cima', 'Na linha de cima da letra, cada acorde alinhado com a sílaba em que entra.') + guiaExtras },
+    colchetes: { nome: 'Colchetes', itens: guiaParte + itemGuia(`${ac('[G]')}Senhor, tende pie${ac('[D]')}dade`, 'Acorde antes da sílaba', 'Entre colchetes, colado na sílaba em que entra.', ficaAssim) + guiaExtras },
+    letra: { nome: 'Só letra', itens: itemGuia('Senhor, tende piedade', 'Só o texto', 'Corrija ou reescreva sem se preocupar com os acordes: ao salvar, cada acorde volta para a mesma sílaba.')
+      + itemGuia('<span class="g-obs">+ linha nova</span>', 'Linhas novas', 'Entram sem acordes. Para colocar acordes nelas, volte para <b>Cifra</b>.') },
   };
   const dica = () => {
-    $('#dica').innerHTML = DICAS[formato] + (formato === 'letra' ? '' : ' Toque num acorde acima para inseri-lo onde está o cursor.');
+    const g = GUIAS[formato];
+    $('#dica').innerHTML = `<div class="ed-guia-cab">${icon('info', 16)}<b>Como escrever</b><span class="chip sm">${g.nome}</span></div>
+      <ul class="ed-guia-lista"><li class="ed-guia-rotulos" aria-hidden="true"><span>Você escreve</span><span>Para que serve</span></li>${g.itens}</ul>`
+      + (formato === 'letra' ? '' : `<p class="ed-guia-rodape">${icon('chord', 14)}<span>Os botões acima colocam partes e acordes onde está o cursor.</span></p>`);
     $('#pal').hidden = formato === 'letra';
   };
   dica();
@@ -6941,14 +7106,14 @@ function viewSettings() {
     <div class="settings-group">
       <label class="setting"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Mostrar acordes</div><div class="s">Desligue para usar só a letra (coral, telão)</div></div><input type="checkbox" class="switch" id="chords" ${p.modo !== 'letra' && p.showChords !== false ? 'checked' : ''}></label>
       <label class="setting"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Desenho dos acordes</div><div class="s">Como montar cada acorde no violão: tabela no início da música e ao tocar num acorde</div></div><input type="checkbox" class="switch" id="diagramas" ${p.diagramas ? 'checked' : ''}></label>
-      <label class="setting"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns !== false ? 'checked' : ''}></label>
+      <label class="setting so-largo"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns !== false ? 'checked' : ''}></label>
       <div class="setting wrap"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div><div class="s">Tamanho, cor e fundo dos acordes sobre a letra</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
     </div>`)}
 
     ${secao('musica', 'A página de cada música', `
     <div class="settings-group">
-      <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo no topo da música</div><div class="s">Um trecho do clipe passa sem som atrás do título, como no Spotify. Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
+      <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo no topo da música</div><div class="s">Quadros do clipe passam sem som atrás do título, como no Spotify (o vídeo toca nas Referências). Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
     </div>
     ${jaInstalado() ? '' : `<div class="settings-group">
       <div class="setting acao"><span class="ico" style="background:none">${logo(36)}</span><div class="grow"><div class="t">Instalar o Songbook</div><div class="s">Ícone na tela inicial, abre em tela cheia e funciona sem internet</div></div><div class="setting-acoes"><button class="btn small primary" id="instalar">Instalar</button></div></div>
@@ -7323,6 +7488,121 @@ async function viewFontes() {
 }
 
 // leitor de arquivos (partituras, hinários, preces do Google Drive, PDFs) dentro do app
+// ---------------------------------------------------------------- Tirar dúvidas
+// Como o NotebookLM: a pergunta vai para o servidor da IA, que responde primeiro pelos arquivos do acervo litúrgico
+// (citando cada um: [1], [2]…) e, se eles não trazem a resposta, busca na internet. A conversa fica na tela (dá para
+// perguntar "e no ofertório?") e as fontes do acervo abrem no app.
+// a conversa fica guardada neste aparelho (volta ao abrir de novo); "Nova conversa" limpa
+let conversaDuvidas = (() => { try { return JSON.parse(localStorage.getItem('songbook.duvidas') || '[]').filter((m) => !m.carregando); } catch { return []; } })();
+const guardarConversa = () => { try { localStorage.setItem('songbook.duvidas', JSON.stringify(conversaDuvidas.filter((m) => !m.carregando).slice(-40))); } catch { /* sem espaço: só não guarda */ } };
+const SUGESTOES_DUVIDAS = [
+  ['music', 'Qual a função do cantor na hora da comunhão?'],
+  ['cross', 'Quando se canta o Glória e quando ele fica de fora?'],
+  ['library', 'Qual canto de comunhão para o Advento, ano A?'],
+  ['text', 'Como o salmista deve proclamar o salmo responsorial?'],
+];
+// a resposta (markdown simples) em HTML: parágrafos, listas, títulos, **negrito** e as citações [n] em bolinhas
+function htmlDaResposta(texto) {
+  const linha = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\[(\d+)\]/g, '<sup class="dv-cita">$1</sup>');
+  return String(texto || '').split(/\n{2,}/).map((bloco) => {
+    const itens = bloco.split('\n');
+    if (itens.every((l) => /^\s*([-*•]|\d+[.)])\s+/.test(l))) return `<ul>${itens.map((l) => `<li>${linha(l.replace(/^\s*([-*•]|\d+[.)])\s+/, ''))}</li>`).join('')}</ul>`;
+    if (/^#{1,4}\s/.test(bloco)) return `<h4>${linha(bloco.replace(/^#+\s*/, ''))}</h4>`;
+    return `<p>${itens.map(linha).join('<br>')}</p>`;
+  }).join('');
+}
+const horaCurta = (t) => (t ? new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
+function viewDuvidas() {
+  setTab('inicio');
+  setTint('#2a3a6b');
+  setHeader('Tirar dúvidas', { back: '#/', eyebrow: 'Assistente litúrgico', actions: conversaDuvidas.length ? [{ icon: 'edit', label: 'Nova conversa', onClick: () => { conversaDuvidas = []; guardarConversa(); viewDuvidas(); } }] : [] });
+  const temServidor = !!servidorIA().url;
+  const avatar = `<span class="dv-avatar" aria-hidden="true">${icon('sparkles', 18)}</span>`;
+  view.innerHTML = `<div class="chat">
+    <div class="chat-rolo" id="dv-conversa"></div>
+    <form class="chat-barra" id="dv-form">
+      ${temServidor ? '' : `<div class="chat-aviso">${icon('info', 16)}<span>O assistente está sendo preparado. Tente de novo daqui a pouco.</span></div>`}
+      <div class="chat-campo"><textarea name="q" rows="1" placeholder="Pergunte sobre liturgia e canto…" aria-label="Sua pergunta" ${temServidor ? '' : 'disabled'}></textarea>
+        <button class="chat-enviar" type="submit" aria-label="Enviar" disabled>${icon('next', 20)}</button></div>
+      <small class="chat-rodape">Responde pelos arquivos do acervo litúrgico e, se não achar, pela internet. Confira sempre as fontes.</small>
+    </form></div>`;
+  const caixa = $('#dv-conversa');
+  const boasVindas = () => `<div class="chat-vazio">
+      <span class="dv-avatar grande">${icon('sparkles', 30)}</span>
+      <h2>Olá! Como posso ajudar o seu ministério?</h2>
+      <p class="muted">Pergunte sobre a missa, os tempos litúrgicos, a função de cada parte ou que canto escolher. Eu procuro primeiro nos <b>arquivos do acervo</b> e, se não achar, <b>na internet</b>.</p>
+      <div class="chat-sugestoes">${SUGESTOES_DUVIDAS.map(([ic, q]) => `<button type="button" class="chat-sugestao" data-q="${esc(q)}"><span>${icon(ic, 18)}</span>${esc(q)}</button>`).join('')}</div></div>`;
+  const msg = (m, k) => (m.role === 'user'
+    ? `<div class="chat-msg eu"><div class="chat-bolha">${esc(m.content)}</div><small class="chat-hora">${horaCurta(m.t)}</small></div>`
+    : `<div class="chat-msg ia">${avatar}<div class="chat-corpo"><div class="chat-nome">Assistente litúrgico <small class="chat-hora">${horaCurta(m.t)}</small></div>
+        <div class="chat-bolha">${m.carregando ? `<div class="chat-digitando" aria-label="Procurando a resposta"><i></i><i></i><i></i><span>${esc(m.etapa || 'Procurando no acervo…')}</span></div>`
+          : m.erro ? `<p class="chat-erro">${icon('info', 16)} ${esc(m.erro)}</p>` : htmlDaResposta(m.content)}
+        ${m.fontes?.length ? `<div class="dv-fontes"><b>${icon('library', 14)} Do acervo</b>${m.fontes.map((f) => `<button type="button" class="dv-fonte" data-k="${k}" data-n="${f.n}"><sup class="dv-cita">${f.n}</sup><span><b>${esc(f.titulo)}</b><small>${esc(f.caminho)}</small></span></button>`).join('')}</div>` : ''}
+        ${m.web?.length ? `<div class="dv-fontes web"><b>${icon('search', 14)} Da internet</b>${m.web.map((w) => `<a class="dv-fonte" href="${esc(w.url)}" target="_blank" rel="noopener"><span><b>${esc(w.titulo)}</b><small>${esc(host(w.url))}</small></span></a>`).join('')}</div>` : ''}</div>
+        ${!m.carregando ? `<div class="chat-acoes">${m.erro ? `<button type="button" data-repetir="${k}">${icon('refresh', 14)} Tentar de novo</button>` : `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>`}</div>` : ''}</div></div>`);
+  const desenhar = () => {
+    caixa.innerHTML = conversaDuvidas.length ? conversaDuvidas.map(msg).join('') : boasVindas();
+    requestAnimationFrame(() => { view.scrollTop = view.scrollHeight; });
+  };
+  desenhar();
+  const perguntar = async (q) => {
+    q = q.trim();
+    if (!q || !temServidor || conversaDuvidas.some((m) => m.carregando)) return;
+    const historico = conversaDuvidas.filter((m) => !m.erro && !m.carregando).map((m) => ({ role: m.role, content: m.content }));
+    conversaDuvidas.push({ role: 'user', content: q, t: Date.now() });
+    const resp = { role: 'assistant', content: '', carregando: true, t: Date.now() };
+    conversaDuvidas.push(resp);
+    desenhar();
+    // enquanto espera, conta o que está fazendo (o acervo é rápido; a busca na web leva mais)
+    const etapas = setTimeout(() => { resp.etapa = 'Não achei tudo no acervo: buscando na internet…'; if (location.hash === '#/duvidas') desenhar(); }, 9000);
+    try {
+      const r = await chamar(servidorIA(), '/duvida', { json: { pergunta: q, historico }, tempo: 4 * 60e3 });
+      Object.assign(resp, { content: r.resposta, fontes: r.fontes, web: r.web, carregando: false, t: Date.now() });
+    } catch (e) { Object.assign(resp, { erro: e.message, carregando: false, pergunta: q }); }
+    clearTimeout(etapas);
+    guardarConversa();
+    if (location.hash === '#/duvidas') viewDuvidas();
+  };
+  const form = $('#dv-form');
+  const campo = form.q;
+  const enviar = form.querySelector('.chat-enviar');
+  const ajustar = () => { campo.style.height = 'auto'; campo.style.height = Math.min(180, campo.scrollHeight) + 'px'; enviar.disabled = !campo.value.trim(); };
+  campo.addEventListener('input', ajustar);
+  campo.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && innerWidth > 700) { e.preventDefault(); form.requestSubmit(); } });
+  form.onsubmit = (e) => { e.preventDefault(); const q = campo.value; campo.value = ''; ajustar(); perguntar(q); };
+  if (temServidor && innerWidth > 700) campo.focus();
+  caixa.addEventListener('click', async (e) => {
+    const sug = e.target.closest('[data-q]');
+    if (sug) { perguntar(sug.dataset.q); return; }
+    const cop = e.target.closest('[data-copiar]');
+    if (cop) { try { await navigator.clipboard.writeText(conversaDuvidas[cop.dataset.copiar].content); toast('Resposta copiada'); } catch { toast('Não consegui copiar'); } return; }
+    const rep = e.target.closest('[data-repetir]');
+    if (rep) {
+      const k = Number(rep.dataset.repetir);
+      const q = conversaDuvidas[k]?.pergunta;
+      conversaDuvidas.splice(k - 1, 2);
+      perguntar(q || '');
+      return;
+    }
+    // a fonte do acervo abre no app (o canto ou o caderno do Hinário); os outros arquivos mostram só o caminho
+    const b = e.target.closest('button.dv-fonte');
+    if (!b) return;
+    const f = conversaDuvidas[b.dataset.k]?.fontes?.find((x) => String(x.n) === b.dataset.n);
+    if (!f) return;
+    if (f.tipo === 'canto') {
+      const cantos = await carregarCantos();
+      const c = cantos.find((x) => x.id === f.id && x.titulo === f.titulo) || cantos.find((x) => x.id === f.id);
+      if (c) { abrirMusicaAcervo({ fonte: `acervo:${c.id}:${c.i}`, chordpro: c.chordpro }, '#/duvidas'); return; }
+    }
+    if (f.tipo === 'hinario') {
+      const cad = (await carregarHinario()).find((x) => x.id === f.id);
+      const i = cad?.cantos.findIndex((c) => c.titulo === f.titulo) ?? -1;
+      if (i >= 0) { abrirMusicaAcervo({ fonte: sourceHinario(cad, i), chordpro: cad.cantos[i].chordpro }, '#/duvidas'); return; }
+    }
+    toast(`${f.titulo} — ${f.caminho}`);
+  });
+}
+
 function viewArquivo(url, titulo, voltar = '') {
   const doAcervo = /^#\/(setor|acervo|buscar)/.test(voltar);
   setTab(doAcervo ? 'buscar' : 'oracoes');
@@ -7386,6 +7666,7 @@ function route() {
     case 'arquivo': return viewArquivo(b, c, d);
     case 'setor': return viewSetor(b, c);
     case 'acervo': return viewAcervo(b || '');
+    case 'duvidas': return viewDuvidas();
     default: return viewNotFound();
   }
 }

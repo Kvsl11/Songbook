@@ -96,6 +96,14 @@ jobs:
         run: |
           command -v pdftoppm || (sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils)
           node scripts/cantos-sync.mjs
+      - name: Endereço do servidor da IA (Hugging Face), para o app achar sozinho
+        continue-on-error: true
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          [ -n "$HF_TOKEN" ] || exit 0
+          dono=$(curl -sf -H "Authorization: Bearer $HF_TOKEN" https://huggingface.co/api/whoami-v2 | python3 -c "import json,sys; print(json.load(sys.stdin)['name'])")
+          [ -n "$dono" ] && python3 -c "import json,sys; d=sys.argv[1].lower().replace('_','-').replace('.','-'); json.dump({'url': f'https://{d}-songbook-ia.hf.space'}, open('public/data/servidor-ia.json','w'))" "$dono"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

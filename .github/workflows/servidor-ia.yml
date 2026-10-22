@@ -1,0 +1,55 @@
+# Publica o servidor da IA (pasta servidor-ia/) no Hugging Face Spaces, de graça: 2 CPUs, 16 GB de memória e
+# endereço https. Cria o Space na primeira vez (seu-usuario/songbook-ia) e atualiza a cada mudança na pasta.
+# Antes do primeiro uso, uma vez: crie a conta em huggingface.co, gere um token de escrita
+# (huggingface.co/settings/tokens → New token → Write) e guarde no GitHub em
+# Settings → Secrets and variables → Actions → New repository secret, com o nome HF_TOKEN.
+# Opcionais, no mesmo lugar: ANTHROPIC_API_KEY (liga o "Tirar dúvidas") e YT_COOKIES (o conteúdo do cookies.txt,
+# para vídeos do YouTube com restrição de idade).
+name: Publicar o servidor da IA
+
+on:
+  push:
+    branches: [main, master, ccr-59dd75f2-oirnca]
+    paths: ['servidor-ia/**', '.github/workflows/servidor-ia.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: servidor-ia
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      YT_COOKIES: ${{ secrets.YT_COOKIES }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sem o token do Hugging Face
+        if: env.HF_TOKEN == ''
+        run: echo "::notice::Guarde o token do Hugging Face no secret HF_TOKEN para publicar o servidor da IA (veja o topo deste arquivo)."
+      - uses: actions/setup-python@v5
+        if: env.HF_TOKEN != ''
+        with:
+          python-version: '3.11'
+      - name: Criar (na primeira vez) e atualizar o Space
+        if: env.HF_TOKEN != ''
+        run: |
+          pip install -q "huggingface_hub>=0.25"
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          dono = api.whoami()["name"]
+          repo = f"{dono}/songbook-ia"
+          api.create_repo(repo, repo_type="space", space_sdk="docker", exist_ok=True)
+          for nome in ("ANTHROPIC_API_KEY", "YT_COOKIES"):
+              if os.environ.get(nome):
+                  api.add_space_secret(repo, nome, os.environ[nome])
+          api.upload_folder(repo_id=repo, repo_type="space", folder_path="servidor-ia",
+                            ignore_patterns=["tests/*", "**/__pycache__/*", ".pytest_cache/*"],
+                            commit_message="Servidor da IA do Songbook")
+          url = f"https://{dono.lower().replace('_', '-').replace('.', '-')}-songbook-ia.hf.space"
+          print(f"::notice::Servidor da IA publicado: {url} (a primeira montagem leva uns 15 minutos)")
+          PY

@@ -99,7 +99,9 @@ body.com-player { --rodape: calc(var(--base-rodape) + var(--player-h) + 6px); }
 main:has(.barra-sel:not([hidden]), .cta-bar) { padding-bottom: calc(var(--rodape) + 170px); }
 /* editor e ensaio da partitura: a palheta/o ensaio é o fim da página; sem folga extra, eles encostam no menu/player também no fim */
 main:has(.compor, .partitura) { --folga-pe: 8px; }
-.shell { display: flex; height: 100dvh; }
+/* height: 100% antes do 100dvh: navegador de tablet/celular mais antigo, que não conhece dvh, ignorava a altura e o app
+   crescia além da tela (barra de rolagem na página e a engrenagem dos Ajustes lá embaixo). 100% = altura visível do html */
+.shell { display: flex; height: 100%; height: 100dvh; }
 .main-col { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
 main {
   --gutter: 16px;
@@ -150,7 +152,7 @@ body.performance .palco-ctrl:hover, body.performance .palco-ctrl:focus-within { 
 
 @media (min-width: 900px) {
   :root { --nav-h: 0px; }
-  .shell { gap: 8px; padding: 8px; height: 100dvh; }
+  .shell { gap: 8px; padding: 8px; height: 100%; height: 100dvh; }
   /* a margem da página é medida pela largura da coluna principal (cqw), e não em %: assim vale igual em
      qualquer elemento que a use (painel da letra, topo com vídeo, prateleiras) para ir de ponta a ponta */
   .main-col { border-radius: var(--radius); container-type: inline-size; }
@@ -1096,9 +1098,9 @@ body.performance .convite-instalar { display: none; }
 
 /* ============================================================ página da música estilo Spotify */
 .song-hero { position: relative; isolation: isolate; }
-/* Canvas (como no Spotify): o vídeo, mudo, ocupa o topo da música — do alto da tela até os botões —
-   por trás da capa, do título e dos botões. Depois de 5 s (quando os controles do YouTube já sumiram) o
-   vídeo aparece e a capa some, deixando o lugar dela livre para o vídeo. */
+/* Canvas (como no Spotify): os quadros do clipe ocupam o topo da música — do alto da tela até os botões —
+   por trás da capa, do título e dos botões. Quando o 1º quadro carrega, a capa some e deixa o lugar livre para
+   eles. O vídeo de verdade (com som) toca na telinha das Referências, não aqui. */
 .song-topo { position: relative; isolation: isolate; }
 /* o isolation prende o menu "mais" dentro do topo: com ele aberto, o topo inteiro sobe acima da barra da música */
 .song-topo.menu-aberto { z-index: 25; }
@@ -1360,23 +1362,6 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 }
 .barra-sel[hidden] { display: none; }
 
-/* o clipe de verdade no topo da música (depois do anúncio): fica por trás do título e dos botões,
-   sem receber toques (os controles do YouTube não aparecem); o degradê do topo continua por cima */
-#pl-tela.no-fundo { z-index: 0; border-radius: 0; box-shadow: none; pointer-events: none; container-type: size; }
-/* numa rolagem rápida o vídeo (que segue o topo quadro a quadro) fica um pouco para trás e aparecia, com a borda
-   reta, abaixo do degradê: logo depois do fim do degradê, um fundo que rola junto com a página o encobre */
-.song-topo.com-video::after { content: ""; position: absolute; z-index: -2; left: calc(-1 * var(--gutter)); right: calc(-1 * var(--gutter)); top: calc(100% + 89px); height: 100vh; background: var(--bg); pointer-events: none; }
-@media (min-width: 641px) { .song-topo.com-video::after { top: calc(100% + 35px); } }
-.song-topo.com-video.menu-aberto::after { content: none; }
-#pl-tela.no-fundo iframe { position: absolute; top: 50%; left: 50%; width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.25); }
-.song-topo.com-video .canvas-fundo { background: transparent; }
-.song-topo.com-video .canvas-fundo img { opacity: 0 !important; transition: opacity 0.6s; }
-.song-topo.com-video .song-hero > .cover { opacity: 0; visibility: hidden; }
-.video-no-topo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-radius: var(--radius); background: var(--bg-elev); font-size: 14px; font-weight: 600; }
-.video-no-topo .ic { color: var(--accent-ink); }
-/* vídeo no topo durante o anúncio: na frente, com os controles do YouTube (dá para pular o anúncio) */
-#pl-tela.na-frente { z-index: 14; border-radius: 0; background: #000; }
-
 /* indicadores pequenos nas listas: tem cifra / tem vídeo */
 .ind { display: inline-flex; gap: 3px; margin-right: 6px; vertical-align: -2px; }
 .ind-i { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 5px; background: var(--accent-soft); color: var(--accent-ink); }
@@ -1463,10 +1448,6 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
    também esse tanto e cobre até o alto da tela (antes sobrava uma faixa do fundo colorido em cima) */
 .set-progress + .song-topo.canvas-on .canvas-fundo { top: -84px; }
 .set-progress { position: relative; z-index: 2; } /* por cima do vídeo do topo */
-@media (min-width: 641px) {
-  /* o clipe tocando atrás do título some aos poucos embaixo, como o fundo */
-  #pl-tela.no-fundo { -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 100%); mask-image: linear-gradient(180deg, #000 78%, transparent 100%); }
-}
 
 /* letra no computador: o painel colorido vai de ponta a ponta da tela (sem as faixas pretas dos lados) e,
    nas telas largas, a letra fica em duas colunas (a opção "Duas colunas") para aproveitar o espaço */
@@ -1534,8 +1515,6 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
   #player.grande .pl-repetir, #player.grande.com-fila .pl-aleat { display: grid; }
 }
 
-/* durante o anúncio/começo o vídeo fica na frente só no topo, até acima dos botões (que continuam à vista) */
-.canvas-frente { position: absolute; z-index: -2; pointer-events: none; left: calc(-1 * var(--gutter)); right: calc(-1 * var(--gutter)); top: -64px; bottom: 80px; }
 /* letra: entra e sai em degradês longos (do vídeo para a letra e da letra para as Referências) */
 .song.lyrics-mode { padding-top: 96px; padding-bottom: 170px; }
 @media (min-width: 900px) { .song.lyrics-mode { padding-top: 110px; padding-bottom: 190px; } }
@@ -2359,3 +2338,233 @@ dialog.lista-dlg[open] { display: flex; flex-direction: column; overflow: hidden
   .bib-acoes .btn { flex: 1 1 auto; justify-content: center; padding: 0 10px; white-space: nowrap; }
 }
 @media (min-width: 900px) { main:has(.bib-barra) .fab { display: none; } } /* no computador a barra já tem a ação principal */
+
+/* ============================================================ guia "Como escrever", Referências da música e
+   opções só de tela larga */
+
+/* ---- guia "Como escrever" (embaixo do editor): cada linha tem o que se digita num bloco de código (acordes e
+   partes coloridos) e, ao lado, para que serve; nos colchetes, também como fica na música */
+.ed-dica.ed-guia {
+  display: grid; gap: 10px; padding: 14px; border-radius: 14px; color: var(--text); font-size: 14px; line-height: 1.45;
+  background: color-mix(in srgb, var(--accent) 4%, var(--bg-elev)); border: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
+}
+.ed-guia-cab { display: flex; align-items: center; gap: 8px; color: var(--accent-ink); }
+.ed-guia-cab b { color: var(--text); font-size: 15px; font-weight: 800; }
+.ed-guia-cab .chip { background: var(--accent-soft); color: var(--accent-ink); font-weight: 800; }
+.ed-guia-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ed-guia-rotulos { display: none; }
+/* no celular: o código e o título lado a lado (quando cabem) e a explicação embaixo, na largura toda */
+.ed-guia-item { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px; border-radius: 10px; background: var(--bg); border: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
+.ed-guia-cod {
+  flex: 0 1 auto; margin: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; padding: 6px 10px; border-radius: 8px;
+  background: var(--surface-2); color: var(--text); font: 600 13px/1.45 var(--mono); white-space: pre;
+}
+.ed-guia-cod::-webkit-scrollbar { display: none; }
+.ed-guia-cod .g-ac { color: var(--chord); font-weight: 800; }
+.ed-guia-cod .g-parte { color: var(--accent-ink); font-weight: 800; }
+.ed-guia-cod .g-obs { color: var(--muted); font-style: italic; }
+.ed-guia-txt { display: contents; }
+.ed-guia-txt > b { font-weight: 800; }
+.ed-guia-txt > span { flex: 1 0 100%; color: var(--muted); font-size: 13px; }
+.ed-guia-txt > span b { color: var(--text); font-weight: 700; }
+/* "fica assim": o acorde em cima da sílaba, como na música */
+.ed-guia-fica { flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: flex-end; margin-top: 4px; font-weight: 600; }
+.ed-guia-fica small { flex: 1 0 100%; margin-bottom: 2px; color: var(--subtle); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+.ed-guia-fica .gc { display: inline-flex; flex-direction: column; white-space: pre; }
+.ed-guia-fica .gc i { font-style: normal; font-weight: 800; font-size: 0.86em; color: var(--chord); }
+.ed-guia-rodape { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--muted); font-size: 13px; }
+.ed-guia-rodape .ic { flex: none; color: var(--accent-ink); }
+/* tablet e computador: uma tabelinha — "Você escreve" numa coluna (da largura do maior código) e "Para que serve"
+   na outra; as linhas usam as colunas da lista (subgrid) para os códigos ficarem todos da mesma largura */
+@media (min-width: 600px) {
+  .ed-guia-lista { grid-template-columns: fit-content(260px) minmax(0, 1fr); }
+  .ed-guia-rotulos, .ed-guia-item {
+    display: grid; grid-column: 1 / -1; grid-template-columns: minmax(170px, 250px) minmax(0, 1fr); grid-template-columns: subgrid; column-gap: 16px;
+  }
+  .ed-guia-rotulos { padding: 2px 13px 0; color: var(--subtle); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+  .ed-guia-item { align-items: center; padding: 10px 12px; }
+  .ed-guia-cod { justify-self: stretch; }
+  .ed-guia-txt { display: grid; gap: 1px; min-width: 0; }
+}
+
+/* ---- Referências da música: um cartão com a telinha do vídeo (é nela que o vídeo toca nesta página), o nome e
+   o canal do vídeo, trocar/abrir no YouTube e os links (cifra original, partitura, outras cifras). Os créditos
+   ficam num cartão ao lado (computador) ou embaixo (celular e tablet em pé), em linhas com ícone */
+.ref-cartao, .ref-creditos { border-radius: 16px; background: var(--bg-elev); border: 1px solid color-mix(in srgb, var(--text) 7%, transparent); }
+.ref-cartao { display: grid; gap: 4px; padding: 8px; }
+.ref-cartao .video-ref { max-width: none; margin: 0; }
+.ref-cartao .video-card, .ref-cartao .video-embed { border-radius: 12px; box-shadow: none; }
+#pl-tela.no-palco { border-radius: 12px; } /* o vídeo tocando tem o mesmo canto arredondado da telinha */
+.ref-cartao .video-card img { opacity: 0.9; }
+.ref-cartao .video-card::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent 60%, rgb(0 0 0 / 0.4)); }
+.ref-cartao .video-card .vplay { z-index: 1; }
+.ref-cartao .vdur {
+  position: absolute; right: 10px; bottom: 10px; z-index: 1; padding: 2px 7px; border-radius: 6px;
+  background: rgb(0 0 0 / 0.75); color: #fff; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.ref-video-info { display: flex; align-items: center; gap: 12px; padding: 12px 8px 2px; }
+.ref-yt { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: #ff0033; color: #fff; }
+.ref-video-info .grow { flex: 1; min-width: 0; }
+.ref-video-info b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 15px; font-weight: 800; line-height: 1.3; }
+.ref-video-info small { display: block; overflow: hidden; color: var(--muted); font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }
+/* tocando: três barrinhas dançando ao lado do nome do vídeo */
+.ref-tocando { display: none; flex: none; align-items: flex-end; gap: 2px; height: 16px; margin-right: 4px; }
+.ref-video.tocando .ref-tocando { display: inline-flex; }
+.ref-tocando i { width: 3px; height: 100%; border-radius: 2px; background: var(--accent); transform-origin: bottom; animation: ref-tocando 0.9s ease-in-out infinite alternate; }
+.ref-tocando i:nth-child(2) { animation-delay: -0.3s; }
+.ref-tocando i:nth-child(3) { animation-delay: -0.6s; }
+@keyframes ref-tocando { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
+.ref-acoes { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 8px 6px; }
+/* sem vídeo: um convite para escolher um */
+.ref-sem-video {
+  all: unset; box-sizing: border-box; cursor: pointer; display: grid; justify-items: center; gap: 6px; padding: 26px 18px; border-radius: 12px; text-align: center;
+  border: 1.5px dashed color-mix(in srgb, var(--text) 18%, transparent); background: color-mix(in srgb, var(--accent) 5%, transparent); transition: border-color 0.15s;
+}
+.ref-sem-video:hover { border-color: var(--accent); }
+.ref-sem-video:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+.ref-sem-video-ic { display: grid; place-items: center; width: 52px; height: 52px; margin-bottom: 4px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-ink); }
+.ref-sem-video b { font-size: 16px; font-weight: 800; }
+.ref-sem-video small { max-width: 340px; color: var(--muted); font-size: 13px; }
+.ref-sem-video .btn { margin-top: 8px; pointer-events: none; }
+/* links: linhas com ícone, nome e para onde levam */
+.ref-links { display: grid; gap: 2px; margin-top: 6px; padding-top: 6px; border-top: 1px solid color-mix(in srgb, var(--text) 7%, transparent); }
+.ref-link { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 12px; min-width: 0; padding: 8px; border-radius: 10px; color: var(--text); transition: background 0.15s; }
+.ref-link:hover { background: var(--surface-2); }
+.ref-link:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: -2px; }
+.ref-link .ico, .ref-link .cover { flex: none; width: 40px; height: 40px; border-radius: 10px; }
+.ref-link .ico { display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-ink); }
+.ref-link .grow { flex: 1; min-width: 0; }
+.ref-link b { display: block; font-size: 14px; font-weight: 700; }
+.ref-link small { display: block; overflow: hidden; color: var(--muted); font-size: 12.5px; white-space: nowrap; text-overflow: ellipsis; }
+.ref-link > .ic { flex: none; color: var(--subtle); }
+/* créditos */
+.refs-area > #creditos:not(:empty) { margin-top: 14px; }
+.ref-creditos { padding: 14px 16px 6px; }
+.ref-creditos-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 8px; }
+.ref-creditos-cab h3 { margin: 0; font-size: 18px; font-weight: 800; }
+.ref-creditos-cab .link-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+.ref-cred { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 10px 0; border-top: 1px solid color-mix(in srgb, var(--text) 7%, transparent); }
+.ref-cred .ico { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2); color: var(--muted); }
+.ref-cred .grow { display: grid; min-width: 0; }
+.ref-cred small { color: var(--muted); font-size: 12px; font-weight: 700; }
+.ref-cred b { font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+.ref-cred a { color: var(--accent-ink); text-decoration: none; }
+.ref-cred a:hover { text-decoration: underline; }
+/* tablet em pé: os links e os créditos em duas colunas */
+@media (min-width: 641px) {
+  .ref-acoes { padding-left: 60px; } /* alinhados com o nome do vídeo */
+  .ref-links { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); column-gap: 8px; }
+  .ref-creditos { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; }
+  .ref-creditos-cab { grid-column: 1 / -1; }
+}
+/* computador: vídeo à esquerda e créditos à direita (as duas colunas vêm da grade .refs-area) */
+@media (min-width: 900px) {
+  .refs-area > #creditos:not(:empty) { margin-top: 0; }
+  .ref-creditos { display: block; }
+}
+@media (prefers-reduced-motion: reduce) { .ref-tocando i { animation: none; } }
+
+/* ---- opções que só valem em tela larga (ex.: "Duas colunas": a letra só fica em colunas a partir de 1100 px):
+   no celular, em pé ou deitado, nem aparecem — nos Ajustes e na barra da música. Girando o tablet, a própria
+   media query mostra ou esconde */
+@media (max-width: 699px), (orientation: landscape) and (max-height: 500px) and (max-width: 1099px) {
+  .song-toolbar .so-largo, .setting.so-largo { display: none; }
+}
+
+/* ---------------------------------------------------------------- servidor da IA (Ajustes e Gerar com IA) */
+.aj-ia-campos { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; margin-top: 10px; }
+.aj-ia-campos .input { flex: 1 1 220px; min-width: 0; }
+.aj-ia-estado { width: 100%; margin: 8px 0 0; font-size: 13px; }
+.ia-yt { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; margin-top: 14px; padding: 14px 16px;
+  border-radius: 16px; background: var(--surface-2, rgb(255 255 255 / 0.05)); border: 1px solid var(--surface-3, rgb(255 255 255 / 0.08)); }
+.ia-yt-ic { color: #ff4e45; display: flex; }
+.ia-yt-txt { display: flex; flex-direction: column; gap: 2px; }
+.ia-yt-txt small { color: var(--text-2, rgb(255 255 255 / 0.65)); }
+.ia-yt-campo { grid-column: 1 / -1; display: flex; gap: 8px; }
+.ia-yt-campo .input { flex: 1; min-width: 0; }
+
+/* ---------------------------------------------------------------- letra sincronizada (a linha cantada acende) */
+.song.sincronizada .line:not(.chords-only) { cursor: pointer; transition: opacity 0.25s, transform 0.25s; }
+.song.sincronizada:has(.line.agora) .line:not(.agora) { opacity: 0.45; }
+.song.sincronizada .line.agora { opacity: 1; transform: scale(1.03); transform-origin: left center; }
+.song.sincronizada .line.agora .lyric { color: var(--accent, #06b6d4); }
+@media (hover: hover) { .song.sincronizada .line:not(.chords-only):hover { opacity: 1; } }
+
+/* ---------------------------------------------------------------- celular sempre em pé
+   onde o navegador não deixa travar a tela (fora do app instalado), o celular deitado mostra o aviso para virar */
+@media (orientation: landscape) and (max-height: 500px) {
+  html.celular body::after {
+    content: "↻  Vire o celular: o Songbook fica em pé"; position: fixed; inset: 0; z-index: 2147483000;
+    display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center;
+    background: var(--bg, #121212); color: var(--text, #fff); font: 700 18px/1.4 Figtree, sans-serif;
+  }
+}
+
+/* ---------------------------------------------------------------- Tirar dúvidas: tela de chat */
+.chat { --chat-max: 820px; min-height: 100%; display: flex; flex-direction: column; }
+.chat-rolo { flex: 1; width: 100%; max-width: var(--chat-max); margin: 0 auto; padding: 28px 16px 8px; display: flex; flex-direction: column; gap: 18px; }
+.dv-avatar { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, var(--accent, #06b6d4), #6d4aff); box-shadow: 0 4px 14px rgb(109 74 255 / 0.35); }
+.dv-avatar.grande { width: 64px; height: 64px; border-radius: 22px; }
+.chat-vazio { margin: auto 0; padding: 24px 0; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; animation: chat-entra 0.4s ease both; }
+.chat-vazio h2 { margin: 8px 0 0; font-size: clamp(22px, 5vw, 28px); }
+.chat-vazio p { max-width: 520px; margin: 0; line-height: 1.5; }
+.chat-sugestoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; width: 100%; margin-top: 14px; }
+.chat-sugestao { display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 14px; border-radius: 16px; cursor: pointer;
+  border: 1px solid var(--surface-3, rgb(255 255 255 / 0.08)); background: var(--surface-2, rgb(255 255 255 / 0.04)); color: inherit; font: inherit; font-weight: 600; line-height: 1.35;
+  transition: background 0.15s, transform 0.15s, border-color 0.15s; }
+.chat-sugestao span { color: var(--accent, #06b6d4); display: flex; }
+.chat-sugestao:hover { background: var(--surface-3, rgb(255 255 255 / 0.08)); border-color: color-mix(in srgb, var(--accent, #06b6d4) 50%, transparent); transform: translateY(-1px); }
+.chat-msg { display: flex; gap: 10px; animation: chat-entra 0.25s ease both; }
+.chat-msg.eu { flex-direction: column; align-items: flex-end; }
+.chat-msg.eu .chat-bolha { max-width: min(85%, 560px); padding: 10px 16px; border-radius: 20px 20px 6px 20px; font-weight: 600; line-height: 1.45;
+  background: linear-gradient(135deg, var(--accent, #06b6d4), color-mix(in srgb, var(--accent, #06b6d4) 70%, #6d4aff)); color: #04161b; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-msg.ia { align-items: flex-start; }
+.chat-corpo { flex: 1; min-width: 0; }
+.chat-nome { font-size: 13px; font-weight: 800; margin: 6px 0 6px; display: flex; gap: 8px; align-items: baseline; }
+.chat-hora { font-size: 11px; font-weight: 500; color: var(--text-3, rgb(255 255 255 / 0.45)); }
+.chat-msg.eu .chat-hora { margin: 4px 6px 0; }
+.chat-msg.ia .chat-bolha { padding: 14px 16px; border-radius: 6px 20px 20px 20px; line-height: 1.6; overflow-wrap: anywhere;
+  background: var(--surface-2, rgb(255 255 255 / 0.05)); border: 1px solid var(--surface-3, rgb(255 255 255 / 0.08)); }
+.chat-bolha p { margin: 0 0 10px; }
+.chat-bolha p:last-child, .chat-bolha ul:last-child { margin-bottom: 0; }
+.chat-bolha ul { margin: 0 0 10px; padding-left: 20px; }
+.chat-bolha li { margin: 3px 0; }
+.chat-bolha h4 { margin: 12px 0 6px; font-size: 15px; }
+.chat-erro { display: flex; gap: 8px; align-items: center; margin: 0; color: #ff8a80; }
+.chat-digitando { display: flex; align-items: center; gap: 5px; color: var(--text-2, rgb(255 255 255 / 0.65)); font-size: 14px; }
+.chat-digitando i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent, #06b6d4); animation: chat-ponto 1.2s infinite ease-in-out; }
+.chat-digitando i:nth-child(2) { animation-delay: 0.15s; }
+.chat-digitando i:nth-child(3) { animation-delay: 0.3s; margin-right: 6px; }
+.chat-acoes { display: flex; gap: 6px; margin-top: 6px; }
+.chat-acoes button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; border: 0; cursor: pointer;
+  background: none; color: var(--text-2, rgb(255 255 255 / 0.6)); font: inherit; font-size: 12px; font-weight: 600; }
+.chat-acoes button:hover { background: var(--surface-2, rgb(255 255 255 / 0.06)); color: var(--text, #fff); }
+.dv-cita { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; margin: 0 2px; border-radius: 9px;
+  font-size: 11px; font-weight: 800; background: color-mix(in srgb, var(--accent, #06b6d4) 25%, transparent); color: var(--accent, #06b6d4); vertical-align: 2px; }
+.dv-fontes { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--surface-3, rgb(255 255 255 / 0.08)); }
+.dv-fontes > b { display: flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2, rgb(255 255 255 / 0.6)); }
+.dv-fonte { display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 8px 10px; border-radius: 12px; border: 0;
+  background: var(--surface-1, rgb(255 255 255 / 0.03)); color: inherit; font: inherit; cursor: pointer; text-decoration: none; }
+.dv-fonte:hover { background: var(--surface-3, rgb(255 255 255 / 0.1)); }
+.dv-fonte span { display: flex; flex-direction: column; min-width: 0; }
+.dv-fonte small { color: var(--text-2, rgb(255 255 255 / 0.6)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-barra { position: sticky; bottom: 0; z-index: 2; padding: 10px 16px 12px;
+  background: linear-gradient(to top, var(--bg, #121212) 70%, transparent); }
+.chat-barra > * { max-width: var(--chat-max); margin-left: auto; margin-right: auto; }
+.chat-aviso { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; padding: 10px 14px; border-radius: 14px; font-size: 14px;
+  background: color-mix(in srgb, var(--accent, #06b6d4) 12%, transparent); }
+.chat-campo { display: flex; gap: 8px; align-items: flex-end; padding: 6px 6px 6px 16px; border-radius: 26px;
+  background: var(--surface-2, #232323); border: 1px solid var(--surface-3, rgb(255 255 255 / 0.1)); box-shadow: 0 8px 28px rgb(0 0 0 / 0.35);
+  transition: border-color 0.15s; }
+.chat-campo:focus-within { border-color: color-mix(in srgb, var(--accent, #06b6d4) 70%, transparent); }
+.chat-campo textarea { flex: 1; min-height: 40px; max-height: 180px; padding: 9px 0; resize: none; border: 0; outline: none; background: none;
+  color: var(--text, #fff); font: inherit; font-size: 16px; line-height: 1.4; }
+.chat-enviar { flex: none; width: 42px; height: 42px; border-radius: 50%; border: 0; display: grid; place-items: center; cursor: pointer;
+  background: var(--accent, #06b6d4); color: #04161b; transition: opacity 0.15s, transform 0.15s; }
+.chat-enviar:disabled { opacity: 0.35; cursor: default; }
+.chat-enviar:not(:disabled):hover { transform: scale(1.06); }
+.chat-rodape { display: block; margin-top: 6px; text-align: center; font-size: 11px; color: var(--text-3, rgb(255 255 255 / 0.45)); }
+@keyframes chat-entra { from { opacity: 0; transform: translateY(6px); } }
+@keyframes chat-ponto { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .chat-msg, .chat-vazio { animation: none; } .chat-digitando i { animation: none; } }
