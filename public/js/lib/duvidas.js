@@ -245,7 +245,24 @@ const PARTES_LITURGIA = [
   ['comunhao', /\bantifona da comunhao\b/],
   ['poscomunhao', /\b(depois da comunhao|pos[- ]?comunhao)\b/],
 ];
-const DIA_PEDIDO = /\b(hoje|hj|amanha|ontem|domingo|do dia|deste dia|(\d{1,2})\/(\d{1,2}))\b/;
+const DIA_PEDIDO = /\b(hoje|hj|amanha|ontem|domingo|do dia|deste dia|dia \d{1,2}|\d{1,2}\/\d{1,2}|\d{1,2} de [a-z]+)\b/;
+const MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+// a data escrita na pergunta (25/10, 25/10/2026, 25 de outubro de 2026, dia 25), em ISO; sem ela, null
+function dataEscrita(t, hoje) {
+  const [anoHoje, mesHoje] = hoje.split('-').map(Number);
+  const iso = (d, m, a) => {
+    const ano = a ? (a < 100 ? 2000 + a : a) : anoHoje;
+    const dt = new Date(ano, m - 1, d, 12);
+    return dt.getMonth() === m - 1 && dt.getDate() === d ? `${ano}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : null;
+  };
+  let m = /\b(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?\b/.exec(t);
+  if (m) return iso(Number(m[1]), Number(m[2]), m[3] && Number(m[3]));
+  m = new RegExp(`\\b(\\d{1,2}) de (${MESES.join('|')})(?: de (\\d{4}))?\\b`).exec(t);
+  if (m) return iso(Number(m[1]), MESES.indexOf(m[2]) + 1, m[3] && Number(m[3]));
+  m = /\bdia (\d{1,2})\b/.exec(t);
+  if (m) return iso(Number(m[1]), mesHoje);
+  return null;
+}
 const VERBO_PEDIDO = /\b(traga|traz|trazer|mostr\w*|manda|mande|leia|ler|ver|quero|qual (e |eh )?(o|a)|quais (sao )?(as|os)|me (de|da|diz|diga))\b/;
 const somaDiasISO = (iso, n) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 export function pedidoLiturgico(pergunta, hoje) {
@@ -258,13 +275,12 @@ export function pedidoLiturgico(pergunta, hoje) {
   if (!partes.length) return null;
   const dia = DIA_PEDIDO.exec(t);
   if (!dia && !VERBO_PEDIDO.test(t)) return null;
-  let data = hoje;
-  if (dia?.[1] === 'amanha') data = somaDiasISO(hoje, 1);
-  else if (dia?.[1] === 'ontem') data = somaDiasISO(hoje, -1);
-  else if (dia?.[1] === 'domingo') data = somaDiasISO(hoje, (7 - new Date(`${hoje}T12:00:00`).getDay()) % 7);
-  else if (dia?.[2]) {
-    const ano = Number(hoje.slice(0, 4));
-    data = `${ano}-${String(dia[3]).padStart(2, '0')}-${String(dia[2]).padStart(2, '0')}`;
+  // a data escrita vale mais que as palavras ("do dia 25/10" é o dia 25, não hoje)
+  let data = dataEscrita(t, hoje) || hoje;
+  if (data === hoje) {
+    if (/\bamanha\b/.test(t)) data = somaDiasISO(hoje, 1);
+    else if (/\bontem\b/.test(t)) data = somaDiasISO(hoje, -1);
+    else if (/\bdomingo\b/.test(t)) data = somaDiasISO(hoje, (7 - new Date(`${hoje}T12:00:00`).getDay()) % 7);
   }
   return { partes, data };
 }

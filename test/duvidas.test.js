@@ -107,6 +107,10 @@ test('tirar dúvidas: reconhece o pedido de uma parte da liturgia e o dia', () =
   assert.deepEqual(pedidoLiturgico('traga a primeira leitura e o salmo de hoje', hoje), { partes: ['leitura1', 'salmo'], data: hoje });
   assert.deepEqual(pedidoLiturgico('leituras de 25/12', hoje), { partes: ['leitura1', 'salmo', 'leitura2', 'evangelho'], data: '2026-12-25' });
   assert.deepEqual(pedidoLiturgico('Qual a coleta de hoje?', hoje), { partes: ['coleta'], data: hoje });
+  // a data escrita vale mais que "do dia" (antes trazia o salmo de hoje)
+  assert.deepEqual(pedidoLiturgico('Traga para mim o salmo do dia 25/10/2026', hoje), { partes: ['salmo'], data: '2026-10-25' });
+  assert.deepEqual(pedidoLiturgico('o salmo de 25 de dezembro', hoje), { partes: ['salmo'], data: '2026-12-25' });
+  assert.deepEqual(pedidoLiturgico('evangelho do dia 2', hoje), { partes: ['evangelho'], data: '2026-10-02' });
   // dúvida sobre o salmo (sem dia, sem pedido) não é pedido da liturgia
   assert.equal(pedidoLiturgico('Como o salmista deve proclamar o salmo responsorial?', hoje), null);
   assert.equal(pedidoLiturgico('O que a liturgia nos traz hj', hoje), null);
