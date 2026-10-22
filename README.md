@@ -113,6 +113,16 @@ Visual escuro moderno (cor padrão ciano (a da logo)), com capas, cabeçalhos em
   ♩ = 130, tudo em colcheias, volta a ♩ = 65 com as figuras dobradas), trocar por *Só a melodia* ou escolher outro compasso (e
   voltar para o *Automático*). É um rascunho: funciona melhor com voz e violão (ou o coral sozinho) do que com banda
   completa.
+- **Servidor da IA (opcional, `servidor-ia/`, Python)**: com o endereço em **Ajustes → IA**, o *Gerar com IA* manda o
+  áudio para o servidor, que separa a **voz da banda** (Demucs) antes de ouvir as notas (Basic Pitch) e confere a
+  afinação (CREPE): em trechos de músicas reais a melodia certa passou de 34% para 70% do tempo. Dá também para colar
+  o **link do YouTube** (o yt-dlp baixa só o áudio e o apaga no fim). Sem servidor, tudo continua no aparelho.
+- **Letra sincronizada** (menu ⋯ da música → *Sincronizar a letra com o vídeo*, com o servidor): o Whisper ouve o
+  vídeo e cada linha ganha o seu instante; tocando, a linha cantada acende e a letra rola junto, como no Spotify, e
+  tocar numa linha leva o vídeo até ela (o refrão repetido vai para a próxima vez dele).
+- **Tirar dúvidas** (✨ no Início): pergunte sobre liturgia e canto; a IA responde primeiro pelos **arquivos do
+  acervo** (citando cada um, que abre no app) e, se não achar, **pela internet**, mostrando as páginas.
+- **Celular sempre em pé**: no celular a tela não deita (o vídeo em tela cheia pode); tablet e computador giram.
 - **Mixer das vozes no ensaio** (na partitura salva, no editor e no fim da IA): cada voz com o seu volume e um botão
   de silenciar; tocar no nome **destaca** a voz e deixa as outras baixinho, de fundo (`destacarVoz`), para a pessoa se
   localizar. O volume muda na hora, tocando (cada voz tem o seu controle de volume no Web Audio), e fica guardado por
