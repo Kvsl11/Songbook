@@ -20,7 +20,7 @@ import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } fro
 import { partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { NOVIDADES, novidadesNaoVistas } from './lib/novidades.js';
 import { baseDoServidor, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
-import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
+import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, dataDaPergunta, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -58,7 +58,7 @@ const responde = (url) => fetch(url + '/saude', { signal: AbortSignal.timeout(80
 const servidorCarregado = (async () => {
   const pc = baseDoServidor(db.prefs().servidorPc);
   if (pc && await responde(pc)) {
-    SERVIDOR_IA = { url: pc, chave: '', pc: true };
+    SERVIDOR_IA = { url: pc, chave: '', pc: true, lumen: pc };
     if (doLink) setTimeout(() => toast('Servidor do seu computador conectado'), 500);
   } else {
     if (pc && doLink) setTimeout(() => toast('O servidor do computador não respondeu. Ele está ligado?'), 500);
@@ -66,7 +66,8 @@ const servidorCarregado = (async () => {
     if (!d?.url) return;
     // sem o "bom dia" que acordava o servidor a cada vez que o app abria: cada acordada gastava o crédito grátis do
     // Modal (a máquina liga e fica ligada um tempo), mesmo sem ninguém gerar nada
-    SERVIDOR_IA = { url: baseDoServidor(d.url), chave: d.chave || '' };
+    // "lumen": a máquina pequena só das perguntas do Lumen (a principal é a das partituras)
+    SERVIDOR_IA = { url: baseDoServidor(d.url), chave: d.chave || '', lumen: baseDoServidor(d.lumen || '') };
   }
   // a tela que já abriu sem saber do servidor é desenhada de novo
   if (/^#\/musica\/[^/]+\/compor\/ia/.test(location.hash)) route();
@@ -107,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-230';
+export const APP_VERSAO = '2026.10.22-231';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -8103,7 +8104,9 @@ const SUGESTOES_DUVIDAS = [
 ];
 // a resposta (markdown simples) em HTML: parágrafos, listas, títulos, **negrito** e as citações [n] em bolinhas
 function htmlDaResposta(texto) {
-  const linha = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\[(\d+)\]/g, '<sup class="dv-cita">$1</sup>');
+  // **negrito**, *itálico*, as citações [n] em bolinhas e as palavras longas com o ponto de quebra (hífen)
+  const linha = (t) => esc(t).replace(/\p{L}+/gu, (w) => hifenizar(w)).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<i>$2</i>')
+    .replace(/\[(\d+)\]/g, '<sup class="dv-cita">$1</sup>');
   return String(texto || '').split(/\n{2,}/).map((bloco) => {
     const itens = bloco.split('\n');
     if (itens.every((l) => /^\s*([-*•]|\d+[.)])\s+/.test(l))) return `<ul>${itens.map((l) => `<li>${linha(l.replace(/^\s*([-*•]|\d+[.)])\s+/, ''))}</li>`).join('')}</ul>`;
@@ -8198,6 +8201,47 @@ async function sugestoesDaMissa({ partes, data }) {
   };
 }
 const textoDasSugestoes = (S) => [S.titulo + (S.celebracao ? ` — ${S.celebracao}` : ''), ...S.partes.map((p) => `${p.nome}:\n${p.cantos.length ? p.cantos.map((c) => `• ${c.titulo} (${FONTES_CANTO[c.fonte] || c.fonte})`).join('\n') : '(sem sugestão)'}`)].join('\n\n');
+// O Lumen com IA: a pergunta vai para o servidor (rota /duvida), onde o Claude lê o acervo do Drive (cantos, Hinário,
+// nomes e texto dos PDFs) e, se precisar, a internet. Junto vai o que está no app: a liturgia do dia de que a pergunta
+// fala, os cantos que o app sugere para ele, as músicas da biblioteca e os repertórios. Sem o servidor, ou sem a chave
+// da IA nele (501), o Lumen continua com a busca gratuita no aparelho.
+let lumenSemIA = false;
+const servidorLumen = () => (SERVIDOR_IA.url && !lumenSemIA ? { url: SERVIDOR_IA.lumen || SERVIDOR_IA.url, chave: SERVIDOR_IA.chave } : null);
+const comPrazo = (promessa, ms) => Promise.race([promessa, new Promise((r) => setTimeout(() => r(null), ms))]);
+async function contextoDoApp(pergunta) {
+  const hoje = hojeISO();
+  const data = dataDaPergunta(pergunta, hoje);
+  const dia = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const l = [`Hoje é ${dia(hoje)}.`];
+  // as leituras direto da CNBB (rápido); a missa com as sugestões de cantos (mais lenta) vem junto, se der tempo
+  const [litCnbb, missa] = await Promise.all([
+    comPrazo(getLiturgiaDoDia(data).catch(() => null), 8000),
+    comPrazo((missaCache.get(data) ? Promise.resolve(missaCache.get(data)) : getMissa(data).then((m) => { missaCache.set(data, m); return m; })).catch(() => null), 9000),
+  ]);
+  const lit = missa?.liturgia || litCnbb;
+  if (lit) {
+    const m0 = lit.missas?.[0] || {};
+    l.push('', `Liturgia de ${dia(data)} (CNBB): ${[lit.celebracao, lit.ano, lit.cor && `cor ${lit.cor}`].filter(Boolean).join(', ')}.`);
+    for (const [k, nome] of [['leitura1', '1ª leitura'], ['salmo', 'Salmo'], ['leitura2', '2ª leitura'], ['aclamacao', 'Aclamação'], ['evangelho', 'Evangelho']]) {
+      const sec = m0[k];
+      if (!sec) continue;
+      const ref = sec.referenciaCompleta || sec.referencia || '';
+      if (k === 'salmo') l.push(`- ${nome}: ${ref} — R. ${sec.refrao || ''}`);
+      else if (k === 'aclamacao') l.push(`- ${nome}: ${sec.versiculo || ''}`);
+      else l.push(`- ${nome}: ${ref}${sec.introducao ? ` (${sec.introducao})` : ''}\n  "${(sec.texto || []).join(' ').replace(/\s+/g, ' ').slice(0, k === 'evangelho' ? 3000 : 1200)}"`);
+    }
+    const liturgica = missa ? await comPrazo(missaLiturgica(missa, data).catch(() => null), 6000) : null;
+    const linhas = (liturgica?.partes || []).filter((p) => p.cantos.length).map((p) => `- ${p.nome}: ${p.cantos.slice(0, 4).map((c) => c.titulo).join('; ')}`);
+    if (linhas.length) l.push('Cantos que o app sugere para esse dia (acervo e Hinário da CNBB):', ...linhas);
+  }
+  const musicas = db.songs();
+  if (musicas.length) l.push('', `Músicas na biblioteca (${musicas.length}): ${musicas.slice(0, 250).map((m) => (m.artist ? `${m.title} (${m.artist})` : m.title)).join('; ')}`);
+  const sets = db.sets().slice(0, 15);
+  if (sets.length) l.push('', 'Repertórios:', ...sets.map((x) => `- ${x.name}${x.date ? ` (${fmtData(x.date)})` : ''}: ${(x.items || []).map((it) => db.song(it.songId)?.title).filter(Boolean).join('; ')}`));
+  return l.join('\n');
+}
+// a resposta da IA em texto corrido (para a voz: sem as citações [1] e sem a marcação)
+const textoDaIA = (r) => String(r?.resposta || '').replace(/\s*\[\d+\]/g, '').replace(/\*\*|^#+\s*|^\s*[-*•]\s+/gm, '');
 // a liturgia em texto (para copiar e para a voz)
 const textoDaLiturgia = (L) => [L.titulo + (L.celebracao ? ` — ${L.celebracao}` : ''), ...L.partes.map((p) => [
   p.titulo + (p.referencia ? ` (${p.referencia})` : ''), p.introducao, p.refrao && `R. ${p.refrao}`,
@@ -8210,6 +8254,7 @@ const nomeDoSite = (w) => {
 };
 // a resposta dita em voz alta na conversa ao vivo: o que achou, de onde, em frases curtas
 const falaDaResposta = (m) => {
+  if (m.ia) return textoDaIA(m.ia);
   if (m.sugestoes) {
     const S = m.sugestoes;
     return [`Sugestões para a ${S.titulo.toLowerCase()}${S.celebracao ? `, ${S.celebracao}` : ''}.`, ...S.partes.map((p) => (p.cantos.length
@@ -8256,7 +8301,7 @@ const realcar = (texto, pergunta) => {
   return esc(texto).replace(/[\p{L}\d]+/gu, (p) => (termos.has(raizDuvida(palavrasDuvida(p)[0] || '')) ? `<b>${hifenizar(p)}</b>` : hifenizar(p)));
 };
 // a resposta em texto (para copiar)
-const textoDaResposta = (m) => (m.sugestoes ? textoDasSugestoes(m.sugestoes) : m.liturgia ? textoDaLiturgia(m.liturgia) : [
+const textoDaResposta = (m) => (m.ia ? m.ia.resposta : m.sugestoes ? textoDasSugestoes(m.sugestoes) : m.liturgia ? textoDaLiturgia(m.liturgia) : [
   ...(m.cantos || []).map((a) => `${a.titulo} (${a.caminho})`),
   ...(m.acervo || []).map((a) => `${a.titulo} (${a.caminho}): ${a.frases.join(' ')}`),
   ...(m.web || []).map((w) => `${w.titulo}: ${w.frases.join(' ')} (${w.url})`),
@@ -8300,6 +8345,18 @@ function viewDuvidas() {
     // a resposta: o trecho que mais responde, em texto corrido, com a fonte embaixo; os outros trechos recolhidos
     const fonte = (a, n) => `<button type="button" class="dv-fonte" data-k="${k}" data-n="${n}">${icon('library', 14)}<span><b>${esc(a.titulo)}</b><small>${esc(a.caminho)}</small></span></button>`;
     const partes = [];
+    if (m.ia) {
+      const fontes = m.ia.fontes || [];
+      const web = m.ia.web || [];
+      const site = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } };
+      const favicon = (s) => `<span class="dv-favicon"><img src="https://external-content.duckduckgo.com/ip3/${encodeURIComponent(s)}.ico" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('sem')">${icon('external', 14)}</span>`;
+      // o arquivo do acervo abre no leitor do app (o PDF do Drive), e o voltar traz para o Lumen
+      const doAcervo = (f) => (f.id ? `<a class="dv-fonte" href="#/arquivo/${encodeURIComponent(`https://drive.google.com/file/d/${f.id}/view`)}/${encodeURIComponent(f.titulo)}/${encodeURIComponent('#/duvidas')}"><sup class="dv-cita">${f.n}</sup><span><b>${esc(f.titulo)}</b><small>${esc(f.caminho || 'Acervo litúrgico')}</small></span></a>`
+        : `<span class="dv-fonte"><sup class="dv-cita">${f.n}</sup><span><b>${esc(f.titulo)}</b><small>${esc(f.caminho || '')}</small></span></span>`);
+      return `<div class="dv-ia">${htmlDaResposta(m.ia.resposta)}</div>
+        ${fontes.length ? `<h4 class="dv-sub">Do acervo</h4><div class="dv-cantos">${fontes.map(doAcervo).join('')}</div>` : ''}
+        ${web.length ? `<h4 class="dv-sub">Na internet</h4><div class="dv-cantos">${web.slice(0, 6).map((w) => `<a class="dv-fonte" href="${esc(w.url)}" target="_blank" rel="noopener">${favicon(site(w.url))}<span><b>${esc(w.titulo)}</b><small>${esc(site(w.url))}</small></span></a>`).join('')}</div>` : ''}`;
+    }
     if (m.sugestoes) {
       const S = m.sugestoes;
       return `<div class="dv-lit">
@@ -8359,7 +8416,7 @@ function viewDuvidas() {
     ? `<div class="chat-msg eu"><div class="chat-bolha">${esc(m.content)}</div><small class="chat-hora">${horaCurta(m.t)}</small></div>`
     : `<div class="chat-msg ia"><div class="chat-corpo"><div class="chat-nome">${avatar}<span>Lumen</span><small class="chat-hora">${horaCurta(m.t)}</small></div>
         <div class="chat-bolha">${corpo(m, k)}</div>
-        ${!m.carregando ? `<div class="chat-acoes">${m.sugestoes || m.liturgia || m.acervo?.length || m.cantos?.length || m.web?.length || m.wiki ? `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>` : ''}
+        ${!m.carregando ? `<div class="chat-acoes">${m.ia || m.sugestoes || m.liturgia || m.acervo?.length || m.cantos?.length || m.web?.length || m.wiki ? `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>` : ''}
           ${m.pergunta ? `<a href="${esc(google(m.pergunta))}" target="_blank" rel="noopener">${icon('search', 14)} Pesquisar no Google</a>` : ''}</div>` : ''}</div></div>`);
   const desenhar = () => {
     caixa.innerHTML = conversaDuvidas.length ? conversaDuvidas.map(msg).join('') : boasVindas();
@@ -8404,6 +8461,29 @@ function viewDuvidas() {
         if (location.hash === '#/duvidas') viewDuvidas();
         return resp;
       }
+    }
+    // o Lumen com IA (servidor), quando está disponível; se falhar, segue a busca gratuita logo abaixo
+    const cfgIA = servidorLumen();
+    if (cfgIA) {
+      resp.etapa = 'Lumen está pensando…';
+      if (location.hash === '#/duvidas') desenhar();
+      try {
+        // as últimas perguntas e respostas: dá para continuar a conversa ("e no ofertório?")
+        const historico = conversaDuvidas.slice(0, -2).filter((m) => !m.carregando).slice(-6)
+          .map((m) => ({ role: m.role, content: m.role === 'user' ? m.content : textoDaResposta(m) || '…' }));
+        const ia = await chamar(cfgIA, '/duvida', { json: { pergunta: q, historico, contexto: await contextoDoApp(q) }, tempo: 150e3 });
+        if (ia?.resposta) {
+          Object.assign(resp, { ia, acervo: [], cantos: [], web: [], wiki: null, carregando: false, t: Date.now() });
+          guardarConversa();
+          if (location.hash === '#/duvidas') viewDuvidas();
+          return resp;
+        }
+      } catch (e) {
+        // sem a chave da IA no servidor (501): não tenta de novo nesta sessão; outros erros: só desta vez
+        if (e.status === 501) lumenSemIA = true;
+      }
+      resp.etapa = 'Procurando no acervo…';
+      if (location.hash === '#/duvidas') desenhar();
     }
     // primeiro o acervo (no aparelho); a internet (sites católicos pelo DuckDuckGo, e a Wikipédia) vai junto, mas sem
     // segurar a resposta se ela falhar

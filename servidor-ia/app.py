@@ -280,6 +280,8 @@ def letra_sincronizada(pedido: PedidoLetra, etapas: bool = Query(False)):
 class PedidoDuvida(BaseModel):
     pergunta: str
     historico: list[dict] = []
+    # o que está no app de quem pergunta (data, liturgia do dia, biblioteca, repertórios), em texto
+    contexto: str = ""
 
 
 @app.post("/duvida", dependencies=[Depends(conferir_chave)])
@@ -290,7 +292,7 @@ def tirar_duvida(pedido: PedidoDuvida):
     import anthropic
 
     try:
-        return duvidas.responder(pedido.pergunta, pedido.historico)
+        return duvidas.responder(pedido.pergunta, pedido.historico, pedido.contexto)
     except ValueError as e:
         raise HTTPException(422, str(e))
     except anthropic.RateLimitError:

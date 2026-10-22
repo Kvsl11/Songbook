@@ -56,3 +56,21 @@ def web():
     from app import app as api
 
     return api
+
+
+# o Lumen (o "Tirar dúvidas" com IA, rota /duvida) numa máquina pequena, separada: a pergunta só lê o acervo e chama
+# o Claude, não precisa dos 8 núcleos da partitura; assim cada pergunta não liga a máquina grande (que gasta o crédito
+# do Modal por núcleo-segundo) nem espera na fila de uma música sendo gerada. O endereço vai em data/servidor-ia.json
+# ("lumen"), gravado pela publicação do app.
+@app.function(image=imagem, cpu=1.0, memory=4096, timeout=300, scaledown_window=120, max_containers=2,
+              secrets=[modal.Secret.from_name("songbook-ia")])
+@modal.concurrent(max_inputs=8)
+@modal.asgi_app()
+def lumen():
+    import sys
+
+    sys.path.insert(0, "/root/app")
+    os.chdir("/root/app")
+    from app import app as api
+
+    return api

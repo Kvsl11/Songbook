@@ -13,3 +13,6 @@ __pycache__/
 .pytest_cache/
 servidor-ia/cookies.txt
 public/data/servidor-ia.json
+
+# texto dos PDFs do acervo lido pelo servidor-ia/indexar_acervo.py (grande; fica no cache da publicação)
+servidor-ia/textos-acervo.jsonl

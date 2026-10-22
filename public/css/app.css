@@ -2716,6 +2716,12 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 .dv-lit-estrofe { margin: 0 0 10px; font-size: 15.5px; line-height: 1.6; }
 .dv-fonte.abrindo { opacity: 0.55; pointer-events: none; }
 .dv-lit-fontes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+/* a resposta da IA: o texto do Lumen (com listas e títulos) e as fontes embaixo */
+.dv-ia { font-size: 15.5px; line-height: 1.65; }
+.dv-ia p { text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
+.dv-ia ul { padding-left: 20px; }
+.dv-ia li { margin: 4px 0; }
+.dv-ia h4 { margin: 14px 0 6px; font-size: 15px; }
 .dv-favicon { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: #fff; overflow: hidden; }
 .dv-favicon img { width: 18px; height: 18px; object-fit: contain; }
 .dv-favicon .ic { display: none; }

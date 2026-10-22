@@ -107,7 +107,16 @@ jobs:
         run: |
           [ -n "$MODAL_TOKEN_ID" ] || exit 0
           pip install -q modal
-          python3 -c "import json, modal; json.dump({'url': modal.Function.from_name('songbook-ia', 'web').get_web_url()}, open('public/data/servidor-ia.json', 'w'))"
+          python3 - <<'PY'
+          import json, modal
+          dados = {'url': modal.Function.from_name('songbook-ia', 'web').get_web_url()}
+          # o Lumen (perguntas com IA) na máquina pequena; sem ela publicada ainda, o app usa o endereço principal
+          try:
+              dados['lumen'] = modal.Function.from_name('songbook-ia', 'lumen').get_web_url()
+          except Exception:
+              pass
+          json.dump(dados, open('public/data/servidor-ia.json', 'w'))
+          PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -53,6 +53,16 @@ quem usa o app não configura nada. Só uma vez, à mão:
 4. Em **Actions**, rode **Publicar o servidor da IA** (a primeira montagem leva uns 15 minutos); a publicação do app
    roda sozinha em seguida.
 
+### Lumen com IA (`ANTHROPIC_API_KEY`)
+
+Com a chave da API da Anthropic (<https://console.anthropic.com> → **API Keys**, paga por uso) no secret
+`ANTHROPIC_API_KEY`, o Lumen (o assistente do app) passa a responder com IA: o Claude Sonnet lê o acervo do Drive
+(cantos, Hinário, nomes dos arquivos e o texto dos PDFs), o que o app manda junto (a liturgia do dia, os cantos
+sugeridos, a biblioteca e os repertórios de quem pergunta) e, se precisar, a internet, e cita de onde tirou cada coisa.
+Roda numa máquina pequena do Modal (a função `lumen`), separada da das partituras. A publicação lê o texto dos PDFs do
+acervo (`indexar_acervo.py`, até 800 arquivos novos por vez, guardados entre as publicações) e roda sozinha toda
+segunda-feira para ler os que entraram no Drive. Sem a chave, o Lumen continua com a busca gratuita no aparelho.
+
 ## Rodar no seu computador
 
 ```bash

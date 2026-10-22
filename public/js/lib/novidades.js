@@ -3,6 +3,13 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 231, data: '2026-10-22', titulo: 'Lumen com inteligência artificial',
+    itens: [
+      { tipo: 'novo', texto: 'O Lumen agora responde com IA (quando o servidor tem a chave da IA): ele lê o acervo do Drive — cantos, Hinário e o texto dos PDFs — e sabe o que está no seu app: a liturgia do dia de que você fala, os cantos sugeridos, as suas músicas e os seus repertórios. A resposta cita de onde veio cada coisa ([1], [2]…); tocar na fonte abre o arquivo do Drive. Sem a IA, continua a busca de antes.' },
+      { tipo: 'correcao', texto: '“O que tem no meu repertório?” não é mais confundido com um pedido de sugestão de cantos.' },
+    ],
+  },
+  {
     versao: 230, data: '2026-10-22', titulo: 'Lumen sugere os cantos da missa',
     itens: [
       { tipo: 'novo', texto: 'Peça ao Lumen “sugestão para a entrada e o ofertório do dia 29/01/2027”, “canto de comunhão para domingo” ou “repertório para a missa de amanhã”: ele traz as sugestões da tela da Liturgia só das partes pedidas — primeiro do acervo e do Hinário da CNBB, depois da Cindy Ferrarezi e do Músicas para Missa. Tocar num canto abre a música.' },
