@@ -29,10 +29,19 @@ imagem = (
 
 app = modal.App("songbook-ia")
 
+# o áudio e a voz separada de cada vídeo ficam guardados aqui (transcricao.guardar): a letra sincronizada e a
+# partitura da mesma música não baixam nem separam duas vezes, mesmo em máquinas diferentes
+guardados = modal.Volume.from_name("songbook-ia-cache", create_if_missing=True)
+NUCLEOS = 8
+
 
 # a chave da IA do "Tirar dúvidas" e o cookies.txt do YouTube vêm do secret "songbook-ia" (o workflow o cria)
-@app.function(image=imagem, cpu=2.0, memory=8192, timeout=900, scaledown_window=300,
-              secrets=[modal.Secret.from_name("songbook-ia")])
+# 8 núcleos (antes 2): o Demucs, o CREPE e o Whisper dividem o trabalho entre eles, e a música sai várias vezes mais
+# rápido pelo mesmo custo de núcleo-segundo. Duas músicas ao mesmo tempo (a letra de uma e a partitura de outra), com
+# memória para as duas
+@app.function(image=imagem, cpu=float(NUCLEOS), memory=16384, timeout=900, scaledown_window=300,
+              secrets=[modal.Secret.from_name("songbook-ia")], volumes={"/cache": guardados},
+              env={"IA_THREADS": str(NUCLEOS), "IA_TAREFAS": "2", "IA_CACHE": "/cache"})
 @modal.concurrent(max_inputs=4)
 @modal.asgi_app()
 def web():

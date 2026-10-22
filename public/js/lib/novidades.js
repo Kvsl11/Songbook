@@ -7,6 +7,8 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'Gerar a partitura com IA travava em “Baixando o áudio”: na verdade a música estava na fila do servidor. Agora a tela avisa quando está esperando a vez.' },
       { tipo: 'melhoria', texto: 'A etapa “Conferindo a afinação da voz” levava uns 10 minutos; agora leva segundos. A partitura sai bem mais rápido e não segura a fila.' },
+      { tipo: 'melhoria', texto: 'O servidor da IA ficou com 4 vezes mais força (8 núcleos) e faz duas músicas ao mesmo tempo: a letra de uma não segura mais a partitura de outra.' },
+      { tipo: 'melhoria', texto: 'A letra sincronizada e a partitura da mesma música aproveitam o mesmo áudio e a mesma voz separada: a segunda não baixa nem separa de novo e sai bem mais rápido.' },
       { tipo: 'correcao', texto: 'Letra que não sincronizava porque o servidor estava ocupado: o app tenta de novo da próxima vez que a música abrir.' },
       { tipo: 'novo', texto: 'Notas de atualização: a cada versão nova, o sininho avisa o que mudou, e esta tela mostra tudo.' },
     ],

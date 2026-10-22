@@ -244,6 +244,90 @@ def limpar(voz: list[Nota], banda: list[Nota], afinacao=None, quebra_voz=None, q
     return voz, banda, tipo
 
 
+# ------------------------------------------------------------------ guardado por vídeo
+# O áudio de um vídeo (já em 22050 Hz, mono) e a voz e a banda separadas ficam guardados por um tempo: a letra
+# sincronizada e a partitura da mesma música usam o mesmo áudio e a mesma separação (antes cada uma baixava e
+# separava de novo: o Demucs é a parte mais pesada). Em float16, ~16 MB por faixa de 6 min; ficam as 30 últimas.
+# IA_CACHE: a pasta (no Modal, um Volume, que sobrevive às máquinas que ligam e desligam)
+CACHE = os.environ.get("IA_CACHE") or os.path.join(tempfile.gettempdir(), "songbook-ia-cache")
+MAX_GUARDADOS = int(os.environ.get("IA_CACHE_MAX", 30))
+_trava_cache = threading.Lock()
+
+
+def _arquivo_guardado(video: str) -> str:
+    return os.path.join(CACHE, f"{video}.npz")
+
+
+def guardado(video: str | None) -> dict:
+    """O que já foi guardado deste vídeo: y, cortado, titulo, voz, banda (o que houver); {} se nada."""
+    if not video:
+        return {}
+    try:
+        with np.load(_arquivo_guardado(video), allow_pickle=False) as d:
+            saida = {k: d[k] for k in d.files}
+        for k in ("y", "voz", "banda"):
+            if k in saida:
+                saida[k] = saida[k].astype(np.float32)
+        os.utime(_arquivo_guardado(video))  # usado agora: é dos últimos a sair
+        return saida
+    except Exception:  # não tem, ou o arquivo ficou pela metade
+        return {}
+
+
+def guardar(video: str | None, **dados) -> None:
+    """Junta os dados aos já guardados do vídeo (os áudios em float16) e tira os mais antigos além do limite."""
+    if not video:
+        return
+    try:
+        with _trava_cache:
+            os.makedirs(CACHE, exist_ok=True)
+            tudo = guardado(video)
+            for k, v in dados.items():
+                tudo[k] = v.astype(np.float16) if isinstance(v, np.ndarray) and v.dtype.kind == "f" else np.asarray(v)
+            tmp = os.path.join(CACHE, f".{video}.{threading.get_ident()}.npz")
+            np.savez(tmp, **tudo)
+            os.replace(tmp, _arquivo_guardado(video))
+            arquivos = sorted((os.path.join(CACHE, f) for f in os.listdir(CACHE) if f.endswith(".npz") and not f.startswith(".")),
+                              key=os.path.getmtime, reverse=True)
+            for f in arquivos[MAX_GUARDADOS:]:
+                os.remove(f)
+    except Exception:  # sem espaço ou sem permissão: segue sem guardar
+        log.warning("não consegui guardar o áudio de %s", video, exc_info=True)
+
+
+def audio_do_video(video: str, baixar) -> tuple[np.ndarray, bool, str]:
+    """(y, cortado, título) do vídeo: o guardado ou, se não houver, baixar() → {"caminho", "titulo"} e carrega."""
+    g = guardado(video)
+    if "y" in g:
+        return g["y"], bool(g.get("cortado", False)), str(g.get("titulo", ""))
+    baixado = baixar()
+    y, cortado = carregar(baixado["caminho"])
+    guardar(video, y=y, cortado=np.array(cortado), titulo=np.array(baixado.get("titulo") or ""))
+    return y, cortado, baixado.get("titulo") or ""
+
+
+def separar_guardado(y: np.ndarray, video: str | None = None) -> tuple[np.ndarray, np.ndarray]:
+    """A voz e a banda: as já separadas deste vídeo ou, se não houver, separa (e guarda)."""
+    g = guardado(video)
+    if "voz" in g and "banda" in g and len(g["voz"]) == len(y):
+        return g["voz"], g["banda"]
+    voz, banda = separar(y)
+    guardar(video, voz=voz, banda=banda)
+    return voz, banda
+
+
+# quantos núcleos cada modelo usa (IA_THREADS; no Modal, os da máquina). Sem isso o torch pode achar que tem os
+# núcleos da máquina física inteira e brigar por eles, o que deixa tudo mais lento
+THREADS = int(os.environ.get("IA_THREADS") or 0)
+
+
+def _threads_do_torch():
+    if THREADS:
+        import torch
+
+        torch.set_num_threads(THREADS)
+
+
 # ------------------------------------------------------------------ modelos (carregados uma vez)
 
 _trava = threading.Lock()
@@ -284,6 +368,7 @@ def modelo_demucs():
         if _modelo_demucs is None:
             from demucs.pretrained import get_model
 
+            _threads_do_torch()
             _modelo_demucs = get_model(os.environ.get("IA_DEMUCS", "htdemucs"))
             _modelo_demucs.eval()
         return _modelo_demucs
@@ -364,6 +449,7 @@ def afinacao_da_voz(voz: np.ndarray):
     except ImportError:
         torchcrepe = None
     if torchcrepe is not None and not os.environ.get("IA_SEM_CREPE"):
+        _threads_do_torch()
         sr, hop = 16000, 160  # quadros de 10 ms
         x = torch.tensor(librosa.resample(voz, orig_sr=SR, target_sr=sr), dtype=torch.float32)[None]
         f0, period = torchcrepe.predict(x, sr, hop, 65.0, 1100.0, os.environ.get("IA_CREPE", "tiny"),
@@ -388,10 +474,11 @@ def andamento(y: np.ndarray) -> tuple[float, list[float]]:
     return round(bpm, 1), [round(float(t), 3) for t in batidas]
 
 
-def transcrever(caminho: str, separar_voz: bool = True, etapa=lambda nome: None) -> dict:
+def transcrever(caminho: str | None, separar_voz: bool = True, etapa=lambda nome: None, audio=None, video: str | None = None) -> dict:
     """O arquivo de áudio → as notas para o app (e o que mais se ouviu). "etapa(nome)" avisa em que parte está
-    (para o app mostrar o andamento): separando, notas, afinacao, escrevendo."""
-    y, cortado = carregar(caminho)
+    (para o app mostrar o andamento): separando, notas, afinacao, escrevendo. audio = (y, cortado) já carregado
+    (o do vídeo guardado); video: o id, para usar e guardar a voz já separada."""
+    y, cortado = audio if audio is not None else carregar(caminho)
     duracao = len(y) / SR
     if duracao < 0.5:
         raise ValueError("áudio vazio ou curto demais")
@@ -402,7 +489,7 @@ def transcrever(caminho: str, separar_voz: bool = True, etapa=lambda nome: None)
         if separado:
             etapa("separando")
             try:
-                voz_y, banda_y = separar(y)
+                voz_y, banda_y = separar_guardado(y, video)
                 voz_y, banda_y = np.nan_to_num(voz_y), np.nan_to_num(banda_y)
                 # quase nada na faixa da voz (música instrumental, ou a voz que o Demucs não reconheceu): a música junta
                 razao = float(np.sqrt(np.mean(voz_y ** 2))) / (float(np.sqrt(np.mean(y ** 2))) or 1.0)
