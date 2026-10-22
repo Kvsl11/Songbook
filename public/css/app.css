@@ -2686,8 +2686,6 @@ html.tablet body.painel-recolhido #player .pl-video { width: 60px; height: 60px;
 html.tablet body.painel-recolhido #player .pl-info { flex: 1; min-width: 0; padding: 0; }
 html.tablet body.painel-recolhido #player .pl-txt b { font-size: 17px; white-space: nowrap; }
 html.tablet body.painel-recolhido #player .pl-txt small { font-size: 14.5px; margin-top: 3px; }
-/* o cantor e o tempo, como no celular: 0:09 / 4:23 */
-html.tablet body.painel-recolhido #player .pl-tmini { display: inline; }
 html.tablet body.painel-recolhido #player .pl-ctrl { flex: none; padding: 0; gap: 2px; }
 html.tablet body.painel-recolhido #player .pl-modo { display: none; }
 html.tablet body.painel-recolhido #player .pl-play { width: 48px; height: 48px; }
