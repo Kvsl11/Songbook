@@ -20,7 +20,7 @@ import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } fro
 import { partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { NOVIDADES, novidadesNaoVistas } from './lib/novidades.js';
 import { baseDoServidor, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
-import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
+import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -107,7 +107,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-226';
+export const APP_VERSAO = '2026.10.22-227';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -8119,6 +8119,62 @@ const pedeLiturgiaDoDia = (q) => {
 // o ditado da pergunta: o reconhecimento de voz do próprio navegador (Chrome, Edge, Safari), em português
 const ReconhecerVoz = window.SpeechRecognition || window.webkitSpeechRecognition;
 let vozDuvidas = null;
+// Pedido de uma parte da liturgia ("o salmo de hoje"): vem só aquela parte, da mesma liturgia que a tela da Liturgia
+// mostra (leituras, salmo e aclamação da CNBB; antífonas e orações do Pocket Terço, que também serve de reserva das
+// leituras). Devolve null quando nenhuma das duas tem a parte (aí o Lumen procura na internet, como nas dúvidas).
+const NOMES_PARTES = {
+  leitura1: 'Primeira leitura', salmo: 'Salmo responsorial', leitura2: 'Segunda leitura', aclamacao: 'Aclamação ao Evangelho',
+  evangelho: 'Evangelho', sequencia: 'Sequência', entrada: 'Antífona de entrada', coleta: 'Oração do dia (coleta)',
+  ofertorio: 'Antífona do ofertório', oferendas: 'Sobre as oferendas', comunhao: 'Antífona da comunhão', poscomunhao: 'Depois da comunhão',
+};
+const TITULOS_POCKET = {
+  leitura1: /^primeira leitura/i, salmo: /^salmo/i, leitura2: /^segunda leitura/i, evangelho: /^evangelho/i, entrada: /^antífona de entrada/i,
+  coleta: /^(coleta|oração do dia)/i, ofertorio: /^antífona do ofertório/i, oferendas: /^sobre as oferendas/i, comunhao: /^antífona da comunhão/i,
+  poscomunhao: /^depois da comunhão/i,
+};
+// o texto de um bloco do Pocket Terço (HTML já limpo pelo parser) em parágrafos
+const paragrafosDoHtml = (html) => {
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+  doc.querySelectorAll('br').forEach((br) => br.replaceWith('\n'));
+  const ps = [...doc.body.querySelectorAll('p')];
+  return (ps.length ? ps.map((p) => p.textContent) : doc.body.textContent.split(/\n{2,}/)).map((t) => t.trim()).filter(Boolean);
+};
+async function partesDaLiturgia({ partes, data }) {
+  const [missa, pocket] = await Promise.all([
+    (missaCache.get(data) ? Promise.resolve(missaCache.get(data)) : getMissa(data).then((m) => { missaCache.set(data, m); return m; })).catch(() => null),
+    missalDoDia(data).catch(() => null),
+  ]);
+  const lit = missa?.liturgia;
+  const cnbb = lit?.missas?.[0] || {};
+  const achadas = [];
+  for (const parte of partes) {
+    const s = cnbb[parte];
+    const nome = NOMES_PARTES[parte];
+    if (s && parte === 'salmo') {
+      achadas.push({ parte, titulo: nome, referencia: s.referenciaCompleta || s.referencia, refrao: s.refrao, estrofes: (s.estrofes || []).map((e) => e.map((l) => l.replace(/\s*[*†]\s*$/, ''))), fonte: 'cnbb' });
+    } else if (s && parte === 'aclamacao') {
+      achadas.push({ parte, titulo: nome, referencia: s.referencia, refrao: s.refrao, paragrafos: [s.versiculo].filter(Boolean), fonte: 'cnbb' });
+    } else if (s) {
+      achadas.push({ parte, titulo: nome, referencia: s.referenciaCompleta || s.referencia, introducao: s.introducao, paragrafos: (s.texto || []).map((p) => p.replace(/\n/g, ' ')), fonte: 'cnbb' });
+    } else {
+      const b = TITULOS_POCKET[parte] && pocket?.blocos?.find((x) => TITULOS_POCKET[parte].test(x.titulo));
+      if (b) achadas.push({ parte, titulo: nome, referencia: b.titulo.split(' — ')[1] || '', paragrafos: paragrafosDoHtml(b.html), fonte: 'pocket' });
+    }
+  }
+  if (!achadas.length) return null;
+  return {
+    data,
+    titulo: data === hojeISO() ? 'Liturgia de hoje' : `Liturgia de ${fmtData(data)}`,
+    celebracao: lit?.celebracao || pocket?.titulo || '',
+    partes: achadas,
+    fontes: [...new Set(achadas.map((p) => p.fonte))],
+  };
+}
+// a liturgia em texto (para copiar e para a voz)
+const textoDaLiturgia = (L) => [L.titulo + (L.celebracao ? ` — ${L.celebracao}` : ''), ...L.partes.map((p) => [
+  p.titulo + (p.referencia ? ` (${p.referencia})` : ''), p.introducao, p.refrao && `R. ${p.refrao}`,
+  ...(p.estrofes || []).map((e) => e.join('\n')), ...(p.paragrafos || []),
+].filter(Boolean).join('\n'))].join('\n\n');
 // o nome do site, para mostrar e falar: o que vem depois do "|" no título ("… | Católicos Orantes") ou o endereço
 const nomeDoSite = (w) => {
   const fim = String(w.titulo || '').split(/\s[|–—-]\s/).slice(1).pop()?.trim();
@@ -8126,6 +8182,13 @@ const nomeDoSite = (w) => {
 };
 // a resposta dita em voz alta na conversa ao vivo: o que achou, de onde, em frases curtas
 const falaDaResposta = (m) => {
+  if (m.liturgia) {
+    const L = m.liturgia;
+    return [`${L.titulo}${L.celebracao ? `, ${L.celebracao}` : ''}.`, ...L.partes.map((p) => [
+      `${p.titulo}.`, p.introducao && `${p.introducao}.`, p.refrao && `Refrão: ${p.refrao}`,
+      ...(p.estrofes || []).map((e) => e.join(' ')), ...(p.paragrafos || []),
+    ].filter(Boolean).join(' '))].join(' ');
+  }
   const partes = [];
   if (pedeLiturgiaDoDia(m.pergunta)) partes.push('A liturgia de hoje está na página da Liturgia. Deixei o atalho aqui na tela.');
   if (m.cantos?.length) partes.push(`Achei ${m.cantos.length === 1 ? 'este canto' : 'estes cantos'} no acervo: ${m.cantos.slice(0, 4).map((a) => a.titulo).join(', ')}.`);
@@ -8159,12 +8222,12 @@ const realcar = (texto, pergunta) => {
   return esc(texto).replace(/[\p{L}\d]+/gu, (p) => (termos.has(raizDuvida(palavrasDuvida(p)[0] || '')) ? `<b>${hifenizar(p)}</b>` : hifenizar(p)));
 };
 // a resposta em texto (para copiar)
-const textoDaResposta = (m) => [
+const textoDaResposta = (m) => (m.liturgia ? textoDaLiturgia(m.liturgia) : [
   ...(m.cantos || []).map((a) => `${a.titulo} (${a.caminho})`),
   ...(m.acervo || []).map((a) => `${a.titulo} (${a.caminho}): ${a.frases.join(' ')}`),
   ...(m.web || []).map((w) => `${w.titulo}: ${w.frases.join(' ')} (${w.url})`),
   ...(m.wiki ? [`Wikipédia — ${m.wiki.titulo}: ${m.wiki.frases.join(' ')} (${m.wiki.url})`] : []),
-].join('\n\n');
+].join('\n\n'));
 function viewDuvidas() {
   vozDuvidas?.abort();
   vozDuvidas = null;
@@ -8203,6 +8266,21 @@ function viewDuvidas() {
     // a resposta: o trecho que mais responde, em texto corrido, com a fonte embaixo; os outros trechos recolhidos
     const fonte = (a, n) => `<button type="button" class="dv-fonte" data-k="${k}" data-n="${n}">${icon('library', 14)}<span><b>${esc(a.titulo)}</b><small>${esc(a.caminho)}</small></span></button>`;
     const partes = [];
+    if (m.liturgia) {
+      const L = m.liturgia;
+      const fonteLit = { cnbb: ['cnbb.org.br', 'Liturgia Diária – CNBB', 'https://www.cnbb.org.br/liturgia-diaria/'], pocket: ['pocketterco.com.br', 'Pocket Terço', 'https://pocketterco.com.br/liturgia'] };
+      return `<div class="dv-lit">
+        <a class="dv-lit-cab" href="#/liturgia/${L.data}">${icon('cross', 18)}<span><b>${esc(L.titulo)}</b>${L.celebracao ? `<small>${esc(L.celebracao)}</small>` : ''}</span>${icon('next', 16)}</a>
+        ${L.partes.map((p) => `<section class="dv-lit-parte">
+          <h4>${esc(p.titulo)}${p.referencia ? ` <small>${esc(p.referencia)}</small>` : ''}</h4>
+          ${p.introducao ? `<p class="dv-lit-intro">${esc(p.introducao)}</p>` : ''}
+          ${p.refrao ? `<p class="dv-lit-refrao"><b>R.</b> ${esc(p.refrao)}</p>` : ''}
+          ${(p.estrofes || []).map((e) => `<p class="dv-lit-estrofe">${e.map(esc).join('<br>')}</p>`).join('')}
+          ${(p.paragrafos || []).map((t) => `<p class="dv-texto">${realcar(t, '')}</p>`).join('')}
+        </section>`).join('')}
+        <div class="dv-lit-fontes">${L.fontes.map((f) => { const [site, nome, url] = fonteLit[f]; return `<a class="dv-fonte" href="${url}" target="_blank" rel="noopener"><span class="dv-favicon"><img src="https://external-content.duckduckgo.com/ip3/${site}.ico" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('sem')">${icon('external', 14)}</span><span><b>${nome}</b><small>${site}</small></span></a>`; }).join('')}</div>
+      </div>`;
+    }
     if (pedeLiturgiaDoDia(m.pergunta)) {
       partes.push(`<a class="dv-atalho" href="#/liturgia">${icon('cross', 20)}<span><b>Liturgia de hoje</b><small>Leituras, salmo, evangelho e orações do dia</small></span>${icon('next', 18)}</a>`);
     }
@@ -8236,7 +8314,7 @@ function viewDuvidas() {
     ? `<div class="chat-msg eu"><div class="chat-bolha">${esc(m.content)}</div><small class="chat-hora">${horaCurta(m.t)}</small></div>`
     : `<div class="chat-msg ia"><div class="chat-corpo"><div class="chat-nome">${avatar}<span>Lumen</span><small class="chat-hora">${horaCurta(m.t)}</small></div>
         <div class="chat-bolha">${corpo(m, k)}</div>
-        ${!m.carregando ? `<div class="chat-acoes">${m.acervo?.length || m.cantos?.length || m.web?.length || m.wiki ? `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>` : ''}
+        ${!m.carregando ? `<div class="chat-acoes">${m.liturgia || m.acervo?.length || m.cantos?.length || m.web?.length || m.wiki ? `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>` : ''}
           ${m.pergunta ? `<a href="${esc(google(m.pergunta))}" target="_blank" rel="noopener">${icon('search', 14)} Pesquisar no Google</a>` : ''}</div>` : ''}</div></div>`);
   const desenhar = () => {
     caixa.innerHTML = conversaDuvidas.length ? conversaDuvidas.map(msg).join('') : boasVindas();
@@ -8256,6 +8334,19 @@ function viewDuvidas() {
     const resp = { role: 'assistant', pergunta: q, carregando: true, t: Date.now() };
     conversaDuvidas.push(resp);
     desenhar();
+    // pedido de uma parte da liturgia ("o salmo de hoje"): só aquela parte, da liturgia da CNBB / Pocket Terço
+    const pedido = pedidoLiturgico(q, hojeISO());
+    if (pedido) {
+      resp.etapa = 'Buscando na liturgia do dia…';
+      if (location.hash === '#/duvidas') desenhar();
+      const liturgia = await partesDaLiturgia(pedido).catch(() => null);
+      if (liturgia) {
+        Object.assign(resp, { liturgia, acervo: [], cantos: [], web: [], wiki: null, carregando: false, t: Date.now() });
+        guardarConversa();
+        if (location.hash === '#/duvidas') viewDuvidas();
+        return resp;
+      }
+    }
     // primeiro o acervo (no aparelho); a internet (sites católicos pelo DuckDuckGo, e a Wikipédia) vai junto, mas sem
     // segurar a resposta se ela falhar
     const canto = pedeCanto(q);

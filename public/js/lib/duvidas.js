@@ -158,26 +158,34 @@ export function lerResultadosDuckDuckGo(markdown) {
   }
   return res;
 }
+// as fontes oficiais: o que vier delas responde primeiro; só sem elas a busca vai para os outros sites
+const PREFERIDOS = /(^|\.)(cnbb\.org\.br|pocketterco\.com\.br|edicoescnbb\.com\.br)$/;
 export async function buscarNaWeb(pergunta, { fetch: buscar = fetch, quantos = 3, timeout = 15000 } = {}) {
-  const ddg = `https://html.duckduckgo.com/html/?kl=br-pt&q=${encodeURIComponent(`${pergunta} liturgia católica`)}`;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeout);
-  try {
-    // o leitor gratuito às vezes devolve a página vazia (muitos pedidos): tenta mais duas vezes
+  const termos = palavras(pergunta).map(raiz);
+  const minimo = Math.min(2, termos.length);
+  // uma busca no DuckDuckGo; o leitor gratuito às vezes devolve a página vazia (muitos pedidos): tenta mais duas vezes
+  const consultar = async (q) => {
+    const ddg = `https://html.duckduckgo.com/html/?kl=br-pt&q=${encodeURIComponent(q)}`;
     let texto = '';
     for (let vez = 0; vez < 3 && !texto.includes('\n## '); vez++) {
       const r = await buscar(`https://r.jina.ai/${ddg}`, { headers: { Accept: 'text/plain' }, signal: ctrl.signal });
       texto = r.ok ? await r.text() : '';
     }
-    const termos = palavras(pergunta).map(raiz);
-    const minimo = Math.min(2, termos.length);
     return lerResultadosDuckDuckGo(texto)
       .map((x, n) => ({ ...x, n, cobre: new Set(palavras(`${x.titulo} ${x.texto}`).map(raiz).filter((p) => termos.includes(p))).size }))
       // fala do assunto (2 palavras da pergunta) e, de preferência, em sites em português (o DuckDuckGo mistura espanhol)
       .filter((x) => x.cobre >= minimo && !/wikipedia\.org$/.test(x.site))
       .sort((a, b) => (LUSOFONOS.test(b.site) - LUSOFONOS.test(a.site)) || (b.cobre - a.cobre) || (a.n - b.n))
       .slice(0, quantos)
-      .map(({ titulo, url, site, texto }) => ({ titulo, url, site, frases: [texto.replace(/\s*\.\.\.$/, '…')] }));
+      .map(({ titulo, url, site, texto: resumo }) => ({ titulo, url, site, frases: [resumo.replace(/\s*\.\.\.$/, '…')] }));
+  };
+  try {
+    // 1º só a CNBB e o Pocket Terço (o DuckDuckGo às vezes ignora o "site:": confere o endereço de cada um)
+    const oficiais = (await consultar(`${pergunta} (site:cnbb.org.br OR site:pocketterco.com.br)`)).filter((x) => PREFERIDOS.test(x.site));
+    if (oficiais.length) return oficiais;
+    return await consultar(`${pergunta} liturgia católica`);
   } finally { clearTimeout(t); }
 }
 
@@ -217,4 +225,46 @@ export function hifenizar(palavra, { minimo = 6 } = {}) {
   let ini = 0;
   for (const c of bons) { out += `${p.slice(ini, c)}­`; ini = c; }
   return out + p.slice(ini);
+}
+
+// Pedido de uma parte da liturgia de um dia ("traga o salmo de hoje", "evangelho de domingo", "qual a coleta?"):
+// o Lumen responde só com aquela parte, da liturgia que o app já usa (CNBB e Pocket Terço), e não procura na
+// internet. Devolve { partes, data } ou null. "Como o salmista proclama o salmo?" é dúvida, não pedido: o pedido
+// tem um dia (hoje, amanhã, domingo, 25/12…) ou um verbo de pedido (traga, mostre, qual é…).
+const PARTES_LITURGIA = [
+  ['leitura1', /\b(primeira|1a?|1ª) leitura\b/],
+  ['leitura2', /\b(segunda|2a?|2ª) leitura\b/],
+  ['salmo', /\bsalmo\b/],
+  ['aclamacao', /\b(aclamacao|aleluia|canto ao evangelho)\b/],
+  ['evangelho', /\bevangelho\b/],
+  ['sequencia', /\bsequencia\b/],
+  ['entrada', /\bantifona (de|da) entrada\b/],
+  ['coleta', /\b(coleta|oracao do dia)\b/],
+  ['ofertorio', /\bantifona do ofertorio\b/],
+  ['oferendas', /\b(oracao )?sobre as oferendas\b/],
+  ['comunhao', /\bantifona da comunhao\b/],
+  ['poscomunhao', /\b(depois da comunhao|pos[- ]?comunhao)\b/],
+];
+const DIA_PEDIDO = /\b(hoje|hj|amanha|ontem|domingo|do dia|deste dia|(\d{1,2})\/(\d{1,2}))\b/;
+const VERBO_PEDIDO = /\b(traga|traz|trazer|mostr\w*|manda|mande|leia|ler|ver|quero|qual (e |eh )?(o|a)|quais (sao )?(as|os)|me (de|da|diz|diga))\b/;
+const somaDiasISO = (iso, n) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+export function pedidoLiturgico(pergunta, hoje) {
+  const t = sem(pergunta);
+  let partes = PARTES_LITURGIA.filter(([, re]) => re.test(t)).map(([k]) => k);
+  // "as leituras": as leituras e o salmo, sem as orações
+  if (!partes.length && /\bleituras\b/.test(t)) partes = ['leitura1', 'salmo', 'leitura2', 'evangelho'];
+  // "antífona" sem dizer qual: a de entrada e a da comunhão
+  if (!partes.length && /\bantifonas?\b/.test(t)) partes = ['entrada', 'comunhao'];
+  if (!partes.length) return null;
+  const dia = DIA_PEDIDO.exec(t);
+  if (!dia && !VERBO_PEDIDO.test(t)) return null;
+  let data = hoje;
+  if (dia?.[1] === 'amanha') data = somaDiasISO(hoje, 1);
+  else if (dia?.[1] === 'ontem') data = somaDiasISO(hoje, -1);
+  else if (dia?.[1] === 'domingo') data = somaDiasISO(hoje, (7 - new Date(`${hoje}T12:00:00`).getDay()) % 7);
+  else if (dia?.[2]) {
+    const ano = Number(hoje.slice(0, 4));
+    data = `${ano}-${String(dia[3]).padStart(2, '0')}-${String(dia[2]).padStart(2, '0')}`;
+  }
+  return { partes, data };
 }

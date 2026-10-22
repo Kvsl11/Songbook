@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buscarNaWeb, criarIndice, explica, hifenizar, lerResultadosDuckDuckGo, melhoresFrases, pedeCanto, semCifra } from '../public/js/lib/duvidas.js';
+import { buscarNaWeb, criarIndice, explica, hifenizar, pedidoLiturgico, lerResultadosDuckDuckGo, melhoresFrases, pedeCanto, semCifra } from '../public/js/lib/duvidas.js';
 
 const IGMR = 'O Glória é um hino antiquíssimo e venerável, pelo qual a Igreja glorifica a Deus. É cantado aos domingos fora do Advento e da Quaresma, nas solenidades e festas.';
 
@@ -65,9 +65,25 @@ test('tirar dúvidas: a busca na internet tenta de novo quando o leitor falha e 
     return pedidos.length === 1 ? { ok: false, text: async () => '' } : { ok: true, text: async () => DDG };
   };
   const r = await buscarNaWeb('Quando se canta o Glória?', { fetch });
-  assert.equal(pedidos.length, 2);
+  // 1º pedido falha e repete; a busca na CNBB/Pocket Terço não traz nenhum deles; aí a busca geral
+  assert.equal(pedidos.length, 3);
   assert.match(pedidos[0], /^https:\/\/r\.jina\.ai\/https:\/\/html\.duckduckgo\.com\/html\/\?kl=br-pt&q=/);
+  assert.match(decodeURIComponent(pedidos[1]), /site:cnbb\.org\.br OR site:pocketterco\.com\.br/);
+  assert.doesNotMatch(decodeURIComponent(pedidos[2]), /site:/);
   assert.deepEqual(r.map((x) => x.site), ['catolicosorantes.com.br', 'iglesia.com.ar']);
+});
+
+test('tirar dúvidas: o que a CNBB ou o Pocket Terço respondem vem antes dos outros sites (e para a busca ali)', async () => {
+  const CNBB = `${DDG}
+## [O Glória na Missa - CNBB](https://duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.cnbb.org.br%2Fo-gloria%2F&rut=x)
+
+[O **Glória** é **cantado** nos domingos fora do Advento e da Quaresma.](https://duckduckgo.com/l/?uddg=z)
+`;
+  const pedidos = [];
+  const fetch = async (url) => { pedidos.push(url); return { ok: true, text: async () => CNBB }; };
+  const r = await buscarNaWeb('Quando se canta o Glória?', { fetch });
+  assert.equal(pedidos.length, 1);
+  assert.deepEqual(r.map((x) => x.site), ['cnbb.org.br']);
 });
 
 test('tirar dúvidas: divide as palavras longas nas sílabas, para o texto justificado quebrar com hífen', () => {
@@ -81,4 +97,17 @@ test('tirar dúvidas: divide as palavras longas nas sílabas, para o texto justi
   assert.equal(div('assembleia'), 'as-sem-bleia');
   assert.equal(div('caminhada'), 'ca-mi-nhada');
   assert.equal(div('missa'), 'missa');
+});
+
+test('tirar dúvidas: reconhece o pedido de uma parte da liturgia e o dia', () => {
+  const hoje = '2026-10-22'; // quinta-feira
+  assert.deepEqual(pedidoLiturgico('Traga o salmo de hoje', hoje), { partes: ['salmo'], data: hoje });
+  assert.deepEqual(pedidoLiturgico('qual o evangelho de domingo?', hoje), { partes: ['evangelho'], data: '2026-10-25' });
+  assert.deepEqual(pedidoLiturgico('Me mostra a segunda leitura de amanhã', hoje), { partes: ['leitura2'], data: '2026-10-23' });
+  assert.deepEqual(pedidoLiturgico('traga a primeira leitura e o salmo de hoje', hoje), { partes: ['leitura1', 'salmo'], data: hoje });
+  assert.deepEqual(pedidoLiturgico('leituras de 25/12', hoje), { partes: ['leitura1', 'salmo', 'leitura2', 'evangelho'], data: '2026-12-25' });
+  assert.deepEqual(pedidoLiturgico('Qual a coleta de hoje?', hoje), { partes: ['coleta'], data: hoje });
+  // dúvida sobre o salmo (sem dia, sem pedido) não é pedido da liturgia
+  assert.equal(pedidoLiturgico('Como o salmista deve proclamar o salmo responsorial?', hoje), null);
+  assert.equal(pedidoLiturgico('O que a liturgia nos traz hj', hoje), null);
 });
