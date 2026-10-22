@@ -3,6 +3,13 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 220, data: '2026-10-22', titulo: 'Servidor da IA em modo econômico',
+    itens: [
+      { tipo: 'melhoria', texto: 'A letra não sincroniza mais sozinha ao abrir a música: toque no ✦ da barra da música (ou em “Sincronizar a letra com o vídeo” no menu ⋯). Só abrir as músicas gastava o crédito grátis do servidor e fazia ele parar no meio do mês.' },
+      { tipo: 'melhoria', texto: 'O servidor da IA gasta bem menos: não liga mais só porque o app abriu, desliga 1 minuto depois do uso e faz uma música por vez.' },
+    ],
+  },
+  {
     versao: 219, data: '2026-10-22', titulo: 'Servidor da IA no seu computador',
     itens: [
       { tipo: 'novo', texto: 'Partitura e letra sincronizada pelo seu próprio PC, de graça e sem fila: ligue o servidor no computador (servidor-ia/iniciar-windows.bat), leia o QR code da página dele e o app passa a usar o PC. Fica em Ajustes → Servidor no seu computador.' },

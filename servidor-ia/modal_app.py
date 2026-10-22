@@ -38,12 +38,14 @@ NUCLEOS = 8
 
 
 # a chave da IA do "Tirar dúvidas" e o cookies.txt do YouTube vêm do secret "songbook-ia" (o workflow o cria)
-# 8 núcleos (antes 2): o Demucs, o CREPE e o Whisper dividem o trabalho entre eles, e a música sai várias vezes mais
-# rápido pelo mesmo custo de núcleo-segundo. Duas músicas ao mesmo tempo (a letra de uma e a partitura de outra), com
-# memória para as duas
-@app.function(image=imagem, cpu=float(NUCLEOS), memory=16384, timeout=900, scaledown_window=300,
+# 8 núcleos: o Demucs, o CREPE e o Whisper dividem o trabalho entre eles, e a música sai várias vezes mais rápido pelo
+# mesmo custo de núcleo-segundo.
+# Modo econômico (o crédito grátis de US$ 30/mês acabava e o Modal desativava a conta): uma música por vez e uma
+# máquina só (a segunda espera na fila em vez de ligar outra), 8 GB de memória (antes 16, para duas músicas) e desliga
+# 1 minuto depois do último uso (antes 5: o tempo parado também é cobrado)
+@app.function(image=imagem, cpu=float(NUCLEOS), memory=8192, timeout=900, scaledown_window=60, max_containers=1,
               secrets=[modal.Secret.from_name("songbook-ia")], volumes={"/cache": guardados},
-              env={"IA_THREADS": str(NUCLEOS), "IA_TAREFAS": "2", "IA_CACHE": "/cache"})
+              env={"IA_THREADS": str(NUCLEOS), "IA_TAREFAS": "1", "IA_CACHE": "/cache"})
 @modal.concurrent(max_inputs=4)
 @modal.asgi_app()
 def web():
