@@ -28,6 +28,8 @@ def test_etapas_vem_uma_por_linha(monkeypatch):
     r = TestClient(app.app).post("/transcrever?etapas=1", files={"arquivo": ("a.wav", b"RIFF", "audio/wav")})
     linhas = [l for l in r.text.strip().split("\n") if '"vivo"' not in l]
     assert linhas == ['{"etapa": "separando"}', '{"etapa": "notas"}', '{"resultado": {"notas": [1]}}']
+    # sem compressão (o zstd do Modal segurava as etapas até o fim)
+    assert r.headers["content-encoding"] == "identity" and "no-transform" in r.headers["cache-control"]
 
 
 def test_youtube_manda_a_porcentagem_do_download_e_avisa_a_fila(monkeypatch, tmp_path):

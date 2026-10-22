@@ -3,6 +3,14 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 216, data: '2026-10-22', titulo: 'Etapas da partitura com IA ao vivo',
+    itens: [
+      { tipo: 'correcao', texto: 'Gerar a partitura com IA ficava em 0% e de repente aparecia a partitura pronta: as etapas (baixar, separar a voz, ouvir as notas…) agora andam na tela enquanto acontecem.' },
+      { tipo: 'melhoria', texto: 'Ao escolher um arquivo de áudio, a porcentagem do envio aparece na etapa “Enviando o áudio”.' },
+      { tipo: 'correcao', texto: 'Se o servidor da IA não responde, a tela avisa que a partitura está sendo feita no próprio aparelho (antes trocava de tela sem dizer nada).' },
+    ],
+  },
+  {
     versao: 215, data: '2026-10-22', titulo: 'Partitura com IA bem mais rápida',
     itens: [
       { tipo: 'correcao', texto: 'Gerar a partitura com IA travava em “Baixando o áudio”: na verdade a música estava na fila do servidor. Agora a tela avisa quando está esperando a vez.' },

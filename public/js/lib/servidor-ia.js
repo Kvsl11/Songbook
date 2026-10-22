@@ -44,6 +44,7 @@ export async function chamar(cfg, rota, { json, form, metodo, sinal, tempo = 15 
 export async function chamarComEtapas(cfg, rota, { json, form, sinal, tempo = 20 * 60e3 } = {}, aoEtapa = () => {}) {
   const base = baseDoServidor(cfg?.url);
   if (!base) throw new Error('A IA do servidor ainda não está disponível');
+  if (form && typeof XMLHttpRequest !== 'undefined') return enviarComEtapas(cfg, `${base}${rota}${rota.includes('?') ? '&' : '?'}etapas=1`, form, sinal, tempo, aoEtapa);
   const ctrl = new AbortController();
   const fim = setTimeout(() => ctrl.abort(), tempo);
   sinal?.addEventListener('abort', () => ctrl.abort());
@@ -75,9 +76,55 @@ export async function chamarComEtapas(cfg, rota, { json, form, sinal, tempo = 20
     }
   } catch (e) {
     if (e.name === 'AbortError') throw new Error(sinal?.aborted ? 'Cancelado' : 'O servidor demorou demais');
-    if (e instanceof TypeError) throw new Error('Não consegui falar com o servidor da IA');
+    if (e instanceof TypeError) throw Object.assign(new Error('Não consegui falar com o servidor da IA'), { conexao: true });
     throw e;
   } finally { clearTimeout(fim); }
+}
+
+// o arquivo enviado (o áudio da partitura): pelo XMLHttpRequest, que diz quanto do envio já foi (o fetch não diz) —
+// aoEtapa('enviando', 0…1) —, e a resposta é lida aos poucos, linha por linha, como no fetch. erro.conexao: não
+// chegou a falar com o servidor (sem internet, envio caiu); aí o app pode ler o arquivo no próprio aparelho
+function enviarComEtapas(cfg, url, form, sinal, tempo, aoEtapa) {
+  return new Promise((ok, falha) => {
+    const xhr = new XMLHttpRequest();
+    let lido = 0;
+    let respondeu = false;
+    let fim = false;
+    const terminar = (fn, v) => { if (fim) return; fim = true; clearTimeout(relogio); fn(v); };
+    const relogio = setTimeout(() => { xhr.abort(); terminar(falha, new Error('O servidor demorou demais')); }, tempo);
+    sinal?.addEventListener('abort', () => { xhr.abort(); terminar(falha, new Error('Cancelado')); });
+    const linhas = () => {
+      const texto = xhr.responseText || '';
+      const k = texto.lastIndexOf('\n');
+      if (k < lido) return;
+      for (const l of texto.slice(lido, k).split('\n')) {
+        if (!l.trim()) continue;
+        let m;
+        try { m = JSON.parse(l); } catch { continue; }
+        respondeu = true;
+        if (m.etapa) aoEtapa(m.etapa, typeof m.progresso === 'number' ? m.progresso : null);
+        if (m.erro) { xhr.abort(); terminar(falha, Object.assign(new Error(m.erro), { status: m.status || 500 })); return; }
+        if (m.resultado) { terminar(ok, m.resultado); return; }
+      }
+      lido = k + 1;
+    };
+    xhr.open('POST', url);
+    if (cfg.chave) xhr.setRequestHeader('X-Chave', cfg.chave);
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable && e.total) aoEtapa('enviando', Math.min(1, e.loaded / e.total)); };
+    xhr.onprogress = () => { if (xhr.status === 200) linhas(); };
+    xhr.onload = () => {
+      if (xhr.status !== 200) {
+        let dados = {};
+        try { dados = JSON.parse(xhr.responseText); } catch { /* sem corpo */ }
+        terminar(falha, Object.assign(new Error(typeof dados.detail === 'string' ? dados.detail : `o servidor respondeu ${xhr.status}`), { status: xhr.status }));
+        return;
+      }
+      linhas();
+      terminar(falha, new Error('O servidor parou no meio. Tente de novo'));
+    };
+    xhr.onerror = () => terminar(falha, Object.assign(new Error(respondeu ? 'A conexão caiu no meio. Tente de novo' : 'Não consegui falar com o servidor da IA'), { conexao: !respondeu }));
+    xhr.send(form);
+  });
 }
 
 // o erro do servidor em português para quem usa o app (o YouTube que bloqueia o download do servidor é o mais comum)

@@ -125,7 +125,12 @@ def com_etapas(trabalho, etapas: bool, pasta: str | None = None):
                 return
             yield (json.dumps(item, ensure_ascii=False) + "\n").encode()
 
-    return StreamingResponse(linhas(), media_type="application/x-ndjson")
+    # sem compressão: o Modal comprimia esta resposta em zstd para o navegador (que sempre aceita), e o compressor
+    # segurava as linhas até o fim: no app a etapa ficava em 0% e a partitura pronta aparecia de repente (o curl,
+    # que não pede compressão, recebia tudo na hora). "no-transform" pede o mesmo a quem estiver no caminho
+    # e o tipo text/event-stream: é o que o Modal manda entregar na hora, sem juntar (o app lê as linhas do mesmo jeito)
+    return StreamingResponse(linhas(), media_type="text/event-stream", headers={
+        "Content-Encoding": "identity", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
 
 
 @app.get("/saude")
