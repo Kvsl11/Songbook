@@ -5803,17 +5803,14 @@ function viewSong(id, ctx = {}) {
   };
 
   // estrofes sem acordes: o app repete sozinho a sequência da estrofe cifrada nelas (sem precisar tocar em nada),
-  // guarda e avisa
+  // guarda e avisa uma vez, num toast (o aviso fixo acima da letra só ocupava espaço)
   const avisoCifra = () => {
     const box = $('#aviso-cifra');
     if (!box) return;
-    const meta = renderSong(song.content).meta;
     const faltam = !semCifra && completarCifra(song.content).completadas;
     if (semCifra) {
       box.innerHTML = '';
       trazerCifraSozinho();
-    } else if (meta.x_cifra_completada) {
-      box.innerHTML = `<div class="aviso">${icon('sparkles', 18)}<span>A cifra original só tinha acordes em parte da música. Repeti a mesma sequência nas outras estrofes${song.youtube ? ' — confira ouvindo o vídeo' : ''}.</span></div>`;
     } else if (faltam) {
       const r = completarCifra(song.content);
       song.content = r.texto.replace(/(\n\n)/, `\n{x_cifra_completada: ${r.completadas}}$1`);
