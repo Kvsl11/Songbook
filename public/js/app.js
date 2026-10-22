@@ -20,7 +20,7 @@ import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } fro
 import { partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { NOVIDADES, novidadesNaoVistas } from './lib/novidades.js';
 import { baseDoServidor, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
-import { buscarNaWikipedia, criarIndice as criarIndiceDuvidas, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
+import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -8117,6 +8117,11 @@ const pedeLiturgiaDoDia = (q) => {
 // o ditado da pergunta: o reconhecimento de voz do próprio navegador (Chrome, Edge, Safari), em português
 const ReconhecerVoz = window.SpeechRecognition || window.webkitSpeechRecognition;
 let vozDuvidas = null;
+// o nome do site, para mostrar e falar: o que vem depois do "|" no título ("… | Católicos Orantes") ou o endereço
+const nomeDoSite = (w) => {
+  const fim = String(w.titulo || '').split(/\s[|–—-]\s/).slice(1).pop()?.trim();
+  return fim && fim.length <= 40 && !/\.\.\.|…/.test(fim) ? fim : w.site;
+};
 // a resposta dita em voz alta na conversa ao vivo: o que achou, de onde, em frases curtas
 const falaDaResposta = (m) => {
   const partes = [];
@@ -8124,7 +8129,9 @@ const falaDaResposta = (m) => {
   if (m.cantos?.length) partes.push(`Achei ${m.cantos.length === 1 ? 'este canto' : 'estes cantos'} no acervo: ${m.cantos.slice(0, 4).map((a) => a.titulo).join(', ')}.`);
   const [a] = m.acervo || [];
   if (a) partes.push(`No acervo, em ${a.titulo}: ${a.frases.join(' ')}`);
-  if (m.wiki) partes.push(`${a ? 'E na internet' : 'No acervo não achei, mas na internet'}, na Wikipédia: ${m.wiki.frases.join(' ')}`);
+  const [w] = m.web || [];
+  if (w) partes.push(`${a ? 'E na internet' : 'No acervo não achei, mas na internet'}, no site ${nomeDoSite(w).replace(/\.(com\.br|org\.br|com|org|br|pt)$/, '')}: ${w.frases.join(' ')}`);
+  else if (m.wiki) partes.push(`${a ? 'E na internet' : 'No acervo não achei, mas na internet'}, na Wikipédia: ${m.wiki.frases.join(' ')}`);
   if (!partes.length) partes.push('Não achei nada sobre isso no acervo nem na internet. Tente perguntar com outras palavras.');
   return partes.join(' ');
 };
@@ -8152,6 +8159,7 @@ const realcar = (texto, pergunta) => {
 const textoDaResposta = (m) => [
   ...(m.cantos || []).map((a) => `${a.titulo} (${a.caminho})`),
   ...(m.acervo || []).map((a) => `${a.titulo} (${a.caminho}): ${a.frases.join(' ')}`),
+  ...(m.web || []).map((w) => `${w.titulo}: ${w.frases.join(' ')} (${w.url})`),
   ...(m.wiki ? [`Wikipédia — ${m.wiki.titulo}: ${m.wiki.frases.join(' ')} (${m.wiki.url})`] : []),
 ].join('\n\n');
 function viewDuvidas() {
@@ -8171,7 +8179,7 @@ function viewDuvidas() {
         ${ReconhecerVoz ? `<button class="chat-mic" type="button" aria-label="Falar a pergunta" aria-pressed="false" title="Falar a pergunta">${icon('mic', 20)}</button>` : ''}
         <button class="chat-enviar" type="submit" aria-label="Enviar" disabled>${icon('enviar', 20)}</button>
       </div>
-      <small class="chat-rodape">Acervo litúrgico + Wikipédia · a conversa se apaga em 24 horas</small>
+      <small class="chat-rodape">Acervo litúrgico + internet · a conversa se apaga em 24 horas</small>
     </form></div>`;
   const caixa = $('#dv-conversa');
   const boasVindas = () => `<div class="chat-vazio">
@@ -8201,19 +8209,24 @@ function viewDuvidas() {
           ${outros.map((a, n) => `<p class="dv-texto">${a.frases.map((f) => realcar(f, m.pergunta)).join(' ')}</p>${fonte(a, n + 1)}`).join('')}</details>`);
       }
     }
-    if (m.wiki) {
-      partes.push(`${primeiro ? '<h4 class="dv-sub">Na internet</h4>' : '<p class="dv-aviso">Não achei nos arquivos do acervo. Achei isto na internet:</p>'}
-        <p class="dv-texto">${m.wiki.frases.map((f) => realcar(f, m.pergunta)).join(' ')}</p>
-        <a class="dv-fonte" href="${esc(m.wiki.url)}" target="_blank" rel="noopener">${icon('search', 14)}<span><b>${esc(m.wiki.titulo)}</b><small>Wikipédia</small></span></a>`);
+    // a internet: o resumo do site que mais responde, com o link; os outros sites (e a Wikipédia) embaixo, como links
+    const link = (w, nome) => `<a class="dv-fonte" href="${esc(w.url)}" target="_blank" rel="noopener">${icon('external', 14)}<span><b>${esc(w.titulo)}</b><small>${esc(nome)}</small></span></a>`;
+    const sites = [...(m.web || []).map((w) => ({ ...w, nome: nomeDoSite(w) })), ...(m.wiki ? [{ ...m.wiki, nome: 'Wikipédia' }] : [])];
+    if (sites.length) {
+      const [melhor, ...mais] = sites;
+      partes.push(`${primeiro || m.cantos?.length ? '<h4 class="dv-sub">Na internet</h4>' : '<p class="dv-aviso">Não achei nos arquivos do acervo. Achei isto na internet:</p>'}
+        <p class="dv-texto">${melhor.frases.map((f) => realcar(f, m.pergunta)).join(' ')}</p>${link(melhor, melhor.nome)}
+        ${mais.length ? `<details class="dv-mais"><summary>Mais ${mais.length === 1 ? '1 site' : `${mais.length} sites`}</summary>
+          ${mais.map((w) => `<p class="dv-texto">${w.frases.map((f) => realcar(f, m.pergunta)).join(' ')}</p>${link(w, w.nome)}`).join('')}</details>` : ''}`);
     }
-    if (!partes.length) partes.push(`<div class="dv-nada">${icon('search', 20)}<p>Não achei nada sobre isso no acervo nem na Wikipédia. Tente com outras palavras ou pesquise no Google.</p></div>`);
+    if (!partes.length) partes.push(`<div class="dv-nada">${icon('search', 20)}<p>Não achei nada sobre isso no acervo nem na internet. Tente com outras palavras ou pesquise no Google.</p></div>`);
     return partes.join('');
   };
   const msg = (m, k) => (m.role === 'user'
     ? `<div class="chat-msg eu"><div class="chat-bolha">${esc(m.content)}</div><small class="chat-hora">${horaCurta(m.t)}</small></div>`
     : `<div class="chat-msg ia"><div class="chat-corpo"><div class="chat-nome">${avatar}<span>Assistente litúrgico</span><small class="chat-hora">${horaCurta(m.t)}</small></div>
         <div class="chat-bolha">${corpo(m, k)}</div>
-        ${!m.carregando ? `<div class="chat-acoes">${m.acervo?.length || m.cantos?.length || m.wiki ? `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>` : ''}
+        ${!m.carregando ? `<div class="chat-acoes">${m.acervo?.length || m.cantos?.length || m.web?.length || m.wiki ? `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>` : ''}
           ${m.pergunta ? `<a href="${esc(google(m.pergunta))}" target="_blank" rel="noopener">${icon('search', 14)} Pesquisar no Google</a>` : ''}</div>` : ''}</div></div>`);
   const desenhar = () => {
     caixa.innerHTML = conversaDuvidas.length ? conversaDuvidas.map(msg).join('') : boasVindas();
@@ -8233,8 +8246,10 @@ function viewDuvidas() {
     const resp = { role: 'assistant', pergunta: q, carregando: true, t: Date.now() };
     conversaDuvidas.push(resp);
     desenhar();
-    // primeiro o acervo (no aparelho); a Wikipédia vai junto, mas sem segurar a resposta se a internet falhar
+    // primeiro o acervo (no aparelho); a internet (sites católicos pelo DuckDuckGo, e a Wikipédia) vai junto, mas sem
+    // segurar a resposta se ela falhar
     const canto = pedeCanto(q);
+    const naWeb = buscarNaWeb(q).catch(() => []);
     const naWiki = canto ? Promise.resolve(null) : buscarNaWikipedia(q).catch(() => null);
     const todos = (await indiceDasDuvidas().then((ix) => ix.buscar(q, canto ? 12 : 8)).catch(() => []))
       .filter((a, n, lista) => a.cobre >= 0.5 && a.nota >= lista[0].nota * 0.45);
@@ -8246,7 +8261,8 @@ function viewDuvidas() {
       .filter((a) => a.frases.length && termosEm(a.frases.join(' '), q) >= Math.min(2, palavrasDuvida(q).length)).slice(0, 3);
     resp.etapa = 'Procurando na internet…';
     if (location.hash === '#/duvidas') desenhar();
-    Object.assign(resp, { acervo: achados, cantos, wiki: await naWiki, carregando: false, t: Date.now() });
+    const [web, wiki] = await Promise.all([naWeb, naWiki]);
+    Object.assign(resp, { acervo: achados, cantos, web, wiki, carregando: false, t: Date.now() });
     guardarConversa();
     if (location.hash === '#/duvidas') viewDuvidas();
     return resp;
@@ -8319,7 +8335,7 @@ function viewDuvidas() {
 
   // Conversa ao vivo (como o DJ do Spotify): a pessoa fala, a resposta vem em voz alta e nos cartões (trechos do
   // acervo, links da internet) e ele volta a ouvir sozinho. Tudo no aparelho: o ditado e a voz do próprio navegador
-  // e a busca de sempre (acervo + Wikipédia), sem gastar o servidor da IA
+  // e a busca de sempre (acervo + internet), sem gastar o servidor da IA
   function abrirVivo() {
     if (document.querySelector('.dv-vivo')) return;
     const r0 = vozDuvidas; vozDuvidas = null; r0?.abort();

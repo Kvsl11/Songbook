@@ -128,3 +128,55 @@ export async function buscarNaWikipedia(pergunta, { fetch: buscar = fetch } = {}
   }
   return melhor && { titulo: melhor.titulo, frases: melhor.frases, url: melhor.url };
 }
+
+// A busca na internet de verdade (não só a Wikipédia): o DuckDuckGo, lido pelo Jina Reader (que libera CORS e
+// devolve a página em markdown), em português do Brasil. Cada resultado traz o resumo que responde à pergunta e o
+// link do site (Missário, CNBB, Canção Nova, Vaticano…).
+const LUSOFONOS = /\.(br|pt)$|(^|\.)vatican\.va$|(^|\.)cnbb\.org$/;
+// o link de saída do DuckDuckGo ("/l/?uddg=<endereço>") vira o endereço do site
+function enderecoReal(link) {
+  try {
+    const u = new URL(link, 'https://duckduckgo.com');
+    return u.hostname.endsWith('duckduckgo.com') ? u.searchParams.get('uddg') || '' : u.href;
+  } catch { return ''; }
+}
+// "**se****canta****o****Glória**" (o negrito das palavras buscadas, sem os espaços) volta a ser "se canta o Glória"
+const semNegrito = (t) => t.replace(/\*\*\*\*/g, ' ').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
+export function lerResultadosDuckDuckGo(markdown) {
+  const res = [];
+  for (const bloco of String(markdown || '').split(/\n## /).slice(1)) {
+    const cab = bloco.match(/^\[([^\]]+)\]\(([^)\s]+)\)/);
+    const url = cab && enderecoReal(cab[2]);
+    if (!url || !/^https?:/.test(url)) continue;
+    // o resumo: o último parágrafo-link do bloco (o primeiro é o ícone com o endereço do site)
+    const resumo = bloco.split('\n').slice(1).map((l) => l.trim()).filter((l) => l.startsWith('[') && !l.startsWith('[!['))
+      .map((l) => (l.match(/^\[([\s\S]+)\]\([^)]*\)$/) || [])[1]).filter(Boolean).pop();
+    if (!resumo) continue;
+    let site = '';
+    try { site = new URL(url).hostname.replace(/^www\./, ''); } catch { continue; }
+    res.push({ titulo: semNegrito(cab[1]), url, site, texto: semNegrito(resumo) });
+  }
+  return res;
+}
+export async function buscarNaWeb(pergunta, { fetch: buscar = fetch, quantos = 3, timeout = 15000 } = {}) {
+  const ddg = `https://html.duckduckgo.com/html/?kl=br-pt&q=${encodeURIComponent(`${pergunta} liturgia católica`)}`;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeout);
+  try {
+    // o leitor gratuito às vezes devolve a página vazia (muitos pedidos): tenta mais duas vezes
+    let texto = '';
+    for (let vez = 0; vez < 3 && !texto.includes('\n## '); vez++) {
+      const r = await buscar(`https://r.jina.ai/${ddg}`, { headers: { Accept: 'text/plain' }, signal: ctrl.signal });
+      texto = r.ok ? await r.text() : '';
+    }
+    const termos = palavras(pergunta).map(raiz);
+    const minimo = Math.min(2, termos.length);
+    return lerResultadosDuckDuckGo(texto)
+      .map((x, n) => ({ ...x, n, cobre: new Set(palavras(`${x.titulo} ${x.texto}`).map(raiz).filter((p) => termos.includes(p))).size }))
+      // fala do assunto (2 palavras da pergunta) e, de preferência, em sites em português (o DuckDuckGo mistura espanhol)
+      .filter((x) => x.cobre >= minimo && !/wikipedia\.org$/.test(x.site))
+      .sort((a, b) => (LUSOFONOS.test(b.site) - LUSOFONOS.test(a.site)) || (b.cobre - a.cobre) || (a.n - b.n))
+      .slice(0, quantos)
+      .map(({ titulo, url, site, texto }) => ({ titulo, url, site, frases: [texto.replace(/\s*\.\.\.$/, '…')] }));
+  } finally { clearTimeout(t); }
+}
