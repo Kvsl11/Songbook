@@ -54,10 +54,19 @@ def conferir_chave(x_chave: str | None = Header(default=None)):
         raise HTTPException(401, "chave do servidor errada")
 
 
-def ouvir(caminho: str, separar: bool, etapa=lambda nome: None) -> dict:
-    # uma música por vez (ou IA_TAREFAS): a separação e o modelo usam muita memória
+def esperar_vaga(etapa) -> None:
+    """Uma música por vez (ou IA_TAREFAS): a separação e o modelo usam muita memória. Com outra na frente (a letra
+    sincronizada de outra música, por exemplo), avisa que está na fila: antes a tela ficava parada no "Baixando"
+    sem dizer nada enquanto esperava"""
+    if vagas.acquire(blocking=False):
+        return
+    etapa("fila")
     if not vagas.acquire(timeout=600):
         raise HTTPException(503, "servidor ocupado, tente de novo em alguns minutos")
+
+
+def ouvir(caminho: str, separar: bool, etapa=lambda nome, progresso=None: None) -> dict:
+    esperar_vaga(etapa)
     try:
         return transcricao.transcrever(caminho, separar_voz=separar, etapa=etapa)
     except ValueError as e:
@@ -79,14 +88,18 @@ def com_etapas(trabalho, etapas: bool, pasta: str | None = None):
 
     if not etapas:
         try:
-            return trabalho(lambda nome: None)
+            return trabalho(lambda nome, progresso=None: None)
         finally:
             apagar()
     fila: queue.Queue = queue.Queue()
 
+    def aviso(nome, progresso=None):
+        # progresso: de 0 a 1, na etapa que sabe quanto falta (o download do áudio)
+        fila.put({"etapa": nome} if progresso is None else {"etapa": nome, "progresso": round(progresso, 3)})
+
     def rodar():
         try:
-            fila.put({"resultado": trabalho(lambda nome: fila.put({"etapa": nome}))})
+            fila.put({"resultado": trabalho(aviso)})
         except HTTPException as e:
             fila.put({"erro": e.detail, "status": e.status_code})
         except Exception as e:
@@ -151,10 +164,11 @@ class PedidoYoutube(BaseModel):
     separar: bool = True
 
 
-def baixar(video: str, pasta: str) -> dict:
-    """O áudio do vídeo na pasta (temporária, de quem chama), ou o erro em português."""
+def baixar(video: str, pasta: str, etapa=lambda nome, progresso=None: None) -> dict:
+    """O áudio do vídeo na pasta (temporária, de quem chama), ou o erro em português. O andamento do download vai
+    para a tela (etapa "baixando" com o progresso de 0 a 1)"""
     try:
-        return youtube.baixar_audio(video, pasta)
+        return youtube.baixar_audio(video, pasta, progresso=lambda p: etapa("baixando", p))
     except ValueError as e:
         raise HTTPException(422, str(e))
     except Exception as e:
@@ -178,8 +192,8 @@ def do_youtube(pedido: PedidoYoutube, etapas: bool = Query(False)):
     pasta = tempfile.mkdtemp(prefix="songbook-yt-")
 
     def trabalho(etapa):
-        etapa("baixando")
-        baixado = baixar(video, pasta)
+        etapa("baixando", 0)
+        baixado = baixar(video, pasta, etapa)
         return {**ouvir(baixado["caminho"], pedido.separar, etapa), "video": video, "titulo": baixado["titulo"]}
 
     return com_etapas(trabalho, etapas, pasta)
@@ -210,10 +224,9 @@ def letra_sincronizada(pedido: PedidoLetra, etapas: bool = Query(False)):
     pasta = tempfile.mkdtemp(prefix="songbook-letra-")
 
     def trabalho(etapa):
-        etapa("baixando")
-        baixado = baixar(video, pasta)
-        if not vagas.acquire(timeout=600):
-            raise HTTPException(503, "servidor ocupado, tente de novo em alguns minutos")
+        etapa("baixando", 0)
+        baixado = baixar(video, pasta, etapa)
+        esperar_vaga(etapa)
         try:
             r = letra.sincronizar(baixado["caminho"], pedido.linhas, separar_voz=pedido.separar, etapa=etapa)
         except ValueError as e:

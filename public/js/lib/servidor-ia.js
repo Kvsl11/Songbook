@@ -39,7 +39,8 @@ export async function chamar(cfg, rota, { json, form, metodo, sinal, tempo = 15 
 }
 
 // a mesma chamada, com o andamento: o servidor manda uma linha por etapa ({"etapa": "separando"}…) e no fim o
-// resultado; aoEtapa(nome) é chamada a cada etapa. O erro vem com a mensagem e o status do servidor
+// resultado; aoEtapa(nome, progresso) é chamada a cada etapa (progresso de 0 a 1 no download do áudio, senão null;
+// "fila" = esperando outra música terminar no servidor). O erro vem com a mensagem e o status do servidor
 export async function chamarComEtapas(cfg, rota, { json, form, sinal, tempo = 20 * 60e3 } = {}, aoEtapa = () => {}) {
   const base = baseDoServidor(cfg?.url);
   if (!base) throw new Error('A IA do servidor ainda não está disponível');
@@ -66,7 +67,7 @@ export async function chamarComEtapas(cfg, rota, { json, form, sinal, tempo = 20
       for (const l of linhas) {
         if (!l.trim()) continue;
         const m = JSON.parse(l);
-        if (m.etapa) aoEtapa(m.etapa);
+        if (m.etapa) aoEtapa(m.etapa, typeof m.progresso === 'number' ? m.progresso : null);
         if (m.erro) throw Object.assign(new Error(m.erro), { status: m.status || 500 });
         if (m.resultado) return m.resultado;
       }
@@ -90,13 +91,16 @@ export function erroExplicado(e) {
 
 // a linha da letra que está sendo cantada no instante t (segundos), pelos tempos que o servidor mandou:
 // [{ inicio, fim }] na ordem em que se canta. Antes da primeira linha: -1
+// a linha acende um pouco antes do instante ouvido: o Whisper marca a palavra já começada, o vídeo informa o tempo
+// com atraso e o olho leva um instante para achar a linha (com 0,15 s ela ainda acendia atrasada)
+const ANTECIPAR = 0.4;
 export function linhaNoTempo(tempos, t) {
   let ini = 0;
   let fim = tempos.length - 1;
   let achada = -1;
   while (ini <= fim) {
     const meio = (ini + fim) >> 1;
-    if (tempos[meio].inicio <= t + 0.15) { achada = meio; ini = meio + 1; } else fim = meio - 1;
+    if (tempos[meio].inicio <= t + ANTECIPAR) { achada = meio; ini = meio + 1; } else fim = meio - 1;
   }
   return achada;
 }

@@ -90,7 +90,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-213';
+export const APP_VERSAO = '2026.10.22-214';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -681,9 +681,10 @@ const player = (() => {
       <button class="icon-btn" data-pl="ampliar" aria-label="Ampliar o vídeo" title="Ampliar o vídeo">${icon('expand', 18)}</button>
       <button class="icon-btn" data-pl="fechar" aria-label="Fechar o player" title="Fechar">${icon('x', 18)}</button>
     </div>
-    <div class="pl-cab"><button class="icon-btn" data-pl="recolher" aria-label="Recolher o painel" title="Recolher">${icon('sidebar', 20)}</button>
-      <span><small>Tocando agora</small><b></b></span><i class="pl-cab-vazio"></i></div>
-    <section class="pl-letra" hidden><div class="pl-letra-cab"><h3>Letra</h3><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></div><div class="pl-linhas"></div></section>`;
+    <div class="pl-cab"><button class="icon-btn" data-pl="expandir" aria-label="Expandir o Tocando agora" title="Expandir">${icon('expand', 20)}</button>
+      <span><small>Tocando agora</small><b></b></span><button class="icon-btn" data-pl="recolher" aria-label="Minimizar o painel" title="Minimizar">${icon('down', 22)}</button></div>
+    <section class="pl-letra" hidden><div class="pl-letra-cab"><h3>Letra</h3><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></div><div class="pl-linhas"></div></section>
+    <div class="pl-extra" hidden></div>`;
   // no tablet o player é o painel "Tocando agora" à direita, fora da coluna principal (que não o corta)
   const casa = ehTablet() ? document.body : $('.main-col');
   document.body.classList.toggle('painel-recolhido', Boolean(db.prefs().painelRecolhido));
@@ -776,6 +777,60 @@ const player = (() => {
     $('.pl-t1', el).textContent = duracao ? fmt(duracao) : '';
     $('.pl-cab b', el).textContent = atual.setId ? db.set(atual.setId)?.name || '' : atual.parte || '';
     desenharLetra();
+    desenharExtra();
+  };
+  // embaixo da letra, no painel do tablet (como os cartões do "Tocando agora" do Spotify): o artista com a foto,
+  // os créditos (quem canta, compôs, o tom, de onde veio a cifra) e o vídeo, com o que dá para fazer em cada um
+  let extraDe = '';
+  const desenharExtra = () => {
+    if (!document.documentElement.classList.contains('tablet')) return;
+    const song = atual?.songId && db.song(atual.songId);
+    const titulo = song?.title || atual?.titulo || '';
+    const artista = song?.artist || atual?.artista || '';
+    const chave = `${atual?.youtube}|${titulo}|${artista}|${song?.content?.length || 0}`;
+    if (chave === extraDe) return;
+    extraDe = chave;
+    const box = $('.pl-extra', el);
+    const meta = song ? renderSong(song.content).meta : {};
+    const pessoas = pessoasDosCreditos({ artista, titulo, compositor: meta.composer, letrista: meta.lyricist });
+    const fonte = song?.source && /^https?:/.test(song.source) ? host(song.source) : '';
+    const slug = /cifraclub\.com\.br\/([^/?#]+)/.exec(song?.source || '')?.[1];
+    const principal = pessoas[0]?.nome || artista;
+    const detalhes = [
+      ['Álbum', meta.album], ['Ano', meta.year], ['Tom', song ? renderSong(song.content).key || song.key : ''],
+      [/cifraclub/.test(song?.source || '') ? 'Fonte da cifra' : 'Fonte', fonte ? `<a href="${esc(song.source)}" target="_blank" rel="noopener">${esc(fonte)}</a>` : '', true],
+    ].filter(([, v]) => v);
+    const cartoes = [];
+    if (principal) {
+      cartoes.push(`<section class="pl-cartao pl-artista"><div class="pl-artista-foto" data-foto><span>${esc(principal.split(/\s+/).slice(0, 2).map((x) => x[0] || '').join('').toUpperCase())}</span><h4>Sobre o artista</h4></div>
+        <div class="pl-artista-pe"><span class="grow"><b>${esc(principal)}</b><small>${esc(pessoas[0]?.papeis.join(' • ') || 'Artista')}</small></span>
+        ${slug ? `<a class="ref-pilula" href="#/artista/${encodeURIComponent(slug)}/${encodeURIComponent(principal)}">Ver artista</a>` : ''}</div></section>`);
+    }
+    if (pessoas.length || detalhes.length) {
+      cartoes.push(`<section class="pl-cartao"><h4>Créditos</h4>
+        ${pessoas.map((x) => `<div class="ref-linha"><span class="grow"><b>${esc(x.nome)}</b><small>${esc(x.papeis.join(' • '))}</small></span></div>`).join('')}
+        ${detalhes.map(([k, v, html]) => `<div class="ref-linha"><span class="grow"><b>${html ? v : esc(v)}</b><small>${esc(k)}</small></span></div>`).join('')}</section>`);
+    }
+    if (atual?.youtube) {
+      cartoes.push(`<section class="pl-cartao"><h4>Vídeo de referência</h4>
+        <div class="ref-linha"><span class="grow"><b class="pl-extra-vtit">${esc(titulo || 'Vídeo')}</b><small class="pl-extra-vcanal">YouTube</small></span></div>
+        <div class="ref-acoes">${song || atual.href || atual.abrir ? `<button class="ref-pilula" data-pl="abrir">${icon('music', 14)} Abrir a música</button>` : ''}
+          <a class="ref-pilula" href="https://www.youtube.com/watch?v=${esc(atual.youtube)}" target="_blank" rel="noopener">${icon('youtube', 14)} Abrir no YouTube</a></div></section>`);
+    }
+    box.innerHTML = cartoes.join('');
+    box.hidden = !cartoes.length;
+    if (principal) fotoDoArtista(principal).then((url) => {
+      const f = $('.pl-extra [data-foto]', el);
+      if (!url || !f || extraDe !== chave) return;
+      const img = new Image();
+      img.onload = () => { f.classList.add('com-foto'); f.style.backgroundImage = `url("${url}")`; };
+      img.src = url;
+    }).catch(() => {});
+    if (atual?.youtube) infoDoVideo(atual.youtube).then((v) => {
+      if (!v || extraDe !== chave) return;
+      if (v.titulo) $('.pl-extra-vtit', el).textContent = v.titulo;
+      if (v.canal) $('.pl-extra-vcanal', el).textContent = v.canal;
+    }).catch(() => {});
   };
   // a letra da música tocando, no painel do tablet: na ordem em que se canta; com a letra sincronizada, a linha
   // cantada acende e o painel rola junto (tocar numa linha leva o vídeo para ela)
@@ -804,7 +859,7 @@ const player = (() => {
     caixa.querySelectorAll('p').forEach((p, i) => { p.classList.toggle('agora', i === k); p.classList.toggle('cantada', i < k); });
     const p = caixa.querySelector(`p[data-k="${k}"]`);
     if (p) caixa.scrollTo({ top: p.offsetTop - caixa.clientHeight / 3, behavior: 'smooth' });
-  }, 250);
+  }, 80);
   el.addEventListener('click', (e) => {
     const p = e.target.closest('.pl-linhas p');
     if (p && tempos?.[p.dataset.k]) api.irPara(Math.max(0, tempos[p.dataset.k].inicio - 0.3));
@@ -881,7 +936,7 @@ const player = (() => {
       quadro = 0;
       el.hidden = true;
       el.classList.remove('grande');
-      document.body.classList.remove('com-player');
+      document.body.classList.remove('com-player', 'painel-cheio');
       atual = null;
       estado = 'parado';
       avisar();
@@ -1018,6 +1073,16 @@ const player = (() => {
       if (antes !== estado) avisar();
     } catch { /* mensagem de outro formato */ }
   });
+  // o "Tocando agora" na tela toda (tablet): o botão do canto de cima troca entre expandir e voltar ao painel
+  const painelCheio = (ligar) => {
+    document.body.classList.toggle('painel-cheio', ligar);
+    const b = $('[data-pl="expandir"]', el);
+    b.innerHTML = icon(ligar ? 'shrink' : 'expand', 20);
+    b.title = ligar ? 'Voltar ao painel' : 'Expandir';
+    b.setAttribute('aria-label', ligar ? 'Voltar ao painel' : 'Expandir o Tocando agora');
+  };
+  window.addEventListener('hashchange', () => painelCheio(false));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('painel-cheio')) painelCheio(false); });
   el.addEventListener('click', (e) => {
     const prog = e.target.closest('.pl-prog');
     if (prog && duracao) { const r = prog.getBoundingClientRect(); api.irPara(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * duracao); return; }
@@ -1031,9 +1096,17 @@ const player = (() => {
     if (!b) return;
     if (b.dataset.pl === 'play') api.alternar();
     if (b.dataset.pl === 'salva' && atual) {
-      // salva: adicionar a um repertório (como o ✓ do Spotify); não salva: abre a música, que tem o botão de salvar
+      // salva: adicionar a um repertório (como o ✓ do Spotify); não salva: salva ali mesmo, sem precisar abrir a música
+      // (a música aberta da busca fica guardada na sessão; um vídeo solto, sem cifra, abre a música para salvar)
       if (atual.songId && db.song(atual.songId)) addToSetDialog(atual.songId, atual.parte || '');
-      else if (atual.href && location.hash !== atual.href) location.hash = atual.href;
+      else if (preview && atual.songId === 'previa' && youtubeId(renderSong(preview.content).meta.youtube) === atual.youtube) {
+        const ja = db.songBySource(preview.source);
+        const salva = ja || db.saveSong({ content: preview.content, source: preview.source, transpose: preview.transpose || 0, capo: preview.capo || 0 });
+        api.atualizar({ songId: salva.id, href: `#/musica/${salva.id}` });
+        toast(ja ? 'Já estava na biblioteca' : 'Salva na biblioteca');
+        if (location.hash === '#/musica/previa') location.replace('#/musica/' + salva.id);
+        else if (/^#\/biblioteca/.test(location.hash)) route();
+      } else if (atual.href && location.hash !== atual.href) location.hash = atual.href;
       else if (!atual.href && atual.abrir) atual.abrir();
     }
     if (b.dataset.pl === 'proxima') pular(1);
@@ -1056,8 +1129,10 @@ const player = (() => {
     // voltar, como no Spotify: depois dos 3 primeiros segundos volta ao começo da música; antes, vai para a anterior
     if (b.dataset.pl === 'anterior') { if (tempo > 3 || anteriorIndice() < 0) api.irPara(0); else pular(-1); }
     if (b.dataset.pl === 'fechar') api.fechar();
-    // tablet: recolher o painel (vira uma barrinha acima do menu) ou abrir de novo
-    if (b.dataset.pl === 'recolher') { document.body.classList.toggle('painel-recolhido'); db.setPref('painelRecolhido', document.body.classList.contains('painel-recolhido')); }
+    // tablet: minimizar o painel (vira uma barrinha embaixo; tocar nela abre de novo) — saindo também da tela toda
+    if (b.dataset.pl === 'recolher') { painelCheio(false); document.body.classList.add('painel-recolhido'); db.setPref('painelRecolhido', true); }
+    // tablet: expandir o "Tocando agora" para a tela toda (o vídeo grande e a letra ao lado) ou voltar ao painel
+    if (b.dataset.pl === 'expandir') painelCheio(!document.body.classList.contains('painel-cheio'));
     if (b.dataset.pl === 'trocar') {
       const s = db.song(atual?.songId);
       if (s) escolherVideo(s).then((url) => { if (!url) return; db.saveSong({ ...db.song(s.id), content: definirMeta(db.song(s.id).content, 'youtube', url) }); api.tocar({ ...atual, youtube: youtubeId(url) }); route(); });
@@ -1065,6 +1140,7 @@ const player = (() => {
     if (b.dataset.pl === 'ampliar') { el.classList.toggle('grande'); b.innerHTML = icon(el.classList.contains('grande') ? 'shrink' : 'expand', 18); }
     // abrir a música (o nome no player): a página dela; expandir a letra: a página dela já com a letra na tela toda
     if ((b.dataset.pl === 'abrir' || b.dataset.pl === 'cheio') && atual) {
+      painelCheio(false);
       abrirLetraCheia = b.dataset.pl === 'cheio';
       if (atual.href && location.hash !== atual.href) location.hash = atual.href;
       else if (!atual.href && atual.abrir) atual.abrir();
@@ -4951,19 +5027,43 @@ async function gerarComIA(song, titulo) {
     passo.onclick = null;
     passo.innerHTML = `<div class="ia-etapas">
       <div class="ia-etapas-cab"><span class="ia-pulso"></span><div><b>Gerando a partitura</b><small id="ia-etapa-tempo">pode levar alguns minutos</small></div></div>
-      <ol>${lista.map(([id, nome, ic]) => `<li data-etapa="${id}"><span class="ia-etapa-ic">${icon(ic, 18)}</span><span class="ia-etapa-nome">${nome}</span><span class="ia-etapa-st"></span></li>`).join('')}</ol>
+      <ol>${lista.map(([id, nome, ic]) => `<li data-etapa="${id}"><span class="ia-etapa-ic">${icon(ic, 18)}</span><span class="ia-etapa-nome">${nome}<small class="ia-etapa-sub"></small><i class="ia-etapa-barra"><b></b></i></span><span class="ia-etapa-st"></span></li>`).join('')}</ol>
       <div class="row ia-fim"><button class="btn ghost" id="ia-cancelar">${icon('x', 16)} Cancelar</button></div></div>`;
   }
-  function marcarEtapa(id) {
+  // progresso (0 a 1): a porcentagem da etapa (o download do áudio), com a barrinha; ao chegar a 100% a tela já
+  // passa para a etapa seguinte. "fila": o servidor termina outra música antes (a etapa seguinte diz que está na vez)
+  function marcarEtapa(id, progresso = null) {
     const itens = [...passo.querySelectorAll('.ia-etapas li')];
-    const k = itens.findIndex((li) => li.dataset.etapa === id);
+    if (id === 'fila') {
+      const prox = itens.find((li) => li.classList.contains('agora'));
+      const i = itens.indexOf(prox);
+      const alvo = prox?.classList.contains('com-pct') ? itens[i + 1] : prox;
+      if (!alvo) return;
+      itens.forEach((li, j) => { li.classList.toggle('feita', j < itens.indexOf(alvo)); li.classList.toggle('agora', li === alvo); });
+      alvo.querySelector('.ia-etapa-sub').textContent = 'Esperando a vez: o servidor está terminando outra música';
+      return;
+    }
+    let k = itens.findIndex((li) => li.dataset.etapa === id);
     if (k < 0) return;
-    itens.forEach((li, i) => { li.classList.toggle('feita', i < k); li.classList.toggle('agora', i === k); });
+    // download completo: a etapa fica feita e a próxima já aparece em andamento
+    if (progresso !== null && progresso >= 1 && itens[k + 1]) { itens[k].classList.remove('com-pct'); k += 1; progresso = null; }
+    itens.forEach((li, i) => {
+      li.classList.toggle('feita', i < k);
+      li.classList.toggle('agora', i === k);
+      li.querySelector('.ia-etapa-sub').textContent = '';
+    });
+    const li = itens[k];
+    li.classList.toggle('com-pct', progresso !== null);
+    if (progresso !== null) {
+      const pct = Math.max(0, Math.min(100, Math.round(progresso * 100)));
+      li.querySelector('.ia-etapa-st').textContent = `${pct}%`;
+      li.querySelector('.ia-etapa-barra b').style.width = `${pct}%`;
+    } else li.querySelector('.ia-etapa-st').textContent = '';
   }
   async function lerNoServidor({ arquivo, url }) {
     // a etapa de afinação só existe com a voz separada; ela aparece se o servidor avisar
     telaEtapas(ETAPAS_IA.filter(([id]) => id !== (arquivo ? 'baixando' : 'enviando')));
-    marcarEtapa(arquivo ? 'enviando' : 'baixando');
+    marcarEtapa(arquivo ? 'enviando' : 'baixando', arquivo ? null : 0);
     const ctrl = new AbortController();
     $('#ia-cancelar').onclick = () => { ctrl.abort(); telaFontes(); };
     const t0 = Date.now();
@@ -5433,14 +5533,15 @@ function viewSong(id, ctx = {}) {
   // editar, fila e tela cheia ficam só na barra de ações abaixo da capa (sem repetir no topo)
   setHeader(song.title, { back, eyebrow: ctx.set ? `${ctx.index + 1} de ${ctx.set.items.length} · ${ctx.set.name}` : '' });
 
-  const kind = ctx.label || song.parte || (/^salmo/i.test(song.title) ? 'Salmo' : /aclama|aleluia/i.test(song.title) ? 'Aclamação' : temCifra(song.content) ? 'Cifra' : 'Letra');
+  // em cima do título só a parte da missa (Entrada, Salmo…): "Cifra"/"Letra" já estão no botão logo abaixo
+  const kind = ctx.label || song.parte || (/^salmo/i.test(song.title) ? 'Salmo' : /aclama|aleluia/i.test(song.title) ? 'Aclamação' : '');
   const fonte = song.source && /^https?:/.test(song.source) ? host(song.source) : song.source?.startsWith('cnbb:') ? 'Liturgia Diária – CNBB' : song.source?.startsWith('hinario:') ? 'Hinário Litúrgico da CNBB (Igreja em Oração)' : song.source?.startsWith('acervo:') ? 'Acervo litúrgico (hinários e subsídios da CNBB)' : '';
   view.innerHTML = `
     ${ctx.set ? `<div class="set-progress"><i style="width:${((ctx.index + 1) / ctx.set.items.length) * 100}%"></i></div>` : ''}
     ${canvas ? '<div class="song-topo canvas-on">' : ''}
     ${canvas ? `<div class="canvas-fundo quadros" aria-hidden="true"><img class="canvas-img" src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt="">${htmlQuadros(song.youtube, tipoQuadros || 'sd')}</div>` : ''}
     <section class="page-hero song-hero">${capa(song)}
-      <div>${ctx.set ? `<button class="kind kind-btn" id="btn-parte" title="Trocar a parte da missa desta música no repertório">${esc(ctx.set.items[ctx.index]?.label || 'Definir a parte da missa')} ${icon('edit', 12)}</button>` : `<div class="kind">${esc(kind)}</div>`}<h2 id="song-title">${esc(song.title)}</h2>
+      <div class="hero-txt">${ctx.set ? `<button class="kind kind-btn" id="btn-parte" title="Trocar a parte da missa desta música no repertório">${esc(ctx.set.items[ctx.index]?.label || 'Definir a parte da missa')} ${icon('edit', 12)}</button>` : kind ? `<div class="kind">${esc(kind)}</div>` : ''}<h2 id="song-title">${esc(song.title)}</h2>
         <div class="meta" id="song-meta"></div></div></section>
     <div class="actions-row acoes-musica">
       <button class="play-big ${song.youtube ? '' : 'off'}" id="btn-play" aria-label="${song.youtube ? 'Tocar' : 'Escolher vídeo'}" title="${song.youtube ? 'Tocar (continua tocando no player enquanto você navega)' : 'Sem vídeo: escolher um no YouTube'}">${icon(song.youtube ? (player.tocandoAgora(song.youtube) ? 'pause' : 'play') : 'youtube', 24)}</button>
@@ -5512,12 +5613,12 @@ function viewSong(id, ctx = {}) {
   aoSair(() => view.removeEventListener('scroll', grudou));
   const draw = () => {
     const r = renderSong(song.content, { transpose, capo, key: song.key });
+    // embaixo do título, numa linha só: o artista e o tom (e o capo). De onde veio a cifra fica nos Créditos
     const meta = [];
     if (song.artist) meta.push(`<b>${esc(song.artist)}</b>`);
-    if (r.key) meta.push(`<span class="chip sm key">Tom ${esc(r.key)}</span>`);
-    if (capo) meta.push(`<span class="chip sm">Capo ${capo}</span>`);
-    if (fonte) meta.push(`<span>${esc(fonte)}</span>`);
-    $('#song-meta').innerHTML = meta.join(' ');
+    if (r.key && comCifra) meta.push(`<span class="meta-tom">Tom ${esc(r.key)}</span>`);
+    if (capo && comCifra) meta.push(`<span>Capo ${capo}ª casa</span>`);
+    $('#song-meta').innerHTML = meta.join('<i class="meta-ponto" aria-hidden="true">•</i>');
     songEl.innerHTML = r.html;
     songEl.classList.toggle('no-chords', !comCifra);
     songEl.classList.toggle('columns', db.prefs().columns !== false); // em colunas nas telas largas (vem ligado)
@@ -5855,7 +5956,7 @@ function viewSong(id, ctx = {}) {
     linha.classList.add('agora');
     // a letra vai junto, a não ser que a pessoa tenha rolado com o dedo há pouco
     if (player.estado === 'tocando' && Date.now() - rolouEm > 4000) linha.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, 200);
+  }, 80); // conferido várias vezes por segundo: a linha acende junto com a voz, não até 0,2 s depois
   aoSair(() => { clearInterval(seguir); view.removeEventListener('wheel', marcarRolagem); view.removeEventListener('touchmove', marcarRolagem); });
   songEl.addEventListener('click', (e) => {
     const sinc = sincronia();
@@ -5874,7 +5975,7 @@ function viewSong(id, ctx = {}) {
   });
   // o andamento aparece aqui, logo acima da letra (carregando, em que etapa está, deu certo ou não e o que fazer);
   // o resultado vai também para as notificações (o sininho)
-  const ETAPAS_SINC = { baixando: 'Baixando o áudio do vídeo…', separando: 'Separando a voz…', ouvindo: 'Ouvindo a letra no vídeo…', alinhando: 'Acertando cada linha…' };
+  const ETAPAS_SINC = { baixando: 'Baixando o áudio do vídeo…', separando: 'Separando a voz…', ouvindo: 'Ouvindo a letra no vídeo…', alinhando: 'Acertando cada linha…', fila: 'Esperando a vez no servidor…' };
   let fecharSinc = 0;
   const statusSinc = (tipo, texto, acao = '') => {
     const box = $('#sinc-status');
@@ -5882,8 +5983,11 @@ function viewSong(id, ctx = {}) {
     clearTimeout(fecharSinc);
     box.hidden = false;
     box.dataset.tipo = tipo;
-    box.innerHTML = `<span class="sinc-ic">${tipo === 'carregando' ? '<span class="spin"></span>' : icon(tipo === 'ok' ? 'check' : 'alerta', 16)}</span>
-      <span class="sinc-txt">${esc(texto)}</span>${acao}${tipo === 'carregando' ? '' : `<button class="icon-btn" data-sinc="fechar" aria-label="Fechar">${icon('x', 16)}</button>`}`;
+    // carregando: barrinhas de equalizador ouvindo a música e um fio que corre embaixo (no lugar do círculo girando)
+    const ic = tipo === 'carregando' ? '<span class="sinc-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>' : icon(tipo === 'ok' ? 'check' : 'alerta', 16);
+    const titulo = tipo === 'carregando' ? 'Letra sincronizada' : tipo === 'ok' ? 'Pronto' : 'Letra sincronizada';
+    box.innerHTML = `<span class="sinc-ic">${ic}</span>
+      <span class="sinc-txt"><small>${titulo}</small>${esc(texto)}</span>${acao}${tipo === 'carregando' ? '<i class="sinc-fio" aria-hidden="true"></i>' : `<button class="icon-btn" data-sinc="fechar" aria-label="Fechar">${icon('x', 16)}</button>`}`;
     if (tipo === 'ok') fecharSinc = setTimeout(() => { box.hidden = true; }, 6000);
   };
   $('#sinc-status').addEventListener('click', (e) => {
@@ -5901,7 +6005,7 @@ function viewSong(id, ctx = {}) {
     const aqui = isPreview ? '' : `#/musica/${song.id}`;
     try {
       const r = await chamarComEtapas(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: cantadas } },
-        (etapa) => statusSinc('carregando', ETAPAS_SINC[etapa] || 'Sincronizando a letra…'));
+        (etapa, p) => statusSinc('carregando', etapa === 'baixando' && p !== null && p < 1 ? `Baixando o áudio do vídeo… ${Math.round(p * 100)}%` : etapa === 'baixando' && p >= 1 ? 'Áudio baixado. Preparando…' : ETAPAS_SINC[etapa] || 'Sincronizando a letra…'));
       const sinc = { video: song.youtube, linhas: cantadas, tempos: r.linhas.map((x) => ({ inicio: x.inicio, fim: x.fim })) };
       song.sincronia = sinc;
       mapa = null;
@@ -8082,7 +8186,12 @@ function route() {
   const [a, b, c, d, e] = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   view.scrollTop = 0;
   topbar.classList.remove('scrolled');
-  document.body.classList.toggle('na-musica', a === 'musica' || (a === 'repertorio' && c !== undefined));
+  // na página da música o menu de baixo some; na partitura (criar, gerar com IA, editar, ver) ele continua, com o
+  // player: são telas de trabalho, que precisam da largura toda — no tablet o painel "Tocando agora" vira a barrinha
+  // embaixo, ao lado do menu (sem mudar a escolha guardada; tocar na barrinha abre o painel de novo)
+  const telaDePartitura = a === 'musica' && (c === 'compor' || c === 'partitura');
+  document.body.classList.toggle('na-musica', (a === 'musica' && !telaDePartitura) || (a === 'repertorio' && c !== undefined));
+  if (ehTablet()) document.body.classList.toggle('painel-recolhido', telaDePartitura || Boolean(db.prefs().painelRecolhido));
   desenharLateral();
   // o sininho das notificações só aparece na página inicial
   sino.hidden = a !== undefined;

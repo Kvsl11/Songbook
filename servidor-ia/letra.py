@@ -109,26 +109,37 @@ def alinhar(letra: list[str], ouvidas: list[str], minimo: float = 0.6) -> list[i
 
 def tempos_das_linhas(linhas: list[str], palavras: list[tuple[str, float, float]], duracao: float) -> list[dict]:
     """O começo e o fim de cada linha, pelas palavras ouvidas ((texto, início, fim) do Whisper)."""
-    letra, dona = [], []
+    letra, dona, posicao = [], [], []
     for k, linha in enumerate(linhas):
-        for p in palavras_da_linha(linha):
+        for n, p in enumerate(palavras_da_linha(linha)):
             letra.append(p)
             dona.append(k)
+            posicao.append(n)
     ouvidas = [normalizar(p[0]) for p in palavras]
     par = alinhar(letra, ouvidas)
     achadas: list[list[int]] = [[] for _ in linhas]
+    primeira: list[int | None] = [None] * len(linhas)  # a posição, na linha, da 1ª palavra achada
     total = [0] * len(linhas)
     for i, j in enumerate(par):
         total[dona[i]] += 1
         if j is not None:
             achadas[dona[i]].append(j)
+            if primeira[dona[i]] is None:
+                primeira[dona[i]] = posicao[i]
     saida: list[dict] = []
     for k in range(len(linhas)):
         js = achadas[k]
         # a linha conta como achada com metade das palavras (ou 2, nas compridas); menos que isso pode ser engano
         if js and len(js) >= min(2, total[k]) and len(js) >= total[k] * 0.3:
-            saida.append({"inicio": palavras[min(js)][1], "fim": palavras[max(js)][2],
-                          "confianca": round(len(js) / max(1, total[k]), 2)})
+            inicio, fim = palavras[min(js)][1], palavras[max(js)][2]
+            # o Whisper não ouviu as primeiras palavras da linha: ela começou antes da 1ª achada (recua o tempo
+            # dessas palavras, pelo ritmo da própria linha), senão a linha acendia atrasada
+            antes = primeira[k] or 0
+            if antes:
+                por_palavra = min(0.6, max(0.2, (fim - inicio) / max(1, len(js) - 1)))
+                ant = next((x for x in reversed(saida) if x), None)
+                inicio = max(ant["fim"] if ant else 0.0, inicio - antes * por_palavra, 0.0)
+            saida.append({"inicio": inicio, "fim": fim, "confianca": round(len(js) / max(1, total[k]), 2)})
         else:
             saida.append(None)
     return _preencher(saida, [max(1, t) for t in total], duracao)
