@@ -1,0 +1,27 @@
+# O servidor da IA no seu computador, de graça e sem fila: partitura e letra sincronizada do Songbook.
+# Precisa do Docker Desktop (docker.com, grátis para uso pessoal) e de uns 8 GB de memória livre.
+#
+#     docker compose up -d --build     (ou dê dois cliques em iniciar-windows.bat / rode ./iniciar.sh)
+#
+# Depois abra http://localhost:7860 e leia o QR code com o celular: o app passa a usar este PC.
+# O "tunel" (Cloudflare, grátis, sem conta) dá o endereço https que o celular alcança de qualquer lugar.
+services:
+  ia:
+    build: .
+    restart: unless-stopped
+    ports: ["127.0.0.1:7860:7860"]
+    environment:
+      IA_TUNEL: http://tunel:2000
+      IA_TAREFAS: "1"
+      IA_CACHE: /home/user/dados/cache
+      IA_COOKIES: /home/user/dados/cookies.txt
+    volumes:
+      - dados:/home/user/dados
+  tunel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --metrics 0.0.0.0:2000 --url http://ia:7860
+    depends_on: [ia]
+
+volumes:
+  dados:

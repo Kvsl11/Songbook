@@ -3,6 +3,13 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 219, data: '2026-10-22', titulo: 'Servidor da IA no seu computador',
+    itens: [
+      { tipo: 'novo', texto: 'Partitura e letra sincronizada pelo seu próprio PC, de graça e sem fila: ligue o servidor no computador (servidor-ia/iniciar-windows.bat), leia o QR code da página dele e o app passa a usar o PC. Fica em Ajustes → Servidor no seu computador.' },
+      { tipo: 'correcao', texto: 'No celular, o aviso “Letra sincronizada” deixava o texto espremido numa coluna estreita. Agora o texto ocupa a largura toda e o botão “Ficou errada? Refazer” fica numa linha própria.' },
+    ],
+  },
+  {
     versao: 218, data: '2026-10-22', titulo: 'Sincronizar a letra de novo, com mais precisão',
     itens: [
       { tipo: 'novo', texto: 'Letra sincronizada errada, pulando partes? O botão ↻ na barra da música (e “Sincronizar a letra de novo” no menu ⋯) refaz a sincronia com um reconhecimento de voz maior e mais preciso.' },

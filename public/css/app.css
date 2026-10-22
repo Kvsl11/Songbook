@@ -1148,6 +1148,8 @@ body.performance .convite-instalar { display: none; }
 .setting-ajuda code { background: var(--surface-2); padding: 2px 6px; border-radius: 4px; word-break: break-all; font-size: 12px; }
 .setting.wrap { flex-wrap: wrap; }
 .setting.wrap .grow { min-width: 190px; } /* no celular, o seletor desce para a linha de baixo em vez de espremer o texto */
+.aj-servidor { flex: 1 1 100%; display: flex; gap: 8px; align-items: center; }
+.aj-servidor .input { flex: 1; min-width: 0; height: 38px; }
 .setting.wrap .seg { margin-left: auto; }
 /* linha com botões (Instalar, Enviar modelo, Apagar tudo…): no celular os botões descem para baixo do texto, alinhados
    com ele, em vez de espremer o título e a descrição numa coluna estreita */
