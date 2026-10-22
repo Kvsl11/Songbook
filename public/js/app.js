@@ -91,7 +91,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-216';
+export const APP_VERSAO = '2026.10.22-217';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -707,9 +707,24 @@ const player = (() => {
   // com o botão de tocar, como a página desenhou.
   let telinhaParada = ''; // o que a telinha mostra sem o vídeo
   let naTelinha = false;
+  // Onde o navegador sabe mudar um elemento de lugar sem recarregá-lo (moveBefore, Chrome 133+), o vídeo entra de
+  // verdade na telinha da página: rola junto com ela. Sem isso ele fica por cima, seguido a cada quadro, e na
+  // rolagem rápida do celular chegava um quadro atrasado e parecia tremer
+  const mover = typeof Element.prototype.moveBefore === 'function';
+  const dentro = () => tela.parentElement !== casa;
+  const tirarDaTelinha = () => {
+    if (!dentro()) return;
+    try { casa.moveBefore(tela, null); } catch { casa.append(tela); }
+    tela.classList.remove('na-telinha');
+  };
+  const porNaTelinha = (box) => {
+    if (!mover || !box?.isConnected || tela.parentElement === box || tela.hidden) return;
+    try { box.moveBefore(tela, null); tela.classList.add('na-telinha'); } catch { /* fica por cima, seguindo */ }
+  };
   const telinha = (comVideo) => {
     if (comVideo === naTelinha || !palco?.isConnected) return;
     naTelinha = comVideo;
+    if (!comVideo) tirarDaTelinha(); // antes de a telinha voltar à miniatura (senão o vídeo sairia junto)
     palco.innerHTML = comVideo ? '<div class="video-embed pl-alvo"></div>' : telinhaParada;
   };
   const alvo = () => {
@@ -726,6 +741,9 @@ const player = (() => {
   const seguir = () => {
     quadro = requestAnimationFrame(seguir);
     const a = alvo();
+    if (!tela.isConnected) { casa.append(tela); tela.classList.remove('na-telinha'); montar(); return; } // saiu junto com uma página (não deveria): refaz
+    if (a && noPalco() && mover) porNaTelinha(a); else tirarDaTelinha();
+    if (dentro()) { tela.style.visibility = 'visible'; tela.classList.add('no-palco'); return; }
     const r = a?.isConnected ? a.getBoundingClientRect() : null;
     if (!r || !r.width || !r.height) { tela.style.visibility = 'hidden'; return; }
     const base = tela.parentElement.getBoundingClientRect();
@@ -918,8 +936,11 @@ const player = (() => {
       desenhar();
       avisar();
     },
+    // a página vai ser desenhada de novo: o vídeo sai da telinha antes (senão iria embora com a página velha)
+    soltar: () => tirarDaTelinha(),
     // a página da música avisa onde fica a telinha do vídeo dela (box) — ou null ao sair da página
     palco(box, youtube = '') {
+      tirarDaTelinha(); // a página vai sair (ou ser desenhada de novo): o vídeo volta para fora antes
       palco = box;
       palcoDe = box ? youtube : '';
       telinhaParada = box ? box.innerHTML : '';
@@ -929,6 +950,7 @@ const player = (() => {
     },
     fechar() {
       telinha(false); // a telinha da página volta a mostrar a miniatura
+      tirarDaTelinha();
       if ('mediaSession' in navigator) { navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none'; }
       sessaoDe = '';
       tela.innerHTML = '';
@@ -5526,6 +5548,7 @@ async function viewPartitura(id) {
 
 function viewSong(id, ctx = {}) {
   stopScroll();
+  player.soltar();
   const isPreview = id === 'previa';
   let song = isPreview ? preview : db.song(id);
   if (!song) return viewNotFound();

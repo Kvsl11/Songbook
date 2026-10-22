@@ -3,6 +3,12 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 217, data: '2026-10-22', titulo: 'Vídeo de referência firme na rolagem',
+    itens: [
+      { tipo: 'correcao', texto: 'O vídeo de referência não treme mais ao rolar a página da música (celular e tablet).' },
+    ],
+  },
+  {
     versao: 216, data: '2026-10-22', titulo: 'Etapas da partitura com IA ao vivo',
     itens: [
       { tipo: 'correcao', texto: 'Gerar a partitura com IA ficava em 0% e de repente aparecia a partitura pronta: as etapas (baixar, separar a voz, ouvir as notas…) agora andam na tela enquanto acontecem.' },
