@@ -10,6 +10,8 @@ Variáveis:
     IA_COOKIES   arquivo cookies.txt para os vídeos com restrição (padrão: cookies.txt nesta pasta)
     IA_SEM_SEPARACAO  desliga a separação da voz (Demucs), mesmo instalada
     IA_WHISPER   modelo do Whisper para a letra sincronizada (padrão: small; base é mais rápido, medium acerta mais)
+    IA_THREADS   núcleos que cada modelo usa (padrão: o do modelo; no Modal, os da máquina)
+    IA_CACHE     pasta onde o áudio e a voz separada de cada vídeo ficam guardados (padrão: a temporária)
     ANTHROPIC_API_KEY  liga o "Tirar dúvidas" (a IA que responde pelos arquivos do acervo e pela web)
 """
 
@@ -65,10 +67,11 @@ def esperar_vaga(etapa) -> None:
         raise HTTPException(503, "servidor ocupado, tente de novo em alguns minutos")
 
 
-def ouvir(caminho: str, separar: bool, etapa=lambda nome, progresso=None: None) -> dict:
+def ouvir(caminho: str | None, separar: bool, etapa=lambda nome, progresso=None: None, **guardado) -> dict:
+    """guardado: audio=(y, cortado) e video=id, quando o áudio veio do vídeo (já baixado ou guardado)"""
     esperar_vaga(etapa)
     try:
-        return transcricao.transcrever(caminho, separar_voz=separar, etapa=etapa)
+        return transcricao.transcrever(caminho, separar_voz=separar, etapa=etapa, **guardado)
     except ValueError as e:
         raise HTTPException(422, str(e))
     except Exception as e:  # o arquivo não abre (formato estranho, corrompido)
@@ -183,6 +186,22 @@ def baixar(video: str, pasta: str, etapa=lambda nome, progresso=None: None) -> d
         raise HTTPException(502, "não consegui baixar o áudio deste vídeo" + (f" ({motivo[:160]})" if motivo else ""))
 
 
+def audio_do_video(video: str, pasta: str, etapa) -> tuple:
+    """(y, cortado, título): o áudio já guardado deste vídeo (pela letra ou pela partitura feita antes: não baixa
+    de novo) ou baixado agora, com a porcentagem na tela"""
+    baixou = []
+
+    def baixar_agora():
+        baixou.append(1)
+        etapa("baixando", 0)
+        return baixar(video, pasta, etapa)
+
+    r = transcricao.audio_do_video(video, baixar_agora)
+    if not baixou:
+        etapa("baixando", 1.0)  # já estava guardado: a etapa passa direto
+    return r
+
+
 @app.post("/youtube", dependencies=[Depends(conferir_chave)])
 def do_youtube(pedido: PedidoYoutube, etapas: bool = Query(False)):
     video = youtube.id_do_video(pedido.url)
@@ -192,9 +211,8 @@ def do_youtube(pedido: PedidoYoutube, etapas: bool = Query(False)):
     pasta = tempfile.mkdtemp(prefix="songbook-yt-")
 
     def trabalho(etapa):
-        etapa("baixando", 0)
-        baixado = baixar(video, pasta, etapa)
-        return {**ouvir(baixado["caminho"], pedido.separar, etapa), "video": video, "titulo": baixado["titulo"]}
+        y, cortado, titulo = audio_do_video(video, pasta, etapa)
+        return {**ouvir(None, pedido.separar, etapa, audio=(y, cortado), video=video), "video": video, "titulo": titulo}
 
     return com_etapas(trabalho, etapas, pasta)
 
@@ -224,11 +242,10 @@ def letra_sincronizada(pedido: PedidoLetra, etapas: bool = Query(False)):
     pasta = tempfile.mkdtemp(prefix="songbook-letra-")
 
     def trabalho(etapa):
-        etapa("baixando", 0)
-        baixado = baixar(video, pasta, etapa)
+        y, cortado, _ = audio_do_video(video, pasta, etapa)
         esperar_vaga(etapa)
         try:
-            r = letra.sincronizar(baixado["caminho"], pedido.linhas, separar_voz=pedido.separar, etapa=etapa)
+            r = letra.sincronizar(None, pedido.linhas, separar_voz=pedido.separar, etapa=etapa, audio=(y, cortado), video=video)
         except ValueError as e:
             raise HTTPException(422, str(e))
         finally:

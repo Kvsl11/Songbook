@@ -2927,3 +2927,19 @@ a.nt-txt span { text-decoration: underline; text-decoration-color: color-mix(in 
 .sinc-fio::after { content: ""; position: absolute; top: 0; bottom: 0; width: 35%; border-radius: 2px; background: linear-gradient(90deg, transparent, #fff, transparent); animation: sinc-fio 1.4s ease-in-out infinite; }
 @keyframes sinc-fio { from { left: -35%; } to { left: 100%; } }
 @media (prefers-reduced-motion: reduce) { .sinc-eq i, .sinc-fio::after { animation: none; } }
+
+/* ---------------------------------------------------------------- Novidades: o que mudou em cada atualização */
+.nv-intro { margin: -4px 0 18px; }
+.nv-lista { display: grid; gap: 14px; max-width: 760px; }
+.nv-versao { padding: 18px 20px 14px; border-radius: 16px; background: var(--bg-elev); scroll-margin-top: 96px; }
+.nv-versao.destaque { box-shadow: inset 0 0 0 2px var(--accent); }
+.nv-cab { display: flex; align-items: center; gap: 10px; }
+.nv-cab small { color: var(--muted); font-size: 13px; }
+.nv-versao h3 { margin: 10px 0 10px; font-size: 19px; font-weight: 800; }
+.nv-versao ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.nv-versao li { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; font-size: 15px; line-height: 1.45; }
+.nv-versao li b { font-weight: 800; margin-right: 2px; }
+.nv-ic { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--accent-ink); background: var(--accent-soft); }
+.nv-versao li[data-tipo="correcao"] .nv-ic { color: #30a46c; background: rgb(48 164 108 / 0.15); }
+.nv-versao li[data-tipo="novo"] .nv-ic { color: #f5a524; background: rgb(245 165 36 / 0.15); }
+#notificacoes li[data-tipo="atualizacao"] .nt-ic { color: var(--accent-ink); background: var(--accent-soft); }

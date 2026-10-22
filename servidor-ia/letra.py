@@ -39,7 +39,9 @@ def modelo_whisper():
         if _whisper is None:
             from faster_whisper import WhisperModel
 
-            _whisper = WhisperModel(os.environ.get("IA_WHISPER", "small"), device="cpu", compute_type="int8")
+            # cpu_threads: os núcleos da máquina (o padrão do faster-whisper é 4, e o servidor tem mais)
+            _whisper = WhisperModel(os.environ.get("IA_WHISPER", "small"), device="cpu", compute_type="int8",
+                                    cpu_threads=int(os.environ.get("IA_THREADS") or 0))
         return _whisper
 
 
@@ -187,7 +189,10 @@ def ouvir_palavras(y16: np.ndarray, dica: str) -> list[tuple[str, float, float]]
     return [(w.word.strip(), float(w.start), float(w.end)) for s in segmentos for w in (s.words or [])]
 
 
-def sincronizar(caminho: str, linhas: list[str], separar_voz: bool = True, etapa=lambda nome: None) -> dict:
+def sincronizar(caminho: str | None, linhas: list[str], separar_voz: bool = True, etapa=lambda nome: None,
+                audio=None, video: str | None = None) -> dict:
+    """audio = (y, cortado) já carregado (o do vídeo guardado); video: o id, para usar e guardar a voz já separada
+    (a partitura da mesma música aproveita, e vice-versa)."""
     import librosa
 
     import transcricao
@@ -197,12 +202,12 @@ def sincronizar(caminho: str, linhas: list[str], separar_voz: bool = True, etapa
     linhas = [l for l in (x.strip() for x in linhas) if l][:400]
     if not linhas:
         raise ValueError("a música não tem letra")
-    y, _ = transcricao.carregar(caminho)
+    y, _ = audio if audio is not None else transcricao.carregar(caminho)
     duracao = len(y) / transcricao.SR
     separado = separar_voz and transcricao.tem_separacao()
     if separado:
         etapa("separando")
-    voz = transcricao.separar(y)[0] if separado else y
+    voz = transcricao.separar_guardado(y, video)[0] if separado else y
     y16 = librosa.resample(voz, orig_sr=transcricao.SR, target_sr=SR_WHISPER).astype(np.float32)
     dica = " ".join(re.sub(r"\[[^\]]*\]", "", l) for l in linhas)
     etapa("ouvindo")

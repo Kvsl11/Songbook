@@ -50,4 +50,4 @@ Precisa do `ffmpeg` instalado. No app: **Ajustes → IA da partitura**, cole o e
 | `POST /letra` | `{"url": "...", "linhas": [...]}` → início e fim de cada linha |
 
 Variáveis: `IA_ORIGENS` (CORS), `IA_CHAVE` (senha, cabeçalho `X-Chave`), `IA_TAREFAS`, `IA_MAX_MB`, `IA_COOKIES`,
-`IA_WHISPER` (small), `IA_CREPE` (full). Testes: `python -m pytest tests`.
+`IA_WHISPER` (small), `IA_CREPE` (tiny; `full` é mais lento e só um pouco mais preciso), `IA_THREADS` (núcleos por modelo), `IA_CACHE` (onde ficam o áudio e a voz separada de cada vídeo, para a letra e a partitura não baixarem nem separarem duas vezes). Testes: `python -m pytest tests`.
