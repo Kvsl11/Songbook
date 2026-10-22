@@ -7,6 +7,7 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'novo', texto: 'O Tirar dúvidas agora se chama Lumen (“luz”, em latim): é o seu assistente litúrgico, por escrito ou ao vivo, por voz.' },
       { tipo: 'melhoria', texto: 'O Lumen não fica mais preso à Wikipédia: busca também em sites católicos (Missário, CNBB, liturgia.pt, blogs de música litúrgica…) e mostra o resumo do site que melhor responde, com o link, e outros sites em “Mais sites”.' },
+      { tipo: 'melhoria', texto: 'Os sites da internet nas respostas do Lumen aparecem com o ícone do próprio site, além do nome e do link.' },
       { tipo: 'correcao', texto: 'Tocar num canto ou arquivo do acervo na resposta do Lumen abre na hora (antes esperava alguns segundos procurando o vídeo; agora o vídeo é procurado com a página já aberta).' },
     ],
   },
