@@ -3,11 +3,18 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 224, data: '2026-10-22', titulo: 'Lumen mais organizado',
+    itens: [
+      { tipo: 'melhoria', texto: 'A apresentação do Lumen ficou organizada em três itens, cada um com ícone: o acervo litúrgico, os sites católicos e a conversa por voz.' },
+      { tipo: 'melhoria', texto: 'As respostas do Lumen vêm com o texto justificado.' },
+      { tipo: 'melhoria', texto: 'Os sites da internet nas respostas do Lumen aparecem com o ícone do próprio site, além do nome e do link.' },
+    ],
+  },
+  {
     versao: 223, data: '2026-10-22', titulo: 'Lumen, o seu assistente litúrgico',
     itens: [
       { tipo: 'novo', texto: 'O Tirar dúvidas agora se chama Lumen (“luz”, em latim): é o seu assistente litúrgico, por escrito ou ao vivo, por voz.' },
       { tipo: 'melhoria', texto: 'O Lumen não fica mais preso à Wikipédia: busca também em sites católicos (Missário, CNBB, liturgia.pt, blogs de música litúrgica…) e mostra o resumo do site que melhor responde, com o link, e outros sites em “Mais sites”.' },
-      { tipo: 'melhoria', texto: 'Os sites da internet nas respostas do Lumen aparecem com o ícone do próprio site, além do nome e do link.' },
       { tipo: 'correcao', texto: 'Tocar num canto ou arquivo do acervo na resposta do Lumen abre na hora (antes esperava alguns segundos procurando o vídeo; agora o vídeo é procurado com a página já aberta).' },
     ],
   },

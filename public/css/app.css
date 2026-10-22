@@ -2524,6 +2524,15 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 .dv-avatar.grande { position: relative; width: 68px; height: 68px; border-radius: 24px; }
 .dv-avatar.grande .ic { width: 30px; height: 30px; }
 .chat-vazio h2 { margin: 0; text-align: center; font-size: clamp(22px, 5vw, 30px); letter-spacing: -0.02em; line-height: 1.15; }
+.dv-recursos { list-style: none; display: flex; flex-direction: column; gap: 2px; width: 100%; max-width: 460px; margin: 8px 0 0; padding: 6px;
+  border-radius: 18px; border: 1px solid var(--border); background: var(--surface); text-align: left; }
+.dv-recursos li { display: flex; align-items: center; gap: 12px; padding: 8px 10px; }
+.dv-recursos li + li { border-top: 1px solid var(--border); }
+.dv-recursos .dv-ico { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.dv-recursos li > span:last-child { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.dv-recursos b { font-size: 14.5px; }
+.dv-recursos small { font-size: 13px; line-height: 1.35; color: var(--muted); }
 .chat-vazio .dv-lema { margin-top: -4px; font-size: 17px; font-weight: 700; color: var(--text); }
 .chat-vazio p { max-width: 500px; margin: 0; line-height: 1.5; color: var(--muted); }
 .chat-vazio p b { color: var(--text); }
@@ -2644,10 +2653,10 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 }
 @media (max-width: 600px) and (max-height: 780px) {
   .dv-hero { display: none; }
-  .chat-vazio p:not(.dv-lema) { display: none; }
+  .chat-vazio p:not(.dv-lema), .dv-recursos small { display: none; }
 }
 /* Tirar dúvidas: a resposta (texto corrido) e a fonte embaixo, como uma etiqueta */
-.dv-texto { margin: 0 0 10px; font-size: 15.5px; line-height: 1.65; }
+.dv-texto { margin: 0 0 10px; font-size: 15.5px; line-height: 1.65; text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
 .dv-texto b { font-weight: 700; color: inherit; background: color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 4px; padding: 0 2px; }
 .chat-bolha .dv-fonte { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; margin: 0 0 4px; padding: 6px 10px 6px 8px; border-radius: 10px; font-size: 13px; color: var(--accent); }
 .chat-bolha .dv-fonte span { min-width: 0; }

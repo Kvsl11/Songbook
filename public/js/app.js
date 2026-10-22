@@ -107,7 +107,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-223';
+export const APP_VERSAO = '2026.10.22-224';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -8187,7 +8187,11 @@ function viewDuvidas() {
       <div class="dv-hero"><span class="dv-avatar grande">${icon('sparkles', 30)}</span></div>
       <h2>Olá, eu sou o Lumen</h2>
       <p class="dv-lema">Como posso ajudar o seu ministério hoje?</p>
-      <p>Pergunte sobre a missa, os tempos litúrgicos ou que canto escolher${ReconhecerVoz ? ' — digitando ou <b>falando</b>, pelo microfone' : ''}. Procuro primeiro no <b>acervo litúrgico</b> e depois na internet.</p>
+      <ul class="dv-recursos">
+        <li><span class="dv-ico">${icon('library', 18)}</span><span><b>Acervo litúrgico</b><small>Procuro primeiro nos documentos e cantos do acervo</small></span></li>
+        <li><span class="dv-ico">${icon('search', 18)}</span><span><b>Sites católicos</b><small>Depois na internet, com o ícone e o link de cada fonte</small></span></li>
+        ${ReconhecerVoz ? `<li><span class="dv-ico">${icon('mic', 18)}</span><span><b>Por voz</b><small>Pergunte pelo microfone ou converse comigo ao vivo</small></span></li>` : ''}
+      </ul>
       ${ReconhecerVoz ? `<button type="button" class="dv-vivo-entrar" data-vivo>${icon('som', 18)}<span><b>Conversar ao vivo</b><small>Fale e ouça a resposta, sem tocar na tela</small></span></button>` : ''}
       <div class="chat-sugestoes">${SUGESTOES_DUVIDAS.map(([ic, q]) => `<button type="button" class="chat-sugestao" data-q="${esc(q)}"><span class="dv-ico">${icon(ic, 18)}</span><span>${esc(q)}</span></button>`).join('')}</div></div>`;
   const google = (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
