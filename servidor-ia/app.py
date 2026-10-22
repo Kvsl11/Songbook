@@ -126,7 +126,7 @@ def saude():
 
 
 @app.post("/transcrever", dependencies=[Depends(conferir_chave)])
-def transcrever(arquivo: UploadFile = File(...), separar: bool = Form(True), etapas: bool = Query(False)):
+def transcrever(arquivo: UploadFile = File(...), separar: str = Form("1"), etapas: bool = Query(False)):
     # o arquivo fica numa pasta temporária, apagada assim que as notas saem (com erro ou não)
     pasta = tempfile.mkdtemp(prefix="songbook-up-")
     ext = os.path.splitext(arquivo.filename or "")[1][:8] or ".audio"
@@ -139,7 +139,9 @@ def transcrever(arquivo: UploadFile = File(...), separar: bool = Form(True), eta
                 shutil.rmtree(pasta, ignore_errors=True)
                 raise HTTPException(413, f"arquivo grande demais (máximo {MAX_MB} MB)")
             f.write(bloco)
-    return com_etapas(lambda etapa: ouvir(caminho, separar, etapa), etapas, pasta)
+    # (o campo vai como texto: com bool, o FastAPI lia o campo ausente como "não separar" e a voz nunca era separada)
+    separar_voz = separar.strip().lower() not in ("0", "false", "nao", "não", "no")
+    return com_etapas(lambda etapa: ouvir(caminho, separar_voz, etapa), etapas, pasta)
 
 
 class PedidoYoutube(BaseModel):
@@ -244,3 +246,19 @@ def tirar_duvida(pedido: PedidoDuvida):
         raise HTTPException(502, "a IA não respondeu agora, tente de novo")
     except anthropic.APIConnectionError:
         raise HTTPException(502, "sem conexão com a IA, tente de novo")
+
+
+class PedidoConectar(BaseModel):
+    cookies: str
+
+
+@app.post("/youtube/conectar", dependencies=[Depends(conferir_chave)])
+def conectar_youtube(pedido: PedidoConectar):
+    """O app manda o cookies.txt da conta do YouTube (uma vez): o servidor passa a baixar como essa conta."""
+    if len(pedido.cookies) > 500_000:
+        raise HTTPException(413, "arquivo de cookies grande demais")
+    try:
+        youtube.conectar(pedido.cookies)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    return {"ok": True}

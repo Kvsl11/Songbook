@@ -2688,28 +2688,38 @@ html.tablet #player .pl-cab { display: flex; }
 @keyframes girar { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .ia-etapas li.agora .ia-etapa-st { animation: none; } }
 
-/* painel recolhido: vira uma barrinha flutuante acima do menu (o conteúdo usa a tela toda); tocar no ícone abre de novo */
-html.tablet body.painel-recolhido { --painel-w: 0px; }
-html.tablet body.com-player.painel-recolhido { --rodape: calc(var(--base-rodape) + 82px); }
+/* painel recolhido: como no Spotify do tablet, a barra de baixo divide a linha: o menu à esquerda e o mini player à
+   direita, lado a lado, na mesma altura (deitado ou em pé); tocar no ícone do mini player abre o painel de novo */
+html.tablet body.painel-recolhido { --painel-w: 0px; --linha-w: calc(100vw - 42px); }
 html.tablet body.painel-recolhido .main-col { margin-right: 0; }
-html.tablet body.painel-recolhido .nav { left: calc(8px + (100vw - 16px) / 2); width: min(600px, calc(100vw - 64px)); }
+html.tablet body.com-player.painel-recolhido .nav { left: 16px; transform: none; width: calc(var(--linha-w) * 0.56); }
 html.tablet body.painel-recolhido #player {
-  top: auto; right: auto; left: calc(8px + (100vw - 16px) / 2); transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom) + 72px);
-  width: min(600px, calc(100vw - 64px)); height: 68px; flex-direction: row; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 16px;
-  overflow: hidden; background: color-mix(in srgb, var(--cor-musica, var(--tint)) 80%, #000); box-shadow: 0 10px 30px rgb(0 0 0 / 0.45);
+  top: auto; left: auto; right: 16px; transform: none; bottom: calc(14px + env(safe-area-inset-bottom));
+  width: calc(var(--linha-w) * 0.44); height: 64px; flex-direction: row; align-items: center; gap: 8px; padding: 7px 8px 7px 7px;
+  border-radius: 999px; overflow: hidden; border: 1px solid rgb(255 255 255 / 0.08);
+  background: color-mix(in srgb, var(--cor-musica, var(--tint)) 72%, #000); box-shadow: 0 12px 34px rgb(0 0 0 / 0.45);
 }
-html.tablet body.painel-recolhido #player .pl-cab, html.tablet body.painel-recolhido #player .pl-letra, html.tablet body.painel-recolhido #player .pl-tempo { display: none; }
-html.tablet body.painel-recolhido #player .pl-video { width: 92px; flex: none; border-radius: 8px; box-shadow: none; }
+html.tablet body.painel-recolhido #player .pl-cab, html.tablet body.painel-recolhido #player .pl-letra { display: none; }
+/* o andamento: um fio no pé do mini player, como no Spotify */
+html.tablet body.painel-recolhido #player .pl-tempo { display: block; position: absolute; left: 28px; right: 28px; bottom: 3px; margin: 0; }
+html.tablet body.painel-recolhido #player .pl-t0, html.tablet body.painel-recolhido #player .pl-t1 { display: none; }
+html.tablet body.painel-recolhido #player .pl-prog { height: 2px; }
+html.tablet body.painel-recolhido #player .pl-video { width: 50px; height: 50px; aspect-ratio: 1; flex: none; border-radius: 10px; box-shadow: none; overflow: hidden; }
 html.tablet body.painel-recolhido #player .pl-info { flex: 1; min-width: 0; padding: 0; }
-html.tablet body.painel-recolhido #player .pl-txt b { font-size: 15px; white-space: nowrap; }
-html.tablet body.painel-recolhido #player .pl-txt small { font-size: 13px; }
+html.tablet body.painel-recolhido #player .pl-txt b { font-size: 14px; white-space: nowrap; }
+html.tablet body.painel-recolhido #player .pl-txt small { font-size: 12px; }
 html.tablet body.painel-recolhido #player .pl-ctrl { flex: none; padding: 0; gap: 0; }
 html.tablet body.painel-recolhido #player .pl-modo { display: none; }
-html.tablet body.painel-recolhido #player .pl-play { width: 46px; height: 46px; }
-html.tablet body.painel-recolhido #player .pl-pulo { width: 38px; height: 38px; }
-html.tablet body.painel-recolhido #player .pl-abrir-painel { display: grid; order: 9; color: #fff; }
-html.tablet body.painel-recolhido #player .pl-lado { display: flex; order: 10; position: static; }
-html.tablet body.painel-recolhido #player .pl-lado [data-pl="ampliar"] { display: none; }
+html.tablet body.painel-recolhido #player .pl-play { width: 44px; height: 44px; }
+html.tablet body.painel-recolhido #player .pl-pulo { width: 36px; height: 36px; }
+html.tablet body.painel-recolhido #player .pl-abrir-painel { display: grid; order: 9; color: #fff; width: 38px; height: 38px; }
+html.tablet body.painel-recolhido #player .pl-lado { display: none; }
+/* em pé a linha é estreita: o mini player fica com a capa, o nome, o tocar e o abrir */
+@media (orientation: portrait) {
+  html.tablet body.painel-recolhido #player .pl-pulo { display: none; }
+  html.tablet body.com-player.painel-recolhido .nav { padding: 0 4px; }
+  html.tablet body.com-player.painel-recolhido .nav a { font-size: 11px; }
+}
 /* tela inteira: a música ocupa tudo (deitado, o vídeo e os controles de um lado e a letra grande do outro) */
 html.tablet body.painel-cheio #player { left: 8px; width: auto; z-index: 40; padding: 20px 24px 24px; }
 html.tablet body.painel-cheio #player .pl-letra { max-height: none; flex: 1 1 auto; }
@@ -2721,3 +2731,59 @@ html.tablet body.painel-cheio #player .pl-linhas p { font-size: 30px; margin-bot
 }
 html.tablet body.painel-cheio #pl-tela { z-index: 41; }
 @media (orientation: landscape) { html.tablet body.painel-cheio #player { align-content: start; } }
+
+/* ---------------------------------------------------------------- Notificações: o sino no topo guarda os avisos do
+   servidor (letra sincronizada, YouTube pedindo login…) em vez de eles pularem na tela; o número diz quantos são novos */
+.sino { position: relative; }
+.sino-n { position: absolute; top: 3px; right: 2px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; display: grid; place-items: center;
+  font-size: 10px; font-weight: 900; line-height: 1; color: #fff; background: #e5484d; box-shadow: 0 0 0 2px var(--bg); }
+.sino.tocou svg { animation: badalar 0.9s ease; transform-origin: 50% 10%; }
+@keyframes badalar { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(16deg); } 35% { transform: rotate(-13deg); } 55% { transform: rotate(8deg); } 75% { transform: rotate(-4deg); } }
+@media (prefers-reduced-motion: reduce) { .sino.tocou svg { animation: none; } }
+#notificacoes {
+  position: fixed; z-index: 60; top: calc(58px + env(safe-area-inset-top)); right: 12px; width: min(380px, calc(100vw - 24px));
+  max-height: min(70dvh, 520px); display: flex; flex-direction: column; overflow: hidden; border-radius: 16px;
+  background: var(--surface, #1f1f1f); color: var(--text); border: 1px solid rgb(255 255 255 / 0.08);
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.5); animation: surgir 0.2s both;
+}
+:root[data-theme="light"] #notificacoes { background: #fff; border-color: rgb(0 0 0 / 0.08); box-shadow: 0 18px 50px rgb(0 0 0 / 0.18); }
+.nt-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 16px 10px; }
+.nt-cab b { font-size: 16px; }
+.nt-cab .link-btn { font-size: 13px; }
+#notificacoes ul { list-style: none; margin: 0; padding: 0 6px 8px; overflow-y: auto; overscroll-behavior: contain; }
+#notificacoes li { position: relative; display: grid; grid-template-columns: 34px 1fr 32px; align-items: start; gap: 10px; padding: 10px 6px 10px 10px; border-radius: 12px; }
+#notificacoes li + li { margin-top: 2px; }
+#notificacoes li.nova { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+#notificacoes li.nova::before { content: ""; position: absolute; left: 3px; top: 50%; width: 6px; height: 6px; margin-top: -3px; border-radius: 50%; background: var(--accent); }
+.nt-ic { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3, rgb(127 127 127 / 0.15)); color: var(--muted); }
+#notificacoes li[data-tipo="erro"] .nt-ic { color: #e5484d; background: rgb(229 72 77 / 0.14); }
+#notificacoes li[data-tipo="sucesso"] .nt-ic { color: #30a46c; background: rgb(48 164 108 / 0.15); }
+.nt-txt { min-width: 0; display: flex; flex-direction: column; gap: 2px; color: inherit; text-decoration: none; font-size: 14px; line-height: 1.35; }
+.nt-txt b { font-size: 14px; }
+.nt-txt small { color: var(--muted); font-size: 12px; }
+a.nt-txt span { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: 2px; }
+#notificacoes li .icon-btn { width: 32px; height: 32px; color: var(--muted); }
+.nt-vazio { margin: 0; padding: 18px 16px 24px; text-align: center; }
+
+/* ---------------------------------------------------------------- Conectar o YouTube (os cookies, uma vez só) */
+.conectar-yt { display: flex; flex-direction: column; gap: 18px; max-width: 640px; margin: 0 auto; padding: 8px 0 24px; }
+.cy-topo { display: flex; gap: 16px; align-items: flex-start; }
+.cy-topo h2 { margin: 2px 0 6px; font-size: 22px; letter-spacing: -0.01em; }
+.cy-topo p { margin: 0; line-height: 1.5; }
+.cy-ic { flex: none; width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; color: #fff; background: #e62117; box-shadow: 0 10px 24px rgb(230 33 23 / 0.3); }
+.cy-estado { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 12px; font-weight: 700;
+  background: var(--surface-2, rgb(127 127 127 / 0.1)); color: var(--muted); }
+.cy-estado.ok { color: #30a46c; background: rgb(48 164 108 / 0.13); }
+.cy-passos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.cy-passos li { display: grid; grid-template-columns: 32px 1fr; gap: 12px; align-items: start; padding: 10px 4px; }
+.cy-passos li + li { border-top: 1px solid var(--surface-3, rgb(127 127 127 / 0.15)); }
+.cy-n { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 14px; background: var(--accent); color: var(--accent-ink-on, #04161b); }
+.cy-passos li > div > b { display: block; margin-bottom: 3px; }
+.cy-passos small b { color: var(--text); }
+.cy-passos small { display: block; color: var(--muted); font-size: 14px; line-height: 1.45; }
+.cy-passos a { color: var(--accent-ink); font-weight: 700; }
+.cy-form { display: flex; flex-direction: column; gap: 10px; }
+.cy-form textarea { width: 100%; box-sizing: border-box; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.cy-form .btn { justify-content: center; }
+.cy-nota { display: flex; gap: 8px; align-items: flex-start; margin: 0; font-size: 13px; line-height: 1.45; }
+.cy-nota svg { flex: none; margin-top: 2px; }

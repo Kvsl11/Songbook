@@ -85,7 +85,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-193';
+export const APP_VERSAO = '2026.10.22-194';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -193,6 +193,66 @@ function toast(msg, opcoes = {}) {
   requestAnimationFrame(() => card.classList.add('show'));
   card.timer = setTimeout(() => fecharAviso(card), ms);
 }
+
+// ---------------------------------------------------------------- notificações (o sininho do topo)
+// O que o servidor da IA faz em segundo plano (letra sincronizada, partitura, erros) não pula na tela: fica aqui,
+// com as não lidas contadas no sininho; abrir marca como lidas e dá para limpar. Ficam neste aparelho (as 50 últimas)
+let notificacoes = (() => { try { return JSON.parse(localStorage.getItem('songbook.notificacoes') || '[]'); } catch { return []; } })();
+const guardarNotificacoes = () => { try { localStorage.setItem('songbook.notificacoes', JSON.stringify(notificacoes.slice(0, 50))); } catch { /* sem espaço */ } };
+const sino = document.createElement('button');
+sino.className = 'icon-btn sino';
+sino.setAttribute('aria-label', 'Notificações');
+sino.title = 'Notificações';
+function desenharSino() {
+  const n = notificacoes.filter((x) => !x.lida).length;
+  sino.innerHTML = `${icon('bell', 18)}${n ? `<b class="sino-n">${n > 9 ? '9+' : n}</b>` : ''}`;
+  sino.setAttribute('aria-label', n ? `Notificações: ${n} novas` : 'Notificações');
+}
+// tipo: sucesso | erro | ia | info; href: para onde tocar leva (a música, a tela de conectar…)
+function notificar(texto, { tipo = 'info', href = '', titulo = '' } = {}) {
+  notificacoes.unshift({ id: Date.now() + Math.random(), t: Date.now(), texto, titulo, tipo, href, lida: false });
+  guardarNotificacoes();
+  desenharSino();
+  sino.classList.remove('tocou');
+  void sino.offsetWidth;
+  sino.classList.add('tocou');
+  if ($('#notificacoes')) abrirNotificacoes(true);
+}
+function abrirNotificacoes(redesenhar = false) {
+  let caixa = $('#notificacoes');
+  if (caixa && !redesenhar) { caixa.remove(); return; }
+  if (!caixa) {
+    caixa = document.createElement('div');
+    caixa.id = 'notificacoes';
+    caixa.setAttribute('role', 'dialog');
+    caixa.setAttribute('aria-label', 'Notificações');
+    document.body.append(caixa);
+    setTimeout(() => document.addEventListener('pointerdown', function fora(e) {
+      if (!caixa.contains(e.target) && !sino.contains(e.target)) { caixa.remove(); document.removeEventListener('pointerdown', fora); }
+    }), 0);
+  }
+  const quando = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'agora' : m < 60 ? `há ${m} min` : m < 1440 ? `há ${Math.round(m / 60)} h` : new Date(t).toLocaleDateString('pt-BR'); };
+  caixa.innerHTML = `<div class="nt-cab"><b>Notificações</b>${notificacoes.length ? '<button class="link-btn" data-nt="limpar">Limpar tudo</button>' : ''}</div>
+    ${notificacoes.length ? `<ul>${notificacoes.map((x) => `<li class="${x.lida ? '' : 'nova'}" data-tipo="${x.tipo}">
+      <span class="nt-ic">${icon(ICONE_AVISO[x.tipo] || 'info', 16)}</span>
+      <${x.href ? `a href="${esc(x.href)}"` : 'div'} class="nt-txt">${x.titulo ? `<b>${esc(x.titulo)}</b>` : ''}<span>${esc(x.texto)}</span><small>${quando(x.t)}</small></${x.href ? 'a' : 'div'}>
+      <button class="icon-btn" data-nt="${x.id}" aria-label="Apagar">${icon('x', 14)}</button></li>`).join('')}</ul>`
+      : '<p class="muted nt-vazio">Nenhuma notificação.</p>'}`;
+  caixa.onclick = (e) => {
+    const b = e.target.closest('[data-nt]');
+    if (b?.dataset.nt === 'limpar') notificacoes = [];
+    else if (b) notificacoes = notificacoes.filter((x) => String(x.id) !== b.dataset.nt);
+    else if (e.target.closest('a')) caixa.remove();
+    if (b) { guardarNotificacoes(); desenharSino(); abrirNotificacoes(true); }
+  };
+  // abrir marca tudo como lido (o ponto azul some na próxima vez)
+  notificacoes.forEach((x) => { x.lida = true; });
+  guardarNotificacoes();
+  desenharSino();
+}
+sino.onclick = () => abrirNotificacoes();
+desenharSino();
+$('.topbar').insertBefore(sino, $('#top-actions'));
 
 function setHeader(title, { back = null, actions = [], eyebrow = '' } = {}) {
   titleEl.textContent = title;
@@ -4856,6 +4916,7 @@ async function gerarComIA(song, titulo) {
       // servidor fora do ar: o arquivo ainda dá para ler no aparelho; o link do YouTube, não
       if (arquivo && !e.status) { toast('Servidor da IA fora do ar: lendo no aparelho'); lerNoAparelho(arquivo); return; }
       telaFontes(erroExplicado(e));
+      if (e.status === 403) passo.querySelector('.aviso')?.insertAdjacentHTML('beforeend', `<a class="btn small primary" href="#/youtube">${icon('youtube', 15)} Conectar o YouTube</a>`);
     }
   }
   async function lerNoAparelho(arquivo) {
@@ -5708,20 +5769,25 @@ function viewSong(id, ctx = {}) {
     if (!player.desta(song.youtube)) tocar();
     player.irPara(Math.max(0, sinc.tempos[k].inicio - 0.3));
   });
+  // o andamento e o resultado vão para as notificações (o sininho), não pulam na tela; uma por vez por música
   const sincronizarLetra = async ({ sozinho = false } = {}) => {
     const cantadas = linhasCantadas(song.content).map(linhaSemCifra).filter(Boolean);
     if (!cantadas.length) { if (!sozinho) toast('Esta música não tem letra para sincronizar'); return; }
-    if (!sozinho) toast('Sincronizando a letra com o vídeo… (leva uns minutos)');
+    if (!sozinho) toast('Sincronizando a letra: o aviso chega no sininho quando terminar', { tipo: 'ia' });
     tentouSincronizar.add(song.youtube);
+    const aqui = isPreview ? '' : `#/musica/${song.id}`;
     try {
-      const NOMES = { baixando: 'baixando o áudio do vídeo', separando: 'separando a voz', ouvindo: 'ouvindo a letra', alinhando: 'acertando as linhas' };
-      const r = await chamarComEtapas(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: cantadas } }, (et) => { if (!sozinho && NOMES[et]) toast(`Sincronizando a letra: ${NOMES[et]}…`); });
+      const r = await chamarComEtapas(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: cantadas } });
       const sinc = { video: song.youtube, linhas: cantadas, tempos: r.linhas.map((x) => ({ inicio: x.inicio, fim: x.fim })) };
       song.sincronia = sinc;
       mapa = null;
       if (isPreview) preview.sincronia = sinc; else db.updateSong(song.id, { sincronia: sinc });
-      toast(sozinho ? 'Letra sincronizada com o vídeo: dê play e ela acompanha' : `Letra sincronizada: ${r.achadas} de ${r.total} linhas ouvidas no vídeo. Toque numa linha para ir até ela`);
-    } catch (e) { if (!sozinho) toast(e.status === 403 ? 'O YouTube bloqueou o download do áudio pelo servidor (ele pede login): a letra não deu para sincronizar agora' : erroExplicado(e)); }
+      notificar(`${r.achadas} de ${r.total} linhas ouvidas no vídeo. Dê play: a letra acompanha, e tocar numa linha vai até ela.`, { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
+    } catch (e) {
+      // o bloqueio do YouTube avisa uma vez só (as outras músicas dariam o mesmo aviso)
+      if (e.status === 403) { if (!notificacoes.some((x) => x.href === '#/youtube' && !x.lida)) notificar('O YouTube pediu login para o servidor baixar o áudio. Conecte a conta do YouTube uma vez e tente de novo.', { tipo: 'erro', titulo: 'Conecte o YouTube', href: '#/youtube' }); }
+      else if (!sozinho) notificar(erroExplicado(e), { tipo: 'erro', titulo: `Letra de ${song.title}`, href: aqui });
+    }
   };
   $('#btn-sincronizar')?.addEventListener('click', () => { $('#menu-mais').hidden = true; sincronizarLetra(); });
   // a música com vídeo e sem letra sincronizada: sincroniza sozinha, em segundo plano (uma tentativa por vídeo a cada
@@ -7196,6 +7262,7 @@ function viewSettings() {
 
     ${secao('musica', 'A página de cada música', `
     <div class="settings-group">
+      <a class="setting" href="#/youtube"><span class="ico">${icon('youtube', 18)}</span><div class="grow"><div class="t">Conta do YouTube</div><div class="s">Para o app baixar o áudio dos vídeos sozinho: partitura e letra sincronizada</div></div>${icon('next', 18)}</a>
       <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo no topo da música</div><div class="s">Quadros do clipe passam sem som atrás do título, como no Spotify (o vídeo toca nas Referências). Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
     </div>
     ${jaInstalado() ? '' : `<div class="settings-group">
@@ -7571,6 +7638,61 @@ async function viewFontes() {
 }
 
 // leitor de arquivos (partituras, hinários, preces do Google Drive, PDFs) dentro do app
+// ---------------------------------------------------------------- conectar o YouTube (uma vez)
+// O YouTube só deixa o servidor baixar o áudio (partitura e letra sincronizada) se o pedido vier de uma conta logada.
+// Não existe "entrar com o Google" para isso: o jeito é o servidor usar a sessão de um navegador logado (o arquivo de
+// cookies). A pessoa exporta uma vez com uma extensão, cola aqui e o servidor guarda.
+function viewConectarYoutube() {
+  setTab('inicio');
+  setTint('#5a1a1a');
+  setHeader('Conectar o YouTube', { back: '#/ajustes' });
+  const passoN = (n, t, d) => `<li><span class="cy-n">${n}</span><div><b>${t}</b><small>${d}</small></div></li>`;
+  view.innerHTML = `<div class="conectar-yt">
+    <section class="cy-topo"><span class="cy-ic">${icon('youtube', 30)}</span><div><h2>Conectar a conta do YouTube</h2>
+      <p class="muted">Para o app baixar o áudio dos vídeos sozinho (gerar a partitura e sincronizar a letra), o YouTube pede uma conta logada. Faça isto <b>uma vez</b>; se um dia ele pedir de novo, é só repetir.</p></div></section>
+    <div class="cy-estado" id="cy-estado">Verificando…</div>
+    <ol class="cy-passos">
+      ${passoN(1, 'Instale a extensão “Get cookies.txt LOCALLY”', 'No celular Android, use o <a href="https://addons.mozilla.org/firefox/addon/get-cookies-txt-locally/" target="_blank" rel="noopener">Firefox</a>; no computador, o <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener">Chrome</a> ou o Firefox.')}
+      ${passoN(2, 'Entre no youtube.com com uma conta Google', 'De preferência uma conta só para isso (não a principal). Abra qualquer vídeo para confirmar que está logado.')}
+      ${passoN(3, 'Exporte os cookies', 'Toque na extensão → <b>Export</b> (baixa o arquivo cookies.txt) ou <b>Copy</b> (copia o texto).')}
+      ${passoN(4, 'Mande para o app', 'Escolha o arquivo baixado ou cole o texto aqui embaixo e toque em Conectar.')}
+    </ol>
+    <div class="cy-form">
+      <button class="btn" id="cy-arquivo">${icon('upload', 16)} Escolher o arquivo cookies.txt</button>
+      <textarea class="input" id="cy-texto" rows="5" placeholder="…ou cole aqui o texto copiado pela extensão"></textarea>
+      <button class="btn primary" id="cy-conectar">${icon('check', 16)} Conectar</button>
+    </div>
+    <p class="muted cy-nota">${icon('info', 14)} O arquivo vai só para o servidor do Songbook, que o usa apenas para baixar o áudio dos vídeos. Para desconectar, saia da conta nesse navegador ou troque a senha.</p></div>`;
+  const estado = $('#cy-estado');
+  const verEstado = () => chamar(servidorIA(), '/saude', { tempo: 60e3 })
+    .then((r) => { estado.className = `cy-estado ${r.cookies ? 'ok' : ''}`; estado.innerHTML = r.cookies ? `${icon('check', 16)} Conta do YouTube conectada` : `${icon('info', 16)} Ainda não conectado`; })
+    .catch((e) => { estado.textContent = e.message; });
+  servidorCarregado.then(verEstado);
+  $('#cy-arquivo').onclick = () => {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = '.txt,text/plain';
+    inp.onchange = async () => { if (inp.files[0]) { $('#cy-texto').value = await inp.files[0].text(); $('#cy-conectar').click(); } };
+    inp.click();
+  };
+  $('#cy-conectar').onclick = async () => {
+    const texto = $('#cy-texto').value.trim();
+    if (!texto) { toast('Escolha o arquivo ou cole o texto dos cookies'); return; }
+    const b = $('#cy-conectar');
+    b.disabled = true;
+    try {
+      await chamar(servidorIA(), '/youtube/conectar', { json: { cookies: texto }, tempo: 60e3 });
+      $('#cy-texto').value = '';
+      toast('YouTube conectado: agora a partitura e a letra baixam sozinhas', { tipo: 'sucesso' });
+      notificacoes = notificacoes.filter((x) => x.href !== '#/youtube');
+      guardarNotificacoes();
+      desenharSino();
+      tentouSincronizar.clear();
+      verEstado();
+    } catch (e) { toast(e.message, { tipo: 'erro' }); } finally { b.disabled = false; }
+  };
+}
+
 // ---------------------------------------------------------------- Tirar dúvidas
 // Como o NotebookLM: a pergunta vai para o servidor da IA, que responde primeiro pelos arquivos do acervo litúrgico
 // (citando cada um: [1], [2]…) e, se eles não trazem a resposta, busca na internet. A conversa fica na tela (dá para
@@ -7802,6 +7924,7 @@ function route() {
     case 'setor': return viewSetor(b, c);
     case 'acervo': return viewAcervo(b || '');
     case 'duvidas': return viewDuvidas();
+    case 'youtube': return viewConectarYoutube();
     default: return viewNotFound();
   }
 }
