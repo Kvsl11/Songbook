@@ -3,6 +3,12 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 230, data: '2026-10-22', titulo: 'Lumen sugere os cantos da missa',
+    itens: [
+      { tipo: 'novo', texto: 'Peça ao Lumen “sugestão para a entrada e o ofertório do dia 29/01/2027”, “canto de comunhão para domingo” ou “repertório para a missa de amanhã”: ele traz as sugestões da tela da Liturgia só das partes pedidas — primeiro do acervo e do Hinário da CNBB, depois da Cindy Ferrarezi e do Músicas para Missa. Tocar num canto abre a música.' },
+    ],
+  },
+  {
     versao: 229, data: '2026-10-22', titulo: 'Sem o aviso “Esta música não tem cifra”',
     itens: [
       { tipo: 'melhoria', texto: 'Música sem cifra não mostra mais o aviso “Esta música não tem cifra” em cima da letra: a aba diz “Letra · sem cifra”, discreta. A falta de letra ou de vídeo continua avisada.' },

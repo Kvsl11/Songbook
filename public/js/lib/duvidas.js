@@ -275,12 +275,42 @@ export function pedidoLiturgico(pergunta, hoje) {
   if (!partes.length) return null;
   const dia = DIA_PEDIDO.exec(t);
   if (!dia && !VERBO_PEDIDO.test(t)) return null;
-  // a data escrita vale mais que as palavras ("do dia 25/10" é o dia 25, não hoje)
-  let data = dataEscrita(t, hoje) || hoje;
-  if (data === hoje) {
-    if (/\bamanha\b/.test(t)) data = somaDiasISO(hoje, 1);
-    else if (/\bontem\b/.test(t)) data = somaDiasISO(hoje, -1);
-    else if (/\bdomingo\b/.test(t)) data = somaDiasISO(hoje, (7 - new Date(`${hoje}T12:00:00`).getDay()) % 7);
-  }
-  return { partes, data };
+  return { partes, data: dataDoPedido(t, hoje) };
+}
+// o dia do pedido: a data escrita vale mais que as palavras ("do dia 25/10" é o dia 25, não hoje)
+function dataDoPedido(t, hoje) {
+  const escrita = dataEscrita(t, hoje);
+  if (escrita) return escrita;
+  if (/\bamanha\b/.test(t)) return somaDiasISO(hoje, 1);
+  if (/\bontem\b/.test(t)) return somaDiasISO(hoje, -1);
+  if (/\bdomingo\b/.test(t)) return somaDiasISO(hoje, (7 - new Date(`${hoje}T12:00:00`).getDay()) % 7);
+  return hoje;
+}
+
+// Pedido de sugestão de cantos para partes da missa de um dia ("sugestão para a entrada e o ofertório do dia
+// 29/01/2027", "que canto de comunhão para domingo?"): as chaves das partes (as de lib/missa.js) e a data. Sem parte
+// dita, mas pedindo o repertório/os cantos da missa: as partes principais. Sem pedido de canto: null.
+const PARTES_CANTO = [
+  ['refrao', /\brefrao orante\b/],
+  ['entrada', /\b(entrada|abertura)\b/],
+  ['ato', /\b(ato penitencial|perdao|kyrie|senhor,? tende piedade)\b/],
+  ['gloria', /\bgloria\b/],
+  ['salmo', /\bsalmo\b/],
+  ['aclamacao', /\b(aclamacao|aleluia)\b/],
+  ['oferendas', /\b(ofertorio|oferendas?|apresentacao das oferendas)\b/],
+  ['santo', /\bsanto\b(?! do dia)/],
+  ['cordeiro', /\b(cordeiro|agnus)\b/],
+  ['comunhao', /\bcomunhao\b/],
+  ['final', /\b(final|envio|saida|despedida)\b/],
+];
+const PEDE_CANTO = /\b(sugest\w*|sujest\w*|sugir\w*|indic\w*|cantos?|musicas?|hinos?|cantar|repertorio)\b/;
+export function pedidoSugestao(pergunta, hoje) {
+  const t = sem(pergunta);
+  if (!PEDE_CANTO.test(t)) return null;
+  let partes = PARTES_CANTO.filter(([, re]) => re.test(t)).map(([k]) => k);
+  if (!partes.length && /\b(repertorio|missa|celebracao)\b/.test(t)) partes = ['entrada', 'ato', 'gloria', 'salmo', 'aclamacao', 'oferendas', 'santo', 'cordeiro', 'comunhao', 'final'];
+  if (!partes.length) return null;
+  // "para o Advento", "na Quaresma", sem dia: é um tempo litúrgico, não a missa de um dia (fica a busca no acervo)
+  if (/\b(advento|natal|quaresma|pascoa|pentecostes|tempo comum|ano [abc])\b/.test(t) && !DIA_PEDIDO.test(t)) return null;
+  return { partes, data: dataDoPedido(t, hoje) };
 }
