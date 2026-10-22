@@ -3,11 +3,16 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 232, data: '2026-10-22', titulo: 'Lumen com a cara do Gemini',
+    itens: [
+      { tipo: 'melhoria', texto: 'O Lumen ficou com a cara do Gemini: a estrela e “Pode perguntar!” no meio, as sugestões em linhas simples e a caixa de pergunta em pílula, com o microfone e o botão azul da conversa ao vivo (vira a seta de enviar quando você digita).' },
+      { tipo: 'melhoria', texto: 'Conversa ao vivo nova: a resposta em letra grande, “Toque para interromper”, o que você falou embaixo e a barra com as fontes, a pílula azul que brilha enquanto ouve, pensa e fala, o microfone (liga e desliga) e o encerrar.' },
+    ],
+  },
+  {
     versao: 231, data: '2026-10-22', titulo: 'Lumen com inteligência artificial',
     itens: [
       { tipo: 'novo', texto: 'O Lumen agora responde com IA (quando o servidor tem a chave da IA): ele lê o acervo do Drive — cantos, Hinário e o texto dos PDFs — e sabe o que está no seu app: a liturgia do dia de que você fala, os cantos sugeridos, as suas músicas e os seus repertórios. A resposta cita de onde veio cada coisa ([1], [2]…); tocar na fonte abre o arquivo do Drive. Sem a IA, continua a busca de antes.' },
-      { tipo: 'melhoria', texto: 'O Lumen ficou com a cara do Gemini: a estrela e “Pode perguntar!” no meio, as sugestões em linhas simples e a caixa de pergunta em pílula, com o microfone e o botão azul da conversa ao vivo (vira a seta de enviar quando você digita).' },
-      { tipo: 'melhoria', texto: 'Conversa ao vivo nova: a resposta em letra grande, “Toque para interromper”, o que você falou embaixo e a barra com as fontes, a pílula azul que brilha enquanto ouve, pensa e fala, o microfone (liga e desliga) e o encerrar.' },
       { tipo: 'correcao', texto: '“O que tem no meu repertório?” não é mais confundido com um pedido de sugestão de cantos.' },
     ],
   },
