@@ -14,6 +14,7 @@ export const NOVIDADES = [
     versao: 222, data: '2026-10-22', titulo: 'Conversa ao vivo no Tirar dúvidas',
     itens: [
       { tipo: 'novo', texto: 'Conversar ao vivo, como o DJ do Spotify: em Tirar dúvidas, toque em “Conversar ao vivo” (ou no 🔊 do topo), fale a pergunta e ouça a resposta em voz alta. Na tela aparecem os trechos do acervo e os links da internet, e ele volta a ouvir sozinho, sem tocar em nada. A música tocando pausa enquanto vocês conversam.' },
+      { tipo: 'melhoria', texto: 'Tirar dúvidas não fica mais preso à Wikipédia: busca também em sites católicos (Missário, CNBB, liturgia.pt, blogs de música litúrgica…) e mostra o resumo do site que melhor responde, com o link, e outros sites em “Mais sites”.' },
       { tipo: 'correcao', texto: 'Ao abrir as Novidades pela notificação, o título “Novidades do app” ficava cortado embaixo da barra do topo.' },
     ],
   },
