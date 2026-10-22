@@ -50,12 +50,13 @@ def cloudflared() -> str:
 def main() -> None:
     os.chdir(PASTA)
     sys.path.insert(0, PASTA)
-    try:
-        import static_ffmpeg
+    if not shutil.which("ffmpeg"):
+        try:
+            import static_ffmpeg
 
-        static_ffmpeg.add_paths()  # o ffmpeg (o yt-dlp e o áudio precisam) sem instalar nada
-    except ImportError:
-        pass
+            static_ffmpeg.add_paths()  # o ffmpeg (o yt-dlp e o áudio precisam) sem instalar nada
+        except Exception as e:  # sem o pacote ou sem internet para baixar: o servidor liga, sem o YouTube
+            print(f"Aviso: não consegui o ffmpeg ({type(e).__name__}); os vídeos do YouTube não vão funcionar.", flush=True)
     dados = os.path.join(PASTA, "dados")
     os.makedirs(dados, exist_ok=True)
     # antes de importar o app: o pc.py lê o IA_TUNEL ao carregar
