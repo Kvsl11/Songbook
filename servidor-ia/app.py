@@ -19,12 +19,14 @@ import hashlib
 import json
 import logging
 import os
+import queue
 import shutil
 import tempfile
 import threading
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 import duvidas
@@ -51,12 +53,12 @@ def conferir_chave(x_chave: str | None = Header(default=None)):
         raise HTTPException(401, "chave do servidor errada")
 
 
-def ouvir(caminho: str, separar: bool) -> dict:
+def ouvir(caminho: str, separar: bool, etapa=lambda nome: None) -> dict:
     # uma música por vez (ou IA_TAREFAS): a separação e o modelo usam muita memória
     if not vagas.acquire(timeout=600):
         raise HTTPException(503, "servidor ocupado, tente de novo em alguns minutos")
     try:
-        return transcricao.transcrever(caminho, separar_voz=separar)
+        return transcricao.transcrever(caminho, separar_voz=separar, etapa=etapa)
     except ValueError as e:
         raise HTTPException(422, str(e))
     except Exception as e:  # o arquivo não abre (formato estranho, corrompido)
@@ -64,6 +66,49 @@ def ouvir(caminho: str, separar: bool) -> dict:
         raise HTTPException(422, f"não consegui ouvir este áudio ({type(e).__name__})")
     finally:
         vagas.release()
+
+
+def com_etapas(trabalho, etapas: bool, pasta: str | None = None):
+    """Roda trabalho(etapa). Com etapas=True, a resposta vai saindo aos poucos, uma linha JSON por vez
+    ({"etapa": "baixando"}… e no fim {"resultado": …} ou {"erro": …, "status": …}): o app mostra em que parte está.
+    A pasta temporária (o áudio) é apagada no fim, com erro ou não."""
+    def apagar():
+        if pasta:
+            shutil.rmtree(pasta, ignore_errors=True)
+
+    if not etapas:
+        try:
+            return trabalho(lambda nome: None)
+        finally:
+            apagar()
+    fila: queue.Queue = queue.Queue()
+
+    def rodar():
+        try:
+            fila.put({"resultado": trabalho(lambda nome: fila.put({"etapa": nome}))})
+        except HTTPException as e:
+            fila.put({"erro": e.detail, "status": e.status_code})
+        except Exception as e:
+            log.exception("falha no trabalho")
+            fila.put({"erro": f"erro no servidor ({type(e).__name__})", "status": 500})
+        finally:
+            apagar()
+            fila.put(None)
+
+    threading.Thread(target=rodar, daemon=True).start()
+
+    def linhas():
+        while True:
+            try:
+                item = fila.get(timeout=15)
+            except queue.Empty:  # trabalho comprido: uma linha de vez em quando mantém a conexão aberta
+                yield b'{"vivo":1}\n'
+                continue
+            if item is None:
+                return
+            yield (json.dumps(item, ensure_ascii=False) + "\n").encode()
+
+    return StreamingResponse(linhas(), media_type="application/x-ndjson")
 
 
 @app.get("/saude")
@@ -81,19 +126,22 @@ def saude():
 
 
 @app.post("/transcrever", dependencies=[Depends(conferir_chave)])
-def transcrever(arquivo: UploadFile = File(...), separar: bool = Form(True)):
+def transcrever(arquivo: UploadFile = File(...), separar: str = Form("1"), etapas: bool = Query(False)):
     # o arquivo fica numa pasta temporária, apagada assim que as notas saem (com erro ou não)
-    with tempfile.TemporaryDirectory(prefix="songbook-up-") as pasta:
-        ext = os.path.splitext(arquivo.filename or "")[1][:8] or ".audio"
-        caminho = os.path.join(pasta, "audio" + ext)
-        total = 0
-        with open(caminho, "wb") as f:
-            while bloco := arquivo.file.read(1 << 20):
-                total += len(bloco)
-                if total > MAX_MB << 20:
-                    raise HTTPException(413, f"arquivo grande demais (máximo {MAX_MB} MB)")
-                f.write(bloco)
-        return ouvir(caminho, separar)
+    pasta = tempfile.mkdtemp(prefix="songbook-up-")
+    ext = os.path.splitext(arquivo.filename or "")[1][:8] or ".audio"
+    caminho = os.path.join(pasta, "audio" + ext)
+    total = 0
+    with open(caminho, "wb") as f:
+        while bloco := arquivo.file.read(1 << 20):
+            total += len(bloco)
+            if total > MAX_MB << 20:
+                shutil.rmtree(pasta, ignore_errors=True)
+                raise HTTPException(413, f"arquivo grande demais (máximo {MAX_MB} MB)")
+            f.write(bloco)
+    # (o campo vai como texto: com bool, o FastAPI lia o campo ausente como "não separar" e a voz nunca era separada)
+    separar_voz = separar.strip().lower() not in ("0", "false", "nao", "não", "no")
+    return com_etapas(lambda etapa: ouvir(caminho, separar_voz, etapa), etapas, pasta)
 
 
 class PedidoYoutube(BaseModel):
@@ -111,20 +159,24 @@ def baixar(video: str, pasta: str) -> dict:
         log.warning("yt-dlp falhou: %s", e)
         msg = str(e).lower()
         if any(x in msg for x in ("sign in", "age-restricted", "confirm your age", "cookies", "login")):
-            raise HTTPException(403, "o YouTube pediu login para este vídeo (ponha o cookies.txt no servidor)")
+            raise HTTPException(403, "o YouTube bloqueou o download pelo servidor (pede login)")
         raise HTTPException(502, "não consegui baixar o áudio deste vídeo")
 
 
 @app.post("/youtube", dependencies=[Depends(conferir_chave)])
-def do_youtube(pedido: PedidoYoutube):
+def do_youtube(pedido: PedidoYoutube, etapas: bool = Query(False)):
     video = youtube.id_do_video(pedido.url)
     if not video:
         raise HTTPException(400, "link do YouTube inválido")
     # o áudio baixado vive só dentro desta pasta: sai junto com ela, assim que a partitura fica pronta
-    with tempfile.TemporaryDirectory(prefix="songbook-yt-") as pasta:
+    pasta = tempfile.mkdtemp(prefix="songbook-yt-")
+
+    def trabalho(etapa):
+        etapa("baixando")
         baixado = baixar(video, pasta)
-        r = ouvir(baixado["caminho"], pedido.separar)
-    return {**r, "video": video, "titulo": baixado["titulo"]}
+        return {**ouvir(baixado["caminho"], pedido.separar, etapa), "video": video, "titulo": baixado["titulo"]}
+
+    return com_etapas(trabalho, etapas, pasta)
 
 
 class PedidoLetra(BaseModel):
@@ -137,7 +189,7 @@ _letras: dict[str, dict] = {}  # a mesma letra no mesmo vídeo: a resposta guard
 
 
 @app.post("/letra", dependencies=[Depends(conferir_chave)])
-def letra_sincronizada(pedido: PedidoLetra):
+def letra_sincronizada(pedido: PedidoLetra, etapas: bool = Query(False)):
     """O instante de cada linha da letra no vídeo do YouTube (para a letra seguir a música, como no Spotify)."""
     if not letra.tem_whisper():
         raise HTTPException(501, "este servidor não tem o Whisper (pip install faster-whisper)")
@@ -148,22 +200,27 @@ def letra_sincronizada(pedido: PedidoLetra):
         raise HTTPException(400, "a música não tem letra")
     chave = hashlib.sha1(json.dumps([video, pedido.linhas, pedido.separar]).encode()).hexdigest()
     if chave in _letras:
-        return _letras[chave]
-    with tempfile.TemporaryDirectory(prefix="songbook-letra-") as pasta:
+        return com_etapas(lambda etapa: _letras[chave], etapas)
+    pasta = tempfile.mkdtemp(prefix="songbook-letra-")
+
+    def trabalho(etapa):
+        etapa("baixando")
         baixado = baixar(video, pasta)
         if not vagas.acquire(timeout=600):
             raise HTTPException(503, "servidor ocupado, tente de novo em alguns minutos")
         try:
-            r = letra.sincronizar(baixado["caminho"], pedido.linhas, separar_voz=pedido.separar)
+            r = letra.sincronizar(baixado["caminho"], pedido.linhas, separar_voz=pedido.separar, etapa=etapa)
         except ValueError as e:
             raise HTTPException(422, str(e))
         finally:
             vagas.release()
-    r = {**r, "video": video}
-    if len(_letras) > 200:
-        _letras.pop(next(iter(_letras)))
-    _letras[chave] = r
-    return r
+        r = {**r, "video": video}
+        if len(_letras) > 200:
+            _letras.pop(next(iter(_letras)))
+        _letras[chave] = r
+        return r
+
+    return com_etapas(trabalho, etapas, pasta)
 
 
 class PedidoDuvida(BaseModel):
@@ -189,3 +246,19 @@ def tirar_duvida(pedido: PedidoDuvida):
         raise HTTPException(502, "a IA não respondeu agora, tente de novo")
     except anthropic.APIConnectionError:
         raise HTTPException(502, "sem conexão com a IA, tente de novo")
+
+
+class PedidoConectar(BaseModel):
+    cookies: str
+
+
+@app.post("/youtube/conectar", dependencies=[Depends(conferir_chave)])
+def conectar_youtube(pedido: PedidoConectar):
+    """O app manda o cookies.txt da conta do YouTube (uma vez): o servidor passa a baixar como essa conta."""
+    if len(pedido.cookies) > 500_000:
+        raise HTTPException(413, "arquivo de cookies grande demais")
+    try:
+        youtube.conectar(pedido.cookies)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    return {"ok": True}

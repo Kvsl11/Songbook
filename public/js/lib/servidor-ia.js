@@ -38,6 +38,54 @@ export async function chamar(cfg, rota, { json, form, metodo, sinal, tempo = 15 
   } finally { clearTimeout(fim); }
 }
 
+// a mesma chamada, com o andamento: o servidor manda uma linha por etapa ({"etapa": "separando"}…) e no fim o
+// resultado; aoEtapa(nome) é chamada a cada etapa. O erro vem com a mensagem e o status do servidor
+export async function chamarComEtapas(cfg, rota, { json, form, sinal, tempo = 20 * 60e3 } = {}, aoEtapa = () => {}) {
+  const base = baseDoServidor(cfg?.url);
+  if (!base) throw new Error('A IA do servidor ainda não está disponível');
+  const ctrl = new AbortController();
+  const fim = setTimeout(() => ctrl.abort(), tempo);
+  sinal?.addEventListener('abort', () => ctrl.abort());
+  const headers = {};
+  if (cfg.chave) headers['X-Chave'] = cfg.chave;
+  if (json) headers['Content-Type'] = 'application/json';
+  try {
+    const r = await fetch(`${base}${rota}${rota.includes('?') ? '&' : '?'}etapas=1`, { method: 'POST', headers, body: json ? JSON.stringify(json) : form, signal: ctrl.signal });
+    if (!r.ok) {
+      const dados = await r.json().catch(() => ({}));
+      throw Object.assign(new Error(typeof dados.detail === 'string' ? dados.detail : `o servidor respondeu ${r.status}`), { status: r.status });
+    }
+    const leitor = r.body.getReader();
+    const texto = new TextDecoder();
+    let resto = '';
+    for (;;) {
+      const { value, done } = await leitor.read();
+      resto += texto.decode(value || new Uint8Array(), { stream: !done });
+      const linhas = resto.split('\n');
+      resto = done ? '' : linhas.pop();
+      for (const l of linhas) {
+        if (!l.trim()) continue;
+        const m = JSON.parse(l);
+        if (m.etapa) aoEtapa(m.etapa);
+        if (m.erro) throw Object.assign(new Error(m.erro), { status: m.status || 500 });
+        if (m.resultado) return m.resultado;
+      }
+      if (done) throw new Error('O servidor parou no meio. Tente de novo');
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error(sinal?.aborted ? 'Cancelado' : 'O servidor demorou demais');
+    if (e instanceof TypeError) throw new Error('Não consegui falar com o servidor da IA');
+    throw e;
+  } finally { clearTimeout(fim); }
+}
+
+// o erro do servidor em português para quem usa o app (o YouTube que bloqueia o download do servidor é o mais comum)
+export function erroExplicado(e) {
+  if (e?.status === 403) return 'O YouTube pediu login para o servidor baixar o áudio. Conecte a conta do YouTube (uma vez só) ou, por agora, escolha um arquivo de áudio da música.';
+  if (e?.status === 503) return 'O servidor está ocupado com outra música. Tente de novo em alguns minutos.';
+  return e?.message || 'Não deu certo agora. Tente de novo.';
+}
+
 // a linha da letra que está sendo cantada no instante t (segundos), pelos tempos que o servidor mandou:
 // [{ inicio, fim }] na ordem em que se canta. Antes da primeira linha: -1
 export function linhaNoTempo(tempos, t) {

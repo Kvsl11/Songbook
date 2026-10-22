@@ -116,3 +116,13 @@ def test_mesma_nota_cantada_de_novo_nao_junta():
 def test_eco_fraco_no_meio_da_nota_nao_corta_o_cantor():
     linha = uma_linha([Nota(0.0, 1.0, 67, 0.8), Nota(0.3, 0.7, 79, 0.3), Nota(1.0, 1.5, 69, 0.8)])
     assert [(n.alt, n.fim) for n in linha] == [(67, 1.0), (69, 1.5)]
+
+
+def test_cookies_do_youtube_sao_reconhecidos(tmp_path, monkeypatch):
+    import youtube
+    bom = "# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t1999999999\tLOGIN_INFO\tabc\n"
+    assert youtube.cookies_validos(bom)
+    assert not youtube.cookies_validos("oi, não é cookie")
+    monkeypatch.setenv("IA_COOKIES", str(tmp_path / "c.txt"))
+    youtube.conectar(bom)
+    assert open(youtube.arquivo_de_cookies()).read().startswith("# Netscape")

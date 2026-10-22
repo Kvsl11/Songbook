@@ -17,6 +17,7 @@ fonte de cada uma ("voz" ou "banda"). A força da voz é posta acima da banda: o
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 import threading
@@ -24,6 +25,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+log = logging.getLogger("songbook-ia")
 SR = 22050  # o Basic Pitch ouve em 22050 Hz, mono
 MAX_SEGUNDOS = 360  # no máximo 6 minutos (como no app)
 
@@ -384,21 +386,33 @@ def andamento(y: np.ndarray) -> tuple[float, list[float]]:
     return round(bpm, 1), [round(float(t), 3) for t in batidas]
 
 
-def transcrever(caminho: str, separar_voz: bool = True) -> dict:
-    """O arquivo de áudio → as notas para o app (e o que mais se ouviu)."""
+def transcrever(caminho: str, separar_voz: bool = True, etapa=lambda nome: None) -> dict:
+    """O arquivo de áudio → as notas para o app (e o que mais se ouviu). "etapa(nome)" avisa em que parte está
+    (para o app mostrar o andamento): separando, notas, afinacao, escrevendo."""
     y, cortado = carregar(caminho)
     duracao = len(y) / SR
     if duracao < 0.5:
         raise ValueError("áudio vazio ou curto demais")
     separado = separar_voz and tem_separacao()
+    razao = None
+    aviso = ""
     with tempfile.TemporaryDirectory(prefix="songbook-ia-") as pasta:
         if separado:
-            voz_y, banda_y = separar(y)
-            # quase nada na faixa da voz (música instrumental, ou a voz que o Demucs não reconheceu): a música junta
-            separado = float(np.sqrt(np.mean(voz_y ** 2))) > 0.05 * float(np.sqrt(np.mean(y ** 2)))
+            etapa("separando")
+            try:
+                voz_y, banda_y = separar(y)
+                voz_y, banda_y = np.nan_to_num(voz_y), np.nan_to_num(banda_y)
+                # quase nada na faixa da voz (música instrumental, ou a voz que o Demucs não reconheceu): a música junta
+                razao = float(np.sqrt(np.mean(voz_y ** 2))) / (float(np.sqrt(np.mean(y ** 2))) or 1.0)
+                separado = razao > 0.05
+            except Exception as e:  # a separação falhou (memória, modelo): segue com a música inteira
+                log.exception("separação da voz falhou")
+                separado, aviso = False, f"separação da voz falhou ({type(e).__name__})"
+        etapa("notas")
         if separado:
             voz, quebra_voz = ouvir(voz_y, pasta, "voz", "voz", **OPCOES_VOZ)
             banda, quebra_banda = ouvir(banda_y, pasta, "banda", "banda", **OPCOES_BANDA)
+            etapa("afinacao")
             afin = afinacao_da_voz(voz_y) if voz else None
             voz, banda, tipo = limpar(voz, banda, afin, quebra_voz, quebra_banda)
             # a voz acima da banda: o app escolhe a melodia (e o Soprano) pela força
@@ -409,6 +423,7 @@ def transcrever(caminho: str, separar_voz: bool = True) -> dict:
             mistura, quebra = ouvir(y, pasta, "mistura", "mistura", **OPCOES_MISTURA)
             juntas = juntar_pedacos(tirar_harmonicos(mistura), quebra=quebra)
             voz, banda, tipo = [], tirar_estalos(juntas), "mistura"
+    etapa("escrevendo")
     bpm, batidas = andamento(y)
     notas = sorted(voz + banda, key=lambda n: (n.ini, n.alt))
     return {
@@ -416,6 +431,8 @@ def transcrever(caminho: str, separar_voz: bool = True) -> dict:
         "duracao": round(duracao, 3),
         "cortado": cortado,
         "separado": separado,
+        "razaoVoz": None if razao is None else round(razao, 3),
+        "aviso": aviso,
         "vozes": tipo,
         "andamento": bpm,
         "batidas": batidas,

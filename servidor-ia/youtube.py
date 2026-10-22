@@ -42,14 +42,55 @@ def id_do_video(texto: str) -> str | None:
     return cand if ID.match(cand or "") else None
 
 
+def _guarda():
+    """Onde a conexão do YouTube (os cookies) fica guardada no Modal: um dicionário que sobrevive às máquinas que
+    ligam e desligam. Fora do Modal, None (aí é o arquivo cookies.txt)."""
+    try:
+        import modal
+
+        if not modal.is_local():
+            return modal.Dict.from_name("songbook-ia-dados", create_if_missing=True)
+    except Exception:  # sem o Modal (rodando no computador)
+        pass
+    return None
+
+
+def cookies_validos(texto: str) -> bool:
+    """É um cookies.txt (formato Netscape) com os cookies de login do YouTube/Google?"""
+    linhas = [l for l in (texto or "").splitlines() if l.strip() and not l.startswith("#") or l.startswith("#HttpOnly_")]
+    return any(("youtube.com" in l or "google.com" in l) and len(l.split("\t")) >= 7 for l in linhas)
+
+
+def conectar(texto: str) -> None:
+    """Guarda os cookies colados no app (a conexão com a conta do YouTube), no lugar dos anteriores."""
+    if not cookies_validos(texto):
+        raise ValueError("isso não parece o arquivo de cookies do YouTube (cookies.txt)")
+    guarda = _guarda()
+    if guarda is not None:
+        guarda["yt_cookies"] = texto
+    else:
+        with open(os.environ.get("IA_COOKIES") or os.path.join(PASTA, "cookies.txt"), "w", encoding="utf-8") as f:
+            f.write(texto)
+    caminho = os.path.join(tempfile.gettempdir(), "songbook-cookies.txt")
+    if os.path.isfile(caminho):
+        os.remove(caminho)  # a cópia temporária antiga sai: a próxima vez usa os novos
+
+
 def arquivo_de_cookies() -> str | None:
-    # publicado (Modal), o cookies.txt vem pelo segredo YT_COOKIES (o conteúdo do arquivo): vira um arquivo temporário
-    conteudo = os.environ.get("YT_COOKIES")
+    # publicado (Modal), o cookies.txt vem do que foi colado no app (guardado no Modal) ou do segredo YT_COOKIES (o
+    # conteúdo do arquivo): vira um arquivo temporário
+    conteudo = None
+    guarda = _guarda()
+    if guarda is not None:
+        try:
+            conteudo = guarda.get("yt_cookies")
+        except Exception:
+            conteudo = None
+    conteudo = conteudo or os.environ.get("YT_COOKIES")
     if conteudo:
         caminho = os.path.join(tempfile.gettempdir(), "songbook-cookies.txt")
-        if not os.path.isfile(caminho):
-            with open(caminho, "w", encoding="utf-8") as f:
-                f.write(conteudo if conteudo.endswith("\n") else conteudo + "\n")
+        with open(caminho, "w", encoding="utf-8") as f:
+            f.write(conteudo if conteudo.endswith("\n") else conteudo + "\n")
         return caminho
     caminho = os.environ.get("IA_COOKIES") or os.path.join(PASTA, "cookies.txt")
     return caminho if os.path.isfile(caminho) else None

@@ -176,7 +176,7 @@ def ouvir_palavras(y16: np.ndarray, dica: str) -> list[tuple[str, float, float]]
     return [(w.word.strip(), float(w.start), float(w.end)) for s in segmentos for w in (s.words or [])]
 
 
-def sincronizar(caminho: str, linhas: list[str], separar_voz: bool = True) -> dict:
+def sincronizar(caminho: str, linhas: list[str], separar_voz: bool = True, etapa=lambda nome: None) -> dict:
     import librosa
 
     import transcricao
@@ -189,10 +189,14 @@ def sincronizar(caminho: str, linhas: list[str], separar_voz: bool = True) -> di
     y, _ = transcricao.carregar(caminho)
     duracao = len(y) / transcricao.SR
     separado = separar_voz and transcricao.tem_separacao()
+    if separado:
+        etapa("separando")
     voz = transcricao.separar(y)[0] if separado else y
     y16 = librosa.resample(voz, orig_sr=transcricao.SR, target_sr=SR_WHISPER).astype(np.float32)
     dica = " ".join(re.sub(r"\[[^\]]*\]", "", l) for l in linhas)
+    etapa("ouvindo")
     palavras = ouvir_palavras(y16, dica)
+    etapa("alinhando")
     tempos = tempos_das_linhas(linhas, palavras, duracao)
     achadas = sum(1 for t in tempos if t["confianca"] > 0)
     return {"linhas": tempos, "achadas": achadas, "total": len(linhas), "duracao": round(duracao, 3),
