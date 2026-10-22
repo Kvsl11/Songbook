@@ -96,6 +96,27 @@ def arquivo_de_cookies() -> str | None:
     return caminho if os.path.isfile(caminho) else None
 
 
+def pede_login(erro) -> bool:
+    """O erro do yt-dlp é o YouTube pedindo login ("confirme que não é um robô", restrição de idade)?"""
+    msg = str(erro).lower()
+    return any(x in msg for x in ("sign in", "age-restricted", "confirm your age", "cookies", "login", "not a bot"))
+
+
+def guardar_cookies_renovados(caminho: str, antes: str | None) -> None:
+    """O YouTube troca os cookies da conta a cada uso (e o yt-dlp grava os novos no arquivo): guarda os renovados no
+    Modal, senão a próxima vez usa os velhos e a conexão "vence" logo."""
+    guarda = _guarda()
+    if guarda is None or not antes:
+        return
+    try:
+        with open(caminho, encoding="utf-8") as f:
+            novos = f.read()
+        if novos != antes and cookies_validos(novos):
+            guarda["yt_cookies"] = novos
+    except Exception:  # sem o arquivo ou sem o Modal: fica o que estava
+        pass
+
+
 def baixar_audio(video: str, pasta: str) -> dict:
     """Baixa só o áudio do vídeo para pasta/audio.wav. Devolve o caminho, o título e a duração."""
     import yt_dlp
@@ -112,11 +133,14 @@ def baixar_audio(video: str, pasta: str) -> dict:
         "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
     }
     cookies = arquivo_de_cookies()
+    antes = None
     if cookies:
         opcoes["cookiefile"] = cookies
+        with open(cookies, encoding="utf-8") as f:
+            antes = f.read()
     # o YouTube pede login ("confirme que não é um robô") a quem baixa de servidor na nuvem; alguns aparelhos (a TV,
     # o Safari, o celular, os óculos de realidade virtual) ainda passam sem login: tenta um por um até um baixar
-    info, erro = None, None
+    info, erros = None, []
     for clientes in (None, ["tv"], ["web_safari"], ["android_vr"], ["mweb"], ["tv_embedded"]):
         tentativa = dict(opcoes)
         if clientes:
@@ -124,14 +148,18 @@ def baixar_audio(video: str, pasta: str) -> dict:
         try:
             with yt_dlp.YoutubeDL(tentativa) as ydl:
                 info = ydl.extract_info(f"https://www.youtube.com/watch?v={video}", download=True)
-            erro = None
+            erros = []
             break
         except yt_dlp.utils.DownloadError as e:
-            erro = e
+            erros.append(e)
             for f in os.listdir(pasta):  # o pedaço baixado pela metade não fica para a próxima tentativa
                 os.remove(os.path.join(pasta, f))
-    if erro is not None:
-        raise erro
+    if cookies:
+        guardar_cookies_renovados(cookies, antes)
+    if erros:
+        # o motivo de verdade: o primeiro erro que não é "pede login" (os aparelhos sem login sempre dizem isso e
+        # escondiam o resto); se todos pedem login, o da primeira tentativa (a que usa a conta conectada)
+        raise next((e for e in erros if not pede_login(e)), erros[0])
     if not info:
         raise ValueError("vídeo longo demais (mais de %d min)" % (MAX_VIDEO // 60))
     caminho = os.path.join(pasta, "audio.wav")

@@ -126,3 +126,10 @@ def test_cookies_do_youtube_sao_reconhecidos(tmp_path, monkeypatch):
     monkeypatch.setenv("IA_COOKIES", str(tmp_path / "c.txt"))
     youtube.conectar(bom)
     assert open(youtube.arquivo_de_cookies()).read().startswith("# Netscape")
+
+
+def test_pedido_de_login_do_youtube_e_reconhecido():
+    import youtube
+    assert youtube.pede_login("ERROR: [youtube] abc: Sign in to confirm you're not a bot. Use --cookies-from-browser")
+    assert youtube.pede_login("Sign in to confirm your age")
+    assert not youtube.pede_login("ERROR: [youtube] abc: Requested format is not available")

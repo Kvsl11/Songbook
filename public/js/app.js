@@ -90,7 +90,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-209';
+export const APP_VERSAO = '2026.10.22-210';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -5469,6 +5469,7 @@ function viewSong(id, ctx = {}) {
       </div>
     </div>
     <div class="acordes-musica" id="acordes-musica" hidden></div>
+    <div class="sinc-status" id="sinc-status" role="status" aria-live="polite" hidden></div>
     <div class="song" id="song"></div>
     <div class="rolagem" id="rolagem" hidden>
       <button class="icon-btn" data-rol="-" aria-label="Mais devagar" title="Mais devagar">${icon('minus', 18)}</button>
@@ -5856,24 +5857,50 @@ function viewSong(id, ctx = {}) {
     if (!player.desta(song.youtube)) tocar();
     player.irPara(Math.max(0, sinc.tempos[k].inicio - 0.3));
   });
-  // o andamento e o resultado vão para as notificações (o sininho), não pulam na tela; uma por vez por música
+  // o andamento aparece aqui, logo acima da letra (carregando, em que etapa está, deu certo ou não e o que fazer);
+  // o resultado vai também para as notificações (o sininho)
+  const ETAPAS_SINC = { baixando: 'Baixando o áudio do vídeo…', separando: 'Separando a voz…', ouvindo: 'Ouvindo a letra no vídeo…', alinhando: 'Acertando cada linha…' };
+  let fecharSinc = 0;
+  const statusSinc = (tipo, texto, acao = '') => {
+    const box = $('#sinc-status');
+    if (!box) return;
+    clearTimeout(fecharSinc);
+    box.hidden = false;
+    box.dataset.tipo = tipo;
+    box.innerHTML = `<span class="sinc-ic">${tipo === 'carregando' ? '<span class="spin"></span>' : icon(tipo === 'ok' ? 'check' : 'alerta', 16)}</span>
+      <span class="sinc-txt">${esc(texto)}</span>${acao}${tipo === 'carregando' ? '' : `<button class="icon-btn" data-sinc="fechar" aria-label="Fechar">${icon('x', 16)}</button>`}`;
+    if (tipo === 'ok') fecharSinc = setTimeout(() => { box.hidden = true; }, 6000);
+  };
+  $('#sinc-status').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-sinc]');
+    if (!b) return;
+    if (b.dataset.sinc === 'fechar') $('#sinc-status').hidden = true;
+    if (b.dataset.sinc === 'de-novo') sincronizarLetra();
+    if (b.dataset.sinc === 'youtube') location.hash = '#/youtube';
+  });
   const sincronizarLetra = async ({ sozinho = false } = {}) => {
     const cantadas = linhasCantadas(song.content).map(linhaSemCifra).filter(Boolean);
-    if (!cantadas.length) { if (!sozinho) toast('Esta música não tem letra para sincronizar'); return; }
-    if (!sozinho) toast('Sincronizando a letra: o aviso chega no sininho quando terminar', { tipo: 'ia' });
+    if (!cantadas.length) { if (!sozinho) statusSinc('erro', 'Esta música não tem letra para sincronizar'); return; }
+    statusSinc('carregando', 'Sincronizando a letra com o vídeo…');
     tentouSincronizar.add(song.youtube);
     const aqui = isPreview ? '' : `#/musica/${song.id}`;
     try {
-      const r = await chamarComEtapas(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: cantadas } });
+      const r = await chamarComEtapas(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: cantadas } },
+        (etapa) => statusSinc('carregando', ETAPAS_SINC[etapa] || 'Sincronizando a letra…'));
       const sinc = { video: song.youtube, linhas: cantadas, tempos: r.linhas.map((x) => ({ inicio: x.inicio, fim: x.fim })) };
       song.sincronia = sinc;
       mapa = null;
       if (isPreview) preview.sincronia = sinc; else db.updateSong(song.id, { sincronia: sinc });
+      statusSinc('ok', `Letra sincronizada: ${r.achadas} de ${r.total} linhas. Dê play e ela acompanha.`);
       notificar(`${r.achadas} de ${r.total} linhas ouvidas no vídeo. Dê play: a letra acompanha, e tocar numa linha vai até ela.`, { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
     } catch (e) {
+      const motivo = erroExplicado(e);
+      statusSinc('erro', `Não sincronizou: ${motivo}`, e.status === 403
+        ? `<button class="btn small" data-sinc="youtube">${icon('youtube', 14)} Conectar o YouTube</button>`
+        : `<button class="btn small" data-sinc="de-novo">${icon('refresh', 14)} Tentar de novo</button>`);
       // o bloqueio do YouTube avisa uma vez só (as outras músicas dariam o mesmo aviso)
-      if (e.status === 403) { if (!notificacoes.some((x) => x.href === '#/youtube' && !x.lida)) notificar('O YouTube pediu login para o servidor baixar o áudio. Conecte a conta do YouTube uma vez e tente de novo.', { tipo: 'erro', titulo: 'Conecte o YouTube', href: '#/youtube' }); }
-      else if (!sozinho) notificar(erroExplicado(e), { tipo: 'erro', titulo: `Letra de ${song.title}`, href: aqui });
+      if (e.status === 403) { if (!notificacoes.some((x) => x.href === '#/youtube' && !x.lida)) notificar(motivo, { tipo: 'erro', titulo: 'Conecte o YouTube', href: '#/youtube' }); }
+      else if (!sozinho) notificar(motivo, { tipo: 'erro', titulo: `Letra de ${song.title}`, href: aqui });
     }
   };
   $('#btn-sincronizar')?.addEventListener('click', () => { $('#menu-mais').hidden = true; sincronizarLetra(); });
@@ -7758,8 +7785,8 @@ function viewConectarYoutube() {
     <details class="cy-como"${salvo ? '' : ' open'}><summary>${icon('info', 16)}<b>Como pegar o arquivo</b><span class="muted">4 passos</span>${icon('down', 18)}</summary>
       <ol class="cy-passos">
         ${passoN(1, 'Instale a extensão “Get cookies.txt LOCALLY”', 'No celular Android, use o <a href="https://addons.mozilla.org/firefox/addon/get-cookies-txt-locally/" target="_blank" rel="noopener">Firefox</a>; no computador, o <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener">Chrome</a> ou o Firefox.')}
-        ${passoN(2, 'Entre no youtube.com com uma conta Google', 'De preferência uma conta só para isso (não a principal). Abra qualquer vídeo para confirmar que está logado.')}
-        ${passoN(3, 'Exporte os cookies', 'Toque na extensão → <b>Export</b> (baixa o arquivo cookies.txt) ou <b>Copy</b> (copia o texto).')}
+        ${passoN(2, 'Numa janela anônima, entre no youtube.com', 'Abra uma <b>janela anônima (privada)</b> e entre com uma conta Google, de preferência uma só para isso. Assim a conexão não vence: o YouTube troca os cookies das janelas comuns a todo momento.')}
+        ${passoN(3, 'Exporte os cookies e feche a janela', 'Ainda na janela anônima, toque na extensão → <b>Export</b> (baixa o cookies.txt) ou <b>Copy</b> (copia o texto). Depois <b>feche a janela anônima</b> sem sair da conta. (No Firefox, permita a extensão nas janelas privadas.)')}
         ${passoN(4, 'Mande para o app', 'Escolha o arquivo baixado ou cole o texto acima e toque em Conectar. Se um dia o YouTube pedir de novo, é só repetir.')}
       </ol></details>
     <p class="muted cy-nota">${icon('info', 14)} O arquivo vai só para o servidor do Songbook, que o usa apenas para baixar o áudio dos vídeos, e fica guardado neste aparelho para você ver depois. Para desconectar, saia da conta nesse navegador ou troque a senha.</p></div>`;
