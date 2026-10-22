@@ -30,7 +30,8 @@ dá o endereço https que o celular alcança de qualquer lugar. De quebra, o You
 
 **Sem o Docker** (não instala, ou o PC não tem virtualização), no Windows: com qualquer Python instalado (marque
 "Add python.exe to PATH"), dê dois cliques em **`iniciar-windows-sem-docker.bat`**. O servidor precisa do 3.11: se o
-seu for outro (3.12, 3.13, 3.14…), o [uv](https://docs.astral.sh/uv/) baixa um 3.11 só para ele, sem mexer no seu. A primeira vez instala tudo na pasta `.venv` (uns 15 minutos e
+seu for outro (3.12, 3.13, 3.14…), `preparar_python.py` baixa o Python 3.11 portátil (o zip "embeddable" oficial do
+python.org) para `servidor-ia\python311`, sem instalar nada e sem administrador (serve no notebook corporativo). A primeira vez instala tudo na pasta `.venv` (uns 15 minutos e
 5 GB); depois abre a mesma página com o QR code. Deixe a janela preta aberta enquanto usa (fechar desliga o servidor).
 No Mac/Linux, o mesmo com `python3.11 iniciar_pc.py` depois da instalação de "Rodar no seu computador" (abaixo).
 

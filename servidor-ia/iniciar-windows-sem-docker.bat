@@ -1,16 +1,20 @@
 @echo off
-rem Liga o servidor da IA neste computador SEM o Docker (Windows).
-rem O servidor precisa do Python 3.11. Se o seu for outro (3.12, 3.13, 3.14...), o uv baixa um 3.11 so para o
-rem servidor, dentro da pasta .venv, sem mexer no Python que voce ja tem.
+rem Liga o servidor da IA neste computador SEM o Docker (Windows), sem administrador.
+rem O servidor precisa do Python 3.11. Se o seu for outro (3.12, 3.13, 3.14...), baixa um Python 3.11 portatil
+rem (o zip oficial do python.org, so descompactado em servidor-ia\python311), sem instalar nada.
 rem A primeira vez instala tudo (uns 15 minutos, ~5 GB); as outras abrem em segundos.
 chcp 65001 >nul
 cd /d "%~dp0"
 
-if exist ".venv\Scripts\python.exe" goto instalar
+set "PY=%~dp0.venv\Scripts\python.exe"
+if exist "%PY%" goto instalar
+set "PY=%~dp0python311\python.exe"
+if exist "%~dp0python311\pip-ok" goto instalar
 
 py -3.11 -c "" >nul 2>nul
 if not errorlevel 1 (
   py -3.11 -m venv .venv || goto erro
+  set "PY=%~dp0.venv\Scripts\python.exe"
   goto instalar
 )
 
@@ -23,39 +27,29 @@ if not defined PYBASE (
   pause
   exit /b 1
 )
-echo Seu Python nao e o 3.11: vou baixar um Python 3.11 so para o servidor. O seu continua como esta.
-%PYBASE% -m pip install --user --upgrade uv || goto erro
-rem o Python 3.11 e o cache do uv ficam aqui dentro, nao no AppData: la o antivirus ou as regras do PC
-rem travavam a pasta na hora de mover o Python baixado ("Acesso negado", os error 5)
-if not defined UV_PYTHON_INSTALL_DIR set "UV_PYTHON_INSTALL_DIR=%~dp0python"
-if not defined UV_CACHE_DIR set "UV_CACHE_DIR=%~dp0.uv-cache"
-set TENTATIVA=0
-:baixar_python
-set /a TENTATIVA+=1
-%PYBASE% -m uv venv --seed --python 3.11 .venv && goto instalar
-if %TENTATIVA% GEQ 3 goto erro
-echo Nao deu, tentando de novo em 10 segundos (o antivirus pode estar conferindo os arquivos)...
-timeout /t 10 >nul
-goto baixar_python
+echo Seu Python nao e o 3.11: vou baixar um Python 3.11 portatil so para o servidor, nesta pasta, sem instalar nada.
+%PYBASE% preparar_python.py || goto erro
+echo ok> "%~dp0python311\pip-ok"
 
 :instalar
-if exist ".venv\pronto" goto ligar
+if exist "%~dp0pronto.txt" goto ligar
 echo Primeira vez: instalando o servidor da IA. Demora uns 15 minutos, deixe a janela aberta...
-".venv\Scripts\python" -m pip install -U pip || goto erro
-".venv\Scripts\python" -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu || goto erro
-".venv\Scripts\python" -m pip install -r requirements.txt static-ffmpeg uvicorn || goto erro
-".venv\Scripts\python" -m pip install --no-deps basic-pitch==0.4.0 || goto erro
+"%PY%" -m pip install --no-warn-script-location -U pip || goto erro
+"%PY%" -m pip install --no-warn-script-location torch torchaudio --index-url https://download.pytorch.org/whl/cpu || goto erro
+"%PY%" -m pip install --no-warn-script-location -r requirements.txt static-ffmpeg uvicorn || goto erro
+"%PY%" -m pip install --no-warn-script-location --no-deps basic-pitch==0.4.0 || goto erro
 echo Baixando os modelos de IA...
-".venv\Scripts\python" -c "import static_ffmpeg; static_ffmpeg.add_paths(); from demucs.pretrained import get_model; get_model('htdemucs'); from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')" || goto erro
-echo ok> ".venv\pronto"
+"%PY%" -c "import static_ffmpeg; static_ffmpeg.add_paths(); from demucs.pretrained import get_model; get_model('htdemucs'); from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')" || goto erro
+echo ok> "%~dp0pronto.txt"
 
 :ligar
-".venv\Scripts\python" iniciar_pc.py
+"%PY%" iniciar_pc.py
 pause
 exit /b 0
 
 :erro
 echo.
-echo Deu erro na instalacao (veja a mensagem acima). Confira a internet e rode de novo: ele continua de onde parou.
+echo Deu erro (veja a mensagem acima). Confira a internet e rode de novo: ele continua de onde parou.
+echo Se nao resolver, copie o texto acima e mande.
 pause
 exit /b 1
