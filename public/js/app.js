@@ -107,7 +107,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-220';
+export const APP_VERSAO = '2026.10.22-221';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -8108,6 +8108,14 @@ function htmlDaResposta(texto) {
     return `<p>${itens.map(linha).join('<br>')}</p>`;
   }).join('');
 }
+// pergunta sobre a liturgia de hoje (leituras, evangelho, salmo): o acervo não traz, a página da Liturgia traz
+const pedeLiturgiaDoDia = (q) => {
+  const t = String(q || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return /\b(hoje|hj|do dia|de agora)\b/.test(t) && /\b(liturgia|leituras?|evangelho|salmo|missa|santo)\b/.test(t);
+};
+// o ditado da pergunta: o reconhecimento de voz do próprio navegador (Chrome, Edge, Safari), em português
+const ReconhecerVoz = window.SpeechRecognition || window.webkitSpeechRecognition;
+let vozDuvidas = null;
 const horaCurta = (t) => (t ? new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
 // o índice das dúvidas: o texto de cada canto do acervo e de cada canto do Hinário (feito uma vez, na 1ª pergunta)
 let indiceDuvidas = null;
@@ -8135,6 +8143,8 @@ const textoDaResposta = (m) => [
   ...(m.wiki ? [`Wikipédia — ${m.wiki.titulo}: ${m.wiki.frases.join(' ')} (${m.wiki.url})`] : []),
 ].join('\n\n');
 function viewDuvidas() {
+  vozDuvidas?.abort();
+  vozDuvidas = null;
   conversaDuvidas = conversaDuvidas.filter((m) => m.carregando || Date.now() - (m.t || 0) < DIA);
   setTab('inicio');
   setTint('#2a3a6b');
@@ -8143,16 +8153,20 @@ function viewDuvidas() {
   view.innerHTML = `<div class="chat">
     <div class="chat-rolo" id="dv-conversa"></div>
     <form class="chat-barra" id="dv-form">
-      <div class="chat-campo"><textarea name="q" rows="1" placeholder="Pergunte sobre liturgia e canto…" aria-label="Sua pergunta"></textarea>
-        <button class="chat-enviar" type="submit" aria-label="Enviar" disabled>${icon('next', 20)}</button></div>
-      <small class="chat-rodape">Mostra o que está nos arquivos do acervo litúrgico e, se não achar, na Wikipédia. A conversa se apaga sozinha em 24 horas.</small>
+      <div class="chat-ouvindo" id="dv-ouvindo" hidden><span class="dv-onda" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span>Ouvindo… fale a sua pergunta</span></div>
+      <div class="chat-campo">
+        <textarea name="q" rows="1" placeholder="${ReconhecerVoz ? 'Pergunte ou fale…' : 'Pergunte sobre liturgia e canto…'}" aria-label="Sua pergunta"></textarea>
+        ${ReconhecerVoz ? `<button class="chat-mic" type="button" aria-label="Falar a pergunta" aria-pressed="false" title="Falar a pergunta">${icon('mic', 20)}</button>` : ''}
+        <button class="chat-enviar" type="submit" aria-label="Enviar" disabled>${icon('enviar', 20)}</button>
+      </div>
+      <small class="chat-rodape">Acervo litúrgico + Wikipédia · a conversa se apaga em 24 horas</small>
     </form></div>`;
   const caixa = $('#dv-conversa');
   const boasVindas = () => `<div class="chat-vazio">
-      <span class="dv-avatar grande">${icon('sparkles', 30)}</span>
-      <h2>Olá! Como posso ajudar o seu ministério?</h2>
-      <p class="muted">Pergunte sobre a missa, os tempos litúrgicos, a função de cada parte ou que canto escolher. Eu procuro primeiro nos <b>arquivos do acervo</b> e, se não achar, <b>na internet</b>.</p>
-      <div class="chat-sugestoes">${SUGESTOES_DUVIDAS.map(([ic, q]) => `<button type="button" class="chat-sugestao" data-q="${esc(q)}"><span>${icon(ic, 18)}</span>${esc(q)}</button>`).join('')}</div></div>`;
+      <div class="dv-hero"><span class="dv-avatar grande">${icon('sparkles', 30)}</span></div>
+      <h2>Como posso ajudar o seu ministério?</h2>
+      <p>Pergunte sobre a missa, os tempos litúrgicos ou que canto escolher${ReconhecerVoz ? ' — digitando ou <b>falando</b>, pelo microfone' : ''}. Procuro primeiro no <b>acervo litúrgico</b> e depois na internet.</p>
+      <div class="chat-sugestoes">${SUGESTOES_DUVIDAS.map(([ic, q]) => `<button type="button" class="chat-sugestao" data-q="${esc(q)}"><span class="dv-ico">${icon(ic, 18)}</span><span>${esc(q)}</span></button>`).join('')}</div></div>`;
   const google = (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
   const corpo = (m, k) => {
     if (m.carregando) return `<div class="chat-digitando" aria-label="Procurando a resposta"><i></i><i></i><i></i><span>${esc(m.etapa || 'Procurando no acervo…')}</span></div>`;
@@ -8160,6 +8174,9 @@ function viewDuvidas() {
     // a resposta: o trecho que mais responde, em texto corrido, com a fonte embaixo; os outros trechos recolhidos
     const fonte = (a, n) => `<button type="button" class="dv-fonte" data-k="${k}" data-n="${n}">${icon('library', 14)}<span><b>${esc(a.titulo)}</b><small>${esc(a.caminho)}</small></span></button>`;
     const partes = [];
+    if (pedeLiturgiaDoDia(m.pergunta)) {
+      partes.push(`<a class="dv-atalho" href="#/liturgia">${icon('cross', 20)}<span><b>Liturgia de hoje</b><small>Leituras, salmo, evangelho e orações do dia</small></span>${icon('next', 18)}</a>`);
+    }
     if (m.cantos?.length) {
       partes.push(`<p class="dv-texto">Achei estes cantos nos arquivos do acervo:</p><div class="dv-cantos">${m.cantos.map((a, n) => `<button type="button" class="dv-fonte" data-k="${k}" data-n="${n}" data-lista="cantos">${icon('music', 14)}<span><b>${esc(a.titulo)}</b><small>${esc(a.caminho)}</small></span></button>`).join('')}</div>`);
     }
@@ -8176,12 +8193,12 @@ function viewDuvidas() {
         <p class="dv-texto">${m.wiki.frases.map((f) => realcar(f, m.pergunta)).join(' ')}</p>
         <a class="dv-fonte" href="${esc(m.wiki.url)}" target="_blank" rel="noopener">${icon('search', 14)}<span><b>${esc(m.wiki.titulo)}</b><small>Wikipédia</small></span></a>`);
     }
-    if (!partes.length) partes.push('<p class="dv-texto">Não achei nada sobre isso nos arquivos do acervo nem na Wikipédia. Tente com outras palavras ou pesquise no Google.</p>');
+    if (!partes.length) partes.push(`<div class="dv-nada">${icon('search', 20)}<p>Não achei nada sobre isso no acervo nem na Wikipédia. Tente com outras palavras ou pesquise no Google.</p></div>`);
     return partes.join('');
   };
   const msg = (m, k) => (m.role === 'user'
     ? `<div class="chat-msg eu"><div class="chat-bolha">${esc(m.content)}</div><small class="chat-hora">${horaCurta(m.t)}</small></div>`
-    : `<div class="chat-msg ia">${avatar}<div class="chat-corpo"><div class="chat-nome">Assistente litúrgico <small class="chat-hora">${horaCurta(m.t)}</small></div>
+    : `<div class="chat-msg ia"><div class="chat-corpo"><div class="chat-nome">${avatar}<span>Assistente litúrgico</span><small class="chat-hora">${horaCurta(m.t)}</small></div>
         <div class="chat-bolha">${corpo(m, k)}</div>
         ${!m.carregando ? `<div class="chat-acoes">${m.acervo?.length || m.cantos?.length || m.wiki ? `<button type="button" data-copiar="${k}">${icon('copy', 14)} Copiar</button>` : ''}
           ${m.pergunta ? `<a href="${esc(google(m.pergunta))}" target="_blank" rel="noopener">${icon('search', 14)} Pesquisar no Google</a>` : ''}</div>` : ''}</div></div>`);
@@ -8224,9 +8241,42 @@ function viewDuvidas() {
   const campo = form.q;
   const enviar = form.querySelector('.chat-enviar');
   const ajustar = () => { campo.style.height = 'auto'; campo.style.height = Math.min(180, campo.scrollHeight) + 'px'; enviar.disabled = !campo.value.trim(); };
+  // o microfone: o que a pessoa fala vai aparecendo no campo (dá para corrigir antes de enviar); tocar de novo para de ouvir
+  const mic = form.querySelector('.chat-mic');
+  const ouvindo = (sim) => {
+    mic.classList.toggle('gravando', sim);
+    mic.setAttribute('aria-pressed', String(sim));
+    mic.setAttribute('aria-label', sim ? 'Parar de ouvir' : 'Falar a pergunta');
+    form.classList.toggle('gravando', sim);
+    $('#dv-ouvindo').hidden = !sim;
+  };
+  mic?.addEventListener('click', () => {
+    if (vozDuvidas) { vozDuvidas.stop(); return; }
+    const rec = new ReconhecerVoz();
+    rec.lang = 'pt-BR';
+    rec.interimResults = true;
+    rec.continuous = false;
+    const antes = campo.value.trim() ? `${campo.value.trim()} ` : '';
+    rec.onresult = (e) => { if (vozDuvidas !== rec) return; campo.value = antes + [...e.results].map((r) => r[0].transcript).join('').trim(); ajustar(); };
+    rec.onerror = (e) => {
+      const motivo = {
+        'not-allowed': 'Permita o microfone para o app nas configurações do navegador',
+        'service-not-allowed': 'Permita o microfone para o app nas configurações do navegador',
+        'no-speech': 'Não ouvi nada. Toque no microfone e fale a pergunta',
+        'audio-capture': 'Não achei o microfone do aparelho',
+        network: 'O ditado precisa de internet',
+      }[e.error];
+      if (motivo) toast(motivo, { tipo: 'erro' });
+    };
+    rec.onend = () => { if (vozDuvidas === rec) vozDuvidas = null; ouvindo(false); };
+    try { rec.start(); } catch { toast('Não consegui ligar o microfone', { tipo: 'erro' }); return; }
+    vozDuvidas = rec;
+    ouvindo(true);
+  });
+  aoSair(() => { vozDuvidas?.abort(); vozDuvidas = null; });
   campo.addEventListener('input', ajustar);
   campo.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && innerWidth > 700) { e.preventDefault(); form.requestSubmit(); } });
-  form.onsubmit = (e) => { e.preventDefault(); const q = campo.value; campo.value = ''; ajustar(); perguntar(q); };
+  form.onsubmit = (e) => { e.preventDefault(); const voz = vozDuvidas; vozDuvidas = null; voz?.abort(); const q = campo.value; campo.value = ''; ajustar(); perguntar(q); };
   if (innerWidth > 700) campo.focus();
   caixa.addEventListener('click', async (e) => {
     const sug = e.target.closest('[data-q]');
