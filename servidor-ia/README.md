@@ -28,9 +28,9 @@ dá o endereço https que o celular alcança de qualquer lugar. De quebra, o You
 4. Abre a página <http://localhost:7860> com um QR code: leia com a câmera do celular. O Songbook abre já usando o PC
    (fica em **Ajustes → Servidor no seu computador**).
 
-**Sem o Docker** (não instala, ou o PC não tem virtualização), no Windows: instale o
-[Python 3.11](https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe) (marque "Add python.exe to PATH") e dê
-dois cliques em **`iniciar-windows-sem-docker.bat`**. A primeira vez instala tudo na pasta `.venv` (uns 15 minutos e
+**Sem o Docker** (não instala, ou o PC não tem virtualização), no Windows: com qualquer Python instalado (marque
+"Add python.exe to PATH"), dê dois cliques em **`iniciar-windows-sem-docker.bat`**. O servidor precisa do 3.11: se o
+seu for outro (3.12, 3.13, 3.14…), o [uv](https://docs.astral.sh/uv/) baixa um 3.11 só para ele, sem mexer no seu. A primeira vez instala tudo na pasta `.venv` (uns 15 minutos e
 5 GB); depois abre a mesma página com o QR code. Deixe a janela preta aberta enquanto usa (fechar desliga o servidor).
 No Mac/Linux, o mesmo com `python3.11 iniciar_pc.py` depois da instalação de "Rodar no seu computador" (abaixo).
 
