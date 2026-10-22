@@ -25,6 +25,8 @@ PASTA = os.path.dirname(os.path.abspath(__file__))
 DADOS = os.environ.get("IA_DADOS") or os.path.join(PASTA, "..", "public", "data")
 TEXTOS = os.environ.get("IA_TEXTOS") or os.path.join(PASTA, "textos-acervo.jsonl")
 MODELO = os.environ.get("IA_MODELO", "claude-opus-5-5")
+# sem a pasta public/data ao lado (o servidor publicado sozinho, no Hugging Face): os mesmos arquivos, do app no ar
+DADOS_URL = os.environ.get("IA_DADOS_URL", "https://kvsl11.github.io/Songbook/data/")
 
 VAZIAS = set("""a o e os as um uma uns umas de do da dos das no na nos nas em por para pra com sem que se ao aos à às
 é ser foi são era como mais mas ou eu tu ele ela nós vós eles elas me te lhe nos vos seu sua seus suas meu minha
@@ -79,9 +81,22 @@ def pedacos(texto: str, tamanho: int = 1200, sobra: int = 200) -> list[str]:
     return [p for p in out if p]
 
 
+def _ler_dados(nome: str):
+    caminho = os.path.join(DADOS, nome)
+    if os.path.isfile(caminho):
+        return json.load(open(caminho, encoding="utf-8"))
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(DADOS_URL + nome, timeout=60) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except Exception as e:  # sem internet ou endereço errado: fica sem esses textos
+        raise FileNotFoundError(nome) from e
+
+
 def carregar_trechos() -> list[Trecho]:
     trechos: list[Trecho] = []
-    ler = lambda nome: json.load(open(os.path.join(DADOS, nome), encoding="utf-8"))  # noqa: E731
+    ler = _ler_dados
     try:
         for c in ler("cantos.json")["cantos"]:
             caminho = " / ".join(c.get("caminho") or [])

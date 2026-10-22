@@ -1,3 +1,13 @@
+---
+title: Songbook IA
+emoji: 🎼
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Servidor da IA da partitura (Python)
 
 Transforma áudio em notas para a partitura do Songbook, com mais fidelidade que o modelo que roda no celular:
@@ -15,7 +25,21 @@ Transforma áudio em notas para a partitura do Songbook, com mais fidelidade que
 Medido em 11 trechos de músicas reais (MUSDB18, voz isolada como gabarito): a melodia certa passou de **34%** do
 tempo (a música inteira junta, como no celular) para **70%** (voz separada + limpeza).
 
-## Rodar
+## Publicar de graça (Hugging Face Spaces)
+
+O workflow `.github/workflows/servidor-ia.yml` cria e atualiza o Space sozinho; o app acha o endereço sozinho
+(a publicação do app grava `data/servidor-ia.json`). Só uma vez, à mão:
+
+1. Crie a conta em <https://huggingface.co/join> (grátis, sem cartão).
+2. Gere um token de escrita em <https://huggingface.co/settings/tokens> → **Create new token** → tipo **Write**.
+3. No GitHub do app: **Settings → Secrets and variables → Actions → New repository secret**, nome `HF_TOKEN`,
+   valor = o token. (Opcional: `ANTHROPIC_API_KEY` para o "Tirar dúvidas" e `YT_COOKIES` com o conteúdo do
+   cookies.txt.)
+4. Em **Actions**, rode **Publicar o servidor da IA** e depois **Publicar no GitHub Pages** (ou só faça um push).
+
+O servidor gratuito dorme depois de uns dias sem uso; o app o acorda ao abrir (a primeira resposta demora ~1 min).
+
+## Rodar no seu computador
 
 ```bash
 cd servidor-ia

@@ -12,3 +12,4 @@ public/data/junior.json
 __pycache__/
 .pytest_cache/
 servidor-ia/cookies.txt
+public/data/servidor-ia.json

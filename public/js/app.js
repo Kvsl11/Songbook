@@ -35,8 +35,18 @@ const travarEmPe = () => {
 document.documentElement.classList.toggle('celular', ehCelular());
 travarEmPe();
 document.addEventListener('fullscreenchange', travarEmPe);
-// o servidor da IA configurado nos Ajustes ({ url, chave }; url vazia: só a IA do aparelho)
-const servidorIA = () => ({ url: '', chave: '', ...(db.prefs().servidorIA || {}) });
+// o servidor da IA vem junto com o app: a publicação grava o endereço em data/servidor-ia.json (sem ele, a partitura
+// é gerada no aparelho e as telas que precisam do servidor não aparecem). Quem usa não configura nada
+let SERVIDOR_IA = { url: '', chave: '' };
+const servidorIA = () => SERVIDOR_IA;
+fetch(new URL('data/servidor-ia.json', document.baseURI)).then((r) => (r.ok ? r.json() : null)).then((d) => {
+  if (!d?.url) return;
+  SERVIDOR_IA = { url: baseDoServidor(d.url), chave: d.chave || '' };
+  // a tela que já abriu sem saber do servidor é desenhada de novo
+  if (/^#\/(duvidas|musica\/[^/]+\/compor\/ia)/.test(location.hash)) route();
+  // o servidor gratuito dorme quando ninguém usa: um "bom dia" já o acorda para quando precisar
+  fetch(SERVIDOR_IA.url + '/saude').catch(() => {});
+}).catch(() => {});
 const view = $('#view');
 const titleEl = $('#title');
 const eyebrowEl = $('#eyebrow');
@@ -68,7 +78,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-189';
+export const APP_VERSAO = '2026.10.22-190';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -7057,7 +7067,7 @@ function viewSettings() {
   const nRepertorios = db.sets().length;
   const nVideos = db.songs().filter((s) => s.youtube).length;
   // seção com título, ícone e uma linha explicando; o atalho do topo leva até ela
-  const SECOES = [['aparencia', 'palette', 'Aparência'], ['cifras', 'chord', 'Cifras'], ['musica', 'music', 'Música'], ['ia', 'sparkles', 'IA'], ['pptx', 'grid', 'PowerPoint'], ['dados', 'database', 'Dados'], ['sobre', 'info', 'Sobre']];
+  const SECOES = [['aparencia', 'palette', 'Aparência'], ['cifras', 'chord', 'Cifras'], ['musica', 'music', 'Música'], ['pptx', 'grid', 'PowerPoint'], ['dados', 'database', 'Dados'], ['sobre', 'info', 'Sobre']];
   const secao = (id, sub, corpo) => {
     const [, ic, nome] = SECOES.find(([k]) => k === id);
     return `<section class="aj-sec" id="aj-${id}"><h3 class="aj-titulo"><span class="aj-titulo-ic">${icon(ic, 16)}</span>${nome}</h3>${sub ? `<p class="aj-sub">${sub}</p>` : ''}${corpo}</section>`;
@@ -7108,15 +7118,6 @@ function viewSettings() {
     ${jaInstalado() ? '' : `<div class="settings-group">
       <div class="setting acao"><span class="ico" style="background:none">${logo(36)}</span><div class="grow"><div class="t">Instalar o Songbook</div><div class="s">Ícone na tela inicial, abre em tela cheia e funciona sem internet</div></div><div class="setting-acoes"><button class="btn small primary" id="instalar">Instalar</button></div></div>
     </div>`}`)}
-
-    ${secao('ia', 'O servidor da IA (o seu, em Python): partitura mais fiel, partitura pelo link do YouTube, letra que segue a música e Tirar dúvidas', `
-    <div class="settings-group aj-ia">
-      <div class="setting wrap"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Endereço do servidor</div><div class="s">Ex.: https://meu-servidor.com:8000. Sem ele, a partitura é gerada no próprio aparelho</div></div>
-        <div class="aj-ia-campos"><input class="input" id="ia-url" type="url" inputmode="url" autocomplete="off" placeholder="https://…" value="${esc(servidorIA().url)}">
-          <input class="input" id="ia-chave" type="password" autocomplete="off" placeholder="Chave (se o servidor pedir)" value="${esc(servidorIA().chave)}">
-          <button class="btn small" id="ia-testar">${icon('refresh', 15)} Testar</button></div>
-        <p class="aj-ia-estado muted" id="ia-estado"></p></div>
-    </div>`)}
 
     ${secao('pptx', 'O arquivo do seu grupo: no repertório, “PowerPoint” gera os slides com as letras', `
     <div class="settings-group"><div class="aj-pptx" id="pptx"><div class="aj-pptx-vazio muted">Verificando…</div></div></div>`)}
@@ -7195,21 +7196,6 @@ function viewSettings() {
     $('#destaque').querySelectorAll('[data-v]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   };
   $('#video-fundo').onchange = (e) => db.setPref('videoFundo', e.target.checked);
-  // servidor da IA: guarda ao sair do campo e mostra o que ele tem (separação da voz, YouTube, letra, dúvidas)
-  const guardarIA = () => db.setPref('servidorIA', { url: baseDoServidor($('#ia-url').value), chave: $('#ia-chave').value.trim() });
-  $('#ia-url').onchange = guardarIA;
-  $('#ia-chave').onchange = guardarIA;
-  $('#ia-testar').onclick = async () => {
-    guardarIA();
-    const est = $('#ia-estado');
-    if (!servidorIA().url) { est.textContent = 'Sem servidor: a IA roda no aparelho.'; return; }
-    est.textContent = 'Testando…';
-    try {
-      const r = await chamar(servidorIA(), '/saude', { tempo: 15e3 });
-      const sim = (v, t) => `${v ? '✓' : '✗'} ${t}`;
-      est.textContent = ['Conectado', sim(r.separacao, 'voz separada da banda'), sim(r.youtube, 'YouTube'), sim(r.letra, 'letra sincronizada'), sim(r.duvidas, 'Tirar dúvidas')].join(' · ');
-    } catch (e) { est.textContent = e.message; }
-  };
   $('#exp').onclick = () => download(`songbook-backup-${hojeISO()}.json`, db.exportAll(), 'application/json');
   $('#imp').onclick = openImport;
   $('#clr').onclick = async () => {
@@ -7535,7 +7521,7 @@ function viewDuvidas() {
   view.innerHTML = `<div class="chat">
     <div class="chat-rolo" id="dv-conversa"></div>
     <form class="chat-barra" id="dv-form">
-      ${temServidor ? '' : `<div class="chat-aviso">${icon('info', 16)}<span>Para conversar, configure o <a href="#/ajustes">servidor da IA nos Ajustes</a>.</span></div>`}
+      ${temServidor ? '' : `<div class="chat-aviso">${icon('info', 16)}<span>O assistente está sendo preparado. Tente de novo daqui a pouco.</span></div>`}
       <div class="chat-campo"><textarea name="q" rows="1" placeholder="Pergunte sobre liturgia e canto…" aria-label="Sua pergunta" ${temServidor ? '' : 'disabled'}></textarea>
         <button class="chat-enviar" type="submit" aria-label="Enviar" disabled>${icon('next', 20)}</button></div>
       <small class="chat-rodape">Responde pelos arquivos do acervo litúrgico e, se não achar, pela internet. Confira sempre as fontes.</small>

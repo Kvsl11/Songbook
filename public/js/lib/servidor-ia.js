@@ -1,6 +1,6 @@
 // O servidor da IA (servidor-ia/, em Python): partitura mais fiel (voz separada da banda), partitura pelo link do
-// YouTube, letra sincronizada com o vídeo e "Tirar dúvidas". O endereço (e a chave, se o servidor pedir) fica nos
-// Ajustes; sem ele, o app continua com a IA que roda no próprio aparelho.
+// YouTube, letra sincronizada com o vídeo e "Tirar dúvidas". O endereço vem em
+// data/servidor-ia.json, publicado com o app; sem ele, o app continua com a IA que roda no próprio aparelho.
 
 // o endereço como a pessoa colou ("meu-servidor:8000", "https://…/") → base sem barra no fim
 export function baseDoServidor(texto) {
@@ -19,7 +19,7 @@ export const linhaSemCifra = (l) => String(l || '').replace(/\[[^\]]*\]/g, '').r
 // chamada ao servidor: JSON ou multipart; o erro vem com a mensagem do servidor (em português)
 export async function chamar(cfg, rota, { json, form, metodo, sinal, tempo = 15 * 60e3 } = {}) {
   const base = baseDoServidor(cfg?.url);
-  if (!base) throw new Error('Configure o servidor da IA nos Ajustes');
+  if (!base) throw new Error('A IA do servidor ainda não está disponível');
   const ctrl = new AbortController();
   const fim = setTimeout(() => ctrl.abort(), tempo);
   sinal?.addEventListener('abort', () => ctrl.abort());

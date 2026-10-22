@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+import tempfile
 from urllib.parse import parse_qs, urlparse
 
 PASTA = os.path.dirname(os.path.abspath(__file__))
@@ -42,6 +43,14 @@ def id_do_video(texto: str) -> str | None:
 
 
 def arquivo_de_cookies() -> str | None:
+    # no Hugging Face o cookies.txt vem pelo segredo YT_COOKIES (o conteúdo do arquivo): vira um arquivo temporário
+    conteudo = os.environ.get("YT_COOKIES")
+    if conteudo:
+        caminho = os.path.join(tempfile.gettempdir(), "songbook-cookies.txt")
+        if not os.path.isfile(caminho):
+            with open(caminho, "w", encoding="utf-8") as f:
+                f.write(conteudo if conteudo.endswith("\n") else conteudo + "\n")
+        return caminho
     caminho = os.environ.get("IA_COOKIES") or os.path.join(PASTA, "cookies.txt")
     return caminho if os.path.isfile(caminho) else None
 
