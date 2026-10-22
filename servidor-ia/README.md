@@ -28,6 +28,12 @@ dá o endereço https que o celular alcança de qualquer lugar. De quebra, o You
 4. Abre a página <http://localhost:7860> com um QR code: leia com a câmera do celular. O Songbook abre já usando o PC
    (fica em **Ajustes → Servidor no seu computador**).
 
+**Sem o Docker** (não instala, ou o PC não tem virtualização), no Windows: instale o
+[Python 3.11](https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe) (marque "Add python.exe to PATH") e dê
+dois cliques em **`iniciar-windows-sem-docker.bat`**. A primeira vez instala tudo na pasta `.venv` (uns 15 minutos e
+5 GB); depois abre a mesma página com o QR code. Deixe a janela preta aberta enquanto usa (fechar desliga o servidor).
+No Mac/Linux, o mesmo com `python3.11 iniciar_pc.py` depois da instalação de "Rodar no seu computador" (abaixo).
+
 Deixe o PC ligado enquanto usa. O servidor volta sozinho quando o Docker Desktop abre, mas o endereço do túnel muda a
 cada vez: abra <http://localhost:7860> e leia o QR code de novo. Com o PC desligado, o app volta para o servidor da
 nuvem (abaixo), se houver. Parar: `docker compose down` nesta pasta. Ver o que está fazendo: `docker compose logs -f ia`.
