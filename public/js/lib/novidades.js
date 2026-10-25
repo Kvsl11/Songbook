@@ -3,6 +3,12 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 236, data: '2026-10-25', titulo: 'Visual melhorado para tablets',
+    itens: [
+      { tipo: 'melhoria', texto: 'Layout adaptado para tablets: navegação lateral em paisagem e menu compacto em retrato, com espaçamento, cartões, botões e seleções refinados.' },
+    ],
+  },
+  {
     versao: 235, data: '2026-10-22', titulo: 'O Lumen com as cores dele',
     itens: [
       { tipo: 'melhoria', texto: 'A tela do Lumen inteira agora usa as cores do logo: o fundo escuro com o brilho azul, roxo e rosa, o nome e o “Pode perguntar!” em degradê, os ícones das sugestões coloridos, a sua pergunta no balão em degradê e os botões de enviar, falar e conversar ao vivo no mesmo tom.' },
