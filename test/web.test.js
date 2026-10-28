@@ -369,8 +369,12 @@ test('letra sincronizada do LRCLIB: LRC -> linhas e tempos da sincronia', async 
   assert.equal(r.id, 3);
   assert.equal(r.fonte, 'lrclib');
   assert.match(pedidos[0], /lrclib\.net\/api\/search\?track_name=/);
-  // duração muito diferente (um clipe com introdução): não serve
-  assert.equal(await letraSincronizada({ titulo: 'Noites Traiçoeiras', artista: 'Padre Marcelo Rossi', duracao: 280 }, async () => resp(lista.slice(2))), null);
+  // duração muito diferente (um clipe com uma cena antes da música): a letra vem, mas pedindo o ajuste do começo
+  const fora = await letraSincronizada({ titulo: 'Noites Traiçoeiras', artista: 'Padre Marcelo Rossi', duracao: 600 }, async () => resp(lista.slice(2)));
+  assert.equal(fora.id, 3);
+  assert.equal(fora.ajustar, true);
+  // de outro artista não serve, nem com o ajuste
+  assert.equal(await letraSincronizada({ titulo: 'Noites Traiçoeiras', artista: 'Fulano', duracao: 600 }, async () => resp(lista.slice(2))), null);
   // sem letra sincronizada: null (o app vai para o servidor)
   assert.equal(await letraSincronizada({ titulo: 'Noites Traiçoeiras', artista: 'Padre Marcelo Rossi' }, async () => resp([{ ...lista[2], syncedLyrics: null }])), null);
 });

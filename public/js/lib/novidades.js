@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 264, data: '2026-10-28', titulo: 'Sincronia da letra com aviso e à mão',
+    itens: [
+      { tipo: 'novo', texto: 'Em cima da letra (no cartão e na tela toda), um aviso mostra que a letra está sincronizando e, depois, que sincronizou.' },
+      { tipo: 'correcao', texto: 'Vídeos com uma parte antes da música (como o clipe de "Speed Demon") agora trazem a letra sincronizada: toque em "Acertar" e depois na frase no momento em que ela for cantada. "Ajustar" faz o mesmo quando a letra ficar fora do tempo.' },
+      { tipo: 'novo', texto: 'Se não achar a letra sincronizada, "Sincronizar à mão": a música toca do começo e você toca em "Agora" quando cada frase começar.' },
+    ],
+  },
+  {
     versao: 263, data: '2026-10-28', titulo: 'Letra que acompanha a música',
     itens: [
       { tipo: 'novo', texto: 'Ao tocar uma música, o app procura sozinho a letra sincronizada (LRCLIB, sem servidor): o cartão da letra passa a acompanhar o que está sendo cantado.' },
@@ -65,14 +73,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'Na Busca, os vídeos não ficam mais à parte: cada música da lista já vem com o vídeo dela, e os sinais mostram o que ela tem (cifra, letra e vídeo). Abrindo ou salvando (+), ela entra com tudo junto.' },
       { tipo: 'melhoria', texto: 'Um vídeo que não é de nenhuma música da lista entra nela como música: ao abrir, o app descobre qual é e traz a cifra e a letra. Outros vídeos da mesma música não se repetem.' },
       { tipo: 'melhoria', texto: 'No "Adicionar música" do repertório, a mesma lista única.' },
-    ],
-  },
-  {
-    versao: 254, data: '2026-10-28', titulo: 'Vídeo da busca mais rápido e capa com movimento no celular',
-    itens: [
-      { tipo: 'correcao', texto: 'Abrindo uma música da Busca, o vídeo vem junto: a busca de vídeos pergunta a todos os servidores ao mesmo tempo (antes esperava os que estavam fora do ar) e começa junto com a cifra.' },
-      { tipo: 'correcao', texto: 'Se o vídeo chega depois de a música abrir, o Tocando agora já aberto passa a tocá-lo (antes ficava em "Escolher um vídeo").' },
-      { tipo: 'correcao', texto: 'No celular, "Mudar para música" volta a mostrar os quadros do clipe passando atrás da parte de cima, até o cartão da letra (uma preferência do painel do tablet desligava isso).' },
     ],
   },
 ];
