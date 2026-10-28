@@ -3558,3 +3558,46 @@ html.tablet .pt-atalho-txt small { font-size: 15px; }
 body:not(.painel-cheio) #player.sem-video { display: none !important; }
 #player .pl-video.sem-capa, html.pp #player.modo-capa .pl-video.sem-capa { display: grid; place-items: center; color: rgb(255 255 255 / 0.9);
   background: linear-gradient(135deg, color-mix(in srgb, var(--cor-musica, var(--tint)) 80%, #fff 10%), color-mix(in srgb, var(--cor-musica, var(--tint)) 55%, #000)); }
+
+/* ---------------------------------------------------------------- Tocando agora no celular, no estilo do Apple Music:
+   no modo música a capa ocupa o topo de ponta a ponta (atrás do topo) e se desfaz no fundo; o nome por cima do fim
+   dela; a barra grossa e sem bolinha; anterior / play / próxima grandes, sem círculo; e embaixo uma linha só com
+   aleatório, letra, aparelhos, fila e repetir (compartilhar fica nos ⋮) */
+#player .ic-am, #player .pl-am, html.pp #player .pl-am.pl-modo { display: none; }
+@media (max-width: 899px) {
+  html.pp:not(.tablet) body.painel-cheio #player .ic-padrao { display: none; }
+  html.pp:not(.tablet) body.painel-cheio #player .ic-am { display: contents; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-am { display: grid; }
+  /* a capa de ponta a ponta */
+  html.pp:not(.tablet) body.painel-cheio #player.modo-capa .pl-video {
+    width: calc(100% + 40px); max-width: none; aspect-ratio: 1 / 1; max-height: 64dvh; align-self: stretch;
+    margin: calc(-60px - env(safe-area-inset-top)) -20px -96px; border-radius: 0; box-shadow: none;
+    -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 100%); mask-image: linear-gradient(to bottom, #000 58%, transparent 100%);
+  }
+  html.pp:not(.tablet) body.painel-cheio #player.modo-capa .pl-video::before { content: ""; position: absolute; inset: 0 0 auto; height: 30%; background: linear-gradient(rgb(0 0 0 / 0.45), transparent); pointer-events: none; }
+  html.pp:not(.tablet) body.painel-cheio #player.modo-capa > :not(.pl-video) { position: relative; z-index: 1; }
+  html.pp:not(.tablet) body.painel-cheio #player.modo-capa .pl-cab { text-shadow: 0 1px 6px rgb(0 0 0 / 0.5); }
+  /* nome e artista, com o ✓ num círculo cinza translúcido */
+  html.pp:not(.tablet) body.painel-cheio #player .pl-txt b { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-txt small { font-size: 19px; color: rgb(255 255 255 / 0.6); }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-salva { width: 34px; height: 34px; border: 0; background: rgb(255 255 255 / 0.18); color: #fff; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-salva.salva { background: rgb(255 255 255 / 0.18); color: #fff; }
+  /* a barra: grossa, arredondada, sem bolinha; os tempos apagados embaixo */
+  html.pp:not(.tablet) body.painel-cheio #player .pl-prog { height: 7px; border-radius: 4px; background: rgb(255 255 255 / 0.22); overflow: hidden; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-prog i { background: rgb(255 255 255 / 0.85); border-radius: 0; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-prog i::after { display: none; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-t0, html.pp:not(.tablet) body.painel-cheio #player .pl-t1 { font-size: 13px; color: rgb(255 255 255 / 0.5); }
+  /* anterior / play / próxima: grandes, brancos, sem círculo; aleatório e repetir descem para a linha de baixo */
+  html.pp:not(.tablet) body.painel-cheio #player .pl-ctrl { justify-content: center; gap: 44px; margin: 10px 0 8px; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-ctrl .pl-modo { display: none; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-play { width: 72px; height: 72px; background: none; color: #fff; border-radius: 0; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-play svg { width: 54px; height: 54px; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-pulo { width: 60px; height: 60px; color: #fff; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-pulo svg { width: 40px; height: 40px; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-pulo:disabled { opacity: 0.35; }
+  /* a linha de baixo, espalhada como no Apple Music */
+  html.pp:not(.tablet) body.painel-cheio #player .pl-acoes { justify-content: space-between; margin: 4px 0 6px; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-acoes .grow, html.pp:not(.tablet) body.painel-cheio #player .pl-acoes [data-pl="compartilhar"] { display: none; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-acoes .icon-btn { width: 44px; height: 44px; color: rgb(255 255 255 / 0.75); }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-acoes .pl-modo.ligado { color: var(--accent-ink); }
+}

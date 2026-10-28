@@ -3,6 +3,13 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 247, data: '2026-10-28', titulo: 'Tocando agora no estilo do Apple Music',
+    itens: [
+      { tipo: 'melhoria', texto: 'No celular, no modo música, a capa ocupa o topo da tela de ponta a ponta e se desfaz no fundo, com o nome por cima, como no Apple Music.' },
+      { tipo: 'melhoria', texto: 'Os controles também: barra de tempo grossa e sem bolinha, anterior, play e próxima grandes e sem círculo, e embaixo uma linha com aleatório, letra, aparelhos, fila e repetir (compartilhar fica nos ⋮).' },
+    ],
+  },
+  {
     versao: 246, data: '2026-10-28', titulo: 'Play normal e letra toda em branco',
     itens: [
       { tipo: 'correcao', texto: 'A letra sincronizada do Tocando agora fica toda em branco: as próximas frases não aparecem mais em preto (a cantada fica mais apagada e a de agora acesa).' },

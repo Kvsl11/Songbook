@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-246';
+export const APP_VERSAO = '2026.10.28-247';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -732,9 +732,9 @@ const player = (() => {
     </div>
     <div class="pl-ctrl">
       <button class="icon-btn pl-modo pl-aleat" data-pl="aleatorio" aria-pressed="false" aria-label="Aleatório" title="Aleatório">${icon('shuffle', 18)}</button>
-      <button class="icon-btn pl-pulo" data-pl="anterior" aria-label="Música anterior" title="Anterior">${icon('skipBack', 18)}</button>
+      <button class="icon-btn pl-pulo" data-pl="anterior" aria-label="Música anterior" title="Anterior"><span class="ic-padrao">${icon('skipBack', 18)}</span><span class="ic-am">${icon('voltarAM', 18)}</span></button>
       <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button>
-      <button class="icon-btn pl-pulo" data-pl="proxima" aria-label="Próxima música" title="Próxima">${icon('skipFwd', 18)}</button>
+      <button class="icon-btn pl-pulo" data-pl="proxima" aria-label="Próxima música" title="Próxima"><span class="ic-padrao">${icon('skipFwd', 18)}</span><span class="ic-am">${icon('avancarAM', 18)}</span></button>
       <button class="icon-btn pl-modo pl-repetir" data-pl="repetir" aria-pressed="false" aria-label="Repetir" title="Repetir">${icon('repeat', 18)}<i class="pl-um">1</i></button>
     </div>
     <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
@@ -751,10 +751,13 @@ const player = (() => {
       <span class="pl-cab-meio"><small>Tocando agora</small><b></b></span>
       <span class="pl-cab-dir"><button class="icon-btn pl-mais" data-pl="menu" aria-label="Mais opções" title="Mais opções">${icon('more', 20)}</button></span></div>
     <div class="pl-acoes">
+      <button class="icon-btn pl-modo pl-am" data-pl="aleatorio" aria-pressed="false" aria-label="Aleatório" title="Aleatório">${icon('shuffle', 20)}</button>
+      <button class="icon-btn pl-am" data-pl="cheio" aria-label="Letra na tela toda" title="Letra">${icon('letraBalao', 22)}</button>
       <button class="icon-btn" data-pl="aparelhos" aria-label="Ouvir em outro aparelho" title="Ouvir em outro aparelho">${icon('aparelhos', 20)}</button>
       <span class="grow"></span>
       <button class="icon-btn" data-pl="compartilhar" aria-label="Compartilhar" title="Compartilhar">${icon('share', 20)}</button>
       <button class="icon-btn" data-pl="fila" aria-label="Fila" title="Fila">${icon('queue', 20)}</button>
+      <button class="icon-btn pl-modo pl-repetir pl-am" data-pl="repetir" aria-pressed="false" aria-label="Repetir" title="Repetir">${icon('repeat', 20)}<i class="pl-um">1</i></button>
     </div>
     <section class="pl-letra" hidden><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-linhas"></div></section>
     <div class="pl-extra" hidden></div>`;
@@ -868,7 +871,7 @@ const player = (() => {
     const deQual = f ? atual.setId || 'biblioteca' : '';
     if (filaDe !== deQual) { filaDe = deQual; tocadas = new Set(f ? [f.i] : []); historico = []; }
     el.classList.toggle('com-fila', Boolean(f));
-    $('[data-pl="aleatorio"]', el).disabled = !f;
+    el.querySelectorAll('[data-pl="aleatorio"]').forEach((b) => { b.disabled = !f; });
     desenharCapa();
     $('[data-pl="anterior"]', el).disabled = !f || (anteriorIndice() < 0 && tempo < 3);
     $('[data-pl="proxima"]', el).disabled = !f || proximoIndice() < 0;
@@ -1180,16 +1183,19 @@ const player = (() => {
     if (repetir === 'uma' || (repetir === 'todas' && !fila())) { api.irPara(0); return true; }
     return pular(1);
   };
+  // (há dois de cada: nos controles e na linha de baixo do estilo Apple Music, na tela toda do celular)
   const desenharModos = () => {
-    const bA = $('[data-pl="aleatorio"]', el);
-    const bR = $('[data-pl="repetir"]', el);
-    bA.classList.toggle('ligado', aleatorio);
-    bA.setAttribute('aria-pressed', String(aleatorio));
-    bA.title = aleatorio ? 'Aleatório: ligado' : 'Aleatório';
-    bR.classList.toggle('ligado', repetir !== 'nao');
-    bR.classList.toggle('uma', repetir === 'uma');
-    bR.setAttribute('aria-pressed', String(repetir !== 'nao'));
-    bR.title = repetir === 'uma' ? 'Repetindo esta música' : repetir === 'todas' ? (atual?.setId ? 'Repetindo o repertório' : 'Repetindo a biblioteca') : 'Repetir';
+    el.querySelectorAll('[data-pl="aleatorio"]').forEach((bA) => {
+      bA.classList.toggle('ligado', aleatorio);
+      bA.setAttribute('aria-pressed', String(aleatorio));
+      bA.title = aleatorio ? 'Aleatório: ligado' : 'Aleatório';
+    });
+    el.querySelectorAll('[data-pl="repetir"]').forEach((bR) => {
+      bR.classList.toggle('ligado', repetir !== 'nao');
+      bR.classList.toggle('uma', repetir === 'uma');
+      bR.setAttribute('aria-pressed', String(repetir !== 'nao'));
+      bR.title = repetir === 'uma' ? 'Repetindo esta música' : repetir === 'todas' ? (atual?.setId ? 'Repetindo o repertório' : 'Repetindo a biblioteca') : 'Repetir';
+    });
   };
   window.addEventListener('message', (e) => {
     let h = '';
