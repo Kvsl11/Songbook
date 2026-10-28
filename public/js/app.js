@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-274';
+export const APP_VERSAO = '2026.10.28-275';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1189,7 +1189,11 @@ const player = (() => {
     const song = musicaTocando();
     mapaCifra = null;
     acesaChave = '';
-    if (!modoCifra || !song?.content) { box.innerHTML = ''; return; }
+    // a música sem nenhum acorde (não achou a cifra): só a letra, sem o botão Cifra (a escolha guardada continua para as outras)
+    const semAcordes = Boolean(song?.content) && !temCifra(song.content);
+    el.classList.toggle('sem-acordes', semAcordes);
+    if (semAcordes) { el.classList.remove('cifra-on'); pararRolagem(); }
+    if (!modoCifra || !song?.content || semAcordes) { box.innerHTML = ''; return; }
     const transpose = song.transpose || 0;
     const capo = song.capo || 0;
     const r = renderSong(song.content, { transpose, capo, key: song.key || '' });
@@ -1720,7 +1724,7 @@ const player = (() => {
       !naLetra && (atual.href || atual.abrir) && !telaDeCelular() && { valor: 'abrir', rotulo: 'Abrir a música', ic: 'music' },
       salva ? { valor: 'add-repertorio', rotulo: 'Adicionar a um repertório', ic: 'plus' } : { valor: 'salva', rotulo: 'Salvar na biblioteca', ic: 'download' },
       { valor: 'fila', rotulo: 'Ver a fila', ic: 'queue' },
-      { valor: 'ver-cifra', rotulo: naLetra && modoCifra ? 'Ver só a letra' : 'Ver a cifra', ic: naLetra && modoCifra ? 'text' : 'chord' },
+      !(song?.content && !temCifra(song.content)) && { valor: 'ver-cifra', rotulo: naLetra && modoCifra ? 'Ver só a letra' : 'Ver a cifra', ic: naLetra && modoCifra ? 'text' : 'chord' },
       naLetra && atual.youtube && !atual.semVideo && { valor: 'ver-video', rotulo: 'Ver o vídeo', ic: 'video' },
       naLetra && atual.songId && db.song(atual.songId) && { valor: 'editar', rotulo: 'Editar a cifra', ic: 'edit' },
       naLetra && atual.songId && { valor: 'partitura', rotulo: 'Partitura', ic: 'score' },

@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 275, data: '2026-10-28', titulo: 'Só a letra quando não há cifra',
+    itens: [
+      { tipo: 'melhoria', texto: 'Na letra na tela toda, a música sem cifra não mostra mais o botão Cifra/Letra (nem tom e capotraste): fica só a letra.' },
+      { tipo: 'melhoria', texto: '"Tocando agora", no alto da tela, um pouco maior e em negrito.' },
+    ],
+  },
+  {
     versao: 274, data: '2026-10-28', titulo: 'Artistas nos créditos e letra que não se perde',
     itens: [
       { tipo: 'novo', texto: 'Nos créditos, tocar num artista abre a página dele, com as músicas e os álbuns (no Explorar e na lista dos créditos).' },
@@ -65,14 +72,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'Quando o banco de letras sincronizadas (LRCLIB) está ocupado, o app tenta de novo sozinho em vez de desistir e cair no servidor (que dava erro).' },
       { tipo: 'correcao', texto: 'Sem servidor, "Sincronizar a letra de novo" também usa o banco de letras. Se ele não responder, o aviso mostra "Tentar de novo" e "Sincronizar à mão".' },
-    ],
-  },
-  {
-    versao: 265, data: '2026-10-28', titulo: 'Uma tela só para a música',
-    itens: [
-      { tipo: 'melhoria', texto: 'A música abre sempre na tela nova da letra, em todos os aparelhos; a página antiga saiu. Fechando, você volta para a lista.' },
-      { tipo: 'novo', texto: 'O botão "Cifra" (no canto de cima) mostra os acordes em cima da letra, com tom, capotraste, tamanho da letra (A− / A+) e rolagem automática. Com a letra sincronizada, a linha cantada acende também na cifra.' },
-      { tipo: 'melhoria', texto: 'No ⋯ da tela da música: Ver o vídeo, Editar a cifra e Partitura.' },
     ],
   },
 ];

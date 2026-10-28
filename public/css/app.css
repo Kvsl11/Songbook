@@ -2964,7 +2964,7 @@ html.pp #player .pl-cab { order: 0; display: grid; grid-template-columns: 1fr mi
 html.pp #player .pl-cab-esq { display: flex; gap: 2px; justify-self: start; }
 html.pp #player .pl-cab-dir { display: flex; justify-self: end; }
 html.pp #player .pl-cab-meio { min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
-html.pp #player .pl-cab small { font-size: 12px; color: rgb(255 255 255 / 0.75); }
+html.pp #player .pl-cab small { font-size: 14px; font-weight: 700; letter-spacing: 0.01em; color: rgb(255 255 255 / 0.9); } /* "Tocando agora", em destaque */
 html.pp #player .pl-cab b { font-size: 15px; font-weight: 800; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html.pp #player .pl-cab b:empty { display: none; }
 html.pp #player .pl-cab .icon-btn { width: 40px; height: 40px; flex: none; color: rgb(255 255 255 / 0.85); }
@@ -3069,6 +3069,8 @@ html.pp #player .pl-ferr button { border: 0; background: none; color: #fff; font
 html.pp #player .pl-ferr-g button { min-width: 34px; height: 34px; border-radius: 50%; font-size: 15px; }
 html.pp #player .pl-ferr-g b { display: grid; justify-items: center; min-width: 40px; font-size: 15px; line-height: 1.05; color: #fff; }
 html.pp #player .pl-ferr-g b small { font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(255 255 255 / 0.65); font-weight: 800; }
+/* música sem acordes: nem o botão Cifra/Letra nem as ferramentas da cifra (fica só a letra) */
+html.pp #player.sem-acordes .pl-ver-cifra { display: none; }
 html.pp #player .pl-ferr-rolar { display: inline-flex; align-items: center; gap: 4px; height: 38px; padding: 0 14px; border-radius: 999px; background: rgb(0 0 0 / 0.24) !important; font-size: 13px; }
 html.pp #player .pl-ferr-rolar[aria-pressed="true"] { background: #fff !important; color: #111 !important; }
 /* a cifra: os acordes em cima da letra, no mesmo estilo da letra (à esquerda, sem o fundo da página antiga) */
