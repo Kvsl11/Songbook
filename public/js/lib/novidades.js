@@ -3,6 +3,13 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 248, data: '2026-10-28', titulo: 'Capa pequena no vídeo e capa com movimento',
+    itens: [
+      { tipo: 'melhoria', texto: 'No Tocando agora com o vídeo, a capa da música aparece pequena ao lado do nome, como no Spotify.' },
+      { tipo: 'melhoria', texto: 'Em "Mudar para música", a capa volta a ter movimento: os quadros do clipe passam com um zoom lento, como no topo da página da música.' },
+    ],
+  },
+  {
     versao: 247, data: '2026-10-28', titulo: 'Letra sem rolagem de lado',
     itens: [
       { tipo: 'correcao', texto: 'A letra do Tocando agora não cria mais uma barra de rolagem na horizontal: a frase de agora não passa da borda, as frases quebram a linha antes, a letra ficou um pouco menor no celular e a barra de rolagem não aparece.' },
