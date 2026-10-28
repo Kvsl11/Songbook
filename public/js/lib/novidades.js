@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 265, data: '2026-10-28', titulo: 'Uma tela só para a música',
+    itens: [
+      { tipo: 'melhoria', texto: 'A música abre sempre na tela nova da letra, em todos os aparelhos; a página antiga saiu. Fechando, você volta para a lista.' },
+      { tipo: 'novo', texto: 'O botão "Cifra" (no canto de cima) mostra os acordes em cima da letra, com tom, capotraste, tamanho da letra (A− / A+) e rolagem automática. Com a letra sincronizada, a linha cantada acende também na cifra.' },
+      { tipo: 'melhoria', texto: 'No ⋯ da tela da música: Ver o vídeo, Editar a cifra e Partitura.' },
+    ],
+  },
+  {
     versao: 264, data: '2026-10-28', titulo: 'Sincronia da letra com aviso e à mão',
     itens: [
       { tipo: 'novo', texto: 'Em cima da letra (no cartão e na tela toda), um aviso mostra que a letra está sincronizando e, depois, que sincronizou.' },
@@ -65,14 +73,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'Abrindo uma música da Busca no celular, o Tocando agora aparece de uma vez: a página antiga da música não pisca mais por baixo (nem ao fechar).' },
       { tipo: 'melhoria', texto: 'Na página do artista, o tom de cada música fica num selo pequeno ao lado do salvar, sem o "Tom" escrito; embaixo do nome, o artista.' },
-    ],
-  },
-  {
-    versao: 255, data: '2026-10-28', titulo: 'Busca com cifra, letra e vídeo numa lista só',
-    itens: [
-      { tipo: 'melhoria', texto: 'Na Busca, os vídeos não ficam mais à parte: cada música da lista já vem com o vídeo dela, e os sinais mostram o que ela tem (cifra, letra e vídeo). Abrindo ou salvando (+), ela entra com tudo junto.' },
-      { tipo: 'melhoria', texto: 'Um vídeo que não é de nenhuma música da lista entra nela como música: ao abrir, o app descobre qual é e traz a cifra e a letra. Outros vídeos da mesma música não se repetem.' },
-      { tipo: 'melhoria', texto: 'No "Adicionar música" do repertório, a mesma lista única.' },
     ],
   },
 ];

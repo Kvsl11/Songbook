@@ -3020,6 +3020,34 @@ html.pp #player .pl-letra.sincronizada .pl-linhas p { color: rgb(255 255 255 / 0
 html.pp #player .pl-letra.sincronizada .pl-linhas p.cantada { color: rgb(255 255 255 / 0.32); }
 html.pp #player .pl-letra.sincronizada .pl-linhas p.agora { color: #fff; transform: scale(1.04);
   text-shadow: 0 1px 0 rgb(0 0 0 / 0.35), 0 3px 8px rgb(0 0 0 / 0.35), 0 0 22px rgb(255 255 255 / 0.45); animation: linha-salta 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+/* ---- a tela da música: a letra na tela toda é a tela da música; a página antiga fica por baixo, escondida */
+body.musica-na-letra #view { visibility: hidden; }
+/* ferramentas (na tela toda): tom, capotraste e rolagem só com a cifra; o tamanho da letra sempre */
+#player .pl-ferr, #player .pl-cifra { display: none; }
+html.pp #player.letra-cheia .pl-ferr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: none; margin: 2px 0 8px; }
+html.pp #player.letra-cheia:not(.cifra-on) .pl-ferr .so-cifra { display: none; }
+html.pp #player .pl-ferr-g { display: inline-flex; align-items: center; gap: 2px; height: 38px; padding: 0 4px; border-radius: 999px; background: rgb(0 0 0 / 0.24); }
+html.pp #player .pl-ferr button { border: 0; background: none; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+html.pp #player .pl-ferr-g button { min-width: 34px; height: 34px; border-radius: 50%; font-size: 15px; }
+html.pp #player .pl-ferr-g b { display: grid; justify-items: center; min-width: 40px; font-size: 15px; line-height: 1.05; color: #fff; }
+html.pp #player .pl-ferr-g b small { font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(255 255 255 / 0.65); font-weight: 800; }
+html.pp #player .pl-ferr-rolar { display: inline-flex; align-items: center; gap: 4px; height: 38px; padding: 0 14px; border-radius: 999px; background: rgb(0 0 0 / 0.24) !important; font-size: 13px; }
+html.pp #player .pl-ferr-rolar[aria-pressed="true"] { background: #fff !important; color: #111 !important; }
+/* a cifra: os acordes em cima da letra, no mesmo estilo da letra (à esquerda, sem o fundo da página antiga) */
+html.pp #player.letra-cheia.cifra-on .pl-linhas { display: none; }
+html.pp #player.letra-cheia.cifra-on .pl-cifra { display: block; flex: 1; min-height: 0; overflow-y: auto; padding: 8px 0 30%; scrollbar-width: none; cursor: auto; }
+html.pp #player .pl-cifra::-webkit-scrollbar { display: none; }
+html.pp #player .pl-cifra .song.lyrics-mode { margin: 0; padding: 0; background: none; border-radius: 0; text-align: left; font-size: calc(22px * var(--font-scale)); }
+html.pp #player .pl-cifra .song.lyrics-mode .section, html.pp #player .pl-cifra .song.lyrics-mode .line,
+html.pp #player .pl-cifra .song.lyrics-mode .section-label, html.pp #player .pl-cifra .song.lyrics-mode .comment { text-align: left; justify-content: flex-start; }
+html.pp #player .pl-cifra .song.lyrics-mode .section-label { display: inline-block; margin: 6px 0 8px; padding: 3px 11px; border-radius: 999px; background: rgb(0 0 0 / 0.22); color: rgb(255 255 255 / 0.85); font-size: 13px; letter-spacing: 0.02em; text-transform: none; }
+/* com a letra sincronizada, a linha cantada acende na cifra, com o mesmo relevo da letra */
+html.pp #player .pl-letra.sincronizada .pl-cifra .line .lyric { transition: color 0.25s, text-shadow 0.25s; }
+html.pp #player .pl-letra.sincronizada .pl-cifra .line.agora .lyric { color: #fff; text-shadow: 0 1px 0 rgb(0 0 0 / 0.35), 0 3px 8px rgb(0 0 0 / 0.35), 0 0 22px rgb(255 255 255 / 0.45); }
+/* o tamanho da letra (A− / A+) vale também para a letra na tela toda */
+html.pp #player.letra-cheia .pl-linhas p { font-size: calc(26px * var(--font-scale)); }
+#player .pl-ver-cifra[aria-pressed="true"] { background: #fff; color: #111; }
+
 /* o aviso da sincronia, em cima da letra (cartão e tela toda): sincronizando (barrinhas), sincronizada (✓), falta
    acertar o começo, não achou (com "Sincronizar à mão") e a marcação à mão (com o botão "Agora") */
 #player .pl-sinc { display: none; }
@@ -3074,7 +3102,7 @@ html.pp #player .pl-letra-nome b { font-size: 17px; font-weight: 800; }
 html.pp #player .pl-letra-nome small { font-size: 15px; color: rgb(255 255 255 / 0.85); }
 html.pp #player.letra-cheia .pl-linhas { overflow-y: auto; padding: 14px 0 30%;
   -webkit-mask-image: linear-gradient(180deg, transparent, #000 5%, #000 92%, transparent); mask-image: linear-gradient(180deg, transparent, #000 5%, #000 92%, transparent); }
-html.pp #player.letra-cheia .pl-linhas p { font-size: 26px; margin-bottom: 18px; }
+html.pp #player.letra-cheia .pl-linhas p { font-size: calc(26px * var(--font-scale)); margin-bottom: 18px; }
 html.pp #player.letra-cheia .pl-letra-pe { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; flex: none; padding-top: 6px; }
 html.pp #player .pl-letra-pe > * { grid-area: auto; order: 0; } /* a barra do tempo tem grid-area e order da barra do player */
 html.pp #player .pl-letra-bts2 { display: flex; align-items: center; margin: 0 -8px; }
