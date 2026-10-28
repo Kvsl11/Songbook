@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 274, data: '2026-10-28', titulo: 'Artistas nos créditos e letra que não se perde',
+    itens: [
+      { tipo: 'novo', texto: 'Nos créditos, tocar num artista abre a página dele, com as músicas e os álbuns (no Explorar e na lista dos créditos).' },
+      { tipo: 'melhoria', texto: 'A tela Explorar dos créditos mostra a capa da música (ou a imagem do vídeo).' },
+      { tipo: 'correcao', texto: 'Voltando ao app depois de minimizar, a letra sincronizada volta a seguir o que está sendo cantado (antes ela podia correr sozinha à frente da música).' },
+    ],
+  },
+  {
     versao: 273, data: '2026-10-28', titulo: 'Salvar e tirar sem piscar',
     itens: [
       { tipo: 'correcao', texto: 'Salvar a música aberta pela busca no Tocando agora não faz mais a tela piscar: só a bolinha vira ✓.' },
@@ -65,14 +73,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'A música abre sempre na tela nova da letra, em todos os aparelhos; a página antiga saiu. Fechando, você volta para a lista.' },
       { tipo: 'novo', texto: 'O botão "Cifra" (no canto de cima) mostra os acordes em cima da letra, com tom, capotraste, tamanho da letra (A− / A+) e rolagem automática. Com a letra sincronizada, a linha cantada acende também na cifra.' },
       { tipo: 'melhoria', texto: 'No ⋯ da tela da música: Ver o vídeo, Editar a cifra e Partitura.' },
-    ],
-  },
-  {
-    versao: 264, data: '2026-10-28', titulo: 'Sincronia da letra com aviso e à mão',
-    itens: [
-      { tipo: 'novo', texto: 'Em cima da letra (no cartão e na tela toda), um aviso mostra que a letra está sincronizando e, depois, que sincronizou.' },
-      { tipo: 'correcao', texto: 'Vídeos com uma parte antes da música (como o clipe de "Speed Demon") agora trazem a letra sincronizada: toque em "Acertar" e depois na frase no momento em que ela for cantada. "Ajustar" faz o mesmo quando a letra ficar fora do tempo.' },
-      { tipo: 'novo', texto: 'Se não achar a letra sincronizada, "Sincronizar à mão": a música toca do começo e você toca em "Agora" quando cada frase começar.' },
     ],
   },
 ];

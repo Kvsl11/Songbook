@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-273';
+export const APP_VERSAO = '2026.10.28-274';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -978,11 +978,13 @@ const player = (() => {
         ${slug ? `<a class="ref-pilula" href="#/artista/${encodeURIComponent(slug)}/${encodeURIComponent(principal)}">Ver artista</a>` : ''}</div></section>`);
     }
     // créditos como o SongDNA do Spotify: as pessoas com a foto e o "Explorar"; embaixo, a lista (com a foto pequena)
-    dadosCreditos = { titulo: titulo || 'Música', artista, capa: song ? capaDaMusica(song) : '', cor: atual?.cor || '', pessoas, detalhes };
+    // (a capa: a da música ou, sem ela, a miniatura do vídeo; aberta a página de um artista, o Tocando agora fecha)
+    const capaCreditos = (song && capaDaMusica(song)) || (atual?.youtube ? `https://i.ytimg.com/vi/${atual.youtube}/hqdefault.jpg` : '');
+    dadosCreditos = { titulo: titulo || 'Música', artista, capa: capaCreditos, cor: atual?.cor || '', pessoas, detalhes, aoIrParaArtista: () => painelCheio(false, { semVoltar: true }) };
     if (pessoas.length) cartoes.push(cartaoPessoas({ titulo: titulo || 'Música', pessoas, explorar: 'data-pl="explorar-creditos"', classe: 'pl-cartao ref-pessoas pl-pessoas' }));
     if (pessoas.length || detalhes.length) {
       cartoes.push(`<section class="pl-cartao"><h4>Créditos</h4>
-        ${pessoas.map((x, i) => `<div class="ref-linha cr-linha">${avatarDe(x, i, 'ref-avatar cr-mini')}<span class="grow"><b>${esc(x.nome)}</b><small>${esc(x.papeis.join(' • '))}</small></span></div>`).join('')}
+        ${pessoas.map((x, i) => `<button class="ref-linha cr-linha" data-pl="artista" data-i="${i}" title="Ver as músicas de ${esc(x.nome)}">${avatarDe(x, i, 'ref-avatar cr-mini')}<span class="grow"><b>${esc(x.nome)}</b><small>${esc(x.papeis.join(' • '))}</small></span>${icon('next', 16)}</button>`).join('')}
         ${detalhes.map(([k, v, html]) => `<div class="ref-linha"><span class="grow"><b>${html ? v : esc(v)}</b><small>${esc(k)}</small></span></div>`).join('')}</section>`);
     }
     if (atual?.youtube) {
@@ -1321,11 +1323,19 @@ const player = (() => {
     const p = frase;
     if (p && tempos?.[p.dataset.k]) api.irPara(Math.max(0, tempos[p.dataset.k].inicio - 0.3));
   });
+  // voltando ao app (estava em segundo plano ou com a tela apagada), o vídeo é chamado de novo para avisar o tempo: sem
+  // isso ele podia parar de avisar e a letra sincronizada não seguia mais o que se cantava
+  let reouvir = null;
+  const aoVoltar = () => { if (document.visibilityState === 'visible' && atual && !atual.semVideo) { reouvir?.(); setTimeout(() => reouvir?.(), 800); } };
+  document.addEventListener('visibilitychange', aoVoltar);
+  window.addEventListener('pageshow', aoVoltar);
+  window.addEventListener('focus', aoVoltar);
   // cria o vídeo (só quando muda de vídeo)
   const montar = ({ autoplay = true } = {}) => {
     tela.innerHTML = `<iframe src="${esc(ytEmbed(atual.youtube, { autoplay }))}" title="${esc(atual.titulo || 'Vídeo')}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
     const f = $('iframe', tela);
     f.addEventListener('load', () => f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'));
+    reouvir = () => f.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*');
     tela.hidden = false;
     mostrarBarra();
     if (!quadro) seguir();
@@ -1346,7 +1356,9 @@ const player = (() => {
     get atual() { return atual; },
     get estado() { return estado; },
     // segundos do vídeo agora (o YouTube avisa algumas vezes por segundo; entre um aviso e outro, estima)
-    get tempoAgora() { return tempo + (estado === 'tocando' && marcaTempo ? (performance.now() - marcaTempo) / 1000 : 0); },
+    // (no máximo 2 s além do último aviso: com o app em segundo plano o vídeo para de avisar, e a letra corria sozinha
+    // muito à frente do que se cantava)
+    get tempoAgora() { return tempo + (estado === 'tocando' && marcaTempo ? Math.min(2, (performance.now() - marcaTempo) / 1000) : 0); },
     // o último tempo que o YouTube informou (não anda sozinho: no anúncio fica parado)
     get tempoInformado() { return tempo; },
     get duracao() { return duracao; },
@@ -1939,6 +1951,7 @@ const player = (() => {
     if (b.dataset.pl === 'fonte+') { mudarFonte(0.1); return; }
     if (b.dataset.pl === 'rolar') { rolar(); return; }
     if (b.dataset.pl === 'explorar-creditos' && dadosCreditos) { explorarCreditos(dadosCreditos); return; }
+    if (b.dataset.pl === 'artista' && dadosCreditos?.pessoas[b.dataset.i]) { painelCheio(false, { semVoltar: true }); irParaArtista(dadosCreditos.pessoas[b.dataset.i].nome); return; }
     if (b.dataset.pl === 'leitura') { definirLeitura(!el.classList.contains('so-letra')); return; }
     if (b.dataset.pl === 'editar' && atual?.songId && db.song(atual.songId)) { location.hash = '#/editar/' + atual.songId; return; }
     if (b.dataset.pl === 'partitura' && atual?.songId) { location.hash = `#/musica/${atual.songId}/partitura`; return; }
@@ -3321,9 +3334,18 @@ const cartaoPessoas = ({ titulo, pessoas, explorar, classe = 'ref-cartao ref-pes
   <div class="ref-pessoas-pe"><span class="grow"><b>${esc(titulo)}</b><small>${pessoas.length} ${pessoas.length === 1 ? 'participante' : 'participantes'}</small></span>
     <button class="ref-explorar" ${explorar}>Explorar</button></div>
   <p>Conheça quem está por trás da música.</p></section>`;
+// tocar numa pessoa dos créditos abre a página dela (as músicas, os álbuns), pelo Cifra Club; sem página lá, procura
+// o nome na Busca
+async function irParaArtista(nome) {
+  const achado = await buscarArtistasCifraClub(nome).then((l) => artistaCerto(l, nome)).catch(() => null);
+  if (achado?.slug) { location.hash = `#/artista/${encodeURIComponent(achado.slug)}/${encodeURIComponent(achado.nome || nome)}`; return; }
+  sessionStorage.setItem('busca', nome);
+  sessionStorage.setItem('buscaFiltro', 'tudo');
+  location.hash = '#/buscar';
+}
 // o detalhe (tela toda): a música em cima e todas as pessoas, cada uma com a foto, o nome e todos os papéis; embaixo
 // os detalhes (álbum, ano, tom, de onde veio)
-function explorarCreditos({ titulo, artista, capa, cor, pessoas, detalhes = [] }) {
+function explorarCreditos({ titulo, artista, capa, cor, pessoas, detalhes = [], aoIrParaArtista }) {
   const dlg = document.createElement('dialog');
   dlg.className = 'creditos-dlg';
   if (cor) dlg.style.setProperty('--cor-creditos', cor);
@@ -3331,10 +3353,14 @@ function explorarCreditos({ titulo, artista, capa, cor, pessoas, detalhes = [] }
     <div class="cr-musica">${capa ? `<span class="cr-capa" style="background-image:url('${esc(capa)}')"></span>` : `<span class="cr-capa">${icon('music', 26)}</span>`}
       <span class="grow"><b>${esc(titulo)}</b><small>${esc(artista || '')}</small></span></div>
     <h3>Participantes</h3>
-    <div class="cr-pessoas${pessoas.length === 1 ? ' uma' : ''}">${pessoas.map((p, i) => `<div class="cr-pessoa">${avatarDe(p, i, 'ref-avatar cr-avatar')}<b>${esc(p.nome)}</b><small>${esc(p.papeis.join(' • '))}</small></div>`).join('')}</div>
+    <div class="cr-pessoas${pessoas.length === 1 ? ' uma' : ''}">${pessoas.map((p, i) => `<button class="cr-pessoa" data-artista="${i}" title="Ver as músicas de ${esc(p.nome)}">${avatarDe(p, i, 'ref-avatar cr-avatar')}<b>${esc(p.nome)}</b><small>${esc(p.papeis.join(' • '))}</small></button>`).join('')}</div>
     ${detalhes.length ? `<h3>Detalhes</h3><div class="cr-detalhes">${detalhes.map(([k, v, html]) => `<div class="ref-linha"><span class="grow"><b>${html ? v : esc(v)}</b><small>${esc(k)}</small></span></div>`).join('')}</div>` : ''}`;
   document.body.append(dlg);
-  dlg.addEventListener('click', (e) => { if (e.target.closest('[data-cr="fechar"]')) dlg.close(); });
+  dlg.addEventListener('click', (e) => {
+    if (e.target.closest('[data-cr="fechar"]')) dlg.close();
+    const a = e.target.closest('[data-artista]');
+    if (a) { dlg.close(); aoIrParaArtista?.(); irParaArtista(pessoas[Number(a.dataset.artista)].nome); }
+  });
   dlg.addEventListener('close', () => dlg.remove());
   dlg.showModal();
   porFotos(dlg, pessoas);
