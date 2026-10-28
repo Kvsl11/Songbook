@@ -1574,6 +1574,8 @@ function indicadores(s) {
   if (!s) return '';
   let c = memoCifra.get(s.content);
   if (c === undefined) { c = temCifra(s.content || ''); memoCifra.set(s.content, c); }
+  // a tonalidade (o chip ao lado) já diz que tem cifra: o # só aparece numa cifra sem tom
+  if (s.key) c = false;
   const tem = (ic, t) => `<span class="ind-i" title="${t}" aria-label="${t}">${icon(ic, 11)}</span>`;
   return c || s.youtube ? `<span class="ind">${c ? tem('chord', 'Tem cifra') : ''}${s.youtube ? tem('youtube', 'Tem vídeo') : ''}</span>` : '';
 }

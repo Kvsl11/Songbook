@@ -3,8 +3,9 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
-    versao: 240, data: '2026-10-28', titulo: 'Botão Mudar para capa mais bonito',
+    versao: 240, data: '2026-10-28', titulo: 'Listas mais limpas e o botão Mudar para capa novo',
     itens: [
+      { tipo: 'melhoria', texto: 'Nas listas de música, um só indicador de cifra: a tonalidade (o # só aparece numa cifra sem tom). A tonalidade e o ícone de vídeo agora são cinza, mais discretos e no padrão; no celular a tonalidade também aparece nos repertórios.' },
       { tipo: 'melhoria', texto: 'O botão “Mudar para capa / Mudar para vídeo” ficou mais bonito: uma pílula de vidro clara, com o ícone num círculo branco (antes era uma faixa preta achatada).' },
     ],
   },

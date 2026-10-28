@@ -268,7 +268,7 @@ body.performance .palco-ctrl:hover, body.performance .palco-ctrl:focus-within { 
 .chip:hover { background: var(--surface-3); }
 .chip[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 .chip.sm { height: 24px; padding: 0 9px; font-size: 12px; cursor: default; }
-.chip.key { background: var(--accent-soft); color: var(--accent-ink); }
+.chip.key { background: color-mix(in srgb, var(--text) 9%, transparent); color: var(--muted); } /* cinza: um indicador, não um botão */
 a.chip.sm { cursor: pointer; }
 
 /* ============================================================ títulos, prateleiras e cartões */
@@ -334,7 +334,7 @@ a.chip.sm { cursor: pointer; }
 .track .s { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
 .track .acts { display: flex; align-items: center; }
 .track.clickable { cursor: pointer; }
-@media (max-width: 600px) { .track .acts .icon-btn { width: 32px; height: 32px; } .track.set-item .chip.key { display: none; } .track .n { display: none; } }
+@media (max-width: 600px) { .track .acts .icon-btn { width: 32px; height: 32px; } .track .n { display: none; } }
 
 /* ============================================================ cabeçalho de página (capa grande) */
 .page-hero { display: flex; gap: 22px; align-items: flex-end; padding: 8px 0 22px; }
@@ -1354,7 +1354,7 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 
 /* indicadores pequenos nas listas: tem cifra / tem vídeo */
 .ind { display: inline-flex; gap: 3px; margin-right: 6px; vertical-align: -2px; }
-.ind-i { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 5px; background: var(--accent-soft); color: var(--accent-ink); }
+.ind-i { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 5px; background: color-mix(in srgb, var(--text) 9%, transparent); color: var(--muted); }
 .ind-i svg { width: 11px; height: 11px; }
 
 /* hinários e formação (Junior Música Católica): tudo abre no app */
