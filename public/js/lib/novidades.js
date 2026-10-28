@@ -3,6 +3,12 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 247, data: '2026-10-28', titulo: 'Letra sem rolagem de lado',
+    itens: [
+      { tipo: 'correcao', texto: 'A letra do Tocando agora não cria mais uma barra de rolagem na horizontal: a frase de agora não passa da borda, as frases quebram a linha antes, a letra ficou um pouco menor no celular e a barra de rolagem não aparece.' },
+    ],
+  },
+  {
     versao: 246, data: '2026-10-28', titulo: 'Play normal e letra toda em branco',
     itens: [
       { tipo: 'correcao', texto: 'A letra sincronizada do Tocando agora fica toda em branco: as próximas frases não aparecem mais em preto (a cantada fica mais apagada e a de agora acesa).' },

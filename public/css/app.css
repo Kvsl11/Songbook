@@ -2961,8 +2961,11 @@ html.pp #player .pl-letra-cab { display: flex; align-items: center; justify-cont
 html.pp #player .pl-letra h3 { margin: 0; font-size: 17px; font-weight: 800; }
 html.pp #player .pl-letra-bts { display: flex; gap: 8px; }
 html.pp #player .pl-letra-cab .icon-btn { width: 34px; height: 34px; background: rgb(0 0 0 / 0.25); }
-html.pp #player .pl-linhas { flex: 1; min-height: 0; overflow-y: auto; scroll-behavior: smooth; }
-html.pp #player .pl-linhas p { margin: 0 0 12px; font-size: 21px; font-weight: 800; line-height: 1.3; color: rgb(255 255 255 / 0.95); }
+/* a letra só rola na vertical: a frase de agora cresce um pouco (scale) e passava da borda, criando uma rolagem de lado;
+   as frases quebram a linha antes da borda e a barra de rolagem fica escondida */
+html.pp #player .pl-linhas { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; scroll-behavior: smooth; scrollbar-width: none; }
+html.pp #player .pl-linhas::-webkit-scrollbar { display: none; }
+html.pp #player .pl-linhas p { margin: 0 0 12px; padding-right: 4%; overflow-wrap: anywhere; font-size: 21px; font-weight: 800; line-height: 1.3; color: rgb(255 255 255 / 0.95); }
 /* letra sincronizada: tudo em branco — a que vem um pouco mais suave, a cantada mais apagada e a de agora acesa */
 html.pp #player .pl-letra.sincronizada .pl-linhas p { color: rgb(255 255 255 / 0.78); cursor: pointer; transform-origin: left center; transition: color 0.18s, transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
 html.pp #player .pl-letra.sincronizada .pl-linhas p.cantada { color: rgb(255 255 255 / 0.5); }
@@ -3036,7 +3039,7 @@ html.pp:not(.tablet) body.painel-cheio #player .pl-recolher { display: grid; }
   html.pp:not(.tablet) body.painel-cheio #player .pl-ctrl { padding: 0; }
   html.pp:not(.tablet) body.painel-cheio #player .pl-play { width: 64px; height: 64px; }
   html.pp:not(.tablet) body.painel-cheio #player .pl-letra { min-height: 280px; max-height: 60dvh; }
-  html.pp:not(.tablet) body.painel-cheio #player .pl-letra .pl-linhas p { font-size: 22px; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-letra .pl-linhas p { font-size: 20px; }
   html.pp:not(.tablet) body.painel-cheio #player .pl-extra { grid-template-columns: minmax(0, 1fr); }
 }
 /* no computador o topo é o botão do painel (voltar à barra), de onde toca e os ⋮, como no tablet deitado */
