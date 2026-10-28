@@ -3115,6 +3115,10 @@ html.pp #player .pl-letra-nome small { font-size: 15px; color: rgb(255 255 255 /
 html.pp #player.letra-cheia .pl-linhas { overflow-y: auto; padding: 14px 0 30%;
   -webkit-mask-image: linear-gradient(180deg, transparent, #000 5%, #000 92%, transparent); mask-image: linear-gradient(180deg, transparent, #000 5%, #000 92%, transparent); }
 html.pp #player.letra-cheia .pl-linhas p { font-size: calc(26px * var(--font-scale)); margin-bottom: 18px; }
+/* tablet (também em pé) e computador: a letra na tela toda maior, como na página da música (32px), com e sem cifra */
+@media (min-width: 768px) {
+  html.pp #player.letra-cheia .pl-linhas p, html.pp #player.letra-cheia .pl-cifra .song.lyrics-mode { font-size: calc(32px * var(--font-scale)); }
+}
 html.pp #player.letra-cheia .pl-letra-pe { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; flex: none; padding-top: 6px; }
 html.pp #player .pl-letra-pe > * { grid-area: auto; order: 0; } /* a barra do tempo tem grid-area e order da barra do player */
 html.pp #player .pl-letra-bts2 { display: flex; align-items: center; margin: 0 -8px; }
