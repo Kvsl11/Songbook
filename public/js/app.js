@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-262';
+export const APP_VERSAO = '2026.10.28-263';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1017,16 +1017,36 @@ const player = (() => {
     tempos = sinc?.tempos || null;
     linhasDaLetra = linhas;
     linhaAcesa = -2;
+    acesaChave = '';
     $('.pl-frase', el).hidden = !tempos;
     $('.pl-letra', el).hidden = !linhas.length;
     $('.pl-letra', el).classList.toggle('sincronizada', Boolean(tempos));
-    $('.pl-linhas', el).innerHTML = linhas.map((l, k) => `${marcas.has(k) ? `<h4 class="pl-parte">${esc(marcas.get(k))}</h4>` : ''}<p data-k="${k}">${esc(l)}</p>`).join('');
+    // na letra sincronizada, as partes só de música (a introdução e as pausas de 4 s ou mais entre as frases, e o fim)
+    // ganham as notinhas ♪, que acendem e pulam enquanto tocam
+    const nota = (id) => `<p class="pl-pausa" data-pausa="${id}" aria-label="Só música"><i>♪</i><i>♪</i><i>♪</i></p>`;
+    const pausaAntes = (k) => tempos && (k === 0 ? tempos[0].inicio >= PAUSA_MUSICA : tempos[k].inicio - tempos[k - 1].fim >= PAUSA_MUSICA);
+    $('.pl-linhas', el).innerHTML = linhas.map((l, k) => `${marcas.has(k) ? `<h4 class="pl-parte">${esc(marcas.get(k))}</h4>` : ''}${pausaAntes(k) ? nota(k) : ''}<p data-k="${k}">${esc(l)}</p>`).join('')
+      + (tempos?.length ? nota('fim') : '');
+    // sem sincronia: procura sozinha a letra sincronizada no LRCLIB (grátis, sem servidor), uma vez por vídeo
+    if (!sinc && song && atual?.youtube && !atual.semVideo && !lrclibTentado.has(atual.youtube)) {
+      lrclibTentado.add(atual.youtube);
+      sincronizarMusica(alvoDaMusica(song), { soLrclib: true, sozinho: true });
+    }
   };
+  const PAUSA_MUSICA = 4;
+  const lrclibTentado = new Set();
+  // a música para sincronizar: a salva, ou a prévia da busca com os dados que a página da música calcula
+  const alvoDaMusica = (song) => {
+    if (song !== preview) return song;
+    const m = renderSong(song.content).meta;
+    return { ...song, id: 'previa', title: m.title || atual?.titulo || '', artist: m.artist || '', youtube: youtubeId(m.youtube) || atual?.youtube };
+  };
+  let acesaChave = ''; // o que está aceso agora: a linha (o número) ou a pausa ("p" e o número)
   let linhaAcesa = -1;
   // a linha cantada fica a um terço da caixa (no cartão, que não rola com o dedo, e na letra na tela toda)
   const rolarLetra = (behavior = 'smooth') => {
     const caixa = $('.pl-linhas', el);
-    const p = caixa.querySelector(`p[data-k="${linhaAcesa}"]`);
+    const p = caixa.querySelector('p.agora') || caixa.querySelector(`p[data-k="${linhaAcesa}"]`);
     if (p) caixa.scrollTo({ top: p.offsetTop - caixa.clientHeight / 3, behavior });
   };
   // a letra na tela toda, como no Spotify: o nome em cima, a letra inteira rolando e, embaixo, compartilhar, os ⋮, a
@@ -1043,19 +1063,35 @@ const player = (() => {
   };
   setInterval(() => {
     if (!tempos || !atual || el.hidden) return;
-    const k = linhaNoTempo(tempos, api.tempoAgora);
-    if (k === linhaAcesa) return;
+    const t = api.tempoAgora;
+    const k = linhaNoTempo(tempos, t);
+    const caixa = $('.pl-linhas', el);
+    // numa parte só de música (antes da 1ª frase, numa pausa longa ou depois da última), acendem as notinhas dela
+    let pausa = null;
+    if (k < 0) pausa = '0';
+    else if (t > tempos[k].fim + 0.6) pausa = k + 1 < tempos.length ? String(k + 1) : 'fim';
+    if (pausa !== null && !caixa.querySelector(`[data-pausa="${pausa}"]`)) pausa = null;
+    const chave = pausa !== null ? 'p' + pausa : String(k);
+    if (chave === acesaChave) return;
+    acesaChave = chave;
     linhaAcesa = k;
     // a frase cantada agora, acima do nome (como no Spotify); entre uma frase e outra, a notinha
-    $('.pl-frase', el).textContent = (k >= 0 && linhasDaLetra[k]) || '♪';
-    const caixa = $('.pl-linhas', el);
-    caixa.querySelectorAll('p').forEach((p, i) => { p.classList.toggle('agora', i === k); p.classList.toggle('cantada', i < k); });
+    $('.pl-frase', el).textContent = (pausa === null && k >= 0 && linhasDaLetra[k]) || '♪';
+    caixa.querySelectorAll('p[data-k]').forEach((p) => {
+      const i = Number(p.dataset.k);
+      p.classList.toggle('agora', pausa === null && i === k);
+      p.classList.toggle('cantada', i < k || (pausa !== null && i === k));
+    });
+    caixa.querySelectorAll('p[data-pausa]').forEach((p) => {
+      p.classList.toggle('agora', p.dataset.pausa === pausa);
+      p.classList.toggle('cantada', p.dataset.pausa !== 'fim' && p.dataset.pausa !== pausa && Number(p.dataset.pausa) <= k);
+    });
     rolarLetra();
   }, 80);
   el.addEventListener('click', (e) => {
     // no cartão, tocar na letra abre ela na tela toda; na tela toda, tocar numa linha leva o vídeo para ela
     if (e.target.closest('.pl-linhas') && !el.classList.contains('letra-cheia')) { letraCheia(true); return; }
-    const p = e.target.closest('.pl-linhas p');
+    const p = e.target.closest('.pl-linhas p[data-k]');
     if (p && tempos?.[p.dataset.k]) api.irPara(Math.max(0, tempos[p.dataset.k].inicio - 0.3));
   });
   // cria o vídeo (só quando muda de vídeo)
@@ -1467,8 +1503,7 @@ const player = (() => {
   // sincronizar pela letra do Tocando agora: o andamento aparece embaixo do nome, em cima da letra (a prévia da busca
   // ganha os dados que a página da música calcula: título, artista e vídeo)
   const sincronizarDoPlayer = (song, refazer) => {
-    const m = song === preview ? renderSong(song.content).meta : null;
-    const alvo = m ? { ...song, id: 'previa', title: m.title || atual.titulo, artist: m.artist || '', youtube: youtubeId(m.youtube) || atual.youtube } : song;
+    const alvo = alvoDaMusica(song);
     let volta = 0;
     const status = (tipo, texto) => {
       const sm = $('.pl-letra-nome small', el);
@@ -8693,12 +8728,13 @@ const tentouSincronizar = new Set();
 // que ouve o áudio. Serve a página da música e o Tocando agora (⋯ da letra); status(tipo, texto, acao) mostra o andamento
 const ETAPAS_SINC = { baixando: 'Baixando o áudio do vídeo…', separando: 'Separando a voz…', ouvindo: 'Ouvindo a letra no vídeo…', alinhando: 'Acertando cada linha…', fila: 'Esperando a vez no servidor…' };
 const sincronizando = new Set();
-async function sincronizarMusica(song, { sozinho = false, refazer = false, status = () => {} } = {}) {
+// soLrclib: a busca automática do Tocando agora (só o LRCLIB: sem servidor e sem avisos)
+async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrclib = false, status = () => {} } = {}) {
   if (sincronizando.has(song.id)) return;
   const cantadas = linhasCantadas(song.content).map(linhaSemCifra).filter(Boolean);
   if (!cantadas.length) { if (!sozinho) status('erro', 'Esta música não tem letra para sincronizar'); return; }
   sincronizando.add(song.id);
-  tentouSincronizar.add(song.youtube);
+  if (!soLrclib) tentouSincronizar.add(song.youtube);
   const isPreview = song.id === 'previa';
   const aqui = isPreview ? '' : `#/musica/${song.id}`;
   const guardar = (sinc) => {
@@ -8717,10 +8753,11 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, statu
       sincronizando.delete(song.id);
       status('ok', `Letra sincronizada: ${lrc.linhas.length} linhas (LRCLIB). Dê play e ela acompanha.`,
         `<button class="btn small" data-sinc="de-novo" data-refazer="1">${icon('refresh', 14)} Ficou fora do tempo? Ouvir o vídeo</button>`);
-      notificar('Dê play: a letra acompanha, e tocar numa linha vai até ela.', { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
+      if (!sozinho) notificar('Dê play: a letra acompanha, e tocar numa linha vai até ela.', { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
       return;
     }
   }
+  if (soLrclib) { sincronizando.delete(song.id); return; }
   if (!servidorIA().url) {
     sincronizando.delete(song.id);
     if (!sozinho) status('erro', refazer ? 'O servidor da IA não está disponível agora. Tente de novo daqui a pouco.'

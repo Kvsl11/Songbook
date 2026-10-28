@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 263, data: '2026-10-28', titulo: 'Letra que acompanha a música',
+    itens: [
+      { tipo: 'novo', texto: 'Ao tocar uma música, o app procura sozinho a letra sincronizada (LRCLIB, sem servidor): o cartão da letra passa a acompanhar o que está sendo cantado.' },
+      { tipo: 'melhoria', texto: 'A frase de agora fica em branco, maior e com relevo; as outras mais apagadas.' },
+      { tipo: 'novo', texto: 'Nas partes só de música (introdução, solos e o fim) aparecem as notinhas ♪, que pulam enquanto tocam.' },
+    ],
+  },
+  {
     versao: 262, data: '2026-10-28', titulo: 'Ver a cifra de novo',
     itens: [
       { tipo: 'correcao', texto: '"Abrir a cifra" (no ⋯ das listas) abre a página com os acordes, sem o Tocando agora por cima.' },
@@ -65,14 +73,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'Abrindo uma música da Busca, o vídeo vem junto: a busca de vídeos pergunta a todos os servidores ao mesmo tempo (antes esperava os que estavam fora do ar) e começa junto com a cifra.' },
       { tipo: 'correcao', texto: 'Se o vídeo chega depois de a música abrir, o Tocando agora já aberto passa a tocá-lo (antes ficava em "Escolher um vídeo").' },
       { tipo: 'correcao', texto: 'No celular, "Mudar para música" volta a mostrar os quadros do clipe passando atrás da parte de cima, até o cartão da letra (uma preferência do painel do tablet desligava isso).' },
-    ],
-  },
-  {
-    versao: 253, data: '2026-10-28', titulo: 'A música da busca vem completa e salva de qualquer jeito',
-    itens: [
-      { tipo: 'correcao', texto: 'Na Busca, o salvar do Tocando agora funciona também na música sem vídeo e na que veio de um vídeo (antes não fazia nada).' },
-      { tipo: 'melhoria', texto: 'Abrindo um vídeo da Busca, o app descobre qual música é e traz junto a letra e a cifra dela (do Cifra Club e do Letras).' },
-      { tipo: 'melhoria', texto: 'Abrindo uma música da Busca, o vídeo vem junto: se a busca de vídeos não responder, vale o vídeo que o Cifra Club ou o Letras mostram com a música.' },
     ],
   },
 ];
