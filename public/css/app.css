@@ -3014,9 +3014,22 @@ html.pp #player .pl-linhas .pl-parte { display: inline-block; margin: 6px 0 8px;
 html.pp #player .pl-linhas .pl-parte:first-child { margin-top: 0; }
 html.pp #player.letra-cheia .pl-linhas .pl-parte { font-size: 14px; margin-top: 10px; }
 /* letra sincronizada: tudo em branco — a que vem um pouco mais suave, a cantada mais apagada e a de agora acesa */
-html.pp #player .pl-letra.sincronizada .pl-linhas p { color: rgb(255 255 255 / 0.78); cursor: pointer; transform-origin: left center; transition: color 0.18s, transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
-html.pp #player .pl-letra.sincronizada .pl-linhas p.cantada { color: rgb(255 255 255 / 0.5); }
-html.pp #player .pl-letra.sincronizada .pl-linhas p.agora { color: #fff; transform: scale(1.03); text-shadow: 0 0 16px rgb(255 255 255 / 0.3); animation: linha-salta 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+/* letra sincronizada: as próximas frases mais apagadas, as cantadas ainda mais; a de agora em branco, maior e com relevo
+   (sombra embaixo e um brilho em volta), como no Spotify */
+html.pp #player .pl-letra.sincronizada .pl-linhas p { color: rgb(255 255 255 / 0.5); cursor: pointer; transform-origin: left center; transition: color 0.25s, transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.3), text-shadow 0.25s; }
+html.pp #player .pl-letra.sincronizada .pl-linhas p.cantada { color: rgb(255 255 255 / 0.32); }
+html.pp #player .pl-letra.sincronizada .pl-linhas p.agora { color: #fff; transform: scale(1.04);
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.35), 0 3px 8px rgb(0 0 0 / 0.35), 0 0 22px rgb(255 255 255 / 0.45); animation: linha-salta 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+/* partes só de música: três notinhas; enquanto tocam, acendem e pulam uma depois da outra */
+html.pp #player .pl-linhas p.pl-pausa { display: flex; gap: 10px; cursor: default; color: rgb(255 255 255 / 0.32); font-size: 22px; }
+html.pp #player .pl-linhas p.pl-pausa i { font-style: normal; display: inline-block; }
+html.pp #player .pl-letra.sincronizada .pl-linhas p.pl-pausa.agora { color: #fff; transform: none; animation: none;
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.35), 0 0 18px rgb(255 255 255 / 0.5); }
+html.pp #player .pl-linhas p.pl-pausa.agora i { animation: nota-pula 1.2s ease-in-out infinite; }
+html.pp #player .pl-linhas p.pl-pausa.agora i:nth-child(2) { animation-delay: 0.2s; }
+html.pp #player .pl-linhas p.pl-pausa.agora i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes nota-pula { 0%, 100% { transform: translateY(0); opacity: 0.55; } 40% { transform: translateY(-7px); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { html.pp #player .pl-linhas p.pl-pausa.agora i { animation: none; } }
 #player .pl-letra-topo, #player .pl-letra-pe, #player .pl-cab, #player .pl-letra, #player .pl-salva, #player .pl-extra, #player .pl-frase, #player .pl-troca, #player .pl-acoes { display: none; }
 #player .pl-meio { display: contents; }
 /* a letra na tela toda (o expandir do cartão), como no Spotify: em cima a setinha (fechar), o nome e o artista; no meio
@@ -3032,6 +3045,10 @@ body.com-letra-cheia .nav { display: none; }
 html.pp #player.letra-cheia .pl-letra-cab { display: none; }
 html.pp #player.letra-cheia .pl-letra-topo { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; align-items: center; min-height: 56px; margin: 0 -8px 4px; }
 html.pp #player .pl-letra-topo .icon-btn { width: 48px; height: 48px; color: #fff; }
+/* "Cifra", à direita do nome: fecha a letra e mostra a página da música com os acordes */
+#player .pl-ver-cifra { justify-self: end; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; margin-right: 8px; border: 0; border-radius: 999px;
+  background: rgb(255 255 255 / 0.16); color: #fff; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+html.pp #player.letra-cheia .pl-letra-topo { grid-template-columns: 48px minmax(0, 1fr) auto; }
 html.pp #player .pl-letra-nome { min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
 html.pp #player .pl-letra-nome b, html.pp #player .pl-letra-nome small { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html.pp #player .pl-letra-nome b { font-size: 17px; font-weight: 800; }
