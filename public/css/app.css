@@ -3435,3 +3435,26 @@ a.nt-txt span { text-decoration: underline; text-decoration-color: color-mix(in 
   main { --gutter: 20px; }
   .topbar { padding-left: 18px; padding-right: 18px; }
 }
+
+/* ---------------------------------------------------------------- os ⋮ de uma música (como no Spotify): uma folha que
+   sobe de baixo, com a alça, a capa e o nome em cima e as ações numa coluna só */
+.track .mais-linha { color: var(--muted); }
+.track .mais-linha:hover { color: var(--text); }
+.track .mais-linha svg { transform: rotate(90deg); }
+dialog.lista-menu { padding: 0; }
+.lista-cab.menu-cab { position: relative; justify-content: flex-start; gap: 12px; padding: 22px 20px 14px; border-bottom: 1px solid var(--border); }
+.menu-cab .cover { width: 48px; height: 48px; flex: none; border-radius: 4px; }
+.menu-cab .lista-txt b { font-size: 16.5px; }
+.menu-cab .lista-txt small { font-size: 14px; }
+.menu-alca { position: absolute; top: 8px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--subtle, rgb(255 255 255 / 0.3)); }
+dialog.lista-menu .lista-opcoes { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 6px 8px 12px; }
+dialog.lista-menu .lista-op { gap: 16px; padding: 13px 12px; font-size: 16px; }
+dialog.lista-menu .lista-ic { width: 24px; height: 24px; background: none; border-radius: 0; color: var(--text); }
+dialog.lista-menu .lista-ic svg { width: 22px; height: 22px; }
+dialog.lista-menu .lista-txt b { font-weight: 600; }
+dialog.lista-menu .lista-op.perigo, dialog.lista-menu .lista-op.perigo .lista-ic { color: var(--danger); }
+@media (min-width: 700px) {
+  dialog.lista-menu { width: min(520px, calc(100% - 48px)); margin: auto auto 0; max-height: min(78vh, 720px); border-radius: 18px 18px 0 0; }
+  dialog.lista-menu[open] { animation: menu-subir 0.22s ease; }
+  dialog.lista-menu .lista-opcoes { padding: 6px 12px 20px; }
+}

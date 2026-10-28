@@ -3,6 +3,12 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 238, data: '2026-10-28', titulo: 'Os ⋮ nas listas de música',
+    itens: [
+      { tipo: 'melhoria', texto: 'Nas listas de música (biblioteca, repertórios e playlists), cada música agora tem só os ⋮, como no Spotify. Tocar neles abre uma folha com a capa e o nome e todas as opções: compartilhar, adicionar a uma playlist ou repertório, remover desta playlist, parte da missa, tocar, abrir e editar a cifra, ir para o artista e excluir da biblioteca.' },
+    ],
+  },
+  {
     versao: 237, data: '2026-10-28', titulo: 'O Tocando agora do tablet igual ao Spotify',
     itens: [
       { tipo: 'melhoria', texto: 'No tablet, o painel Tocando agora ganhou o jeito do Spotify: no topo, o botão do painel, o minimizar e os ⋮ com mais opções; embaixo do vídeo, o nome com o ✓ da biblioteca, a barra com a bolinha, os controles de ponta a ponta e uma linha com ouvir em outro aparelho, compartilhar e a fila.' },
