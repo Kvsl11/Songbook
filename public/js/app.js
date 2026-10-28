@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.22-235';
+export const APP_VERSAO = '2026.10.28-236';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -186,6 +186,13 @@ function toast(msg, opcoes = {}) {
   const ultima = notificacoes[0];
   if (ultima && !ultima.lida && ultima.titulo === titulo && ultima.texto === detalhe && Date.now() - ultima.t < 10000) return;
   notificar(detalhe, { tipo, titulo });
+}
+// compartilhar pelo sistema (WhatsApp, e-mail…); sem isso, copia o texto
+async function compartilhar(dados) {
+  if (navigator.share) {
+    try { await navigator.share(dados); return; } catch (e) { if (e?.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText([dados.text, dados.url].filter(Boolean).join('\n')); toast('Copiado: é só colar onde quiser'); } catch { toast('Não consegui compartilhar'); }
 }
 
 // ---------------------------------------------------------------- notificações (o sininho do topo)
@@ -685,9 +692,13 @@ const player = (() => {
   el.hidden = true;
   el.innerHTML = `
     <div class="pl-video"></div>
-    <button class="pl-info" data-pl="abrir" title="Abrir a música"><span class="pl-txt"><b></b><small></small></span></button>
-    <div class="pl-ctrl">
+    <p class="pl-frase" hidden></p>
+    <button class="pl-troca" data-pl="troca">${icon('video', 16)}<span>Mudar para capa</span></button>
+    <div class="pl-meio">
+      <button class="pl-info" data-pl="abrir" title="Abrir a música"><span class="pl-txt"><b></b><small></small></span></button>
       <button class="salvar-btn pl-salva" data-pl="salva" hidden></button>
+    </div>
+    <div class="pl-ctrl">
       <button class="icon-btn pl-modo pl-aleat" data-pl="aleatorio" aria-pressed="false" aria-label="Aleatório" title="Aleatório">${icon('shuffle', 18)}</button>
       <button class="icon-btn pl-pulo" data-pl="anterior" aria-label="Música anterior" title="Anterior">${icon('skipBack', 18)}</button>
       <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button>
@@ -699,9 +710,18 @@ const player = (() => {
       <button class="icon-btn" data-pl="ampliar" aria-label="Ampliar o vídeo" title="Ampliar o vídeo">${icon('expand', 18)}</button>
       <button class="icon-btn" data-pl="fechar" aria-label="Fechar o player" title="Fechar">${icon('x', 18)}</button>
     </div>
-    <div class="pl-cab"><button class="icon-btn" data-pl="expandir" aria-label="Expandir o Tocando agora" title="Expandir">${icon('expand', 20)}</button>
-      <span><small>Tocando agora</small><b></b></span><button class="icon-btn" data-pl="recolher" aria-label="Minimizar o painel" title="Minimizar">${icon('down', 22)}</button></div>
-    <section class="pl-letra" hidden><div class="pl-letra-cab"><h3>Letra</h3><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></div><div class="pl-linhas"></div></section>
+    <div class="pl-cab">
+      <span class="pl-cab-esq"><button class="icon-btn" data-pl="expandir" aria-label="Expandir o Tocando agora" title="Expandir">${icon('sidebar', 20)}</button>
+        <button class="icon-btn pl-recolher" data-pl="recolher" aria-label="Minimizar o painel" title="Minimizar">${icon('down', 22)}</button></span>
+      <span class="pl-cab-meio"><small>Tocando agora</small><b></b></span>
+      <span class="pl-cab-dir"><button class="icon-btn pl-mais" data-pl="menu" aria-label="Mais opções" title="Mais opções">${icon('more', 20)}</button></span></div>
+    <div class="pl-acoes">
+      <button class="icon-btn" data-pl="aparelhos" aria-label="Ouvir em outro aparelho" title="Ouvir em outro aparelho">${icon('aparelhos', 20)}</button>
+      <span class="grow"></span>
+      <button class="icon-btn" data-pl="compartilhar" aria-label="Compartilhar" title="Compartilhar">${icon('share', 20)}</button>
+      <button class="icon-btn" data-pl="fila" aria-label="Fila" title="Fila">${icon('queue', 20)}</button>
+    </div>
+    <section class="pl-letra" hidden><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-linhas"></div></section>
     <div class="pl-extra" hidden></div>`;
   // no tablet o player é o painel "Tocando agora" à direita, fora da coluna principal (que não o corta)
   const casa = ehTablet() ? document.body : $('.main-col');
@@ -714,6 +734,9 @@ const player = (() => {
   tela.hidden = true;
   casa.append(tela);
   const mini = $('.pl-video', el); // espaço reservado no mini player
+  // tablet, como o "Mudar para vídeo" do Spotify: a capa no lugar do vídeo (o vídeo continua tocando, só não aparece)
+  let comCapa = Boolean(db.prefs().playerCapa);
+  const modoCapa = () => comCapa && document.documentElement.classList.contains('tablet');
   // a música tocando é esta?
   const desta = (id) => Boolean(atual && id && atual.youtube === id);
   const noPalco = () => Boolean(atual && palco?.isConnected && desta(palcoDe));
@@ -764,7 +787,7 @@ const player = (() => {
     const r = a?.isConnected ? a.getBoundingClientRect() : null;
     if (!r || !r.width || !r.height) { tela.style.visibility = 'hidden'; return; }
     const base = tela.parentElement.getBoundingClientRect();
-    tela.style.visibility = 'visible';
+    tela.style.visibility = modoCapa() && !noPalco() ? 'hidden' : 'visible';
     tela.style.transform = `translate(${r.left - base.left}px, ${r.top - base.top}px)`;
     tela.style.width = r.width + 'px';
     tela.style.height = r.height + 'px';
@@ -806,14 +829,26 @@ const player = (() => {
     const deQual = f ? atual.setId || 'biblioteca' : '';
     if (filaDe !== deQual) { filaDe = deQual; tocadas = new Set(f ? [f.i] : []); historico = []; }
     el.classList.toggle('com-fila', Boolean(f));
+    $('[data-pl="aleatorio"]', el).disabled = !f;
+    desenharCapa();
     $('[data-pl="anterior"]', el).disabled = !f || (anteriorIndice() < 0 && tempo < 3);
     $('[data-pl="proxima"]', el).disabled = !f || proximoIndice() < 0;
     desenharModos();
     $('.pl-t0', el).textContent = duracao ? fmt(tempo) : '';
     $('.pl-t1', el).textContent = duracao ? fmt(duracao) : '';
-    $('.pl-cab b', el).textContent = atual.setId ? db.set(atual.setId)?.name || '' : atual.parte || '';
+    $('.pl-cab-meio b', el).textContent = atual.setId ? db.set(atual.setId)?.name || '' : atual.parte || '';
     desenharLetra();
     desenharExtra();
+  };
+  // a capa (no modo capa): a da música ou o quadro do vídeo; o botão de trocar diz para o que vai
+  const desenharCapa = () => {
+    const capa = modoCapa();
+    el.classList.toggle('modo-capa', capa);
+    const url = atual?.capa && /^(https?:|data:)/.test(atual.capa) ? atual.capa : atual?.youtube ? `https://i.ytimg.com/vi/${atual.youtube}/hqdefault.jpg` : '';
+    mini.style.backgroundImage = capa && url ? `url("${url}")` : '';
+    mini.classList.toggle('capa-yt', capa && !(atual?.capa && /^(https?:|data:)/.test(atual.capa)));
+    const b = $('.pl-troca', el);
+    b.innerHTML = `${icon(capa ? 'video' : 'disc', 16)}<span>${capa ? 'Mudar para vídeo' : 'Mudar para capa'}</span>`;
   };
   // embaixo da letra, no painel do tablet (como os cartões do "Tocando agora" do Spotify): o artista com a foto,
   // os créditos (quem canta, compôs, o tom, de onde veio a cifra) e o vídeo, com o que dá para fazer em cada um
@@ -872,6 +907,7 @@ const player = (() => {
   // cantada acende e o painel rola junto (tocar numa linha leva o vídeo para ela)
   let letraDe = '';
   let tempos = null;
+  let linhasDaLetra = [];
   const desenharLetra = () => {
     if (!document.documentElement.classList.contains('tablet')) return;
     const song = atual?.songId && db.song(atual.songId);
@@ -881,6 +917,9 @@ const player = (() => {
     const sinc = song?.sincronia?.video === atual?.youtube ? song.sincronia : null;
     const linhas = sinc ? sinc.linhas : song ? linhasCantadas(song.content).map(linhaSemCifra).filter(Boolean) : [];
     tempos = sinc?.tempos || null;
+    linhasDaLetra = linhas;
+    linhaAcesa = -2;
+    $('.pl-frase', el).hidden = !tempos;
     $('.pl-letra', el).hidden = !linhas.length;
     $('.pl-letra', el).classList.toggle('sincronizada', Boolean(tempos));
     $('.pl-linhas', el).innerHTML = linhas.map((l, k) => `<p data-k="${k}">${esc(l)}</p>`).join('');
@@ -891,6 +930,8 @@ const player = (() => {
     const k = linhaNoTempo(tempos, api.tempoAgora);
     if (k === linhaAcesa) return;
     linhaAcesa = k;
+    // a frase cantada agora, acima do nome (como no Spotify); entre uma frase e outra, a notinha
+    $('.pl-frase', el).textContent = (k >= 0 && linhasDaLetra[k]) || '♪';
     const caixa = $('.pl-linhas', el);
     caixa.querySelectorAll('p').forEach((p, i) => { p.classList.toggle('agora', i === k); p.classList.toggle('cantada', i < k); });
     const p = caixa.querySelector(`p[data-k="${k}"]`);
@@ -1114,11 +1155,48 @@ const player = (() => {
       if (antes !== estado) avisar();
     } catch { /* mensagem de outro formato */ }
   });
+  // a fila (o repertório ou a biblioteca): tocar numa música toca ela
+  const abrirFila = async () => {
+    const f = fila();
+    if (!f) { toast('Esta música não está numa fila: salve-a na biblioteca ou toque de um repertório'); return; }
+    const opcoes = f.ids.map((id, i) => ({ i, s: db.song(id) })).filter(({ s }) => s?.youtube).map(({ i, s }) => ({
+      valor: i, rotulo: s.title, sub: [f.set?.items[i]?.label, s.artist].filter(Boolean).join(' · '), ic: i === f.i ? 'onda' : 'music',
+    }));
+    const i = await escolherNaLista({ titulo: f.set ? `Fila · ${f.set.name}` : 'Fila · Biblioteca', opcoes, atual: f.i });
+    if (i === undefined || i === f.i || !atual) return;
+    historico.push(f.i);
+    tocadas.add(i);
+    api.tocar(itemDoPlayer(db.song(f.ids[i]), f.set, f.set ? i : -1));
+  };
+  // os "⋮" do topo do painel
+  const abrirMenu = async () => {
+    if (!atual) return;
+    const salva = Boolean(atual.songId && db.song(atual.songId));
+    const opcoes = [
+      (atual.href || atual.abrir) && { valor: 'abrir', rotulo: 'Abrir a música', ic: 'music' },
+      { valor: 'salva', rotulo: salva ? 'Adicionar a um repertório' : 'Salvar na biblioteca', ic: salva ? 'plus' : 'download' },
+      { valor: 'fila', rotulo: 'Ver a fila', ic: 'queue' },
+      salva && { valor: 'trocar', rotulo: 'Trocar o vídeo', ic: 'refresh' },
+      { valor: 'troca', rotulo: modoCapa() ? 'Mudar para vídeo' : 'Mudar para capa', ic: modoCapa() ? 'video' : 'disc' },
+      { valor: 'compartilhar', rotulo: 'Compartilhar', ic: 'share' },
+      { valor: 'youtube', rotulo: 'Abrir no YouTube', ic: 'youtube' },
+      { valor: 'fechar', rotulo: 'Fechar o player', ic: 'x' },
+    ].filter(Boolean);
+    const v = await escolherNaLista({ titulo: atual.titulo || 'Tocando agora', opcoes });
+    if (!v || !atual) return;
+    if (v === 'youtube') { window.open(`https://www.youtube.com/watch?v=${atual.youtube}&t=${Math.floor(api.tempoAgora)}s`, '_blank', 'noopener'); return; }
+    // as outras opções fazem o mesmo que os botões do painel
+    const alvoBt = document.createElement('button');
+    alvoBt.dataset.pl = v;
+    alvoBt.hidden = true;
+    el.append(alvoBt);
+    alvoBt.click();
+    alvoBt.remove();
+  };
   // o "Tocando agora" na tela toda (tablet): o botão do canto de cima troca entre expandir e voltar ao painel
   const painelCheio = (ligar) => {
     document.body.classList.toggle('painel-cheio', ligar);
     const b = $('[data-pl="expandir"]', el);
-    b.innerHTML = icon(ligar ? 'shrink' : 'expand', 20);
     b.title = ligar ? 'Voltar ao painel' : 'Expandir';
     b.setAttribute('aria-label', ligar ? 'Voltar ao painel' : 'Expandir o Tocando agora');
   };
@@ -1151,6 +1229,16 @@ const player = (() => {
       else if (!atual.href && atual.abrir) atual.abrir();
     }
     if (b.dataset.pl === 'proxima') pular(1);
+    if (b.dataset.pl === 'troca') { comCapa = !comCapa; db.setPref('playerCapa', comCapa); desenharCapa(); }
+    if (b.dataset.pl === 'compartilhar' && atual) compartilhar({ title: atual.titulo || 'Vídeo', text: [atual.titulo, atual.artista].filter(Boolean).join(' — '), url: `https://www.youtube.com/watch?v=${atual.youtube}` });
+    if (b.dataset.pl === 'compartilhar-letra' && atual) compartilhar({ title: atual.titulo || 'Letra', text: `${[atual.titulo, atual.artista].filter(Boolean).join(' — ')}\n\n${linhasDaLetra.join('\n')}` });
+    // ouvir em outro aparelho: o vídeo abre no YouTube (de lá vai para a TV ou a caixa de som), do ponto em que está
+    if (b.dataset.pl === 'aparelhos' && atual) {
+      if (estado === 'tocando') api.alternar();
+      window.open(`https://www.youtube.com/watch?v=${atual.youtube}&t=${Math.floor(api.tempoAgora)}s`, '_blank', 'noopener');
+    }
+    if (b.dataset.pl === 'fila') abrirFila();
+    if (b.dataset.pl === 'menu') abrirMenu();
     if (b.dataset.pl === 'aleatorio') {
       aleatorio = !aleatorio;
       db.setPref('aleatorio', aleatorio);
