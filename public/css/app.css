@@ -2963,8 +2963,9 @@ html.pp #player .pl-letra-bts { display: flex; gap: 8px; }
 html.pp #player .pl-letra-cab .icon-btn { width: 34px; height: 34px; background: rgb(0 0 0 / 0.25); }
 html.pp #player .pl-linhas { flex: 1; min-height: 0; overflow-y: auto; scroll-behavior: smooth; }
 html.pp #player .pl-linhas p { margin: 0 0 12px; font-size: 21px; font-weight: 800; line-height: 1.3; color: rgb(255 255 255 / 0.95); }
-html.pp #player .pl-letra.sincronizada .pl-linhas p { color: rgb(0 0 0 / 0.55); cursor: pointer; transform-origin: left center; transition: color 0.18s, transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
-html.pp #player .pl-letra.sincronizada .pl-linhas p.cantada { color: rgb(255 255 255 / 0.55); }
+/* letra sincronizada: tudo em branco — a que vem um pouco mais suave, a cantada mais apagada e a de agora acesa */
+html.pp #player .pl-letra.sincronizada .pl-linhas p { color: rgb(255 255 255 / 0.78); cursor: pointer; transform-origin: left center; transition: color 0.18s, transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+html.pp #player .pl-letra.sincronizada .pl-linhas p.cantada { color: rgb(255 255 255 / 0.5); }
 html.pp #player .pl-letra.sincronizada .pl-linhas p.agora { color: #fff; transform: scale(1.03); text-shadow: 0 0 16px rgb(255 255 255 / 0.3); animation: linha-salta 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
 #player .pl-cab, #player .pl-letra, #player .pl-salva, #player .pl-extra, #player .pl-frase, #player .pl-troca, #player .pl-acoes { display: none; }
 #player .pl-meio { display: contents; }

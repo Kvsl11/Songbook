@@ -3,8 +3,9 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
-    versao: 246, data: '2026-10-28', titulo: 'Música sem vídeo: play normal',
+    versao: 246, data: '2026-10-28', titulo: 'Play normal e letra toda em branco',
     itens: [
+      { tipo: 'correcao', texto: 'A letra sincronizada do Tocando agora fica toda em branco: as próximas frases não aparecem mais em preto (a cantada fica mais apagada e a de agora acesa).' },
       { tipo: 'melhoria', texto: 'Na música sem vídeo, o botão grande voltou a ser o play de sempre (sem o ícone do YouTube). Para tocar, a pílula “Escolher um vídeo” embaixo da capa (ou o próprio play) abre a busca de vídeo do YouTube.' },
     ],
   },
