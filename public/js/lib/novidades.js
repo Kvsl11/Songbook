@@ -3,6 +3,15 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 242, data: '2026-10-28', titulo: 'Tocando agora: letra, busca e aparelhos',
+    itens: [
+      { tipo: 'correcao', texto: 'Expandir a letra no Tocando agora abre a letra na tela toda (antes voltava para o início).' },
+      { tipo: 'melhoria', texto: 'No celular, abrir uma música da Busca ou da Biblioteca já toca e mostra o Tocando agora; fechando (setinha ou voltar), aparece a cifra.' },
+      { tipo: 'novo', texto: 'O botão de aparelhos agora abre o Conectar, como no Spotify: este aparelho com a música tocando, as saídas de som conhecidas e os botões Transmitir na TV e Procurar aparelhos Bluetooth.' },
+      { tipo: 'melhoria', texto: 'O botão Mudar para música / vídeo ficou discreto, como o do Spotify: escuro e translúcido, só o ícone e o texto.' },
+    ],
+  },
+  {
     versao: 241, data: '2026-10-28', titulo: 'Mudar para música',
     itens: [
       { tipo: 'melhoria', texto: 'O botão do Tocando agora agora diz “Mudar para música” (com o ícone de nota) no lugar de “Mudar para capa”; do outro lado continua “Mudar para vídeo”.' },

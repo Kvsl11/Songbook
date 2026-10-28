@@ -2921,14 +2921,13 @@ html.pp #player.modo-capa .pl-video.capa-yt { background-size: auto 134%; }
 html.pp #player .pl-frase { order: 2; margin: 6px 2px 0; font-size: 16px; font-weight: 800; line-height: 1.3; color: #fff; min-height: 1.3em; }
 html.pp #player .pl-frase[hidden] { display: none; }
 /* "Mudar para vídeo / capa": a pílula escura */
-/* a pílula de vidro: clara e translúcida sobre a cor da música, com o ícone num círculo. flex: none — no painel que
-   rola, a coluna espremia a pílula e ela ficava achatada (o fundo preto fininho) */
-html.pp #player .pl-troca { order: 3; flex: none; align-self: flex-start; display: inline-flex; align-items: center; gap: 9px; height: 38px; margin-top: 2px; padding: 0 16px 0 5px;
-  border: 1px solid rgb(255 255 255 / 0.18); border-radius: 999px; background: rgb(255 255 255 / 0.1); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
-  color: #fff; font: 700 14px/1 var(--sans); letter-spacing: 0.01em; cursor: pointer; transition: background 0.2s, border-color 0.2s, transform 0.15s; }
-html.pp #player .pl-troca .pl-troca-ic { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 50%; background: #fff; color: #111; }
-html.pp #player .pl-troca:hover { background: rgb(255 255 255 / 0.18); border-color: rgb(255 255 255 / 0.3); }
-html.pp #player .pl-troca:active { transform: scale(0.96); }
+/* "Mudar para música / vídeo", discreta como a do Spotify: um retângulo escuro translúcido de cantos redondos, só o ícone
+   e o texto. flex: none — no painel que rola, a coluna espremia a pílula e ela ficava achatada */
+html.pp #player .pl-troca { order: 3; flex: none; align-self: flex-start; display: inline-flex; align-items: center; gap: 10px; height: 34px; padding: 0 16px 0 12px;
+  border: 0; border-radius: 12px; background: rgb(0 0 0 / 0.32); color: #fff; font: 700 14.5px/1 var(--sans); cursor: pointer; transition: background 0.2s, transform 0.15s; }
+html.pp #player .pl-troca svg { flex: none; }
+html.pp #player .pl-troca:hover { background: rgb(0 0 0 / 0.45); }
+html.pp #player .pl-troca:active { transform: scale(0.97); }
 html.pp #player > * { flex-shrink: 0; }
 /* o nome e o artista, com o ✓/+ da biblioteca à direita */
 html.pp #player .pl-meio { order: 4; display: flex; align-items: center; gap: 12px; }
@@ -3510,3 +3509,22 @@ dialog.lista-menu .lista-op.perigo, dialog.lista-menu .lista-op.perigo .lista-ic
   dialog.lista-menu[open] { animation: menu-subir 0.22s ease; }
   dialog.lista-menu .lista-opcoes { padding: 6px 12px 20px; }
 }
+
+/* "Conectar" (o botão de aparelhos do player, como no Spotify): este aparelho com a música, as saídas de som e, no
+   pé, transmitir na TV e procurar aparelhos Bluetooth */
+dialog.aparelhos-dlg { min-height: min(70dvh, 560px); }
+dialog.aparelhos-dlg[open] { display: flex; flex-direction: column; }
+.aparelhos-dlg .menu-cab { border-bottom: 0; padding: 28px 20px 8px; }
+.aparelhos-dlg .menu-cab h3 { font-size: 24px; font-weight: 800; }
+.ap-corpo { flex: 1; overflow-y: auto; padding: 4px 12px 12px; }
+.ap-atual { display: flex; align-items: center; gap: 12px; padding: 18px 18px; border-radius: 14px; background: var(--surface-2); }
+.ap-atual .grow { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.ap-atual b { font-size: 22px; font-weight: 800; }
+.ap-atual small { font-size: 15px; color: var(--accent-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-atual svg { color: var(--accent-ink); flex: none; }
+.ap-nada { margin: 14px 8px; color: var(--muted); font-size: 15px; }
+.ap-corpo h4 { margin: 18px 8px 6px; font-size: 14px; color: var(--muted); font-weight: 700; }
+.ap-saida { display: flex; align-items: center; gap: 14px; padding: 12px 8px; font-size: 16px; }
+.ap-botoes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 12px calc(14px + env(safe-area-inset-bottom)); }
+.ap-bt { all: unset; box-sizing: border-box; display: grid; justify-items: center; gap: 8px; padding: 16px 10px; border-radius: 12px; background: var(--surface-2); text-align: center; font-size: 14.5px; cursor: pointer; }
+.ap-bt:hover, .ap-bt:focus-visible { background: var(--surface-3, #333); }

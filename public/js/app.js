@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-241';
+export const APP_VERSAO = '2026.10.28-242';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -170,6 +170,10 @@ let limpezas = [];
 const aoSair = (fn) => limpezas.push(fn);
 // o expandir da letra no painel "Tocando agora": a página da música já abre com a letra na tela toda
 let abrirLetraCheia = false;
+// no celular, a música aberta da Busca ou da Biblioteca abre no "Tocando agora" (tocando), com a cifra embaixo
+let abrirNoTocando = false;
+const telaDeCelular = () => !ehTablet() && matchMedia('(max-width: 899px)').matches;
+function irParaMusica(id) { abrirNoTocando = true; location.hash = '#/musica/' + id; }
 
 // ------------------------------------------------------------------ util
 
@@ -693,7 +697,7 @@ const player = (() => {
   el.innerHTML = `
     <div class="pl-video"></div>
     <p class="pl-frase" hidden></p>
-    <button class="pl-troca" data-pl="troca"><span class="pl-troca-ic">${icon('music', 15)}</span><span>Mudar para música</span></button>
+    <button class="pl-troca" data-pl="troca">${icon('music', 18)}<span>Mudar para música</span></button>
     <div class="pl-meio">
       <button class="pl-info" data-pl="abrir" title="Abrir a música"><span class="pl-txt"><b></b><small></small></span></button>
       <button class="salvar-btn pl-salva" data-pl="salva" hidden></button>
@@ -744,7 +748,7 @@ const player = (() => {
   const modoCapa = () => comCapa && document.documentElement.classList.contains('pp');
   // a música tocando é esta?
   const desta = (id) => Boolean(atual && id && atual.youtube === id);
-  const noPalco = () => Boolean(atual && palco?.isConnected && desta(palcoDe));
+  const noPalco = () => Boolean(atual && palco?.isConnected && desta(palcoDe)) && !document.body.classList.contains('painel-cheio');
   const iframeAtual = () => tela.querySelector('iframe');
   // Na página da música o vídeo toca na telinha das Referências, com os controles do YouTube (dá para pular
   // o anúncio). O topo da música não toca o vídeo: continua só com os quadros do clipe passando.
@@ -853,14 +857,14 @@ const player = (() => {
     mini.style.backgroundImage = capa && url ? `url("${url}")` : '';
     mini.classList.toggle('capa-yt', capa && !(atual?.capa && /^(https?:|data:)/.test(atual.capa)));
     const b = $('.pl-troca', el);
-    b.innerHTML = `<span class="pl-troca-ic">${icon(capa ? 'video' : 'music', 15)}</span><span>${capa ? 'Mudar para vídeo' : 'Mudar para música'}</span>`;
+    b.innerHTML = `${icon(capa ? 'video' : 'music', 18)}<span>${capa ? 'Mudar para vídeo' : 'Mudar para música'}</span>`;
   };
   // embaixo da letra, no painel do tablet (como os cartões do "Tocando agora" do Spotify): o artista com a foto,
   // os créditos (quem canta, compôs, o tom, de onde veio a cifra) e o vídeo, com o que dá para fazer em cada um
   let extraDe = '';
   const desenharExtra = () => {
     if (!document.documentElement.classList.contains('pp')) return;
-    const song = atual?.songId && db.song(atual.songId);
+    const song = musicaTocando();
     const titulo = song?.title || atual?.titulo || '';
     const artista = song?.artist || atual?.artista || '';
     const chave = `${atual?.youtube}|${titulo}|${artista}|${song?.content?.length || 0}`;
@@ -915,7 +919,7 @@ const player = (() => {
   let linhasDaLetra = [];
   const desenharLetra = () => {
     if (!document.documentElement.classList.contains('pp')) return;
-    const song = atual?.songId && db.song(atual.songId);
+    const song = musicaTocando();
     const chave = `${atual?.youtube}|${song?.sincronia?.tempos?.length || 0}|${song?.content?.length || 0}`;
     if (chave === letraDe) return;
     letraDe = chave;
@@ -1002,6 +1006,8 @@ const player = (() => {
     },
     // a página vai ser desenhada de novo: o vídeo sai da telinha antes (senão iria embora com a página velha)
     soltar: () => tirarDaTelinha(),
+    // abre o "Tocando agora" na tela toda (celular e computador; no tablet, o painel expandido)
+    expandir: () => painelCheio(true),
     // a página da música avisa onde fica a telinha do vídeo dela (box) — ou null ao sair da página
     palco(box, youtube = '') {
       tirarDaTelinha(); // a página vai sair (ou ser desenhada de novo): o vídeo volta para fora antes
@@ -1029,6 +1035,8 @@ const player = (() => {
       avisar();
     },
   };
+  // a música que toca (a da biblioteca ou a prévia aberta da busca, ainda não salva)
+  const musicaTocando = () => (atual?.songId === 'previa' && preview ? preview : atual?.songId && db.song(atual.songId)) || null;
   // a fila: as músicas do repertório de onde veio a música; fora de um repertório, as da biblioteca (na ordem da lista
   // Músicas). i = a posição da música que toca. Música que não está na biblioteca (a prévia de uma busca): sem fila
   const fila = () => {
@@ -1173,6 +1181,47 @@ const player = (() => {
     tocadas.add(i);
     api.tocar(itemDoPlayer(db.song(f.ids[i]), f.set, f.set ? i : -1));
   };
+  // "Conectar" (como no Spotify): onde está tocando — este aparelho, com a música — e as saídas de som que o navegador
+  // conhece (fones Bluetooth, caixas). Embaixo: levar para a TV (o YouTube transmite para TV e Chromecast) e procurar
+  // aparelhos Bluetooth (no Android abre as configurações; nos outros, explica onde fica)
+  const abrirAparelhos = async () => {
+    const tipo = ehTablet() ? ['tablet', 'Este tablet'] : telaDeCelular() ? ['celular', 'Este celular'] : ['computador', 'Este computador'];
+    let saidas = [];
+    try {
+      saidas = (await navigator.mediaDevices.enumerateDevices())
+        .filter((d) => d.kind === 'audiooutput' && d.label && !['default', 'communications'].includes(d.deviceId));
+    } catch { /* o navegador não lista as saídas */ }
+    const dlg = document.createElement('dialog');
+    dlg.className = 'lista-dlg lista-menu aparelhos-dlg';
+    dlg.innerHTML = `<div class="lista-cab menu-cab"><span class="menu-alca" aria-hidden="true"></span><h3>Conectar</h3></div>
+      <div class="ap-corpo">
+        <div class="ap-atual"><span class="grow"><b>${tipo[1]}</b><small>${esc([atual.titulo, atual.artista].filter(Boolean).join(' – '))}</small></span>${icon(tipo[0], 34)}</div>
+        ${saidas.length ? `<h4>Saídas de som</h4>${saidas.map((d) => `<div class="ap-saida">${icon(/bluetooth|buds|fone|headset|airpods|jbl|bose|sony/i.test(d.label) ? 'fone' : 'som', 22)}<span>${esc(d.label)}</span></div>`).join('')}`
+          : '<p class="ap-nada">Nenhum outro aparelho encontrado nesta rede</p>'}
+      </div>
+      <div class="ap-botoes">
+        <button class="ap-bt" data-ap="tv">${icon('tv', 24)}<span>Transmitir na TV</span></button>
+        <button class="ap-bt" data-ap="bt">${icon('bluetooth', 24)}<span>Procurar aparelhos Bluetooth</span></button>
+      </div>`;
+    document.body.append(dlg);
+    dlg.addEventListener('click', (e) => {
+      if (e.target === dlg) { dlg.close(); return; }
+      const ap = e.target.closest('[data-ap]')?.dataset.ap;
+      if (ap === 'tv' && atual) {
+        if (estado === 'tocando') api.alternar();
+        window.open(`https://www.youtube.com/watch?v=${atual.youtube}&t=${Math.floor(api.tempoAgora)}s`, '_blank', 'noopener');
+        toast('No YouTube, toque no ícone de transmitir para mandar para a TV');
+        dlg.close();
+      }
+      if (ap === 'bt') {
+        if (/Android/i.test(navigator.userAgent)) location.href = 'intent:#Intent;action=android.settings.BLUETOOTH_SETTINGS;end';
+        else toast('Ligue o Bluetooth nos ajustes do aparelho e conecte o fone ou a caixa: o som sai por ele');
+        dlg.close();
+      }
+    });
+    dlg.addEventListener('close', () => dlg.remove());
+    dlg.showModal();
+  };
   // os "⋮" do topo do painel
   const abrirMenu = async () => {
     if (!atual) return;
@@ -1201,16 +1250,17 @@ const player = (() => {
   // o "Tocando agora" na tela toda (tablet): o botão do canto de cima troca entre expandir e voltar ao painel
   // No celular e no computador a tela toda é o próprio "Tocando agora": o player muda de jeito (html.pp) só enquanto
   // ela está aberta, e o voltar do celular (ou do navegador) fecha a tela em vez de sair da página
-  const painelCheio = (ligar) => {
+  const painelCheio = (ligar, { semVoltar = false } = {}) => {
     const antes = document.body.classList.contains('painel-cheio');
     document.body.classList.toggle('painel-cheio', ligar);
     if (!ehTablet()) {
       document.documentElement.classList.toggle('pp', ligar);
       if (ligar && !antes) history.pushState({ tocandoAgora: true }, '');
-      if (!ligar && antes && history.state?.tocandoAgora) history.back();
+      if (!ligar && antes && !semVoltar && history.state?.tocandoAgora) history.back();
       if (ligar !== antes) { desenhar(); if (!ligar) medirPlayer(); }
       if (ligar) el.scrollTop = 0;
     }
+    if (ligar !== antes) mostrarBarra(); // na página da própria música a barra some; a tela toda aparece por cima dela
     el.querySelectorAll('[data-pl="expandir"]').forEach((b) => {
       b.title = ligar ? 'Voltar' : 'Tocando agora';
       b.setAttribute('aria-label', ligar ? 'Voltar' : 'Abrir o Tocando agora');
@@ -1218,7 +1268,7 @@ const player = (() => {
   };
   window.addEventListener('popstate', () => { if (document.body.classList.contains('painel-cheio') && !ehTablet()) painelCheio(false); });
   window.addEventListener('hashchange', () => painelCheio(false));
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('painel-cheio')) painelCheio(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('painel-cheio') && !document.querySelector('dialog[open]')) painelCheio(false); });
   el.addEventListener('click', (e) => {
     const prog = e.target.closest('.pl-prog');
     if (prog && duracao) { const r = prog.getBoundingClientRect(); api.irPara(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * duracao); return; }
@@ -1255,10 +1305,7 @@ const player = (() => {
     if (b.dataset.pl === 'compartilhar' && atual) compartilhar({ title: atual.titulo || 'Vídeo', text: [atual.titulo, atual.artista].filter(Boolean).join(' — '), url: `https://www.youtube.com/watch?v=${atual.youtube}` });
     if (b.dataset.pl === 'compartilhar-letra' && atual) compartilhar({ title: atual.titulo || 'Letra', text: `${[atual.titulo, atual.artista].filter(Boolean).join(' — ')}\n\n${linhasDaLetra.join('\n')}` });
     // ouvir em outro aparelho: o vídeo abre no YouTube (de lá vai para a TV ou a caixa de som), do ponto em que está
-    if (b.dataset.pl === 'aparelhos' && atual) {
-      if (estado === 'tocando') api.alternar();
-      window.open(`https://www.youtube.com/watch?v=${atual.youtube}&t=${Math.floor(api.tempoAgora)}s`, '_blank', 'noopener');
-    }
+    if (b.dataset.pl === 'aparelhos' && atual) abrirAparelhos();
     if (b.dataset.pl === 'fila') abrirFila();
     if (b.dataset.pl === 'menu') abrirMenu();
     if (b.dataset.pl === 'aleatorio') {
@@ -1292,9 +1339,13 @@ const player = (() => {
     if (b.dataset.pl === 'ampliar') { el.classList.toggle('grande'); b.innerHTML = icon(el.classList.contains('grande') ? 'shrink' : 'expand', 18); }
     // abrir a música (o nome no player): a página dela; expandir a letra: a página dela já com a letra na tela toda
     if ((b.dataset.pl === 'abrir' || b.dataset.pl === 'cheio') && atual) {
-      painelCheio(false);
+      // saindo da tela toda (celular/computador) para a página da música: ela toma o lugar da tela toda no histórico.
+      // Antes o "voltar" da tela toda corria depois de abrir a página e levava de volta ao início
+      const daTela = !ehTablet() && history.state?.tocandoAgora && atual.href && location.hash !== atual.href;
+      painelCheio(false, { semVoltar: daTela });
       abrirLetraCheia = b.dataset.pl === 'cheio';
-      if (atual.href && location.hash !== atual.href) location.hash = atual.href;
+      if (daTela) location.replace(atual.href);
+      else if (atual.href && location.hash !== atual.href) location.hash = atual.href;
       else if (!atual.href && atual.abrir) atual.abrir();
       else if (abrirLetraCheia) { abrirLetraCheia = false; $('#btn-palco')?.click(); }
     }
@@ -2185,7 +2236,7 @@ function ligarListaCindy(box, back) {
     const li = e.target.closest('li[data-url]');
     if (li) abrirCindy(li.dataset.url, li, back);
     const lm = e.target.closest('li[data-id]');
-    if (lm) location.hash = '#/musica/' + lm.dataset.id;
+    if (lm) irParaMusica(lm.dataset.id);
   });
 }
 
@@ -2279,7 +2330,8 @@ async function trazerMusica({ titulo, artista = '', cifra = '', letra = null, vi
 async function abrirMusica(dados, back, el) {
   // já está na biblioteca: abre a música salva (com o botão marcado), sem trazer de novo
   const ja = !dados.video && musicaSalva({ titulo: dados.titulo, artista: dados.artista, cifra: dados.cifra || '', letra: dados.letra?.url || '' });
-  if (ja) { location.hash = '#/musica/' + ja.id; return; }
+  if (ja) { irParaMusica(ja.id); return; }
+  abrirNoTocando = true;
   const acts = el?.querySelector('.acts');
   const antes = acts?.innerHTML;
   if (acts) acts.innerHTML = '<span class="spin"></span>';
@@ -2288,6 +2340,7 @@ async function abrirMusica(dados, back, el) {
     const r = await trazerMusica(dados);
     await abrirPrevia(r.content, r.source, back, r.video);
   } catch (e) {
+    abrirNoTocando = false;
     toast('Não consegui trazer: ' + e.message);
   } finally { if (acts && acts.isConnected) acts.innerHTML = antes; }
 }
@@ -2591,7 +2644,7 @@ function viewSearch() {
     <div class="chips" id="filtros" style="margin-top:12px">${FILTROS.map(([k, n]) => `<button class="chip" data-f="${k}" aria-pressed="${k === filtro}">${n}</button>`).join('')}</div>
     <div id="res"></div>`;
   const res = $('#res');
-  res.addEventListener('click', (e) => { const lm = e.target.closest('li[data-id]'); if (lm) location.hash = '#/musica/' + lm.dataset.id; });
+  res.addEventListener('click', (e) => { const lm = e.target.closest('li[data-id]'); if (lm) irParaMusica(lm.dataset.id); });
   let achados = { musica: [], videos: [] };
   res.addEventListener('click', (e) => {
     const lv = e.target.closest('li[data-video]');
@@ -3415,7 +3468,7 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
     const p = e.target.closest('[data-play]');
     if (p) { const s = db.song(p.dataset.play); if (s) tocarReferencia(s); return; }
     if (e.target.closest('a, [data-tocar-set]')) return;
-    location.hash = ehRep ? '#/repertorio/' + li.dataset.k : '#/musica/' + li.dataset.k;
+    if (ehRep) location.hash = '#/repertorio/' + li.dataset.k; else irParaMusica(li.dataset.k);
   };
 }
 
@@ -6336,6 +6389,11 @@ function viewSong(id, ctx = {}) {
   if (song.youtube) {
     player.palco($('#video-box'), song.youtube);
     aoSair(() => player.palco(null));
+  }
+  // veio da Busca ou da Biblioteca, no celular: toca e abre o "Tocando agora" por cima (fechando, fica a cifra)
+  if (abrirNoTocando) {
+    abrirNoTocando = false;
+    if (song.youtube && telaDeCelular()) { tocar(); player.expandir(); }
   }
 
   const salvarPrevia = () => {
