@@ -3,12 +3,17 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 240, data: '2026-10-28', titulo: 'Botão Mudar para capa mais bonito',
+    itens: [
+      { tipo: 'melhoria', texto: 'O botão “Mudar para capa / Mudar para vídeo” ficou mais bonito: uma pílula de vidro clara, com o ícone num círculo branco (antes era uma faixa preta achatada).' },
+    ],
+  },
+  {
     versao: 239, data: '2026-10-28', titulo: 'O Tocando agora também no celular e no computador',
     itens: [
       { tipo: 'novo', texto: 'No celular, tocar na barrinha do player abre o Tocando agora na tela toda, como no Spotify: a setinha para fechar, o vídeo (ou a capa), o nome com o ✓, a barra, os controles, compartilhar, a fila, a letra e os cartões do artista. O voltar do celular fecha a tela.' },
       { tipo: 'novo', texto: 'No computador, a barra de baixo ganhou o ✓ da biblioteca ao lado do nome e, à direita, os botões Tocando agora, Fila e Ouvir em outro aparelho. O Tocando agora abre na área principal, com o menu da esquerda à vista.' },
       { tipo: 'correcao', texto: 'Os controles do player ficaram alinhados no celular e no computador: o repetir e o aleatório aparecem sempre, um em cada ponta (aleatório, anterior, tocar, próxima, repetir). Sem fila, o aleatório fica apagado.' },
-      { tipo: 'melhoria', texto: 'O botão “Mudar para capa / Mudar para vídeo” ficou mais bonito: uma pílula de vidro clara, com o ícone num círculo branco (antes era uma faixa preta achatada).' },
     ],
   },
   {
