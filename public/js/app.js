@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-280';
+export const APP_VERSAO = '2026.10.28-281';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1409,6 +1409,10 @@ const player = (() => {
     // cifra: já na letra na tela toda, mostrando os acordes ("Abrir a cifra")
     abrirMusica({ cifra = false } = {}) {
       if (!atual) return;
+      // tablet com o painel recolhido (a barrinha embaixo): a música abre no Tocando agora inteiro (recolhido, a página
+      // ficava escondida e o painel na barrinha: a tela ficava preta). Só enquanto ela está aberta: a escolha guardada
+      // fica, e ao sair dela o painel volta a ficar recolhido
+      if (ehTablet()) document.body.classList.remove('painel-recolhido');
       if (cifra && !modoCifra) definirModoCifra(true);
       if (!document.body.classList.contains('painel-cheio')) painelCheio(true, { sobre: true });
       else if (!sobrePagina) sobrePagina = location.hash;
