@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 272, data: '2026-10-28', titulo: 'Créditos com as fotos',
+    itens: [
+      { tipo: 'novo', texto: 'Os créditos da música mostram as pessoas com a foto, como no Spotify: as duas primeiras no cartão, com quantos participantes; "Explorar" abre todos em detalhe, cada um com a foto, o nome e o que fez na música.' },
+      { tipo: 'melhoria', texto: 'Na lista dos créditos, cada pessoa tem a foto pequena ao lado do nome.' },
+    ],
+  },
+  {
     versao: 271, data: '2026-10-28', titulo: 'Letra maior no tablet e no computador',
     itens: [
       { tipo: 'melhoria', texto: 'No tablet e no computador, a letra na tela toda fica maior, na proporção da tela (com e sem cifra, do mesmo tamanho). No celular continua como estava.' },
@@ -67,13 +74,6 @@ export const NOVIDADES = [
       { tipo: 'novo', texto: 'Ao tocar uma música, o app procura sozinho a letra sincronizada (LRCLIB, sem servidor): o cartão da letra passa a acompanhar o que está sendo cantado.' },
       { tipo: 'melhoria', texto: 'A frase de agora fica em branco, maior e com relevo; as outras mais apagadas.' },
       { tipo: 'novo', texto: 'Nas partes só de música (introdução, solos e o fim) aparecem as notinhas ♪, que pulam enquanto tocam.' },
-    ],
-  },
-  {
-    versao: 262, data: '2026-10-28', titulo: 'Ver a cifra de novo',
-    itens: [
-      { tipo: 'correcao', texto: '"Abrir a cifra" (no ⋯ das listas) abre a página com os acordes, sem o Tocando agora por cima.' },
-      { tipo: 'novo', texto: 'Na letra em tela toda, o botão "Cifra" (no canto de cima) e "Ver a cifra" no ⋯ levam para a música com os acordes. Voltar retorna para a lista.' },
     ],
   },
 ];

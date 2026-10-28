@@ -2503,6 +2503,39 @@ a.ref-linha:hover b, button.ref-linha:hover b { text-decoration: underline; }
 .ref-pessoas-pe b { font-size: 18px; font-weight: 800; }
 .ref-pessoas-pe small { font-size: 13px; color: color-mix(in srgb, var(--text) 75%, transparent); }
 .ref-pessoas p { margin: 8px 0 0; font-size: 13px; color: color-mix(in srgb, var(--text) 75%, transparent); }
+.ref-roda b { font-size: 16px; font-weight: 800; }
+.ref-explorar { flex: none; height: 38px; padding: 0 18px; border: 1px solid rgb(255 255 255 / 0.6); border-radius: 999px; background: none; color: #fff;
+  font: inherit; font-size: 14.5px; font-weight: 800; cursor: pointer; transition: transform 0.15s, border-color 0.2s; }
+.ref-explorar:hover { border-color: #fff; transform: scale(1.04); }
+/* no Tocando agora, o cartão das pessoas na cor do fundo do player; na lista dos créditos, a foto pequena ao lado */
+html.pp #player .pl-pessoas { padding: 18px 18px 16px; background: color-mix(in srgb, var(--cor-musica, var(--tint)) 55%, #000); }
+html.pp #player .pl-pessoas .ref-avatar { width: min(140px, 36vw); }
+.cr-linha { display: flex; align-items: center; gap: 12px; }
+.ref-avatar.cr-mini { width: 44px; margin: 0; font-size: 15px; box-shadow: none; flex: none; }
+/* "Explorar": todas as pessoas da música, na tela toda (como o SongDNA do Spotify) */
+dialog.creditos-dlg { position: fixed; inset: 0; width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: calc(8px + env(safe-area-inset-top)) max(16px, calc((100% - 820px) / 2)) calc(24px + env(safe-area-inset-bottom));
+  border: 0; border-radius: 0; overflow-y: auto; color: #fff; --text: #fff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--cor-creditos, var(--tint)) 55%, #121212) 0, #121212 420px); animation: subir-tela 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+dialog.creditos-dlg::backdrop { background: #121212; }
+.cr-topo { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; min-height: 56px; margin: 0 -8px; }
+.cr-topo b { text-align: center; font-size: 17px; font-weight: 800; }
+.cr-topo .icon-btn { width: 48px; height: 48px; color: #fff; }
+.cr-musica { display: flex; align-items: center; gap: 14px; margin: 10px 0 22px; }
+.cr-capa { flex: none; display: grid; place-items: center; width: 72px; height: 72px; border-radius: 6px; background: rgb(255 255 255 / 0.12) center / cover no-repeat; box-shadow: 0 6px 18px rgb(0 0 0 / 0.4); }
+.cr-musica .grow { min-width: 0; display: grid; gap: 2px; }
+.cr-musica b { font-size: 24px; font-weight: 800; line-height: 1.15; }
+.cr-musica small { font-size: 15px; color: rgb(255 255 255 / 0.8); }
+.creditos-dlg h3 { margin: 6px 0 18px; font-size: 22px; font-weight: 800; }
+/* duas por linha no celular, mais nas telas largas; a última sozinha fica no meio */
+.cr-pessoas { display: flex; flex-wrap: wrap; justify-content: center; gap: 28px 12px; margin-bottom: 30px; }
+.cr-pessoa { flex: 0 0 calc(50% - 6px); display: grid; justify-items: center; align-content: start; text-align: center; gap: 4px; min-width: 0; }
+.cr-pessoa b { font-size: 17px; font-weight: 800; max-width: 100%; overflow-wrap: anywhere; }
+.cr-pessoa small { font-size: 14px; color: rgb(255 255 255 / 0.75); }
+.ref-avatar.cr-avatar { width: min(150px, 38vw); font-size: clamp(30px, 9vw, 48px); }
+@media (min-width: 700px) { .cr-pessoa { flex-basis: calc(33.333% - 8px); } }
+@media (min-width: 1100px) { .cr-pessoa { flex-basis: calc(25% - 9px); } }
+.cr-detalhes { display: grid; gap: 2px; padding: 8px 16px; border-radius: 14px; background: rgb(255 255 255 / 0.06); }
+.cr-detalhes a { color: #fff; }
 @media (prefers-reduced-motion: reduce) { .ref-tocando i { animation: none; } .ref-pilula:hover { transform: none; } }
 
 /* ---- opções que só valem em tela larga (ex.: "Duas colunas": a letra só fica em colunas a partir de 1100 px):
