@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-247';
+export const APP_VERSAO = '2026.10.28-248';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -727,6 +727,7 @@ const player = (() => {
     <p class="pl-frase" hidden></p>
     <button class="pl-troca" data-pl="troca">${icon('music', 18)}<span>Mudar para música</span></button>
     <div class="pl-meio">
+      <span class="pl-capinha" aria-hidden="true"></span>
       <button class="pl-info" data-pl="abrir" title="Abrir a música"><span class="pl-txt"><b></b><small></small></span></button>
       <button class="salvar-btn pl-salva" data-pl="salva" hidden></button>
     </div>
@@ -885,10 +886,25 @@ const player = (() => {
     el.classList.toggle('modo-capa', capa);
     const url = atual?.capa && /^(https?:|data:)/.test(atual.capa) ? atual.capa : atual?.youtube ? `https://i.ytimg.com/vi/${atual.youtube}/hqdefault.jpg` : '';
     mini.style.backgroundImage = capa && url ? `url("${url}")` : '';
-    // sem capa nem vídeo: a cor da música com uma nota no meio
+    const capaYt = !(atual?.capa && /^(https?:|data:)/.test(atual.capa));
+    // sem capa nem vídeo: a cor da música com uma nota no meio. Com vídeo, no modo música, a capa tem movimento: os
+    // quadros do clipe passando com zoom lento, como no topo da página da música (a imagem de fundo fica por baixo)
     const semCapa = capa && !url;
-    if (mini.classList.contains('sem-capa') !== semCapa) { mini.classList.toggle('sem-capa', semCapa); mini.innerHTML = semCapa ? icon('music', 72) : ''; }
-    mini.classList.toggle('capa-yt', capa && !(atual?.capa && /^(https?:|data:)/.test(atual.capa)));
+    const q = capa && !atual?.semVideo && atual?.youtube ? atual.youtube : '';
+    const conteudo = semCapa ? 'nota' : q ? `q:${q}` : '';
+    if (mini.dataset.conteudo !== conteudo) {
+      mini.dataset.conteudo = conteudo;
+      mini.classList.toggle('sem-capa', semCapa);
+      mini.classList.toggle('quadros', Boolean(q));
+      const song = q ? musicaTocando() : null;
+      mini.innerHTML = semCapa ? icon('music', 72) : q ? htmlQuadros(q, (song && renderSong(song.content).meta.x_canvas) || 'sd') : '';
+    }
+    mini.classList.toggle('capa-yt', capa && capaYt);
+    // no modo vídeo, a capa pequena ao lado do nome (como no Spotify)
+    const capinha = $('.pl-capinha', el);
+    capinha.style.backgroundImage = !capa && url ? `url("${url}")` : '';
+    capinha.classList.toggle('capa-yt', capaYt);
+    capinha.hidden = !url;
     const b = $('.pl-troca', el);
     b.innerHTML = atual?.semVideo ? `${icon('youtube', 18)}<span>Escolher um vídeo</span>`
       : `${icon(capa ? 'video' : 'music', 18)}<span>${capa ? 'Mudar para vídeo' : 'Mudar para música'}</span>`;
