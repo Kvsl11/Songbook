@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-266';
+export const APP_VERSAO = '2026.10.28-267';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1027,12 +1027,12 @@ const player = (() => {
     $('.pl-letra', el).hidden = !linhas.length && !letraDaPagina;
     $('.pl-letra', el).classList.toggle('sincronizada', Boolean(tempos) || Boolean(marcando));
     $('.pl-letra', el).classList.toggle('marcando', Boolean(marcando));
-    // na letra sincronizada, as partes só de música (a introdução e as pausas de 4 s ou mais entre as frases, e o fim)
+    // na letra sincronizada, as partes só de música (a introdução, os solos e o final, de 10 s ou mais)
     // ganham as notinhas ♪, que acendem e pulam enquanto tocam
     const nota = (id) => `<p class="pl-pausa" data-pausa="${id}" aria-label="Só música"><i>♪</i><i>♪</i><i>♪</i></p>`;
     const pausaAntes = (k) => tempos && (k === 0 ? tempos[0].inicio >= PAUSA_MUSICA : tempos[k].inicio - tempos[k - 1].fim >= PAUSA_MUSICA);
     $('.pl-linhas', el).innerHTML = linhas.map((l, k) => `${marcas.has(k) ? `<h4 class="pl-parte">${esc(marcas.get(k))}</h4>` : ''}${pausaAntes(k) ? nota(k) : ''}<p data-k="${k}">${esc(l)}</p>`).join('')
-      + (tempos?.length ? nota('fim') : '');
+      + (tempos?.length && duracao > 0 && duracao - tempos[tempos.length - 1].fim >= PAUSA_MUSICA ? nota('fim') : '');
     desenharCifra();
     // sem sincronia: procura sozinha a letra sincronizada no LRCLIB (grátis, sem servidor), uma vez por vídeo
     // (o aviso em cima da letra diz que está sincronizando, se deu certo ou, se não achou, como sincronizar à mão)
@@ -1113,7 +1113,9 @@ const player = (() => {
     letraDe = '';
     guardarSincronia(alvoDaMusica(musicaTocando()), { video, linhas, tempos: ts.map((x) => ({ inicio: Math.round(x.inicio * 100) / 100, fim: Math.round(x.fim * 100) / 100 })), fonte: 'manual' });
   };
-  const PAUSA_MUSICA = 4;
+  // só as partes longas só de instrumentos (introdução, solo, final) ganham as notinhas: as pausas curtas entre as
+  // estrofes não
+  const PAUSA_MUSICA = 10;
   const lrclibTentado = new Set();
   // a música para sincronizar: a salva, ou a prévia da busca com os dados que a página da música calcula
   const alvoDaMusica = (song) => {

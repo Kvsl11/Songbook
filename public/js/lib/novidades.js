@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 267, data: '2026-10-28', titulo: 'Notinhas só nas partes de instrumentos',
+    itens: [
+      { tipo: 'correcao', texto: 'As notinhas ♪ na letra aparecem só onde a música fica 10 segundos ou mais sem voz (introdução, solos e final), não mais em cada pausa entre as estrofes.' },
+    ],
+  },
+  {
     versao: 266, data: '2026-10-28', titulo: 'Letra sincronizada sem servidor, mais firme',
     itens: [
       { tipo: 'correcao', texto: 'Quando o banco de letras sincronizadas (LRCLIB) está ocupado, o app tenta de novo sozinho em vez de desistir e cair no servidor (que dava erro).' },
@@ -66,13 +72,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'novo', texto: 'Sincronizar a letra agora procura primeiro a letra já sincronizada do LRCLIB (banco aberto de letras): vem na hora, sem servidor, quando é a mesma música e a duração bate com a do vídeo.' },
       { tipo: 'melhoria', texto: 'Se a música não estiver lá (os cantos de missa quase nunca estão) ou ficar fora do tempo ("Ouvir o vídeo"), o app usa o servidor que ouve o áudio, como antes.' },
-    ],
-  },
-  {
-    versao: 257, data: '2026-10-28', titulo: 'Ajustes mais limpos',
-    itens: [
-      { tipo: 'melhoria', texto: 'A tela de Ajustes ficou enxuta: sem os números e os atalhos do topo, títulos simples e textos curtos. Aparência, Música (destaque e desenho dos acordes, clipe atrás do título), PowerPoint, Backup, Avançado e Sobre.' },
-      { tipo: 'melhoria', texto: 'A conta do YouTube e o servidor no computador (partitura e letra sincronizada pelo áudio) ficam guardados em "Avançado", fechado.' },
     ],
   },
 ];
