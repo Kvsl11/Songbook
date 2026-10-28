@@ -4,6 +4,27 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 267, data: '2026-10-28', titulo: 'Notinhas só nas partes de instrumentos',
+    itens: [
+      { tipo: 'correcao', texto: 'As notinhas ♪ na letra aparecem só onde a música fica 10 segundos ou mais sem voz (introdução, solos e final), não mais em cada pausa entre as estrofes.' },
+    ],
+  },
+  {
+    versao: 266, data: '2026-10-28', titulo: 'Letra sincronizada sem servidor, mais firme',
+    itens: [
+      { tipo: 'correcao', texto: 'Quando o banco de letras sincronizadas (LRCLIB) está ocupado, o app tenta de novo sozinho em vez de desistir e cair no servidor (que dava erro).' },
+      { tipo: 'correcao', texto: 'Sem servidor, "Sincronizar a letra de novo" também usa o banco de letras. Se ele não responder, o aviso mostra "Tentar de novo" e "Sincronizar à mão".' },
+    ],
+  },
+  {
+    versao: 265, data: '2026-10-28', titulo: 'Uma tela só para a música',
+    itens: [
+      { tipo: 'melhoria', texto: 'A música abre sempre na tela nova da letra, em todos os aparelhos; a página antiga saiu. Fechando, você volta para a lista.' },
+      { tipo: 'novo', texto: 'O botão "Cifra" (no canto de cima) mostra os acordes em cima da letra, com tom, capotraste, tamanho da letra (A− / A+) e rolagem automática. Com a letra sincronizada, a linha cantada acende também na cifra.' },
+      { tipo: 'melhoria', texto: 'No ⋯ da tela da música: Ver o vídeo, Editar a cifra e Partitura.' },
+    ],
+  },
+  {
     versao: 264, data: '2026-10-28', titulo: 'Sincronia da letra com aviso e à mão',
     itens: [
       { tipo: 'novo', texto: 'Em cima da letra (no cartão e na tela toda), um aviso mostra que a letra está sincronizando e, depois, que sincronizou.' },
@@ -51,28 +72,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'novo', texto: 'Sincronizar a letra agora procura primeiro a letra já sincronizada do LRCLIB (banco aberto de letras): vem na hora, sem servidor, quando é a mesma música e a duração bate com a do vídeo.' },
       { tipo: 'melhoria', texto: 'Se a música não estiver lá (os cantos de missa quase nunca estão) ou ficar fora do tempo ("Ouvir o vídeo"), o app usa o servidor que ouve o áudio, como antes.' },
-    ],
-  },
-  {
-    versao: 257, data: '2026-10-28', titulo: 'Ajustes mais limpos',
-    itens: [
-      { tipo: 'melhoria', texto: 'A tela de Ajustes ficou enxuta: sem os números e os atalhos do topo, títulos simples e textos curtos. Aparência, Música (destaque e desenho dos acordes, clipe atrás do título), PowerPoint, Backup, Avançado e Sobre.' },
-      { tipo: 'melhoria', texto: 'A conta do YouTube e o servidor no computador (partitura e letra sincronizada pelo áudio) ficam guardados em "Avançado", fechado.' },
-    ],
-  },
-  {
-    versao: 256, data: '2026-10-28', titulo: 'Abrir música sem piscar e tom mais discreto no artista',
-    itens: [
-      { tipo: 'correcao', texto: 'Abrindo uma música da Busca no celular, o Tocando agora aparece de uma vez: a página antiga da música não pisca mais por baixo (nem ao fechar).' },
-      { tipo: 'melhoria', texto: 'Na página do artista, o tom de cada música fica num selo pequeno ao lado do salvar, sem o "Tom" escrito; embaixo do nome, o artista.' },
-    ],
-  },
-  {
-    versao: 255, data: '2026-10-28', titulo: 'Busca com cifra, letra e vídeo numa lista só',
-    itens: [
-      { tipo: 'melhoria', texto: 'Na Busca, os vídeos não ficam mais à parte: cada música da lista já vem com o vídeo dela, e os sinais mostram o que ela tem (cifra, letra e vídeo). Abrindo ou salvando (+), ela entra com tudo junto.' },
-      { tipo: 'melhoria', texto: 'Um vídeo que não é de nenhuma música da lista entra nela como música: ao abrir, o app descobre qual é e traz a cifra e a letra. Outros vídeos da mesma música não se repetem.' },
-      { tipo: 'melhoria', texto: 'No "Adicionar música" do repertório, a mesma lista única.' },
     ],
   },
 ];

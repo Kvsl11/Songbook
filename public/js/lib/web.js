@@ -451,14 +451,25 @@ export function sincroniaDoLrc(lrc, duracao = 0) {
 // quando se sabe, artista). O tempo do LRC é o da gravação: com a duração do vídeo parecida (até 4 s de diferença),
 // vale como está; com a duração bem diferente (um clipe com uma cena antes da música, como o de "Speed Demon", ou uma
 // versão editada), vem com ajustar: true: a letra está certa, mas falta acertar onde a música começa no vídeo
-export async function letraSincronizada({ titulo = '', artista = '', duracao = 0 } = {}, fetchImpl) {
+export async function letraSincronizada({ titulo = '', artista = '', duracao = 0 } = {}, fetchImpl, { espera = 1500 } = {}) {
   const t = String(titulo || '').trim();
   const a = String(artista || '').trim();
   if (!t) return null;
+  // o LRCLIB às vezes responde "ocupado" (503 ServerOverloaded) ou demora: tenta de novo (até 4 vezes, esperando um
+  // pouco mais a cada vez) antes de desistir. Se nenhum pedido deu certo, é erro (não "não achou")
+  let respondeu = false;
   const pedir = async (params) => {
-    const res = await buscar(`https://lrclib.net/api/search?${params}`, { fetchImpl });
-    if (!res.ok) throw new Error(`LRCLIB respondeu ${res.status}`);
-    return res.json();
+    for (let vez = 0; ; vez++) {
+      try {
+        const res = await buscar(`https://lrclib.net/api/search?${params}`, { fetchImpl, timeout: 10000 });
+        if (res.ok) { const j = await res.json(); respondeu = true; return Array.isArray(j) ? j : []; }
+        if (![429, 500, 502, 503, 504].includes(res.status)) throw new Error(`LRCLIB respondeu ${res.status}`);
+      } catch (e) {
+        if (/LRCLIB respondeu/.test(e.message) || vez >= 3) throw e;
+      }
+      if (vez >= 3) throw new Error('O LRCLIB está ocupado');
+      await new Promise((ok) => setTimeout(ok, espera * (vez + 1)));
+    }
   };
   const tentativas = [
     a && `track_name=${encodeURIComponent(t)}&artist_name=${encodeURIComponent(a)}`,
@@ -480,6 +491,7 @@ export async function letraSincronizada({ titulo = '', artista = '', duracao = 0
     const sinc = sincroniaDoLrc(fora.syncedLyrics, fora.duration);
     if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: fora.id, ajustar: true };
   }
+  if (!respondeu) throw new Error('O LRCLIB não respondeu agora');
   return null;
 }
 

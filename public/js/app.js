@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-264';
+export const APP_VERSAO = '2026.10.28-267';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -172,20 +172,17 @@ const aoSair = (fn) => limpezas.push(fn);
 let abrirLetraCheia = false;
 // no celular, a música aberta da Busca ou da Biblioteca abre no "Tocando agora" (tocando), com a cifra embaixo
 let abrirNoTocando = false;
-// "Ver a cifra" / "Abrir a cifra": esta página de música (o hash) fica visível, sem o Tocando agora abrir por cima
-// dela (vale enquanto se está nela, mesmo que ela seja desenhada de novo)
-let cifraNaTela = '';
+// "Abrir a cifra" (⋯ das listas): a música abre na tela dela (a letra na tela toda) já mostrando os acordes
+let abrirComCifra = false;
 function abrirCifra(href) {
-  cifraNaTela = href;
+  abrirComCifra = true;
   if (location.hash === href) route(); else location.hash = href;
 }
 // a letra na tela toda aberta pelo "Tocando agora" (celular e computador): ao sair dela, volta para o Tocando agora
 let voltarAoTocando = false;
 const telaDeCelular = () => !ehTablet() && matchMedia('(max-width: 899px)').matches;
 function irParaMusica(id) {
-  // no celular, uma música com vídeo toca e abre no Tocando agora ali mesmo, sem passar pela página dela
-  const s = db.song(id);
-  if (s && telaDeCelular()) { if (s.youtube) player.tocar(itemDoPlayer(s)); else player.mostrarSemVideo(itemDoPlayer(s)); player.expandir(); return; }
+  // abre a tela da música (a letra na tela toda) e já toca
   abrirNoTocando = true;
   location.hash = '#/musica/' + id;
 }
@@ -766,7 +763,11 @@ const player = (() => {
       <button class="icon-btn" data-pl="compartilhar" aria-label="Compartilhar" title="Compartilhar">${icon('share', 20)}</button>
       <button class="icon-btn" data-pl="fila" aria-label="Fila" title="Fila">${icon('queue', 20)}</button>
     </div>
-    <section class="pl-letra" hidden><div class="pl-letra-topo"><button class="icon-btn" data-pl="letra-fechar" aria-label="Fechar a letra" title="Fechar">${icon('down', 24)}</button><span class="pl-letra-nome"><b></b><small></small></span><button class="pl-ver-cifra" data-pl="ver-cifra" aria-label="Ver a cifra" title="Ver a cifra">${icon('chord', 15)}<span>Cifra</span></button></div><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-sinc" hidden aria-live="polite"></div><div class="pl-linhas"></div>
+    <section class="pl-letra" hidden><div class="pl-letra-topo"><button class="icon-btn" data-pl="letra-fechar" aria-label="Fechar a letra" title="Fechar">${icon('down', 24)}</button><span class="pl-letra-nome"><b></b><small></small></span><button class="pl-ver-cifra" data-pl="ver-cifra" aria-pressed="false" aria-label="Mostrar os acordes" title="Mostrar os acordes">${icon('chord', 15)}<span>Cifra</span></button></div><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-sinc" hidden aria-live="polite"></div><div class="pl-ferr">
+      <span class="pl-ferr-g so-cifra"><button data-pl="tom-" aria-label="Baixar meio tom" title="Baixar meio tom">−</button><b class="pl-tom"></b><button data-pl="tom+" aria-label="Subir meio tom" title="Subir meio tom">+</button></span>
+      <span class="pl-ferr-g so-cifra"><button data-pl="capo-" aria-label="Capotraste uma casa abaixo" title="Capotraste: uma casa abaixo">−</button><b class="pl-capo"></b><button data-pl="capo+" aria-label="Capotraste uma casa acima" title="Capotraste: uma casa acima">+</button></span>
+      <span class="pl-ferr-g"><button data-pl="fonte-" aria-label="Letra menor" title="Letra menor">A−</button><button data-pl="fonte+" aria-label="Letra maior" title="Letra maior">A+</button></span>
+      <button class="pl-ferr-rolar so-cifra" data-pl="rolar" aria-pressed="false" aria-label="Rolagem automática" title="Rolagem automática">${icon('down', 16)}<span>Rolar</span></button></div><div class="pl-cifra"></div><div class="pl-linhas"></div>
       <div class="pl-letra-pe"><div class="pl-letra-bts2"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 22)}</button><span class="grow"></span><button class="icon-btn pl-mais" data-pl="menu" aria-label="Mais opções" title="Mais opções">${icon('more', 22)}</button></div>
         <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" role="slider" tabindex="0" aria-label="Tempo da música" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
         <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button></div></section>
@@ -1023,15 +1024,16 @@ const player = (() => {
     linhaAcesa = -2;
     acesaChave = '';
     $('.pl-frase', el).hidden = !tempos;
-    $('.pl-letra', el).hidden = !linhas.length;
+    $('.pl-letra', el).hidden = !linhas.length && !letraDaPagina;
     $('.pl-letra', el).classList.toggle('sincronizada', Boolean(tempos) || Boolean(marcando));
     $('.pl-letra', el).classList.toggle('marcando', Boolean(marcando));
-    // na letra sincronizada, as partes só de música (a introdução e as pausas de 4 s ou mais entre as frases, e o fim)
+    // na letra sincronizada, as partes só de música (a introdução, os solos e o final, de 10 s ou mais)
     // ganham as notinhas ♪, que acendem e pulam enquanto tocam
     const nota = (id) => `<p class="pl-pausa" data-pausa="${id}" aria-label="Só música"><i>♪</i><i>♪</i><i>♪</i></p>`;
     const pausaAntes = (k) => tempos && (k === 0 ? tempos[0].inicio >= PAUSA_MUSICA : tempos[k].inicio - tempos[k - 1].fim >= PAUSA_MUSICA);
     $('.pl-linhas', el).innerHTML = linhas.map((l, k) => `${marcas.has(k) ? `<h4 class="pl-parte">${esc(marcas.get(k))}</h4>` : ''}${pausaAntes(k) ? nota(k) : ''}<p data-k="${k}">${esc(l)}</p>`).join('')
-      + (tempos?.length ? nota('fim') : '');
+      + (tempos?.length && duracao > 0 && duracao - tempos[tempos.length - 1].fim >= PAUSA_MUSICA ? nota('fim') : '');
+    desenharCifra();
     // sem sincronia: procura sozinha a letra sincronizada no LRCLIB (grátis, sem servidor), uma vez por vídeo
     // (o aviso em cima da letra diz que está sincronizando, se deu certo ou, se não achou, como sincronizar à mão)
     if (!sinc && !marcando && song && atual?.youtube && !atual.semVideo && !lrclibTentado.has(atual.youtube)) {
@@ -1043,6 +1045,7 @@ const player = (() => {
         if (r === 'ok') sincEstado.set(yt, { tipo: 'ok', texto: 'Letra sincronizada' });
         else if (r === 'ajustar') sincEstado.set(yt, { tipo: 'ajustar' });
         else if (r === 'nada') sincEstado.set(yt, { tipo: 'falhou', texto: 'Não achei a letra sincronizada desta música' });
+        else if (r === 'erro') sincEstado.set(yt, { tipo: 'falhou', texto: 'O banco de letras não respondeu agora', deNovo: true });
         else sincEstado.delete(yt);
         mostrarSinc();
       });
@@ -1076,7 +1079,7 @@ const player = (() => {
       someAviso = setTimeout(() => { e.visto = true; mostrarSinc(); }, 6000);
     } else if (e?.tipo === 'falhou' || e?.tipo === 'erro') {
       html = `<span class="pl-sinc-ic erro">${icon('alerta', 15)}</span><span class="pl-sinc-txt">${esc(e.texto || 'Não sincronizou')}</span>
-        ${botaoSinc('sinc-marcar', 'Sincronizar à mão', true)}${servidorIA().url ? botaoSinc('sinc-servidor', 'Ouvir o vídeo') : ''}`;
+        ${e.deNovo ? botaoSinc('sinc-tentar', 'Tentar de novo', true) : ''}${botaoSinc('sinc-marcar', 'Sincronizar à mão', !e.deNovo)}${servidorIA().url ? botaoSinc('sinc-servidor', 'Ouvir o vídeo') : ''}`;
     }
     box.innerHTML = html;
     box.hidden = !html;
@@ -1110,7 +1113,9 @@ const player = (() => {
     letraDe = '';
     guardarSincronia(alvoDaMusica(musicaTocando()), { video, linhas, tempos: ts.map((x) => ({ inicio: Math.round(x.inicio * 100) / 100, fim: Math.round(x.fim * 100) / 100 })), fonte: 'manual' });
   };
-  const PAUSA_MUSICA = 4;
+  // só as partes longas só de instrumentos (introdução, solo, final) ganham as notinhas: as pausas curtas entre as
+  // estrofes não
+  const PAUSA_MUSICA = 10;
   const lrclibTentado = new Set();
   // a música para sincronizar: a salva, ou a prévia da busca com os dados que a página da música calcula
   const alvoDaMusica = (song) => {
@@ -1129,6 +1134,88 @@ const player = (() => {
   // a letra na tela toda, como no Spotify: o nome em cima, a letra inteira rolando e, embaixo, compartilhar, os ⋮, a
   // barra do tempo e o play. No painel ela é só um cartão, com as primeiras linhas (ou as de agora, sincronizada)
   let voltaDaLetra = false; // o voltar que a própria letra pediu ao fechar (não fecha o Tocando agora junto)
+  // ---- a tela da música: a letra na tela toda, aberta por cima da página da música (que fica escondida). O botão
+  // "Cifra" mostra os acordes em cima da letra, com tom, capotraste, tamanho e rolagem; a escolha fica guardada
+  let letraDaPagina = false;
+  let modoCifra = db.prefs().letraModo === 'cifra';
+  let mapaCifra = null; // linha cantada (sincronia) -> linha da cifra na tela
+  let rolando = 0;
+  const definirModoCifra = (ligar) => {
+    modoCifra = ligar;
+    db.setPref('letraModo', ligar ? 'cifra' : 'letra');
+    pararRolagem();
+    desenharCifra();
+  };
+  const desenharCifra = () => {
+    const box = $('.pl-cifra', el);
+    if (!box) return;
+    el.classList.toggle('cifra-on', modoCifra);
+    const bt = $('.pl-ver-cifra', el);
+    bt.setAttribute('aria-pressed', String(modoCifra));
+    bt.innerHTML = modoCifra ? `${icon('text', 15)}<span>Letra</span>` : `${icon('chord', 15)}<span>Cifra</span>`;
+    bt.title = modoCifra ? 'Mostrar só a letra' : 'Mostrar os acordes';
+    const song = musicaTocando();
+    mapaCifra = null;
+    acesaChave = '';
+    if (!modoCifra || !song?.content) { box.innerHTML = ''; return; }
+    const transpose = song.transpose || 0;
+    const capo = song.capo || 0;
+    const r = renderSong(song.content, { transpose, capo, key: song.key || '' });
+    box.innerHTML = `<div class="song lyrics-mode with-chords">${r.html}</div>`;
+    $('.pl-tom', el).innerHTML = `<small>Tom</small>${esc(r.key || (transpose ? (transpose > 0 ? '+' : '') + transpose : '—'))}`;
+    $('.pl-capo', el).innerHTML = `<small>Capo</small>${capo || '—'}`;
+    // com a letra sincronizada, a linha cantada acende também na cifra
+    const sinc = song.sincronia?.video === atual?.youtube ? song.sincronia : null;
+    if (sinc) {
+      const linhasTela = [...box.querySelectorAll('.line:not(.chords-only)')];
+      const textos = linhasTela.map((l) => [...l.querySelectorAll('.lyric')].map((x) => x.textContent).join(''));
+      mapaCifra = casarLinhas(sinc.linhas, textos).map((i) => (i >= 0 ? linhasTela[i] : null));
+    }
+  };
+  // tom e capotraste da música (guardados nela) e o tamanho da letra (para todas)
+  const mudarCifra = (campo, d) => {
+    const song = musicaTocando();
+    if (!song) return;
+    const valor = campo === 'transpose' ? Math.max(-11, Math.min(11, (song.transpose || 0) + d)) : Math.max(0, Math.min(11, (song.capo || 0) + d));
+    song[campo] = valor;
+    if (song !== preview && db.song(song.id)) db.updateSong(song.id, { [campo]: valor });
+    desenharCifra();
+  };
+  const mudarFonte = (d) => {
+    const f = db.prefs().fontScale || 1;
+    db.setPref('fontScale', Math.max(0.6, Math.min(2.5, +(f + d).toFixed(2))));
+    applyTheme();
+  };
+  // rolagem automática da cifra (a velocidade é a dos Ajustes); para no fim ou ao tocar de novo
+  function pararRolagem() {
+    cancelAnimationFrame(rolando);
+    rolando = 0;
+    $('.pl-ferr-rolar', el)?.setAttribute('aria-pressed', 'false');
+  }
+  const rolar = () => {
+    if (rolando) { pararRolagem(); return; }
+    const box = $('.pl-cifra', el);
+    $('.pl-ferr-rolar', el).setAttribute('aria-pressed', 'true');
+    let resto = 0;
+    const passo = () => {
+      resto += (db.prefs().scrollSpeed || 3) * 0.25;
+      const px = Math.floor(resto);
+      resto -= px;
+      box.scrollTop += px;
+      if (box.scrollTop + box.clientHeight >= box.scrollHeight - 1) { pararRolagem(); return; }
+      rolando = requestAnimationFrame(passo);
+    };
+    rolando = requestAnimationFrame(passo);
+  };
+  // fecha a tela da música: sai da página dela, de volta para a lista (a página antiga não aparece no caminho)
+  const fecharMusica = () => {
+    letraDaPagina = false;
+    pararRolagem();
+    view.style.visibility = 'hidden';
+    if (ehTablet()) { painelCheio(false, { semVoltar: true }); history.back(); return; }
+    sobrePagina = location.hash; // fechando, sai da página da música também
+    painelCheio(false);
+  };
   const letraCheia = (ligar) => {
     if (el.classList.contains('letra-cheia') === ligar) return;
     el.classList.toggle('letra-cheia', ligar);
@@ -1159,6 +1246,14 @@ const player = (() => {
       p.classList.toggle('agora', pausa === null && i === k);
       p.classList.toggle('cantada', i < k || (pausa !== null && i === k));
     });
+    if (mapaCifra) {
+      const linha = pausa === null && k >= 0 ? mapaCifra[k] : null;
+      $('.pl-cifra', el).querySelectorAll('.line.agora').forEach((l) => { if (l !== linha) l.classList.remove('agora'); });
+      if (linha && !linha.classList.contains('agora')) {
+        linha.classList.add('agora');
+        if (!rolando) { const box = $('.pl-cifra', el); box.scrollTo({ top: linha.offsetTop - box.clientHeight / 3, behavior: 'smooth' }); }
+      }
+    }
     caixa.querySelectorAll('p[data-pausa]').forEach((p) => {
       p.classList.toggle('agora', p.dataset.pausa === pausa);
       p.classList.toggle('cantada', p.dataset.pausa !== 'fim' && p.dataset.pausa !== pausa && Number(p.dataset.pausa) <= k);
@@ -1227,6 +1322,19 @@ const player = (() => {
     // vai para o segundo s do vídeo (se ele ainda está abrindo, vai assim que puder)
     // a página da música tocando abriu (ex.: vídeo da busca que virou música): nome, artista e cor dela
     atualizar(dados) { if (!atual) return; atual = { ...atual, ...dados }; desenhar(); },
+    // a tela da música (a página da música chama ao abrir): o Tocando agora com a letra na tela toda, por cima da página
+    // (que fica escondida); cifra: já mostrando os acordes ("Abrir a cifra")
+    abrirMusica({ cifra = false } = {}) {
+      if (!atual) return;
+      if (cifra && !modoCifra) definirModoCifra(true);
+      if (!document.body.classList.contains('painel-cheio')) painelCheio(true, { sobre: true });
+      else if (!sobrePagina) sobrePagina = location.hash;
+      letraDaPagina = true;
+      document.body.classList.add('musica-na-letra');
+      if (!el.classList.contains('letra-cheia')) { el.classList.add('letra-cheia'); document.body.classList.add('com-letra-cheia'); }
+      letraDe = '';
+      desenhar();
+    },
     // modo do Tocando agora: o vídeo ou a música (a capa); o ⋯ das listas troca
     get modoMusica() { return comCapa; },
     trocarModo() { comCapa = !comCapa; db.setPref('playerCapa', comCapa); desenharCapa(); },
@@ -1542,10 +1650,13 @@ const player = (() => {
     const song = musicaTocando();
     const sincronizada = song?.sincronia?.video && song.sincronia.video === atual.youtube;
     const opcoes = [
-      (atual.href || atual.abrir) && !telaDeCelular() && { valor: 'abrir', rotulo: 'Abrir a música', ic: 'music' },
+      !naLetra && (atual.href || atual.abrir) && !telaDeCelular() && { valor: 'abrir', rotulo: 'Abrir a música', ic: 'music' },
       { valor: 'salva', rotulo: salva ? 'Adicionar a um repertório' : 'Salvar na biblioteca', ic: salva ? 'plus' : 'download' },
       { valor: 'fila', rotulo: 'Ver a fila', ic: 'queue' },
-      atual.href && { valor: 'ver-cifra', rotulo: 'Ver a cifra', ic: 'chord' },
+      { valor: 'ver-cifra', rotulo: naLetra && modoCifra ? 'Ver só a letra' : 'Ver a cifra', ic: naLetra && modoCifra ? 'text' : 'chord' },
+      naLetra && atual.youtube && !atual.semVideo && { valor: 'ver-video', rotulo: 'Ver o vídeo', ic: 'video' },
+      naLetra && atual.songId && db.song(atual.songId) && { valor: 'editar', rotulo: 'Editar a cifra', ic: 'edit' },
+      naLetra && atual.songId && { valor: 'partitura', rotulo: 'Partitura', ic: 'score' },
       naLetra && song && atual.youtube && !atual.semVideo && { valor: 'sincronizar', rotulo: sincronizada ? 'Sincronizar a letra de novo' : 'Sincronizar a letra', ic: 'sparkles' },
       !naLetra && salva && { valor: 'trocar', rotulo: atual.semVideo ? 'Escolher um vídeo' : 'Trocar o vídeo', ic: atual.semVideo ? 'youtube' : 'refresh' },
       !naLetra && !atual.semVideo && { valor: 'troca', rotulo: modoCapa() ? 'Mudar para vídeo' : 'Mudar para música', ic: modoCapa() ? 'video' : 'music' },
@@ -1565,21 +1676,6 @@ const player = (() => {
     alvoBt.click();
     alvoBt.remove();
   };
-  // "Ver a cifra": fecha a letra e o Tocando agora (tirando do histórico o que eles puseram) e mostra a página da música
-  // com a cifra: a que já estava por baixo ou, se ele foi aberto de outra tela, a da música que toca
-  const verCifra = (href) => {
-    const voltas = ehTablet() ? (history.state?.letraCheia ? 1 : 0) : (history.state?.letraCheia ? 1 : 0) + (history.state?.tocandoAgora ? 1 : 0);
-    const naPagina = location.hash === href;
-    el.classList.remove('letra-cheia');
-    document.body.classList.remove('com-letra-cheia');
-    if (document.body.classList.contains('painel-cheio')) painelCheio(false, { semVoltar: true, manter: true });
-    sobrePagina = '';
-    cifraNaTela = href;
-    if (!voltas) { abrirCifra(href); return; }
-    voltaDaLetra = true; // o voltar abaixo é nosso: o popstate não fecha nem abre nada
-    if (!naPagina) window.addEventListener('popstate', () => setTimeout(() => abrirCifra(href), 0), { once: true });
-    history.go(-voltas);
-  };
   // sincronizar pela letra do Tocando agora: o andamento aparece embaixo do nome, em cima da letra (a prévia da busca
   // ganha os dados que a página da música calcula: título, artista e vídeo)
   const sincronizarDoPlayer = (song, refazer) => {
@@ -1591,6 +1687,7 @@ const player = (() => {
     };
     sincronizarMusica(alvo, { refazer, status }).then((r) => {
       if (r === 'ajustar') { sincEstado.set(yt, { tipo: 'ajustar' }); mostrarSinc(); }
+      if (r === 'erro' || r === 'nada') { sincEstado.set(yt, { ...(sincEstado.get(yt) || {}), tipo: 'falhou', deNovo: r === 'erro' }); mostrarSinc(); }
     });
   };
   // o "Tocando agora" na tela toda (tablet): o botão do canto de cima troca entre expandir e voltar ao painel
@@ -1664,10 +1761,26 @@ const player = (() => {
   window.addEventListener('popstate', () => {
     if (voltaDaLetra) { voltaDaLetra = false; return; }
     // o voltar com a letra na tela toda fecha só ela (volta para o Tocando agora)
+    if (el.classList.contains('letra-cheia') && letraDaPagina) {
+      // o voltar na tela da música: sai dela (no tablet o próprio voltar já saiu da página)
+      letraDaPagina = false;
+      pararRolagem();
+      if (ehTablet()) { painelCheio(false, { semVoltar: true }); return; }
+      view.style.visibility = 'hidden';
+      sobrePagina = location.hash;
+      painelCheio(false);
+      return;
+    }
     if (el.classList.contains('letra-cheia')) { if (!history.state?.letraCheia) letraCheia(false); return; }
     if (document.body.classList.contains('painel-cheio') && !ehTablet()) painelCheio(false);
   });
-  window.addEventListener('hashchange', () => { letraCheia(false); painelCheio(false); });
+  window.addEventListener('hashchange', () => {
+    // saindo da tela da música (outra tela): fecha a letra e o Tocando agora sem mexer no histórico
+    if (letraDaPagina) { letraDaPagina = false; pararRolagem(); el.classList.remove('letra-cheia'); document.body.classList.remove('com-letra-cheia'); }
+    document.body.classList.remove('musica-na-letra');
+    letraCheia(false);
+    painelCheio(false);
+  });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('painel-cheio') && !document.querySelector('dialog[open]')) painelCheio(false); });
   el.addEventListener('click', (e) => {
     if (e.target.closest('.pl-prog')) return; // a barra do tempo é tratada no toque (abaixo): tocar ou arrastar
@@ -1732,8 +1845,26 @@ const player = (() => {
     if (b.dataset.pl === 'fila') abrirFila();
     if (b.dataset.pl === 'menu') abrirMenu();
     if (b.dataset.pl === 'cheio') { letraCheia(true); return; }
-    if (b.dataset.pl === 'letra-fechar') { letraCheia(false); return; }
-    if (b.dataset.pl === 'ver-cifra' && atual?.href) { verCifra(atual.href); return; }
+    if (b.dataset.pl === 'letra-fechar') { if (letraDaPagina) fecharMusica(); else letraCheia(false); return; }
+    if (b.dataset.pl === 'ver-cifra') { definirModoCifra(!modoCifra); if (!el.classList.contains('letra-cheia')) letraCheia(true); return; }
+    if (b.dataset.pl === 'ver-video') {
+      // da tela da música para o Tocando agora (o vídeo); fechando ele, sai da página da música
+      letraDaPagina = false;
+      pararRolagem();
+      el.classList.remove('letra-cheia');
+      document.body.classList.remove('com-letra-cheia');
+      desenhar();
+      return;
+    }
+    if (b.dataset.pl === 'tom-') { mudarCifra('transpose', -1); return; }
+    if (b.dataset.pl === 'tom+') { mudarCifra('transpose', 1); return; }
+    if (b.dataset.pl === 'capo-') { mudarCifra('capo', -1); return; }
+    if (b.dataset.pl === 'capo+') { mudarCifra('capo', 1); return; }
+    if (b.dataset.pl === 'fonte-') { mudarFonte(-0.1); return; }
+    if (b.dataset.pl === 'fonte+') { mudarFonte(0.1); return; }
+    if (b.dataset.pl === 'rolar') { rolar(); return; }
+    if (b.dataset.pl === 'editar' && atual?.songId && db.song(atual.songId)) { location.hash = '#/editar/' + atual.songId; return; }
+    if (b.dataset.pl === 'partitura' && atual?.songId) { location.hash = `#/musica/${atual.songId}/partitura`; return; }
     if (b.dataset.pl === 'sinc-ajustar') { ajustando = true; ajustandoVideo = atual?.youtube || ''; mostrarSinc(); letraCheia(true); return; }
     if (b.dataset.pl === 'sinc-pronto') {
       ajustando = false;
@@ -1756,6 +1887,7 @@ const player = (() => {
       return;
     }
     if (b.dataset.pl === 'sinc-agora') { marcarFrase(); return; }
+    if (b.dataset.pl === 'sinc-tentar' && atual?.youtube) { lrclibTentado.delete(atual.youtube); sincEstado.delete(atual.youtube); letraDe = ''; desenharLetra(); return; }
     if (b.dataset.pl === 'sinc-desfazer' && marcando) {
       marcando.tempos.pop();
       const n = marcando.tempos.length;
@@ -6887,23 +7019,18 @@ function viewSong(id, ctx = {}) {
     }
   }
 
-  // nesta página o vídeo toca aqui (Referências); o topo fica só com os quadros do clipe. Ao sair, continua no mini player
-  if (song.youtube) {
-    player.palco($('#video-box'), song.youtube);
-    aoSair(() => player.palco(null));
-  }
-  // veio da Busca ou da Biblioteca, no celular: toca e abre o "Tocando agora" por cima (fechando, fica a cifra)
-  // celular: a página antiga da música não aparece mais — o Tocando agora abre por cima dela (com vídeo: tocando, se veio
-  // de uma lista, ou pausado; sem vídeo: a capa e o botão de escolher um). Ela fica por baixo só para a letra na tela toda
-  if (telaDeCelular() && !document.body.classList.contains('performance') && !document.body.classList.contains('painel-cheio') && cifraNaTela !== location.hash) {
+  // A música abre sempre na tela dela: a letra (ou a cifra, com tom, capotraste e tamanho) na tela toda, no Tocando
+  // agora, em todos os aparelhos. Esta página antiga fica por baixo, escondida, só cuidando da música (o vídeo da busca,
+  // a cifra que chega depois, a cifra completada…). Com vídeo: tocando, se veio de uma lista, ou pausado; sem vídeo, a
+  // capa e o botão de escolher um. O vídeo que chega depois (a busca demorou) passa a tocar
+  if (!document.body.classList.contains('performance')) {
     const item = itemDoPlayer(song, ctx.set ? db.set(ctx.set.id) : null, ctx.set ? ctx.index : -1);
-    if (!song.youtube) player.mostrarSemVideo(item);
-    else if (!player.desta(song.youtube)) { if (abrirNoTocando) tocar(); else player.tocar(item, { pausado: true }); }
-    player.expandir({ sobrePagina: true });
-  } else if (song.youtube && player.atual?.semVideo && player.atual.songId === song.id) {
-    // o vídeo chegou depois de a música abrir (a busca demorou): o Tocando agora, já aberto sem vídeo, passa a tocá-lo
-    player.tocar(itemDoPlayer(song, ctx.set ? db.set(ctx.set.id) : null, ctx.set ? ctx.index : -1));
+    const semVideoDesta = player.atual?.semVideo && player.atual.songId === song.id;
+    if (!song.youtube) { if (!semVideoDesta) player.mostrarSemVideo(item); }
+    else if (!player.desta(song.youtube)) { if (abrirNoTocando || semVideoDesta) tocar(); else player.tocar(item, { pausado: true }); }
+    player.abrirMusica({ cifra: abrirComCifra });
   }
+  abrirComCifra = false;
   abrirNoTocando = false;
 
   const salvarPrevia = () => {
@@ -8853,10 +8980,12 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
   const guardar = (sinc) => guardarSincronia(song, sinc);
   // primeiro, sem servidor: a letra já sincronizada do LRCLIB (na hora), se for da mesma música e tiver a duração do
   // vídeo. O "Refazer" (sincronia errada) e as músicas que não estão lá vão para o servidor, que ouve o áudio
-  if (!refazer) {
+  // (sem servidor, o "de novo" também tenta o LRCLIB: senão daria erro na certa)
+  let lrclibFalhou = false;
+  if (!refazer || soLrclib || !servidorIA().url) {
     status('carregando', 'Procurando a letra sincronizada…');
     const duracao = (player.desta(song.youtube) && player.duracao) || await duracaoDaMusica(song).catch(() => 0);
-    const lrc = await letraSincronizada({ titulo: tituloLimpo(song.title), artista: song.artist || '', duracao }).catch(() => null);
+    const lrc = await letraSincronizada({ titulo: tituloLimpo(song.title), artista: song.artist || '', duracao }).catch(() => { lrclibFalhou = true; return null; });
     if (lrc) {
       guardar({ video: song.youtube, linhas: lrc.linhas, tempos: lrc.tempos, fonte: 'lrclib', ...(lrc.ajustar ? { ajustar: true } : {}) });
       sincronizando.delete(song.id);
@@ -8867,12 +8996,12 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
       return lrc.ajustar ? 'ajustar' : 'ok';
     }
   }
-  if (soLrclib) { sincronizando.delete(song.id); return 'nada'; }
+  if (soLrclib) { sincronizando.delete(song.id); return lrclibFalhou ? 'erro' : 'nada'; }
   if (!servidorIA().url) {
     sincronizando.delete(song.id);
-    if (!sozinho) status('erro', refazer ? 'O servidor da IA não está disponível agora. Tente de novo daqui a pouco.'
-      : 'Esta música não tem letra sincronizada pronta, e o servidor que ouve o vídeo não está disponível agora.');
-    return 'erro';
+    if (!sozinho) status('erro', lrclibFalhou ? 'O banco de letras sincronizadas não respondeu agora. Tente de novo daqui a pouco ou sincronize à mão.'
+      : 'Não achei a letra sincronizada desta música. Sincronize à mão: toque em "Agora" no começo de cada frase.');
+    return lrclibFalhou ? 'erro' : 'nada';
   }
   status('carregando', refazer ? 'Sincronizando de novo, com mais precisão…' : 'Sincronizando a letra com o vídeo…');
   try {
@@ -9604,7 +9733,6 @@ function route() {
   const palco = document.body.classList.contains('performance') && /^#\/repertorio\/[^/]+\/\d+/.test(location.hash);
   if (palco) sessionStorage.setItem('palco', '1'); else sairPalco({ navegando: true });
   const [a, b, c, d, e] = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
-  if (cifraNaTela && location.hash !== cifraNaTela) cifraNaTela = ''; // saiu da cifra pedida
   // a última tela de lista (biblioteca, repertório, busca…): o editor volta para ela, não para a música
   if (!['musica', 'editar'].includes(a) && !(a === 'repertorio' && c !== undefined)) ultimaLista = location.hash || '#/';
   view.scrollTop = 0;
