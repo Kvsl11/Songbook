@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-255';
+export const APP_VERSAO = '2026.10.28-256';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1442,9 +1442,14 @@ const player = (() => {
     if (!ehTablet()) {
       document.documentElement.classList.toggle('pp', ligar);
       if (ligar && !antes) { history.pushState({ tocandoAgora: true }, ''); sobrePagina = sobre ? location.hash : ''; }
+      // aberto por cima da página da música (a música aberta da busca ou da biblioteca): aparece de uma vez, sem subir
+      // aos poucos (a página antiga da música aparecia por baixo enquanto ele surgia)
+      el.classList.toggle('sem-subir', ligar && !antes ? sobre : ligar && el.classList.contains('sem-subir'));
       if (!ligar && antes && !semVoltar) {
         // aberto por cima da página da música: fechando, sai dela também (a página antiga não aparece)
         const sairDaPagina = !manter && sobrePagina && location.hash === sobrePagina;
+        // (some já, até a página de antes ser desenhada, para não piscar)
+        if (sairDaPagina) view.style.visibility = 'hidden';
         if (history.state?.tocandoAgora) history.go(sairDaPagina ? -2 : -1);
         else if (sairDaPagina) history.back();
       }
@@ -3145,10 +3150,11 @@ async function todasDoArtista(d) {
   return [...porUrl.values()];
 }
 
+// (o tom fica num chip discreto à direita, como na biblioteca; embaixo do nome, o artista)
 const linhaFaixa = (f, i, n, foto, artista = '') => `<li class="track clickable faixa${f.url ? '' : ' sem-cifra'}" data-i="${i}" style="grid-template-columns:auto auto 1fr auto">
   <span class="num">${n}</span>${capa({ titulo: f.titulo, capa: f.capa || foto })}<div class="info"><div class="t">${esc(f.titulo)}</div>
-  <div class="s">${f.url ? `<span class="ind"><span class="ind-i" title="Tem cifra">${icon('chord', 11)}</span></span>${f.tom ? `Tom ${esc(f.tom)}` : 'Cifra'}` : 'Sem cifra no Cifra Club'}</div></div>
-  <span class="acts">${botaoSalvar({ titulo: f.titulo, artista, cifra: f.url || '' }, 'mini')}<button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
+  <div class="s">${f.url ? `${f.tom ? '' : `<span class="ind"><span class="ind-i" title="Tem cifra">${icon('chord', 11)}</span></span>`}${esc(artista || 'Cifra')}` : 'Sem cifra no Cifra Club'}</div></div>
+  <span class="acts">${f.url && f.tom ? `<span class="chip sm key" title="Tom ${esc(f.tom)}">${esc(f.tom)}</span>` : ''}${botaoSalvar({ titulo: f.titulo, artista, cifra: f.url || '' }, 'mini')}<button class="icon-btn" aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 
 async function viewArtista(slug, nome) {
   setTab('buscar');
@@ -9349,6 +9355,7 @@ async function desenharMissalDoDia(data) {
 }
 
 function route() {
+  view.style.visibility = ''; // escondida ao fechar o Tocando agora aberto por cima da música (painelCheio)
   stopScroll();
   tirarPrevia();
   keyHandler = null;
