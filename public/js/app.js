@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-248';
+export const APP_VERSAO = '2026.10.28-249';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -757,7 +757,10 @@ const player = (() => {
       <button class="icon-btn" data-pl="compartilhar" aria-label="Compartilhar" title="Compartilhar">${icon('share', 20)}</button>
       <button class="icon-btn" data-pl="fila" aria-label="Fila" title="Fila">${icon('queue', 20)}</button>
     </div>
-    <section class="pl-letra" hidden><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-linhas"></div></section>
+    <section class="pl-letra" hidden><div class="pl-letra-topo"><button class="icon-btn" data-pl="letra-fechar" aria-label="Fechar a letra" title="Fechar">${icon('down', 24)}</button><span class="pl-letra-nome"><b></b><small></small></span><span></span></div><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-linhas"></div>
+      <div class="pl-letra-pe"><div class="pl-letra-bts2"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 22)}</button><span class="grow"></span><button class="icon-btn pl-mais" data-pl="menu" aria-label="Mais opções" title="Mais opções">${icon('more', 22)}</button></div>
+        <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
+        <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button></div></section>
     <div class="pl-extra" hidden></div>`;
   // no tablet o player é o painel "Tocando agora" à direita, fora da coluna principal (que não o corta)
   const casa = ehTablet() ? document.body : $('.main-col');
@@ -825,7 +828,7 @@ const player = (() => {
     const r = a?.isConnected ? a.getBoundingClientRect() : null;
     if (!r || !r.width || !r.height) { tela.style.visibility = 'hidden'; return; }
     const base = tela.parentElement.getBoundingClientRect();
-    tela.style.visibility = (modoCapa() || atual?.semVideo) && !noPalco() ? 'hidden' : 'visible';
+    tela.style.visibility = (modoCapa() || atual?.semVideo || el.classList.contains('letra-cheia')) && !noPalco() ? 'hidden' : 'visible';
     tela.style.transform = `translate(${r.left - base.left}px, ${r.top - base.top}px)`;
     tela.style.width = r.width + 'px';
     tela.style.height = r.height + 'px';
@@ -850,8 +853,7 @@ const player = (() => {
     // o tempo vai junto do artista no celular; no computador ele fica na barra de tempo, no centro
     $('.pl-txt small', el).innerHTML = esc([atual.parte, atual.artista].filter(Boolean).join(' · ')) + (duracao ? `<span class="pl-tmini">${atual.parte || atual.artista ? ' · ' : ''}${fmt(tempo)} / ${fmt(duracao)}</span>` : '');
     // música sem vídeo: o play é o de sempre; tocando nele (ou na pílula "Escolher um vídeo"), escolhe um vídeo do YouTube
-    $('.pl-play', el).innerHTML = icon(estado === 'tocando' && !atual.semVideo ? 'pause' : 'play', 20);
-    $('.pl-play', el).title = atual.semVideo ? 'Escolher um vídeo para tocar' : '';
+    el.querySelectorAll('.pl-play').forEach((b) => { b.innerHTML = icon(estado === 'tocando' && !atual.semVideo ? 'pause' : 'play', 20); b.title = atual.semVideo ? 'Escolher um vídeo para tocar' : ''; });
     // a bolinha de salva (na barrinha recolhida do tablet): ✓ se a música está na biblioteca, + se não
     const salva = Boolean(atual.songId && db.song(atual.songId));
     const bs = $('.pl-salva', el);
@@ -862,7 +864,7 @@ const player = (() => {
       bs.title = salva ? 'Na sua biblioteca: adicionar a um repertório' : 'Abrir para salvar na biblioteca';
       bs.setAttribute('aria-label', bs.title);
     }
-    $('.pl-prog i', el).style.width = duracao ? `${Math.min(100, (tempo / duracao) * 100)}%` : '0';
+    el.querySelectorAll('.pl-prog i').forEach((i) => { i.style.width = duracao ? `${Math.min(100, (tempo / duracao) * 100)}%` : '0'; });
     sessaoDeMidia();
     // voltar, pular e aleatório: numa música do repertório ou da biblioteca (a fila)
     const f = fila();
@@ -874,8 +876,10 @@ const player = (() => {
     $('[data-pl="anterior"]', el).disabled = !f || (anteriorIndice() < 0 && tempo < 3);
     $('[data-pl="proxima"]', el).disabled = !f || proximoIndice() < 0;
     desenharModos();
-    $('.pl-t0', el).textContent = duracao ? fmt(tempo) : '';
-    $('.pl-t1', el).textContent = duracao ? fmt(duracao) : '';
+    el.querySelectorAll('.pl-t0').forEach((t) => { t.textContent = duracao ? fmt(tempo) : ''; });
+    el.querySelectorAll('.pl-t1').forEach((t) => { t.textContent = duracao ? fmt(duracao) : ''; });
+    $('.pl-letra-nome b', el).textContent = atual.titulo || '';
+    $('.pl-letra-nome small', el).textContent = atual.artista || '';
     $('.pl-cab-meio b', el).textContent = atual.setId ? db.set(atual.setId)?.name || '' : atual.parte || '';
     desenharLetra();
     desenharExtra();
@@ -984,6 +988,24 @@ const player = (() => {
     $('.pl-linhas', el).innerHTML = linhas.map((l, k) => `<p data-k="${k}">${esc(l)}</p>`).join('');
   };
   let linhaAcesa = -1;
+  // a linha cantada fica a um terço da caixa (no cartão, que não rola com o dedo, e na letra na tela toda)
+  const rolarLetra = (behavior = 'smooth') => {
+    const caixa = $('.pl-linhas', el);
+    const p = caixa.querySelector(`p[data-k="${linhaAcesa}"]`);
+    if (p) caixa.scrollTo({ top: p.offsetTop - caixa.clientHeight / 3, behavior });
+  };
+  // a letra na tela toda, como no Spotify: o nome em cima, a letra inteira rolando e, embaixo, compartilhar, os ⋮, a
+  // barra do tempo e o play. No painel ela é só um cartão, com as primeiras linhas (ou as de agora, sincronizada)
+  let voltaDaLetra = false; // o voltar que a própria letra pediu ao fechar (não fecha o Tocando agora junto)
+  const letraCheia = (ligar) => {
+    if (el.classList.contains('letra-cheia') === ligar) return;
+    el.classList.toggle('letra-cheia', ligar);
+    document.body.classList.toggle('com-letra-cheia', ligar);
+    if (ligar) history.pushState({ ...history.state, letraCheia: true }, '');
+    else if (history.state?.letraCheia) { voltaDaLetra = true; history.back(); }
+    const caixa = $('.pl-linhas', el);
+    if (linhaAcesa >= 0) requestAnimationFrame(() => rolarLetra('auto')); else caixa.scrollTop = 0;
+  };
   setInterval(() => {
     if (!tempos || !atual || el.hidden) return;
     const k = linhaNoTempo(tempos, api.tempoAgora);
@@ -993,10 +1015,11 @@ const player = (() => {
     $('.pl-frase', el).textContent = (k >= 0 && linhasDaLetra[k]) || '♪';
     const caixa = $('.pl-linhas', el);
     caixa.querySelectorAll('p').forEach((p, i) => { p.classList.toggle('agora', i === k); p.classList.toggle('cantada', i < k); });
-    const p = caixa.querySelector(`p[data-k="${k}"]`);
-    if (p) caixa.scrollTo({ top: p.offsetTop - caixa.clientHeight / 3, behavior: 'smooth' });
+    rolarLetra();
   }, 80);
   el.addEventListener('click', (e) => {
+    // no cartão, tocar na letra abre ela na tela toda; na tela toda, tocar numa linha leva o vídeo para ela
+    if (e.target.closest('.pl-linhas') && !el.classList.contains('letra-cheia')) { letraCheia(true); return; }
     const p = e.target.closest('.pl-linhas p');
     if (p && tempos?.[p.dataset.k]) api.irPara(Math.max(0, tempos[p.dataset.k].inicio - 0.3));
   });
@@ -1217,7 +1240,7 @@ const player = (() => {
       if (msg?.event === 'onError') {
         estado = 'parado';
         $('.pl-txt small', el).innerHTML = `Este vídeo não toca fora do YouTube · <a href="https://www.youtube.com/watch?v=${esc(atual.youtube)}" target="_blank" rel="noopener">abrir</a>${atual.songId ? ' · <button class="link-btn" data-pl="trocar">escolher outro</button>' : ''}`;
-        $('.pl-play', el).innerHTML = icon('play', 20);
+        el.querySelectorAll('.pl-play').forEach((b) => { b.innerHTML = icon('play', 20); });
         if (noPalco()) toast('Este vídeo não toca fora do YouTube: escolha outro em “Trocar vídeo”');
         avisar();
         return;
@@ -1329,6 +1352,7 @@ const player = (() => {
   // manter: vai para a letra na tela toda desta música (continua a mesma música, sem sair da página dela)
   const painelCheio = (ligar, { semVoltar = false, manter = false, sobre = false } = {}) => {
     const antes = document.body.classList.contains('painel-cheio');
+    if (!ligar && el.classList.contains('letra-cheia')) { el.classList.remove('letra-cheia'); document.body.classList.remove('com-letra-cheia'); }
     document.body.classList.toggle('painel-cheio', ligar);
     if (!ehTablet()) {
       document.documentElement.classList.toggle('pp', ligar);
@@ -1350,8 +1374,13 @@ const player = (() => {
       b.setAttribute('aria-label', ligar ? 'Voltar' : 'Abrir o Tocando agora');
     });
   };
-  window.addEventListener('popstate', () => { if (document.body.classList.contains('painel-cheio') && !ehTablet()) painelCheio(false); });
-  window.addEventListener('hashchange', () => painelCheio(false));
+  window.addEventListener('popstate', () => {
+    if (voltaDaLetra) { voltaDaLetra = false; return; }
+    // o voltar com a letra na tela toda fecha só ela (volta para o Tocando agora)
+    if (el.classList.contains('letra-cheia')) { if (!history.state?.letraCheia) letraCheia(false); return; }
+    if (document.body.classList.contains('painel-cheio') && !ehTablet()) painelCheio(false);
+  });
+  window.addEventListener('hashchange', () => { letraCheia(false); painelCheio(false); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('painel-cheio') && !document.querySelector('dialog[open]')) painelCheio(false); });
   el.addEventListener('click', (e) => {
     const prog = e.target.closest('.pl-prog');
@@ -1404,6 +1433,8 @@ const player = (() => {
     if (b.dataset.pl === 'aparelhos' && atual) abrirAparelhos();
     if (b.dataset.pl === 'fila') abrirFila();
     if (b.dataset.pl === 'menu') abrirMenu();
+    if (b.dataset.pl === 'cheio') { letraCheia(true); return; }
+    if (b.dataset.pl === 'letra-fechar') { letraCheia(false); return; }
     if (b.dataset.pl === 'aleatorio') {
       aleatorio = !aleatorio;
       db.setPref('aleatorio', aleatorio);
@@ -1433,20 +1464,17 @@ const player = (() => {
       if (s) escolherVideo(s).then((url) => { if (!url) return; db.saveSong({ ...db.song(s.id), content: definirMeta(db.song(s.id).content, 'youtube', url) }); api.tocar({ ...atual, semVideo: false, youtube: youtubeId(url) }); route(); });
     }
     if (b.dataset.pl === 'ampliar') { el.classList.toggle('grande'); b.innerHTML = icon(el.classList.contains('grande') ? 'shrink' : 'expand', 18); }
-    // abrir a música (o nome no player): a página dela; expandir a letra: a página dela já com a letra na tela toda
+    // abrir a música (o nome no player): a página dela (o expandir da letra abre a letra na tela toda, aqui mesmo)
     // no celular o Tocando agora é a tela da música: tocar no nome não leva para a página antiga
     if (b.dataset.pl === 'abrir' && telaDeCelular()) return;
-    if ((b.dataset.pl === 'abrir' || b.dataset.pl === 'cheio') && atual) {
+    if (b.dataset.pl === 'abrir' && atual) {
       // saindo da tela toda (celular/computador) para a página da música: ela toma o lugar da tela toda no histórico.
       // Antes o "voltar" da tela toda corria depois de abrir a página e levava de volta ao início
       const daTela = !ehTablet() && history.state?.tocandoAgora && atual.href && location.hash !== atual.href;
-      painelCheio(false, { semVoltar: daTela, manter: b.dataset.pl === 'cheio' });
-      abrirLetraCheia = b.dataset.pl === 'cheio';
-      voltarAoTocando = abrirLetraCheia && !ehTablet();
+      painelCheio(false, { semVoltar: daTela });
       if (daTela) location.replace(atual.href);
       else if (atual.href && location.hash !== atual.href) location.hash = atual.href;
       else if (!atual.href && atual.abrir) atual.abrir();
-      else if (abrirLetraCheia) { abrirLetraCheia = false; $('#btn-palco')?.click(); voltarAoTocando = !ehTablet(); }
     }
   });
   return api;

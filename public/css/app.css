@@ -2897,7 +2897,7 @@ html.tablet .quick .cover { width: 72px; height: 72px; }
 html.pp #player {
   position: fixed; z-index: 25; top: 8px; right: 8px; bottom: 8px; left: auto; width: var(--painel-w); height: auto;
   display: flex; flex-direction: column; gap: 14px; padding: 16px 18px 18px; overflow-y: auto; overscroll-behavior: contain;
-  border-radius: var(--radius); box-shadow: none; animation: surgir 0.3s both;
+  border-radius: var(--radius); box-shadow: none; animation: surgir 0.3s backwards;
   background: linear-gradient(180deg, color-mix(in srgb, var(--cor-musica, var(--tint)) 88%, #000) 0%, color-mix(in srgb, var(--cor-musica, var(--tint)) 45%, #121212) 55%, #121212 100%);
 }
 html.pp #player[hidden] { display: none; }
@@ -2962,7 +2962,9 @@ html.pp #player .pl-acoes .icon-btn { color: rgb(255 255 255 / 0.9); }
 html.pp #player .pl-play { width: 64px; height: 64px; background: #fff; color: #000; border-radius: 50%; }
 html.pp #player .pl-pulo { display: grid; width: 48px; height: 48px; }
 html.pp #player .pl-modo { width: 44px; height: 44px; }
-html.pp #player .pl-letra { order: 8; flex: 1 0 auto; display: flex; flex-direction: column; min-height: 240px; max-height: 60vh; padding: 16px 18px; border-radius: 14px;
+/* a letra no painel é só um cartão, da mesma altura sempre: as primeiras linhas (sincronizada, as de agora) somem num
+   degradê embaixo; a letra inteira abre no expandir (ou tocando no cartão), na tela toda */
+html.pp #player .pl-letra { order: 8; flex: none; display: flex; flex-direction: column; height: 340px; padding: 16px 18px 0; border-radius: 14px; overflow: hidden; cursor: pointer;
   background: color-mix(in srgb, var(--cor-musica, var(--tint)) 60%, #000); }
 html.pp #player .pl-letra[hidden] { display: none; }
 html.pp #player .pl-letra-cab { display: flex; align-items: center; justify-content: space-between; margin: -4px -6px 8px 0; }
@@ -2971,15 +2973,43 @@ html.pp #player .pl-letra-bts { display: flex; gap: 8px; }
 html.pp #player .pl-letra-cab .icon-btn { width: 34px; height: 34px; background: rgb(0 0 0 / 0.25); }
 /* a letra só rola na vertical: a frase de agora cresce um pouco (scale) e passava da borda, criando uma rolagem de lado;
    as frases quebram a linha antes da borda e a barra de rolagem fica escondida */
-html.pp #player .pl-linhas { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; scroll-behavior: smooth; scrollbar-width: none; }
+html.pp #player .pl-linhas { flex: 1; min-height: 0; overflow: hidden; scroll-behavior: smooth; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent); mask-image: linear-gradient(180deg, #000 70%, transparent); }
 html.pp #player .pl-linhas::-webkit-scrollbar { display: none; }
 html.pp #player .pl-linhas p { margin: 0 0 12px; padding-right: 4%; overflow-wrap: anywhere; font-size: 21px; font-weight: 800; line-height: 1.3; color: rgb(255 255 255 / 0.95); }
 /* letra sincronizada: tudo em branco — a que vem um pouco mais suave, a cantada mais apagada e a de agora acesa */
 html.pp #player .pl-letra.sincronizada .pl-linhas p { color: rgb(255 255 255 / 0.78); cursor: pointer; transform-origin: left center; transition: color 0.18s, transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
 html.pp #player .pl-letra.sincronizada .pl-linhas p.cantada { color: rgb(255 255 255 / 0.5); }
 html.pp #player .pl-letra.sincronizada .pl-linhas p.agora { color: #fff; transform: scale(1.03); text-shadow: 0 0 16px rgb(255 255 255 / 0.3); animation: linha-salta 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
-#player .pl-cab, #player .pl-letra, #player .pl-salva, #player .pl-extra, #player .pl-frase, #player .pl-troca, #player .pl-acoes { display: none; }
+#player .pl-letra-topo, #player .pl-letra-pe, #player .pl-cab, #player .pl-letra, #player .pl-salva, #player .pl-extra, #player .pl-frase, #player .pl-troca, #player .pl-acoes { display: none; }
 #player .pl-meio { display: contents; }
+/* a letra na tela toda (o expandir do cartão), como no Spotify: em cima a setinha (fechar), o nome e o artista; no meio
+   a letra inteira, rolando; embaixo compartilhar e os ⋮, a barra do tempo e o play. Fica por cima de tudo, na cor da música */
+/* o painel entra com animation "backwards" (não "both"): o transform que ficava depois dela prendia esta tela, que é
+   position: fixed, dentro do painel. !important: as regras da tela toda (painel-cheio) dão largura, altura e
+   align-self: center ao cartão (e, num elemento fixo, o center o encolhe para o tamanho do conteúdo) */
+html.pp #player.letra-cheia .pl-letra { position: fixed; inset: 0; z-index: 60; width: auto !important; height: auto !important; align-self: stretch !important; margin: 0; border-radius: 0; cursor: auto;
+  padding: calc(8px + env(safe-area-inset-top)) max(20px, calc((100% - 760px) / 2)) calc(18px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--cor-musica, var(--tint)) 80%, #000) 0%, color-mix(in srgb, var(--cor-musica, var(--tint)) 70%, #000) 100%);
+  animation: subir-tela 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+body.com-letra-cheia .nav { display: none; }
+html.pp #player.letra-cheia .pl-letra-cab { display: none; }
+html.pp #player.letra-cheia .pl-letra-topo { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; align-items: center; min-height: 56px; margin: 0 -8px 4px; }
+html.pp #player .pl-letra-topo .icon-btn { width: 48px; height: 48px; color: #fff; }
+html.pp #player .pl-letra-nome { min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
+html.pp #player .pl-letra-nome b, html.pp #player .pl-letra-nome small { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.pp #player .pl-letra-nome b { font-size: 17px; font-weight: 800; }
+html.pp #player .pl-letra-nome small { font-size: 15px; color: rgb(255 255 255 / 0.85); }
+html.pp #player.letra-cheia .pl-linhas { overflow-y: auto; padding: 14px 0 30%;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 5%, #000 92%, transparent); mask-image: linear-gradient(180deg, transparent, #000 5%, #000 92%, transparent); }
+html.pp #player.letra-cheia .pl-linhas p { font-size: 26px; margin-bottom: 18px; }
+html.pp #player.letra-cheia .pl-letra-pe { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; flex: none; padding-top: 6px; }
+html.pp #player .pl-letra-pe > * { grid-area: auto; order: 0; } /* a barra do tempo tem grid-area e order da barra do player */
+html.pp #player .pl-letra-bts2 { display: flex; align-items: center; margin: 0 -8px; }
+html.pp #player .pl-letra-bts2 .grow { flex: 1; }
+html.pp #player .pl-letra-bts2 .icon-btn { width: 44px; height: 44px; color: #fff; }
+html.pp #player .pl-letra-pe .pl-play { justify-self: center; }
+
 /* embaixo da letra: os cartões do artista, dos créditos e do vídeo (rolando o painel) */
 html.pp #player .pl-extra { order: 9; display: grid; gap: 12px; flex: none; }
 html.pp #player .pl-extra[hidden] { display: none; }
@@ -3020,7 +3050,7 @@ html.pp body.painel-cheio #player .pl-frase { margin-top: 18px; font-size: 18px;
 html.pp body.painel-cheio #player .pl-txt b { font-size: 26px; }
 html.pp body.painel-cheio #player .pl-txt small { font-size: 18px; }
 html.pp body.painel-cheio #player .pl-play { width: 72px; height: 72px; }
-html.pp body.painel-cheio #player .pl-letra { min-height: 320px; max-height: 62vh; }
+html.pp body.painel-cheio #player .pl-letra { height: 380px; }
 html.pp body.painel-cheio #player .pl-letra .pl-linhas p { font-size: 28px; }
 html.pp body.painel-cheio #player .pl-extra { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: start; }
 @media (orientation: portrait) {
@@ -3031,7 +3061,7 @@ html.pp body.painel-cheio #player .pl-extra { grid-template-columns: repeat(auto
 /* celular e computador: o "Tocando agora" é a tela toda, aberta pela barrinha do player (no celular, tocando nela; no
    computador, pelo botão do painel na barra), com o mesmo jeito do tablet. Fica dentro da coluna principal (no computador
    o menu da esquerda continua à vista, como no Spotify) */
-html.pp:not(.tablet) body.painel-cheio #player { position: absolute; inset: 0; z-index: 40; width: auto; height: auto; border-radius: 0; box-shadow: none; animation: subir-tela 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+html.pp:not(.tablet) body.painel-cheio #player { position: absolute; inset: 0; z-index: 40; width: auto; height: auto; border-radius: 0; box-shadow: none; animation: subir-tela 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
 html.pp:not(.tablet) body.painel-cheio #pl-tela:not(.no-palco):not(.na-telinha) { z-index: 41; }
 @keyframes subir-tela { from { transform: translateY(24px); opacity: 0; } }
 /* no celular: o topo é a setinha (fechar), de onde toca e os ⋮, como no Spotify do celular; tudo mais junto */
@@ -3046,7 +3076,7 @@ html.pp:not(.tablet) body.painel-cheio #player .pl-recolher { display: grid; }
   html.pp:not(.tablet) body.painel-cheio #player .pl-txt small { font-size: 16px; }
   html.pp:not(.tablet) body.painel-cheio #player .pl-ctrl { padding: 0; }
   html.pp:not(.tablet) body.painel-cheio #player .pl-play { width: 64px; height: 64px; }
-  html.pp:not(.tablet) body.painel-cheio #player .pl-letra { min-height: 280px; max-height: 60dvh; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-letra { height: 340px; }
   html.pp:not(.tablet) body.painel-cheio #player .pl-letra .pl-linhas p { font-size: 20px; }
   html.pp:not(.tablet) body.painel-cheio #player .pl-extra { grid-template-columns: minmax(0, 1fr); }
 }
