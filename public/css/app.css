@@ -2926,6 +2926,8 @@ html.tablet .nav a.active { color: var(--text); }
 /* em pé o tablet cai na faixa do menu lateral (700–1199 px), que pintava o ícone e o nome ativos de azul: no tablet
    ficam brancos, como deitado */
 html.tablet .nav a.active span, html.tablet .nav a:hover span { color: inherit; }
+/* e sem o fundo cinza em volta da aba ativa (a mesma regra do menu lateral): só o ícone preenchido, em branco */
+html.tablet .nav a.active, html.tablet .nav a:hover { background: none; }
 html.tablet .topbar { padding: 12px 24px; }
 /* no tablet a tela fica mais longe dos olhos: botões, filtros, listas e textos um pouco maiores (como no Spotify) */
 html.tablet .chip { height: 40px; padding: 0 17px; font-size: 15.5px; gap: 8px; }
