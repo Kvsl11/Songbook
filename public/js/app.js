@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-275';
+export const APP_VERSAO = '2026.10.28-276';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -2806,6 +2806,58 @@ const blocoCor = (lit) => {
     <span><b>Cor ${esc(({ branco: 'branca', vermelho: 'vermelha', roxo: 'roxa', preto: 'preta' })[c.cor] || c.cor)}</b>${c.sentido ? ` — ${esc(c.sentido)}` : ''}${c.motivo ? `<small>${esc(c.motivo)}</small>` : ''}</span></div>`;
 };
 
+// ---- o cartão da liturgia (página inicial e página da Liturgia): o dia num quadradinho de calendário, o tempo e a
+// semana, o nome da celebração, a cor do dia com o significado, as leituras com o nome de cada uma e o refrão do salmo
+const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const DIAS_CURTOS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const NOME_COR = { branco: 'Branco', vermelho: 'Vermelho', roxo: 'Roxo', preto: 'Preto', verde: 'Verde', rosa: 'Rosa', azul: 'Azul' };
+// o nome de cada leitura pela referência: Sl é o salmo, Mt/Mc/Lc/Jo o evangelho, as outras 1ª e 2ª leitura
+function leiturasComNome(leituras = []) {
+  let n = 0;
+  return leituras.map((ref) => {
+    const r = String(ref || '').trim();
+    const nome = /^sl\b/i.test(r) ? 'Salmo' : /^(mt|mc|lc|jo)\b/i.test(r) ? 'Evangelho' : `${++n}ª Leitura`;
+    return { nome, ref: r, ic: nome === 'Salmo' ? 'music' : nome === 'Evangelho' ? 'cross' : 'book' };
+  });
+}
+function heroLiturgia(lit, data, { acoes = '', salmo = true, compacto = false } = {}) {
+  const d = new Date(`${data}T12:00:00`);
+  const c = corLiturgica(lit);
+  const refrao = salmo && lit.missas?.[0]?.salmo?.refrao;
+  const semana = lit.semana && lit.semana !== lit.celebracao ? lit.semana : '';
+  const linha = [lit.grau, lit.ano].filter(Boolean).join(' · ');
+  return `<section class="lit-hero ${lit.cor === 'branco' ? 'claro' : ''}${compacto ? ' compacto' : ''}">
+    <div class="lit-hero-topo">
+      <div class="lit-dia" aria-hidden="true"><small>${DIAS_CURTOS[d.getDay()]}</small><b>${d.getDate()}</b><small>${MESES_CURTOS[d.getMonth()]}</small></div>
+      <div class="lit-hero-tit">
+        <div class="lit-tempo">${esc(lit.tempo || 'Liturgia')}${semana ? `<span> · ${esc(semana)}</span>` : ''}</div>
+        <h2>${esc(lit.celebracao)}</h2>
+        ${linha ? `<div class="lit-linha">${esc(linha)}</div>` : ''}
+      </div>
+    </div>
+    ${c.cor ? `<div class="lit-cor"><span class="lit-cor-dot" style="background:${c.cor === 'branco' ? '#fff' : CORES[c.cor] || 'currentColor'}"></span>
+      <span><b>${esc(NOME_COR[c.cor] || c.nome)}</b>${c.sentido ? ` · ${esc(c.sentido)}` : ''}${c.motivo ? `<small>${esc(c.motivo)}</small>` : ''}</span></div>` : ''}
+    ${lit.observacao ? `<div class="lit-obs">${esc(lit.observacao)}</div>` : ''}
+    ${refrao ? `<blockquote class="lit-refrao"><span aria-hidden="true">℟.</span>${esc(refrao)}</blockquote>` : ''}
+    ${lit.leituras?.length ? `<div class="lit-leituras">${leiturasComNome(lit.leituras).map((l) => `<div class="lit-leitura">${icon(l.ic, 15)}<span><small>${esc(l.nome)}</small><b>${esc(l.ref)}</b></span></div>`).join('')}</div>` : ''}
+    ${acoes ? `<div class="lit-acoes">${acoes}</div>` : ''}
+  </section>`;
+}
+// a semana da data (domingo a sábado), para trocar de dia num toque; os dias com a liturgia guardada ganham a bolinha
+// da cor
+function semanaLiturgica(data) {
+  const d = new Date(`${data}T12:00:00`);
+  const domingo = somaDias(data, -d.getDay());
+  const hoje = hojeISO();
+  return `<nav class="lit-semana" aria-label="Dias da semana">${Array.from({ length: 7 }, (_, i) => {
+    const dia = somaDias(domingo, i);
+    const dd = new Date(`${dia}T12:00:00`);
+    const cor = liturgiaGuardada(dia)?.cor;
+    return `<a href="#/liturgia/${dia}" class="${dia === data ? 'ativo' : ''}${dia === hoje ? ' hoje' : ''}" ${dia === data ? 'aria-current="date"' : ''}>
+      <small>${DIAS_CURTOS[i]}</small><b>${dd.getDate()}</b><i style="${cor ? `background:${cor === 'branco' ? '#e8d9a8' : CORES[cor] || 'transparent'}` : 'background:transparent'}"></i></a>`;
+  }).join('')}</nav>`;
+}
+
 const CORES = { verde: '#2e7d32', roxo: '#6a1b9a', branco: '#b8952b', vermelho: '#c62828', rosa: '#d0467f', preto: '#2b2b2b', azul: '#1565c0' };
 
 function tileMusica(s) {
@@ -2909,17 +2961,10 @@ function viewHome() {
     const qa = $('.quick a[href="#/liturgia"] .cover');
     if (qa) qa.style.setProperty('--h', { verde: 130, roxo: 285, vermelho: 0, branco: 45, rosa: 330 }[lit.cor] ?? 130);
     const sugestoes = m ? m.partes.reduce((n, p) => n + p.cantos.length, 0) : 0;
-    box.innerHTML = `
-      <section class="hero ${lit.cor === 'branco' ? 'claro' : ''}">
-        ${linhaCor(lit)}
-        <h2>${esc(lit.celebracao)}</h2>
-        <div class="sub">${esc([lit.data_extenso, lit.ano].filter(Boolean).join(' · '))}</div>
-        ${blocoCor(lit)}
-        ${salmo ? `<div class="salmo">Salmo: “${esc(salmo.refrao)}”</div>` : ''}
-        ${lit.leituras?.length ? `<div class="refs">${lit.leituras.map((l) => `<span>${esc(l)}</span>`).join('')}</div>` : ''}
-        <div class="acts"><a class="btn white" href="#/liturgia/${hoje}">${icon('sparkles', 16)} Montar a missa</a>
-          ${sugestoes ? `<span class="chip sm" style="background:rgb(255 255 255 / .2);color:inherit">${sugestoes} sugestões de cantos</span>` : m === undefined ? '<span class="chip sm" style="background:rgb(255 255 255 / .2);color:inherit">buscando sugestões…</span>' : ''}</div>
-      </section>`;
+    const chip = sugestoes ? `${sugestoes} sugestões de cantos` : m === undefined ? 'buscando sugestões…' : '';
+    box.innerHTML = heroLiturgia(lit, hoje, { acoes: `<a class="btn white" href="#/liturgia/${hoje}">${icon('sparkles', 16)} Montar a missa</a>
+      <a class="btn lit-btn-ler" href="#/liturgia/${hoje}">${icon('book', 16)} Ler a liturgia</a>
+      ${chip ? `<span class="lit-chip">${chip}</span>` : ''}` });
   };
   const guardadaM = missaGuardada(hoje);
   const guardada = liturgiaGuardada(hoje);
@@ -8204,6 +8249,20 @@ const missaCache = new Map();
 let recarregar = false;
 const escolhas = new Map(); // data -> { chave: valor }
 const LEITURAS = ['leitura1', 'leitura2', 'evangelho', 'sequencia'];
+// os momentos da missa, como títulos na lista das partes (a parte que não está aqui fica no momento da anterior)
+const MOMENTOS = [
+  ['Ritos iniciais', ['entrada', 'sinal', 'ato', 'gloria']],
+  ['Liturgia da Palavra', ['leitura1', 'salmo', 'leitura2', 'sequencia', 'aclamacao', 'evangelho']],
+  ['Liturgia Eucarística', ['oferendas', 'santo', 'oracao', 'cordeiro', 'comunhao']],
+  ['Ritos finais', ['final']],
+];
+const momentoDa = (chave) => MOMENTOS.findIndex(([, chaves]) => chaves.includes(chave));
+function momentoAntes(partes, i) {
+  const m = momentoDa(partes[i].chave);
+  if (m < 0) return '';
+  for (let j = i - 1; j >= 0; j--) { const a = momentoDa(partes[j].chave); if (a >= 0) return a === m ? '' : `<h3 class="momento">${esc(MOMENTOS[m][0])}</h3>`; }
+  return `<h3 class="momento">${esc(MOMENTOS[m][0])}</h3>`;
+}
 
 // fonte preferida das sugestões: 'cindy' (Cindy Ferrarezi) ou 'mpm' (Músicas para Missa)
 const fontePreferida = () => (db.prefs().fonteSugestoes === 'mpm' ? 'mpm' : 'cindy');
@@ -8261,13 +8320,13 @@ async function viewLiturgia(data) {
   });
   view.innerHTML = `
     ${abasOracoes('liturgia')}
-    <h2 class="greet">Liturgia Diária</h2>
-    <div class="date-bar">
-      <a class="icon-btn" href="#/liturgia/${somaDias(data, -1)}" aria-label="Dia anterior">${icon('back', 20)}</a>
+    <div class="lit-cab"><h2 class="greet">Liturgia Diária</h2>${ehHoje ? '' : `<a class="lit-hoje-btn" href="#/liturgia/${hojeISO()}">${icon('calendar', 15)} Hoje</a>`}</div>
+    <div class="date-bar lit-datas">
+      <a class="icon-btn" href="#/liturgia/${somaDias(data, -7)}" aria-label="Semana anterior" title="Semana anterior">${icon('back', 20)}</a>
       ${campoData('dt', data, 'Data da liturgia')}
-      <a class="icon-btn" href="#/liturgia/${somaDias(data, 1)}" aria-label="Próximo dia">${icon('next', 20)}</a>
-      ${ehHoje ? '' : `<a class="btn small" href="#/liturgia/${hojeISO()}">Hoje</a>`}
+      <a class="icon-btn" href="#/liturgia/${somaDias(data, 7)}" aria-label="Próxima semana" title="Próxima semana">${icon('next', 20)}</a>
     </div>
+    ${semanaLiturgica(data)}
     <div id="lit">${skeletonLiturgia()}</div>`;
   ligarCampoData('dt', (v) => v && (location.hash = '#/liturgia/' + v));
 
@@ -8343,14 +8402,7 @@ async function viewLiturgia(data) {
   const numeros = {};
   for (const p of missa.partes) if (!LEITURAS.includes(p.chave)) numeros[p.chave] = ++passo;
   $('#lit').innerHTML = `
-    <section class="hero ${lit.cor === 'branco' ? 'claro' : ''}">
-      ${linhaCor(lit)}
-      <h2>${esc(lit.celebracao)}</h2>
-      <div class="sub">${esc([lit.data_extenso, lit.grau, lit.ano, lit.semana !== lit.celebracao ? lit.semana : ''].filter(Boolean).join(' · '))}</div>
-        ${blocoCor(lit)}
-      ${lit.observacao ? `<div class="obs">${esc(lit.observacao)}</div>` : ''}
-      <div class="refs">${lit.leituras.map((l) => `<span>${esc(l)}</span>`).join('')}</div>
-    </section>
+    ${heroLiturgia(lit, data, { salmo: false })}
     <div class="seg-tabs tipo-missa" role="tablist">
       <button class="chip" data-tipo="liturgica" aria-pressed="${liturgica}">${icon('book', 15)} Missa litúrgica</button>
       <button class="chip" data-tipo="popular" aria-pressed="${!liturgica}">${icon('music', 15)} Missa popular</button>
@@ -8368,7 +8420,7 @@ async function viewLiturgia(data) {
     ${missa.avisos.length ? `<div class="alert lit-falha">${icon('info', 18)}<div><b>Algumas sugestões não chegaram</b>
       <ul>${missa.avisos.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>
       <button class="btn small" id="lit-tentar">${icon('refresh', 15)} Tentar de novo</button></div></div>` : ''}
-    <div id="partes">${missa.partes.map((p) => `
+    <div id="partes">${missa.partes.map((p, i) => `${momentoAntes(missa.partes, i)}
       <details class="parte" data-chave="${p.chave}" ${['salmo', 'aclamacao'].includes(p.chave) ? 'open' : ''}>
         <summary>
           ${passoHTML(p, numeros[p.chave])}

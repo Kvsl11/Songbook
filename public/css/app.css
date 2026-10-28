@@ -3769,3 +3769,93 @@ html.tablet .pt-atalho-txt small { font-size: 15px; }
 body:not(.painel-cheio) #player.sem-video { display: none !important; }
 #player .pl-video.sem-capa, html.pp #player.modo-capa .pl-video.sem-capa { display: grid; place-items: center; color: rgb(255 255 255 / 0.9);
   background: linear-gradient(135deg, color-mix(in srgb, var(--cor-musica, var(--tint)) 80%, #fff 10%), color-mix(in srgb, var(--cor-musica, var(--tint)) 55%, #000)); }
+
+/* ================================================================ liturgia: cartão do dia e página da Liturgia (moderno)
+   o cartão: o dia num quadradinho de calendário, o tempo e a semana, a celebração, a cor do dia, o refrão do salmo e as
+   leituras com o nome de cada uma; na cor litúrgica, com um brilho no canto e a cruz bem suave ao fundo */
+.lit-hero { position: relative; overflow: hidden; isolation: isolate; display: grid; gap: 14px; padding: 20px; border-radius: 22px; color: #fff;
+  background: radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--lit-cor) 55%, #fff) 0%, transparent 55%),
+    linear-gradient(160deg, color-mix(in srgb, var(--lit-cor) 92%, #fff 8%) 0%, color-mix(in srgb, var(--lit-cor) 62%, #000) 100%);
+  box-shadow: 0 14px 40px color-mix(in srgb, var(--lit-cor) 30%, transparent), inset 0 1px 0 rgb(255 255 255 / 0.18); animation: surgir 0.45s backwards; }
+.lit-hero::after { content: ""; position: absolute; z-index: -1; right: -30px; top: -36px; width: 190px; height: 190px; opacity: 0.08;
+  background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 2v20M6 8h12'/%3E%3C/svg%3E"); }
+.lit-hero-topo { display: flex; align-items: flex-start; gap: 14px; }
+.lit-dia { flex: none; display: grid; justify-items: center; width: 60px; padding: 7px 0 8px; border-radius: 16px; background: rgb(255 255 255 / 0.16);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22); line-height: 1; }
+.lit-dia small { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.85; }
+.lit-dia b { margin: 3px 0 2px; font-size: 26px; font-weight: 900; letter-spacing: -0.02em; }
+.lit-hero-tit { min-width: 0; flex: 1; }
+.lit-tempo { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.88; }
+.lit-tempo span { font-weight: 700; letter-spacing: 0.04em; text-transform: none; opacity: 0.85; }
+.lit-hero h2 { margin: 6px 0 2px; font-size: clamp(23px, 6vw, 36px); font-weight: 900; letter-spacing: -0.03em; line-height: 1.08; text-wrap: balance; }
+.lit-linha { font-size: 13.5px; font-weight: 600; opacity: 0.88; }
+.lit-cor { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 14px; background: rgb(0 0 0 / 0.18); font-size: 13.5px; line-height: 1.4; }
+.lit-cor small { display: block; margin-top: 3px; font-size: 12.5px; opacity: 0.82; }
+.lit-cor-dot { flex: none; width: 14px; height: 14px; margin-top: 2px; border-radius: 50%; box-shadow: 0 0 0 2px rgb(255 255 255 / 0.9), 0 2px 8px rgb(0 0 0 / 0.3); }
+.lit-obs { font-size: 13px; font-style: italic; opacity: 0.88; }
+.lit-refrao { display: flex; gap: 10px; margin: 0; padding: 4px 0 4px 14px; border-left: 3px solid rgb(255 255 255 / 0.55); font-family: var(--serif); font-size: 17px; font-style: italic; line-height: 1.45; }
+.lit-refrao span { flex: none; font-style: normal; font-weight: 700; opacity: 0.8; }
+.lit-leituras { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; }
+.lit-leitura { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 9px 11px; border-radius: 14px; background: rgb(255 255 255 / 0.14); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12); }
+.lit-leitura > svg { flex: none; opacity: 0.85; }
+.lit-leitura span { display: grid; min-width: 0; line-height: 1.2; }
+.lit-leitura small { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.78; }
+.lit-leitura b { font-size: 13.5px; font-weight: 800; overflow-wrap: anywhere; }
+.lit-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 2px; }
+.lit-acoes .btn { height: 44px; padding: 0 18px; border-radius: 999px; font-weight: 800; }
+.lit-acoes .btn.white { background: #fff; color: #111; border: 0; box-shadow: 0 6px 18px rgb(0 0 0 / 0.22); }
+.lit-acoes .lit-btn-ler { background: rgb(255 255 255 / 0.14); border: 1px solid rgb(255 255 255 / 0.4); color: #fff; }
+.lit-chip { font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 999px; background: rgb(0 0 0 / 0.18); }
+/* o dia de cor branca: o cartão claro, dourado, com o texto escuro */
+.lit-hero.claro { color: #2b2410; background: radial-gradient(120% 90% at 100% 0%, #fff 0%, transparent 55%), linear-gradient(160deg, #fffaf0 0%, #e2c879 100%);
+  box-shadow: 0 14px 40px rgb(184 149 43 / 0.25), inset 0 1px 0 #fff; }
+.lit-hero.claro::after { filter: invert(1); opacity: 0.08; }
+.lit-hero.claro .lit-dia { background: rgb(255 255 255 / 0.6); box-shadow: inset 0 0 0 1px rgb(60 50 10 / 0.12); }
+.lit-hero.claro .lit-cor, .lit-hero.claro .lit-chip { background: rgb(60 50 10 / 0.08); }
+.lit-hero.claro .lit-cor-dot { box-shadow: 0 0 0 1.5px rgb(60 50 10 / 0.4); }
+.lit-hero.claro .lit-refrao { border-left-color: rgb(60 50 10 / 0.35); }
+.lit-hero.claro .lit-leitura { background: rgb(255 255 255 / 0.55); box-shadow: inset 0 0 0 1px rgb(60 50 10 / 0.1); }
+.lit-hero.claro .lit-acoes .btn.white { background: #1b1607; color: #fff; }
+.lit-hero.claro .lit-acoes .lit-btn-ler { background: rgb(255 255 255 / 0.5); border-color: rgb(60 50 10 / 0.3); color: #2b2410; }
+@media (min-width: 900px) { .lit-hero { padding: 26px 28px; gap: 16px; } .lit-dia { width: 70px; } .lit-dia b { font-size: 30px; } }
+@media (prefers-reduced-motion: reduce) { .lit-hero { animation: none; } }
+
+/* a página: o título com "Hoje" ao lado, a data (semana anterior/seguinte) e a semana em pílulas, com a cor de cada dia */
+.lit-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lit-cab .greet { margin-bottom: 12px; }
+.lit-hoje-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; margin-bottom: 12px; border-radius: 999px; text-decoration: none;
+  font-size: 13.5px; font-weight: 800; color: var(--on-accent); background: var(--accent); }
+.lit-datas .icon-btn { border-radius: 50%; }
+.lit-datas .date-field { border-radius: 999px; }
+.lit-semana { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 0 0 16px; }
+.lit-semana a { display: grid; justify-items: center; gap: 3px; padding: 8px 0 7px; border-radius: 14px; text-decoration: none; color: var(--muted);
+  background: var(--bg-elev); transition: background 0.15s, transform 0.15s; }
+.lit-semana a:hover { background: var(--surface-2); color: var(--text); }
+.lit-semana a:active { transform: scale(0.96); }
+.lit-semana small { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+.lit-semana b { font-size: 17px; font-weight: 900; color: var(--text); }
+.lit-semana i { width: 6px; height: 6px; border-radius: 50%; }
+.lit-semana a.hoje { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.lit-semana a.ativo { color: #fff; background: linear-gradient(160deg, color-mix(in srgb, var(--lit-cor) 90%, #fff), color-mix(in srgb, var(--lit-cor) 65%, #000));
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--lit-cor) 35%, transparent); }
+.lit-semana a.ativo b { color: #fff; }
+.lit-semana a.ativo i { background: #fff !important; }
+/* Missa litúrgica / popular: um controle segmentado (antes dois chips soltos) */
+#lit .tipo-missa { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin: 16px 0 12px; border-radius: 16px; background: var(--surface-2); }
+#lit .tipo-missa .chip { justify-content: center; height: 40px; border-radius: 12px; background: none; color: var(--muted); font-weight: 800; }
+#lit .tipo-missa .chip[aria-pressed="true"] { background: var(--bg-elev); color: var(--text); box-shadow: 0 2px 10px rgb(0 0 0 / 0.25); }
+#lit .tipo-missa .chip[aria-pressed="true"] svg { color: var(--lit-ink); }
+#lit .source { border-radius: 16px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.05); }
+#lit .source .ico { border-radius: 12px; color: var(--lit-ink); background: color-mix(in srgb, var(--lit-cor) 22%, var(--surface-2)); }
+/* as partes, agrupadas pelos momentos da missa; cada uma num cartão arredondado e, aberta, com a faixa da cor do dia */
+#partes .momento { display: flex; align-items: center; gap: 10px; margin: 22px 2px 10px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: var(--lit-ink); }
+#partes .momento::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--lit-cor) 40%, transparent); }
+#partes .momento:first-child { margin-top: 8px; }
+#partes .parte { border-radius: 16px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.04); }
+#partes .parte > summary { border-radius: 16px; padding: 10px 12px; }
+#partes .parte[open] { box-shadow: inset 3px 0 0 var(--lit-cor), inset 0 0 0 1px rgb(255 255 255 / 0.06); }
+#partes .parte .step { border-radius: 12px; }
+#partes .parte .step.leitura { color: var(--lit-ink); background: color-mix(in srgb, var(--lit-cor) 12%, var(--surface-2)); }
+#partes .opcao { border-radius: 12px; }
+#lit ~ .cta-bar, .cta-bar { border-radius: 20px; }
+:root[data-theme="light"] .lit-semana a.hoje { box-shadow: inset 0 0 0 1.5px var(--accent); }
