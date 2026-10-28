@@ -395,7 +395,6 @@ a.chip.sm { cursor: pointer; }
 .song .lyric { min-height: 1.3em; }
 .song .comment { color: var(--muted); font-style: italic; margin: 2px 0; }
 .song .tab { font-family: var(--mono); white-space: pre; font-size: 0.85em; }
-@media (min-width: 1100px) { .song.columns { column-count: 2; column-gap: 48px; max-width: none; } .song .section { break-inside: avoid; } }
 
 /* modo "Letra" estilo Spotify */
 .song.lyrics-mode {
@@ -429,7 +428,6 @@ a.chip.sm { cursor: pointer; }
 .song.lyrics-mode .section-label, .song.lyrics-mode .comment { text-align: center; }
 /* duas colunas: só em telas largas (tablet deitado/computador); no celular o botão some */
 /* (colunas da letra: a partir de 1200px, mais abaixo) */
-@media (max-width: 699px) { .song-toolbar .so-largo { display: none; } }
 .song.lyrics-mode .chunk { display: inline; white-space: pre-wrap; }
 .song.lyrics-mode .line { display: block; min-height: 0; }
 @media (min-width: 900px) { .song.lyrics-mode { border-radius: var(--radius); margin: 0; font-size: calc(32px * var(--font-scale)); padding: 72px 40px 110px; } }
@@ -1460,13 +1458,10 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 .set-progress + .song-topo.canvas-on .canvas-fundo { top: -84px; }
 .set-progress { position: relative; z-index: 2; } /* por cima do vídeo do topo */
 
-/* letra no computador: o painel colorido vai de ponta a ponta da tela (sem as faixas pretas dos lados) e,
-   nas telas largas, a letra fica em duas colunas (a opção "Duas colunas") para aproveitar o espaço */
+/* letra no computador: o painel colorido vai de ponta a ponta da tela (sem as faixas pretas dos lados), numa coluna só */
 @media (min-width: 900px) {
   .song.lyrics-mode { margin: 0 calc(-1 * var(--gutter)); border-radius: 0; padding: 72px var(--gutter) 110px; }
-  .song.lyrics-mode.columns { padding-inline: clamp(32px, 4vw, 80px); column-gap: clamp(40px, 5vw, 96px); }
 }
-@media (min-width: 1200px) { .song.lyrics-mode.columns { column-count: 2; } .song.lyrics-mode.columns .section { break-inside: avoid; } }
 
 /* fileiras horizontais no computador: dentro do alinhamento da página, arrastar com o mouse e setas ‹ ›
    redondas ao lado do título (como no Spotify); no celular, só arrastar com o dedo */
@@ -2543,12 +2538,6 @@ dialog.creditos-dlg::backdrop { background: #121212; }
 .cr-detalhes a { color: #fff; }
 @media (prefers-reduced-motion: reduce) { .ref-tocando i { animation: none; } .ref-pilula:hover { transform: none; } }
 
-/* ---- opções que só valem em tela larga (ex.: "Duas colunas": a letra só fica em colunas a partir de 1100 px):
-   no celular, em pé ou deitado, nem aparecem — nos Ajustes e na barra da música. Girando o tablet, a própria
-   media query mostra ou esconde */
-@media (max-width: 699px), (orientation: landscape) and (max-height: 500px) and (max-width: 1099px) {
-  .song-toolbar .so-largo, .setting.so-largo { display: none; }
-}
 
 /* ---------------------------------------------------------------- servidor da IA (Ajustes e Gerar com IA) */
 .aj-ia-campos { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; margin-top: 10px; }
@@ -2989,12 +2978,17 @@ html.pp.tablet body:not(.painel-recolhido) #player.modo-capa .pl-fundo:not([hidd
   overflow: hidden; pointer-events: none;
   -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%); }
 /* tablet: a capa animada fica parada atrás do painel (presa a ele, não rola junto) e o conteúdo rola por cima; ela
-   só some aos poucos (--fundo-op, pela rolagem). Rolando junto, com a máscara e os quadros animados, o tablet tinha
+   só some aos poucos (a opacidade, pela rolagem). Rolando junto, com a máscara e os quadros animados, o tablet tinha
    de redesenhar a camada inteira a cada passo da rolagem e ela piscava */
 html.pp.tablet body:not(.painel-recolhido) #player.modo-capa .pl-fundo:not([hidden]) { position: fixed; top: 8px; right: 8px; left: auto;
   width: var(--painel-w) !important; height: min(var(--fundo-h, 100%), calc(100dvh - 16px)); border-radius: var(--radius) var(--radius) 0 0;
-  opacity: var(--fundo-op, 1); transform: translateZ(0); backface-visibility: hidden; will-change: opacity; }
+  transform: translateZ(0); backface-visibility: hidden; will-change: opacity; }
 html.pp.tablet body.painel-cheio #player.modo-capa .pl-fundo:not([hidden]) { left: 8px; width: auto !important; }
+/* com a letra na tela toda por cima: a capa animada sai (os quadros não ficam animando embaixo dela) e o vídeo fica
+   escondido já na troca de classe (antes só no quadro seguinte: por um instante ele aparecia por cima da letra que subia
+   e a tela piscava) */
+#player.letra-cheia .pl-fundo { display: none !important; }
+body.com-letra-cheia #pl-tela:not(.no-palco) { visibility: hidden !important; }
 html.pp #player .pl-fundo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(0 0 0 / 0.35) 0%, transparent 22%, transparent 45%, rgb(0 0 0 / 0.45) 75%, rgb(0 0 0 / 0.45) 100%); }
 html.pp:not(.tablet) #player.modo-capa .pl-video.com-fundo,
 html.pp.tablet body:not(.painel-recolhido) #player.modo-capa .pl-video.com-fundo { background-image: none !important; background-color: transparent; box-shadow: none; }

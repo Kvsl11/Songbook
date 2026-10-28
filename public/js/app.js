@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-281';
+export const APP_VERSAO = '2026.10.28-282';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -555,8 +555,6 @@ function corDestaque() {
 
 // a cor padrão deixou de ser o verde: quem estava com o verde antigo passa para o azul-marinho (uma vez)
 // a cor padrão agora é o ciano da logo: quem estava no verde antigo ou no azul-marinho (padrão anterior) passa para ele (uma vez)
-// letra em colunas nas telas largas passou a vir ligada: liga uma vez para quem já usava o app
-if (!db.prefs().colunasV2) { db.setPref('columns', true); db.setPref('colunasV2', true); }
 if (!db.prefs().corV3) { if (['#1ed760', '#2747a3', undefined, ''].includes(db.prefs().accent)) db.setPref('accent', COR_PADRAO); db.setPref('corV3', true); }
 
 function applyTheme() {
@@ -870,7 +868,11 @@ const player = (() => {
     const ctrl = $('.pl-ctrl', el);
     el.classList.toggle('rolou', Boolean(ctrl) && el.scrollTop > ctrl.offsetTop + ctrl.offsetHeight);
     // tablet: a capa animada (parada atrás) some aos poucos enquanto o conteúdo sobe por cima dela
-    if (ehTablet() && !fundo.hidden) el.style.setProperty('--fundo-op', Math.max(0, 1 - el.scrollTop / Math.max(200, fundo.offsetHeight * 0.75)).toFixed(3));
+    // (direto na camada dela: uma variável no painel fazia recalcular o estilo de tudo dentro dele a cada passo)
+    if (ehTablet() && !fundo.hidden) {
+      const op = Math.max(0, 1 - el.scrollTop / Math.max(200, fundo.offsetHeight * 0.75)).toFixed(2);
+      if (fundo.style.opacity !== op) fundo.style.opacity = op;
+    }
   }, { passive: true });
   const medirPlayer = () => document.body.classList.contains('painel-cheio') && !ehTablet() ? null : document.body.style.setProperty('--player-h', `${el.offsetHeight}px`);
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(medirPlayer).observe(el);
@@ -6620,7 +6622,6 @@ function viewSong(id, ctx = {}) {
         <div class="seg so-cifra" title="Capotraste"><button data-act="c-" aria-label="Diminuir capo">${icon('minus', 16)}</button><span class="val" id="capo"></span><button data-act="c+" aria-label="Aumentar capo">${icon('plus', 16)}</button></div>
         <div class="seg"><button data-act="f-" aria-label="Diminuir letra" title="Diminuir letra">A−</button><button data-act="f+" aria-label="Aumentar letra" title="Aumentar letra">A+</button></div>
         <div class="seg"><button data-act="scroll" aria-pressed="false" aria-label="Rolagem automática" title="Rolagem automática (ajuste a velocidade na barra)" id="btn-scroll">${icon('gauge', 18)}</button></div>
-        <div class="seg so-largo"><button data-act="cols" aria-pressed="${prefs.columns !== false}" title="Letra em duas colunas (telas largas)" aria-label="Duas colunas">${icon('columns', 17)}</button></div>
       </div>
     </div>
     <div class="acordes-musica" id="acordes-musica" hidden></div>
@@ -6661,7 +6662,6 @@ function viewSong(id, ctx = {}) {
     $('#song-meta').innerHTML = meta.join('<i class="meta-ponto" aria-hidden="true">•</i>');
     songEl.innerHTML = r.html;
     songEl.classList.toggle('no-chords', !comCifra);
-    songEl.classList.toggle('columns', db.prefs().columns !== false); // em colunas nas telas largas (vem ligado)
     // Cifra e Letra usam o mesmo painel estilo Spotify; na Cifra os acordes aparecem por cima
     songEl.classList.add('lyrics-mode');
     songEl.classList.toggle('with-chords', comCifra);
@@ -7160,14 +7160,6 @@ function viewSong(id, ctx = {}) {
         db.setPref('modo', comCifra ? 'cifra' : 'letra');
         view.querySelectorAll('#tools [data-modo]').forEach((x) => x.setAttribute('aria-pressed', String((x.dataset.modo === 'cifra') === comCifra)));
         break;
-      case 'cols': {
-        // prefs() devolve o próprio objeto salvo: guarda o novo valor antes de gravar
-        const duas = p.columns === false;
-        db.setPref('columns', duas);
-        b.setAttribute('aria-pressed', String(duas));
-        toast(duas ? 'Letra em duas colunas' : 'Uma coluna');
-        break;
-      }
       case 'scroll':
         if (scrollTimer) { stopScroll(); setScrollBtn(false); } else { setScrollBtn(true); tick(); }
         return;
@@ -8522,7 +8514,6 @@ function viewSettings() {
       <div class="setting wrap"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
       ${chave('diagramas', 'grid', 'Desenho dos acordes', 'Como montar cada acorde no violão', p.diagramas)}
-      ${chave('cols', 'columns', 'Duas colunas', 'Em telas grandes', p.columns !== false, 'so-largo')}
       ${chave('video-fundo', 'video', 'Capa animada', 'Cenas do clipe passam atrás da música, sem som. Desligue para economizar dados', p.videoFundo !== false)}
     </div>`)}
 
@@ -8596,7 +8587,6 @@ function viewSettings() {
   };
   infoModelo();
   $('#instalar')?.addEventListener('click', instalarApp);
-  $('#cols').onchange = (e) => db.setPref('columns', e.target.checked);
   $('#diagramas').onchange = (e) => { db.setPref('diagramas', e.target.checked); toast(e.target.checked ? 'Desenho dos acordes ligado' : 'Desenho dos acordes desligado'); };
   $('#destaque').onclick = (e) => {
     const b = e.target.closest('[data-v]');

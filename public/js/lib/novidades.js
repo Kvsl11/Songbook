@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 282, data: '2026-10-28', titulo: 'Letra na tela toda sem piscar',
+    itens: [
+      { tipo: 'correcao', texto: 'Abrir a letra na tela toda não pisca mais: o vídeo some na hora (antes aparecia por um instante por cima da letra) e a capa animada para de rodar por baixo dela.' },
+      { tipo: 'melhoria', texto: 'A opção "Duas colunas" saiu dos Ajustes e da barra da música: a letra fica sempre numa coluna só (no PDF, a opção de colunas continua).' },
+    ],
+  },
+  {
     versao: 281, data: '2026-10-28', titulo: 'Música abre certinho com o painel recolhido',
     itens: [
       { tipo: 'correcao', texto: 'No tablet com o Tocando agora recolhido (a barrinha embaixo), tocar numa música da Início abria uma tela preta: agora abre o Tocando agora inteiro, e ao sair o painel volta a ficar recolhido.' },
@@ -65,13 +72,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'Salvar a música aberta pela busca no Tocando agora não faz mais a tela piscar: só a bolinha vira ✓.' },
       { tipo: 'correcao', texto: 'Tocar no ✓ de novo tira a música da biblioteca (ela continua tocando). Adicionar a um repertório fica no menu ⋮.' },
-    ],
-  },
-  {
-    versao: 272, data: '2026-10-28', titulo: 'Créditos com as fotos',
-    itens: [
-      { tipo: 'novo', texto: 'Os créditos da música mostram as pessoas com a foto, como no Spotify: as duas primeiras no cartão, com quantos participantes; "Explorar" abre todos em detalhe, cada um com a foto, o nome e o que fez na música.' },
-      { tipo: 'melhoria', texto: 'Na lista dos créditos, cada pessoa tem a foto pequena ao lado do nome.' },
     ],
   },
 ];
