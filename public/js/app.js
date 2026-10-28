@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-250';
+export const APP_VERSAO = '2026.10.28-251';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -724,6 +724,7 @@ const player = (() => {
   el.id = 'player';
   el.hidden = true;
   el.innerHTML = `
+    <div class="pl-fundo quadros" aria-hidden="true" hidden></div>
     <div class="pl-video"></div>
     <p class="pl-frase" hidden></p>
     <button class="pl-troca" data-pl="troca">${icon('music', 18)}<span>Mudar para música</span></button>
@@ -776,6 +777,13 @@ const player = (() => {
   tela.hidden = true;
   casa.append(tela);
   const mini = $('.pl-video', el); // espaço reservado no mini player
+  // no modo música (Tocando agora), os quadros do clipe passam atrás de toda a parte de cima, até o cartão da letra
+  const fundo = $('.pl-fundo', el);
+  const medirFundo = () => {
+    if (fundo.hidden || el.classList.contains('letra-cheia')) return;
+    const ate = [$('.pl-letra', el), $('.pl-extra', el)].find((x) => !x.hidden);
+    el.style.setProperty('--fundo-h', `${ate ? ate.offsetTop : el.scrollHeight}px`);
+  };
   // tablet, como o "Mudar para vídeo" do Spotify: a capa no lugar do vídeo (o vídeo continua tocando, só não aparece)
   let comCapa = Boolean(db.prefs().playerCapa);
   const modoCapa = () => comCapa && document.documentElement.classList.contains('pp');
@@ -887,25 +895,30 @@ const player = (() => {
     $('.pl-cab-meio b', el).textContent = atual.setId ? db.set(atual.setId)?.name || '' : atual.parte || '';
     desenharLetra();
     desenharExtra();
+    medirFundo();
   };
   // a capa (no modo capa): a da música ou o quadro do vídeo; o botão de trocar diz para o que vai
   const desenharCapa = () => {
     const capa = modoCapa() || Boolean(atual?.semVideo);
     el.classList.toggle('modo-capa', capa);
     const url = atual?.capa && /^(https?:|data:)/.test(atual.capa) ? atual.capa : atual?.youtube ? `https://i.ytimg.com/vi/${atual.youtube}/hqdefault.jpg` : '';
-    mini.style.backgroundImage = capa && url ? `url("${url}")` : '';
     const capaYt = !(atual?.capa && /^(https?:|data:)/.test(atual.capa));
     // sem capa nem vídeo: a cor da música com uma nota no meio. Com vídeo, no modo música, a capa tem movimento: os
-    // quadros do clipe passando com zoom lento, como no topo da página da música (a imagem de fundo fica por baixo)
+    // quadros do clipe passando com zoom lento (como no topo da página da música) atrás de toda a parte de cima do
+    // Tocando agora, sumindo num degradê no fundo; o lugar da capa fica vazio, mostrando os quadros (como o Canvas do
+    // Spotify). O primeiro quadro aparece aos poucos, sobre a cor do fundo
     const semCapa = capa && !url;
     const q = capa && !atual?.semVideo && atual?.youtube ? atual.youtube : '';
+    mini.style.backgroundImage = capa && url ? `url("${url}")` : ''; // (com os quadros no fundo, o CSS a esconde)
+    mini.classList.toggle('com-fundo', Boolean(q));
+    fundo.hidden = !q;
     const conteudo = semCapa ? 'nota' : q ? `q:${q}` : '';
     if (mini.dataset.conteudo !== conteudo) {
       mini.dataset.conteudo = conteudo;
       mini.classList.toggle('sem-capa', semCapa);
-      mini.classList.toggle('quadros', Boolean(q));
       const song = q ? musicaTocando() : null;
-      mini.innerHTML = semCapa ? icon('music', 72) : q ? htmlQuadros(q, (song && renderSong(song.content).meta.x_canvas) || 'sd') : '';
+      mini.innerHTML = semCapa ? icon('music', 72) : '';
+      fundo.innerHTML = q ? htmlQuadros(q, (song && renderSong(song.content).meta.x_canvas) || 'sd') : '';
     }
     mini.classList.toggle('capa-yt', capa && capaYt);
     // no modo vídeo, a capa pequena ao lado do nome (como no Spotify)

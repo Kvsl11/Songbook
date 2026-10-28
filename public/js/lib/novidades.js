@@ -3,6 +3,12 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 251, data: '2026-10-28', titulo: 'Capa com movimento na tela toda',
+    itens: [
+      { tipo: 'melhoria', texto: 'Em "Mudar para música", os quadros do clipe passam atrás de toda a parte de cima do Tocando agora, até o cartão da letra, e somem num degradê na cor do fundo, como o Canvas do Spotify.' },
+    ],
+  },
+  {
     versao: 250, data: '2026-10-28', titulo: 'Barra do tempo que funciona',
     itens: [
       { tipo: 'correcao', texto: 'A barra do tempo do Tocando agora e da letra na tela toda voltou a funcionar: tocando nela ou arrastando, a música vai para aquele ponto. A área de toque ficou maior, para o dedo acertar.' },
