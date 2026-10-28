@@ -3,6 +3,13 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 258, data: '2026-10-28', titulo: 'Letra sincronizada sem servidor',
+    itens: [
+      { tipo: 'novo', texto: 'Sincronizar a letra agora procura primeiro a letra já sincronizada do LRCLIB (banco aberto de letras): vem na hora, sem servidor, quando é a mesma música e a duração bate com a do vídeo.' },
+      { tipo: 'melhoria', texto: 'Se a música não estiver lá (os cantos de missa quase nunca estão) ou ficar fora do tempo ("Ouvir o vídeo"), o app usa o servidor que ouve o áudio, como antes.' },
+    ],
+  },
+  {
     versao: 257, data: '2026-10-28', titulo: 'Ajustes mais limpos',
     itens: [
       { tipo: 'melhoria', texto: 'A tela de Ajustes ficou enxuta: sem os números e os atalhos do topo, títulos simples e textos curtos. Aparência, Música (destaque e desenho dos acordes, clipe atrás do título), PowerPoint, Backup, Avançado e Sobre.' },

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cifraTextoParaChordPro, ehCifraClub, repararCifraInvisivel, semTablaturas, letraReserva, simplificarCifra, parseLetras, resultadosLetras, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
+  cifraTextoParaChordPro, ehCifraClub, repararCifraInvisivel, semTablaturas, letraReserva, letraSincronizada, lerLrc, sincroniaDoLrc, simplificarCifra, parseLetras, resultadosLetras, lerJsonp, letraParaChordPro, parseCifraClub, resultadosCifraClub, tituloDoVideo, videosDoPiped, viaProxy,
 } from '../public/js/lib/web.js';
 import { organizarPartes, partesDosBlocos, tiposDosBlocos, semIntro, aplicarEstrutura, aplicarLetra, definirMeta, doEditor, letraDe, linhasDaLetra, paraEditor, parseChordPro } from '../public/js/chordpro.js';
 
@@ -346,4 +346,31 @@ test('partes sempre em inglês: do editor, de outros sites ("Refrão:", "Verso 1
 
 test('tablatura do Cifra Club sai antes de converter (a letra continua dentro da parte)', () => {
   assert.equal(semTablaturas('[Primeira Parte]\n\n[Tab - Primeira Parte]\nParte 1 de 2\n  D  A\nE|-5--|\n   ↑ ↓\n\nD\nMestre'), '[Primeira Parte]\n\n\nD\nMestre');
+});
+
+test('letra sincronizada do LRCLIB: LRC -> linhas e tempos da sincronia', async () => {
+  const lrc = '[00:12.50] Deus está aqui\n[00:16.00] Neste momento\n[00:20.00]\n[00:24.10][01:10.00] Tão certo como o ar\n';
+  assert.deepEqual(lerLrc(lrc).map((l) => l.t), [12.5, 16, 20, 24.1, 70]);
+  const s = sincroniaDoLrc(lrc, 72);
+  assert.deepEqual(s.linhas, ['Deus está aqui', 'Neste momento', 'Tão certo como o ar', 'Tão certo como o ar']);
+  // o fim é o começo da próxima (ou da pausa); a última vai até 6 s, sem passar da música
+  assert.deepEqual(s.tempos, [{ inicio: 12.5, fim: 16 }, { inicio: 16, fim: 20 }, { inicio: 24.1, fim: 70 }, { inicio: 70, fim: 72 }]);
+
+  const pedidos = [];
+  const resp = (corpo) => ({ ok: true, status: 200, json: async () => corpo });
+  const lista = [
+    { id: 1, trackName: 'Noites Traiçoeiras (Ao Vivo)', artistName: 'Padre Marcelo Rossi', duration: 300, syncedLyrics: lrc },
+    { id: 2, trackName: 'Noites Traiçoeiras', artistName: 'Outro Cantor', duration: 241, syncedLyrics: lrc },
+    { id: 3, trackName: 'Noites Traiçoeiras', artistName: 'Padre Marcelo Rossi', duration: 241, syncedLyrics: lrc },
+  ];
+  const fetchImpl = async (url) => { pedidos.push(url); return resp(lista); };
+  // a do mesmo artista e com a duração do vídeo (a ao vivo, mais longa, fica de fora)
+  const r = await letraSincronizada({ titulo: 'Noites Traiçoeiras', artista: 'Padre Marcelo Rossi', duracao: 243 }, fetchImpl);
+  assert.equal(r.id, 3);
+  assert.equal(r.fonte, 'lrclib');
+  assert.match(pedidos[0], /lrclib\.net\/api\/search\?track_name=/);
+  // duração muito diferente (um clipe com introdução): não serve
+  assert.equal(await letraSincronizada({ titulo: 'Noites Traiçoeiras', artista: 'Padre Marcelo Rossi', duracao: 280 }, async () => resp(lista.slice(2))), null);
+  // sem letra sincronizada: null (o app vai para o servidor)
+  assert.equal(await letraSincronizada({ titulo: 'Noites Traiçoeiras', artista: 'Padre Marcelo Rossi' }, async () => resp([{ ...lista[2], syncedLyrics: null }])), null);
 });

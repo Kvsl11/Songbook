@@ -417,6 +417,64 @@ export async function letraReserva({ titulo = '', artista = '' } = {}, fetchImpl
   return null;
 }
 
+// ------------------------------------------------------------------ letra sincronizada (LRCLIB, sem servidor)
+
+// LRC ("[01:23.45] verso") -> [{ t: 83.45, texto }], em ordem; a linha vazia fica (marca uma pausa)
+export function lerLrc(lrc) {
+  const linhas = [];
+  for (const l of String(lrc || '').split(/\r?\n/)) {
+    const marcas = [...l.matchAll(/\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]/g)];
+    if (!marcas.length) continue;
+    const texto = l.replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+    for (const m of marcas) linhas.push({ t: Number(m[1]) * 60 + Number(m[2].replace(':', '.')), texto });
+  }
+  return linhas.sort((a, b) => a.t - b.t);
+}
+
+// LRC -> a sincronia do app: as linhas cantadas e o início e o fim de cada uma (o fim é o começo da linha seguinte,
+// ou da pausa; a última dura até 6 s, sem passar do fim da música)
+export function sincroniaDoLrc(lrc, duracao = 0) {
+  const ls = lerLrc(lrc);
+  const linhas = [];
+  const tempos = [];
+  ls.forEach((l, i) => {
+    if (!l.texto) return;
+    const prox = ls[i + 1];
+    const fim = prox ? prox.t : duracao > l.t ? Math.min(duracao, l.t + 6) : l.t + 6;
+    linhas.push(l.texto);
+    tempos.push({ inicio: Math.round(l.t * 100) / 100, fim: Math.round(fim * 100) / 100 });
+  });
+  return { linhas, tempos };
+}
+
+// A letra com o tempo de cada linha, do LRCLIB (aberto, com CORS: sem servidor). Só vale a da mesma música (título e,
+// quando se sabe, artista) e, sabendo a duração do vídeo, a de duração parecida (até 4 s de diferença): o tempo do
+// LRC é o da gravação; um clipe com introdução ou uma versão ao vivo sairiam fora do tempo
+export async function letraSincronizada({ titulo = '', artista = '', duracao = 0 } = {}, fetchImpl) {
+  const t = String(titulo || '').trim();
+  const a = String(artista || '').trim();
+  if (!t) return null;
+  const pedir = async (params) => {
+    const res = await buscar(`https://lrclib.net/api/search?${params}`, { fetchImpl });
+    if (!res.ok) throw new Error(`LRCLIB respondeu ${res.status}`);
+    return res.json();
+  };
+  const tentativas = [
+    a && `track_name=${encodeURIComponent(t)}&artist_name=${encodeURIComponent(a)}`,
+    `q=${encodeURIComponent(`${t} ${a}`.trim())}`,
+  ].filter(Boolean);
+  for (const params of tentativas) {
+    const lista = await pedir(params).catch(() => []);
+    const achada = (Array.isArray(lista) ? lista : []).find((r) => r.syncedLyrics && !r.instrumental && mesmoTitulo(r.trackName, t)
+      && (!a || mesmoArtista(r.artistName, a)) && (!(duracao > 0) || !(r.duration > 0) || Math.abs(r.duration - duracao) <= 4));
+    if (achada) {
+      const sinc = sincroniaDoLrc(achada.syncedLyrics, achada.duration || duracao);
+      if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: achada.id };
+    }
+  }
+  return null;
+}
+
 // Letra simples -> ChordPro: estrofes separadas por linha em branco; as partes saem sozinhas (partesDosBlocos):
 // o bloco que mais se repete é o refrão (cópia idêntica vira {chorus}), e também ponte e pré-refrão.
 export function letraParaChordPro({ titulo = '', artista = '', letra = '', fonte = '', compositor = '' } = {}) {

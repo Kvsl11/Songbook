@@ -21,7 +21,7 @@ import { partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { NOVIDADES, novidadesNaoVistas } from './lib/novidades.js';
 import { baseDoServidor, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, dataDaPergunta, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
-import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-257';
+export const APP_VERSAO = '2026.10.28-258';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -6633,18 +6633,40 @@ function viewSong(id, ctx = {}) {
     if (sincronizando) return;
     const cantadas = linhasCantadas(song.content).map(linhaSemCifra).filter(Boolean);
     if (!cantadas.length) { if (!sozinho) statusSinc('erro', 'Esta música não tem letra para sincronizar'); return; }
-    if (!servidorIA().url) { if (!sozinho) statusSinc('erro', 'O servidor da IA não está disponível agora. Tente de novo daqui a pouco.'); return; }
     sincronizando = true;
-    statusSinc('carregando', refazer ? 'Sincronizando de novo, com mais precisão…' : 'Sincronizando a letra com o vídeo…');
     tentouSincronizar.add(song.youtube);
     const aqui = isPreview ? '' : `#/musica/${song.id}`;
-    try {
-      const r = await chamarComEtapas(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: cantadas, refazer } },
-        (etapa, p) => statusSinc('carregando', etapa === 'baixando' && p !== null && p < 1 ? `Baixando o áudio do vídeo… ${Math.round(p * 100)}%` : etapa === 'baixando' && p >= 1 ? 'Áudio baixado. Preparando…' : ETAPAS_SINC[etapa] || 'Sincronizando a letra…'));
-      const sinc = { video: song.youtube, linhas: cantadas, tempos: r.linhas.map((x) => ({ inicio: x.inicio, fim: x.fim })) };
+    const guardar = (sinc) => {
       song.sincronia = sinc;
       mapa = null;
       if (isPreview) preview.sincronia = sinc; else db.updateSong(song.id, { sincronia: sinc });
+    };
+    // primeiro, sem servidor: a letra já sincronizada do LRCLIB (na hora), se for da mesma música e tiver a duração do
+    // vídeo. O "Refazer" (sincronia errada) e as músicas que não estão lá vão para o servidor, que ouve o áudio
+    if (!refazer) {
+      statusSinc('carregando', 'Procurando a letra sincronizada…');
+      const duracao = (player.desta(song.youtube) && player.duracao) || await duracaoDaMusica(song).catch(() => 0);
+      const lrc = await letraSincronizada({ titulo: tituloLimpo(song.title), artista: song.artist || '', duracao }).catch(() => null);
+      if (lrc) {
+        guardar({ video: song.youtube, linhas: lrc.linhas, tempos: lrc.tempos, fonte: 'lrclib' });
+        sincronizando = false;
+        statusSinc('ok', `Letra sincronizada: ${lrc.linhas.length} linhas (LRCLIB). Dê play e ela acompanha.`,
+          `<button class="btn small" data-sinc="de-novo" data-refazer="1">${icon('refresh', 14)} Ficou fora do tempo? Ouvir o vídeo</button>`);
+        notificar('Dê play: a letra acompanha, e tocar numa linha vai até ela.', { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
+        return;
+      }
+    }
+    if (!servidorIA().url) {
+      sincronizando = false;
+      if (!sozinho) statusSinc('erro', refazer ? 'O servidor da IA não está disponível agora. Tente de novo daqui a pouco.'
+        : 'Esta música não tem letra sincronizada pronta, e o servidor que ouve o vídeo não está disponível agora.');
+      return;
+    }
+    statusSinc('carregando', refazer ? 'Sincronizando de novo, com mais precisão…' : 'Sincronizando a letra com o vídeo…');
+    try {
+      const r = await chamarComEtapas(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: cantadas, refazer } },
+        (etapa, p) => statusSinc('carregando', etapa === 'baixando' && p !== null && p < 1 ? `Baixando o áudio do vídeo… ${Math.round(p * 100)}%` : etapa === 'baixando' && p >= 1 ? 'Áudio baixado. Preparando…' : ETAPAS_SINC[etapa] || 'Sincronizando a letra…'));
+      guardar({ video: song.youtube, linhas: cantadas, tempos: r.linhas.map((x) => ({ inicio: x.inicio, fim: x.fim })) });
       statusSinc('ok', `Letra sincronizada: ${r.achadas} de ${r.total} linhas. Dê play e ela acompanha.`,
         refazer ? '' : `<button class="btn small" data-sinc="de-novo" data-refazer="1">${icon('refresh', 14)} Ficou errada? Refazer</button>`);
       notificar(`${r.achadas} de ${r.total} linhas ouvidas no vídeo. Dê play: a letra acompanha, e tocar numa linha vai até ela.`, { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
