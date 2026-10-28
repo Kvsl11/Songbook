@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-243';
+export const APP_VERSAO = '2026.10.28-244';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -175,7 +175,13 @@ let abrirNoTocando = false;
 // a letra na tela toda aberta pelo "Tocando agora" (celular e computador): ao sair dela, volta para o Tocando agora
 let voltarAoTocando = false;
 const telaDeCelular = () => !ehTablet() && matchMedia('(max-width: 899px)').matches;
-function irParaMusica(id) { abrirNoTocando = true; location.hash = '#/musica/' + id; }
+function irParaMusica(id) {
+  // no celular, uma música com vídeo toca e abre no Tocando agora ali mesmo, sem passar pela página dela
+  const s = db.song(id);
+  if (s?.youtube && telaDeCelular()) { player.tocar(itemDoPlayer(s)); player.expandir(); return; }
+  abrirNoTocando = true;
+  location.hash = '#/musica/' + id;
+}
 
 // ------------------------------------------------------------------ util
 
@@ -896,7 +902,7 @@ const player = (() => {
     if (atual?.youtube) {
       cartoes.push(`<section class="pl-cartao"><h4>Vídeo de referência</h4>
         <div class="ref-linha"><span class="grow"><b class="pl-extra-vtit">${esc(titulo || 'Vídeo')}</b><small class="pl-extra-vcanal">YouTube</small></span></div>
-        <div class="ref-acoes">${song || atual.href || atual.abrir ? `<button class="ref-pilula" data-pl="abrir">${icon('music', 14)} Abrir a música</button>` : ''}
+        <div class="ref-acoes">${(song || atual.href || atual.abrir) && !telaDeCelular() ? `<button class="ref-pilula" data-pl="abrir">${icon('music', 14)} Abrir a música</button>` : ''}
           <a class="ref-pilula" href="https://www.youtube.com/watch?v=${esc(atual.youtube)}" target="_blank" rel="noopener">${icon('youtube', 14)} Abrir no YouTube</a></div></section>`);
     }
     box.innerHTML = cartoes.join('');
@@ -1229,7 +1235,7 @@ const player = (() => {
     if (!atual) return;
     const salva = Boolean(atual.songId && db.song(atual.songId));
     const opcoes = [
-      (atual.href || atual.abrir) && { valor: 'abrir', rotulo: 'Abrir a música', ic: 'music' },
+      (atual.href || atual.abrir) && !telaDeCelular() && { valor: 'abrir', rotulo: 'Abrir a música', ic: 'music' },
       { valor: 'salva', rotulo: salva ? 'Adicionar a um repertório' : 'Salvar na biblioteca', ic: salva ? 'plus' : 'download' },
       { valor: 'fila', rotulo: 'Ver a fila', ic: 'queue' },
       salva && { valor: 'trocar', rotulo: 'Trocar o vídeo', ic: 'refresh' },
@@ -1340,6 +1346,8 @@ const player = (() => {
     }
     if (b.dataset.pl === 'ampliar') { el.classList.toggle('grande'); b.innerHTML = icon(el.classList.contains('grande') ? 'shrink' : 'expand', 18); }
     // abrir a música (o nome no player): a página dela; expandir a letra: a página dela já com a letra na tela toda
+    // no celular o Tocando agora é a tela da música: tocar no nome não leva para a página antiga
+    if (b.dataset.pl === 'abrir' && telaDeCelular()) return;
     if ((b.dataset.pl === 'abrir' || b.dataset.pl === 'cheio') && atual) {
       // saindo da tela toda (celular/computador) para a página da música: ela toma o lugar da tela toda no histórico.
       // Antes o "voltar" da tela toda corria depois de abrir a página e levava de volta ao início
@@ -1350,7 +1358,7 @@ const player = (() => {
       if (daTela) location.replace(atual.href);
       else if (atual.href && location.hash !== atual.href) location.hash = atual.href;
       else if (!atual.href && atual.abrir) atual.abrir();
-      else if (abrirLetraCheia) { abrirLetraCheia = false; $('#btn-palco')?.click(); }
+      else if (abrirLetraCheia) { abrirLetraCheia = false; $('#btn-palco')?.click(); voltarAoTocando = !ehTablet(); }
     }
   });
   return api;
@@ -6492,7 +6500,13 @@ function sairPalco({ navegando = false } = {}) {
   document.body.classList.remove('performance');
   sessionStorage.removeItem('palco');
   if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-  if (voltarAoTocando) { voltarAoTocando = false; if (player.atual) player.expandir(); }
+  // fechou a letra aberta pelo Tocando agora: sai da página da música (volta para onde estava) e reabre o Tocando agora
+  if (voltarAoTocando) {
+    voltarAoTocando = false;
+    if (!player.atual) return;
+    window.addEventListener('popstate', () => setTimeout(() => player.expandir(), 120), { once: true });
+    history.back();
+  }
 }
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('performance')) sairPalco(); });
 
