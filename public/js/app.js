@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-239';
+export const APP_VERSAO = '2026.10.28-240';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -693,7 +693,7 @@ const player = (() => {
   el.innerHTML = `
     <div class="pl-video"></div>
     <p class="pl-frase" hidden></p>
-    <button class="pl-troca" data-pl="troca">${icon('video', 16)}<span>Mudar para capa</span></button>
+    <button class="pl-troca" data-pl="troca"><span class="pl-troca-ic">${icon('imagem', 15)}</span><span>Mudar para capa</span></button>
     <div class="pl-meio">
       <button class="pl-info" data-pl="abrir" title="Abrir a música"><span class="pl-txt"><b></b><small></small></span></button>
       <button class="salvar-btn pl-salva" data-pl="salva" hidden></button>
@@ -853,7 +853,7 @@ const player = (() => {
     mini.style.backgroundImage = capa && url ? `url("${url}")` : '';
     mini.classList.toggle('capa-yt', capa && !(atual?.capa && /^(https?:|data:)/.test(atual.capa)));
     const b = $('.pl-troca', el);
-    b.innerHTML = `${icon(capa ? 'video' : 'disc', 16)}<span>${capa ? 'Mudar para vídeo' : 'Mudar para capa'}</span>`;
+    b.innerHTML = `<span class="pl-troca-ic">${icon(capa ? 'video' : 'imagem', 15)}</span><span>${capa ? 'Mudar para vídeo' : 'Mudar para capa'}</span>`;
   };
   // embaixo da letra, no painel do tablet (como os cartões do "Tocando agora" do Spotify): o artista com a foto,
   // os créditos (quem canta, compôs, o tom, de onde veio a cifra) e o vídeo, com o que dá para fazer em cada um
@@ -1182,7 +1182,7 @@ const player = (() => {
       { valor: 'salva', rotulo: salva ? 'Adicionar a um repertório' : 'Salvar na biblioteca', ic: salva ? 'plus' : 'download' },
       { valor: 'fila', rotulo: 'Ver a fila', ic: 'queue' },
       salva && { valor: 'trocar', rotulo: 'Trocar o vídeo', ic: 'refresh' },
-      { valor: 'troca', rotulo: modoCapa() ? 'Mudar para vídeo' : 'Mudar para capa', ic: modoCapa() ? 'video' : 'disc' },
+      { valor: 'troca', rotulo: modoCapa() ? 'Mudar para vídeo' : 'Mudar para capa', ic: modoCapa() ? 'video' : 'imagem' },
       { valor: 'compartilhar', rotulo: 'Compartilhar', ic: 'share' },
       { valor: 'youtube', rotulo: 'Abrir no YouTube', ic: 'youtube' },
       { valor: 'fechar', rotulo: 'Fechar o player', ic: 'x' },
@@ -1574,6 +1574,8 @@ function indicadores(s) {
   if (!s) return '';
   let c = memoCifra.get(s.content);
   if (c === undefined) { c = temCifra(s.content || ''); memoCifra.set(s.content, c); }
+  // a tonalidade (o chip ao lado) já diz que tem cifra: o # só aparece numa cifra sem tom
+  if (s.key) c = false;
   const tem = (ic, t) => `<span class="ind-i" title="${t}" aria-label="${t}">${icon(ic, 11)}</span>`;
   return c || s.youtube ? `<span class="ind">${c ? tem('chord', 'Tem cifra') : ''}${s.youtube ? tem('youtube', 'Tem vídeo') : ''}</span>` : '';
 }

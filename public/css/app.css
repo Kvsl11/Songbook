@@ -268,7 +268,7 @@ body.performance .palco-ctrl:hover, body.performance .palco-ctrl:focus-within { 
 .chip:hover { background: var(--surface-3); }
 .chip[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 .chip.sm { height: 24px; padding: 0 9px; font-size: 12px; cursor: default; }
-.chip.key { background: var(--accent-soft); color: var(--accent-ink); }
+.chip.key { background: color-mix(in srgb, var(--text) 9%, transparent); color: var(--muted); } /* cinza: um indicador, não um botão */
 a.chip.sm { cursor: pointer; }
 
 /* ============================================================ títulos, prateleiras e cartões */
@@ -334,7 +334,7 @@ a.chip.sm { cursor: pointer; }
 .track .s { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
 .track .acts { display: flex; align-items: center; }
 .track.clickable { cursor: pointer; }
-@media (max-width: 600px) { .track .acts .icon-btn { width: 32px; height: 32px; } .track.set-item .chip.key { display: none; } .track .n { display: none; } }
+@media (max-width: 600px) { .track .acts .icon-btn { width: 32px; height: 32px; } .track .n { display: none; } }
 
 /* ============================================================ cabeçalho de página (capa grande) */
 .page-hero { display: flex; gap: 22px; align-items: flex-end; padding: 8px 0 22px; }
@@ -1354,7 +1354,7 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 
 /* indicadores pequenos nas listas: tem cifra / tem vídeo */
 .ind { display: inline-flex; gap: 3px; margin-right: 6px; vertical-align: -2px; }
-.ind-i { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 5px; background: var(--accent-soft); color: var(--accent-ink); }
+.ind-i { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 5px; background: color-mix(in srgb, var(--text) 9%, transparent); color: var(--muted); }
 .ind-i svg { width: 11px; height: 11px; }
 
 /* hinários e formação (Junior Música Católica): tudo abre no app */
@@ -1522,10 +1522,17 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 #player .pl-modo.ligado::after { content: ""; position: absolute; left: 50%; bottom: 2px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: currentColor; }
 #player .pl-um { display: none; position: absolute; top: 5px; right: 4px; min-width: 12px; height: 12px; border-radius: 6px; background: var(--accent); color: var(--on-accent); font: 800 9px/12px var(--sans); text-align: center; font-style: normal; }
 #player .pl-repetir.uma .pl-um { display: block; }
-/* celular: a barra é estreita — aleatório e repetir aparecem com o vídeo ampliado */
+/* celular: aleatório e repetir sempre nas pontas dos controles (simétricos: aleatório | anterior tocar próxima | repetir;
+   sem fila, aleatório fica apagado). Para caber, sai o ampliar: tocar na barrinha já abre o Tocando agora na tela toda */
+#player .pl-aleat { display: grid; }
+#player .pl-modo:disabled { opacity: 0.35; cursor: default; }
 @media (max-width: 599px) {
-  #player .pl-modo, #player.com-fila .pl-aleat { display: none; }
-  #player.grande .pl-repetir, #player.grande.com-fila .pl-aleat { display: grid; }
+  html:not(.tablet) #player .pl-lado [data-pl="ampliar"] { display: none; }
+  html:not(.tablet) #player .pl-modo { width: 30px; height: 30px; }
+  html:not(.tablet) #player .pl-modo svg { width: 16px; height: 16px; }
+  html:not(.tablet) #player .pl-ctrl { gap: 0; }
+  html:not(.tablet):not(.pp) #player .pl-video { width: 72px; }
+  html:not(.tablet):not(.pp) #player .pl-info { padding: 6px 4px 6px 8px; }
 }
 
 /* letra: entra e sai em degradês longos (do vídeo para a letra e da letra para as Referências) */
@@ -2914,9 +2921,15 @@ html.pp #player.modo-capa .pl-video.capa-yt { background-size: auto 134%; }
 html.pp #player .pl-frase { order: 2; margin: 6px 2px 0; font-size: 16px; font-weight: 800; line-height: 1.3; color: #fff; min-height: 1.3em; }
 html.pp #player .pl-frase[hidden] { display: none; }
 /* "Mudar para vídeo / capa": a pílula escura */
-html.pp #player .pl-troca { order: 3; align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px 0 12px; border: 0; border-radius: 10px;
-  background: rgb(0 0 0 / 0.55); color: #fff; font: 800 15px var(--sans); cursor: pointer; }
-html.pp #player .pl-troca:active { transform: scale(0.97); }
+/* a pílula de vidro: clara e translúcida sobre a cor da música, com o ícone num círculo. flex: none — no painel que
+   rola, a coluna espremia a pílula e ela ficava achatada (o fundo preto fininho) */
+html.pp #player .pl-troca { order: 3; flex: none; align-self: flex-start; display: inline-flex; align-items: center; gap: 9px; height: 38px; margin-top: 2px; padding: 0 16px 0 5px;
+  border: 1px solid rgb(255 255 255 / 0.18); border-radius: 999px; background: rgb(255 255 255 / 0.1); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  color: #fff; font: 700 14px/1 var(--sans); letter-spacing: 0.01em; cursor: pointer; transition: background 0.2s, border-color 0.2s, transform 0.15s; }
+html.pp #player .pl-troca .pl-troca-ic { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 50%; background: #fff; color: #111; }
+html.pp #player .pl-troca:hover { background: rgb(255 255 255 / 0.18); border-color: rgb(255 255 255 / 0.3); }
+html.pp #player .pl-troca:active { transform: scale(0.96); }
+html.pp #player > * { flex-shrink: 0; }
 /* o nome e o artista, com o ✓/+ da biblioteca à direita */
 html.pp #player .pl-meio { order: 4; display: flex; align-items: center; gap: 12px; }
 html.pp #player .pl-info { flex: 1; min-width: 0; padding: 0 2px; margin: 0; }
