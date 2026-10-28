@@ -6,7 +6,7 @@ export const NOVIDADES = [
     versao: 245, data: '2026-10-28', titulo: 'Adeus à página antiga da música (celular)',
     itens: [
       { tipo: 'melhoria', texto: 'No celular, toda música abre no Tocando agora, de qualquer lugar do app: listas, repertórios, a missa da Liturgia, playlists, menus e links. A página antiga não aparece mais.' },
-      { tipo: 'novo', texto: 'Música sem vídeo também abre no Tocando agora: a capa (ou a cor da música com uma nota), o nome, a letra e o botão grande para escolher um vídeo do YouTube. O que estava tocando continua e volta quando você fecha.' },
+      { tipo: 'novo', texto: 'Música sem vídeo também abre no Tocando agora: a capa (ou a cor da música com uma nota), o nome, a letra e a pílula “Escolher um vídeo” (o play também leva a ela) para escolher um vídeo do YouTube. O que estava tocando continua e volta quando você fecha.' },
       { tipo: 'melhoria', texto: 'Aberta por um menu ou link (não por uma lista), a música com vídeo abre pausada, sem começar a tocar sozinha.' },
     ],
   },
