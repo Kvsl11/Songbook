@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 283, data: '2026-10-28', titulo: 'Barrinha da música ao rolar, no tablet',
+    itens: [
+      { tipo: 'novo', texto: 'No tablet, rolando o Tocando agora (no painel do lado e na tela toda), aparece no alto uma barrinha com o nome, o artista, o ✓/+ da biblioteca, o play e a linha do andamento da música, como no Spotify.' },
+    ],
+  },
+  {
     versao: 282, data: '2026-10-28', titulo: 'Letra na tela toda sem piscar',
     itens: [
       { tipo: 'correcao', texto: 'Abrir a letra na tela toda não pisca mais: o vídeo some na hora (antes aparecia por um instante por cima da letra) e a capa animada para de rodar por baixo dela.' },
@@ -65,13 +71,6 @@ export const NOVIDADES = [
       { tipo: 'novo', texto: 'Nos créditos, tocar num artista abre a página dele, com as músicas e os álbuns (no Explorar e na lista dos créditos).' },
       { tipo: 'melhoria', texto: 'A tela Explorar dos créditos mostra a capa da música (ou a imagem do vídeo).' },
       { tipo: 'correcao', texto: 'Voltando ao app depois de minimizar, a letra sincronizada volta a seguir o que está sendo cantado (antes ela podia correr sozinha à frente da música).' },
-    ],
-  },
-  {
-    versao: 273, data: '2026-10-28', titulo: 'Salvar e tirar sem piscar',
-    itens: [
-      { tipo: 'correcao', texto: 'Salvar a música aberta pela busca no Tocando agora não faz mais a tela piscar: só a bolinha vira ✓.' },
-      { tipo: 'correcao', texto: 'Tocar no ✓ de novo tira a música da biblioteca (ela continua tocando). Adicionar a um repertório fica no menu ⋮.' },
     ],
   },
 ];
