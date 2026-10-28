@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-244';
+export const APP_VERSAO = '2026.10.28-245';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -178,7 +178,7 @@ const telaDeCelular = () => !ehTablet() && matchMedia('(max-width: 899px)').matc
 function irParaMusica(id) {
   // no celular, uma música com vídeo toca e abre no Tocando agora ali mesmo, sem passar pela página dela
   const s = db.song(id);
-  if (s?.youtube && telaDeCelular()) { player.tocar(itemDoPlayer(s)); player.expandir(); return; }
+  if (s && telaDeCelular()) { if (s.youtube) player.tocar(itemDoPlayer(s)); else player.mostrarSemVideo(itemDoPlayer(s)); player.expandir(); return; }
   abrirNoTocando = true;
   location.hash = '#/musica/' + id;
 }
@@ -495,9 +495,10 @@ document.addEventListener('click', (e) => {
   const set = mr && db.set(mr[1]);
   const i = mr ? Number(mr[2]) : -1;
   const song = mm ? db.song(mm[1]) : set && db.song(set.items[i]?.songId);
-  if (!song?.youtube) return;
+  if (!song) return;
   e.preventDefault();
-  player.tocar(itemDoPlayer(song, set || null, set ? i : -1));
+  if (song.youtube) player.tocar(itemDoPlayer(song, set || null, set ? i : -1));
+  else player.mostrarSemVideo(itemDoPlayer(song, set || null, set ? i : -1));
   player.expandir();
 });
 
@@ -823,7 +824,7 @@ const player = (() => {
     const r = a?.isConnected ? a.getBoundingClientRect() : null;
     if (!r || !r.width || !r.height) { tela.style.visibility = 'hidden'; return; }
     const base = tela.parentElement.getBoundingClientRect();
-    tela.style.visibility = modoCapa() && !noPalco() ? 'hidden' : 'visible';
+    tela.style.visibility = (modoCapa() || atual?.semVideo) && !noPalco() ? 'hidden' : 'visible';
     tela.style.transform = `translate(${r.left - base.left}px, ${r.top - base.top}px)`;
     tela.style.width = r.width + 'px';
     tela.style.height = r.height + 'px';
@@ -847,7 +848,9 @@ const player = (() => {
     $('.pl-txt b', el).textContent = atual.titulo || 'Vídeo';
     // o tempo vai junto do artista no celular; no computador ele fica na barra de tempo, no centro
     $('.pl-txt small', el).innerHTML = esc([atual.parte, atual.artista].filter(Boolean).join(' · ')) + (duracao ? `<span class="pl-tmini">${atual.parte || atual.artista ? ' · ' : ''}${fmt(tempo)} / ${fmt(duracao)}</span>` : '');
-    $('.pl-play', el).innerHTML = icon(estado === 'tocando' ? 'pause' : 'play', 20);
+    // música sem vídeo: o botão grande escolhe um vídeo do YouTube para ela
+    $('.pl-play', el).innerHTML = icon(atual.semVideo ? 'youtube' : estado === 'tocando' ? 'pause' : 'play', 20);
+    $('.pl-play', el).title = atual.semVideo ? 'Escolher um vídeo para esta música' : '';
     // a bolinha de salva (na barrinha recolhida do tablet): ✓ se a música está na biblioteca, + se não
     const salva = Boolean(atual.songId && db.song(atual.songId));
     const bs = $('.pl-salva', el);
@@ -878,10 +881,13 @@ const player = (() => {
   };
   // a capa (no modo capa): a da música ou o quadro do vídeo; o botão de trocar diz para o que vai
   const desenharCapa = () => {
-    const capa = modoCapa();
+    const capa = modoCapa() || Boolean(atual?.semVideo);
     el.classList.toggle('modo-capa', capa);
     const url = atual?.capa && /^(https?:|data:)/.test(atual.capa) ? atual.capa : atual?.youtube ? `https://i.ytimg.com/vi/${atual.youtube}/hqdefault.jpg` : '';
     mini.style.backgroundImage = capa && url ? `url("${url}")` : '';
+    // sem capa nem vídeo: a cor da música com uma nota no meio
+    const semCapa = capa && !url;
+    if (mini.classList.contains('sem-capa') !== semCapa) { mini.classList.toggle('sem-capa', semCapa); mini.innerHTML = semCapa ? icon('music', 72) : ''; }
     mini.classList.toggle('capa-yt', capa && !(atual?.capa && /^(https?:|data:)/.test(atual.capa)));
     const b = $('.pl-troca', el);
     b.innerHTML = `${icon(capa ? 'video' : 'music', 18)}<span>${capa ? 'Mudar para vídeo' : 'Mudar para música'}</span>`;
@@ -978,13 +984,24 @@ const player = (() => {
     if (p && tempos?.[p.dataset.k]) api.irPara(Math.max(0, tempos[p.dataset.k].inicio - 0.3));
   });
   // cria o vídeo (só quando muda de vídeo)
-  const montar = () => {
-    tela.innerHTML = `<iframe src="${esc(ytEmbed(atual.youtube))}" title="${esc(atual.titulo || 'Vídeo')}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
+  const montar = ({ autoplay = true } = {}) => {
+    tela.innerHTML = `<iframe src="${esc(ytEmbed(atual.youtube, { autoplay }))}" title="${esc(atual.titulo || 'Vídeo')}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
     const f = $('iframe', tela);
     f.addEventListener('load', () => f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'));
     tela.hidden = false;
     mostrarBarra();
     if (!quadro) seguir();
+  };
+  let guardado = null; // o que tocava antes de abrir uma música sem vídeo
+  let sobrePagina = ''; // o Tocando agora aberto por cima da página da música (celular)
+  const largarSemVideo = ({ fechar = true } = {}) => {
+    if (!atual?.semVideo) return;
+    el.classList.remove('sem-video');
+    const g = guardado;
+    guardado = null;
+    if (g) { ({ atual, tempo, duracao, estado } = g); desenhar(); mostrarBarra(); avisar(); }
+    else if (fechar) api.fechar();
+    else atual = null;
   };
   const comando = (func, args = []) => iframeAtual()?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
   const api = {
@@ -999,8 +1016,10 @@ const player = (() => {
     tocandoAlgo: () => Boolean(atual) && estado === 'tocando',
     desta,
     ouvir(fn) { ouvintes.add(fn); return () => ouvintes.delete(fn); },
-    tocar(item) {
+    // pausado: abre a música sem começar a tocar (a página dela aberta por um link, voltando do editor…)
+    tocar(item, { pausado = false } = {}) {
       if (!item?.youtube) return;
+      if (atual?.semVideo) largarSemVideo({ fechar: false });
       if (atual?.youtube === item.youtube && estado !== 'parado') {
         atual = { ...atual, ...item };
         if (estado !== 'tocando') api.alternar(); else desenhar();
@@ -1009,8 +1028,8 @@ const player = (() => {
       atual = item;
       tempo = 0;
       duracao = 0;
-      estado = 'tocando';
-      montar();
+      estado = pausado ? 'pausado' : 'tocando';
+      montar({ autoplay: !pausado });
       desenhar();
       avisar();
     },
@@ -1034,7 +1053,18 @@ const player = (() => {
     // a página vai ser desenhada de novo: o vídeo sai da telinha antes (senão iria embora com a página velha)
     soltar: () => tirarDaTelinha(),
     // abre o "Tocando agora" na tela toda (celular e computador; no tablet, o painel expandido)
-    expandir: () => painelCheio(true),
+    // sobrePagina: aberto por cima da página da música (fechando, sai dela também)
+    expandir: ({ sobrePagina: sobre = false } = {}) => painelCheio(true, { sobre }),
+    // uma música sem vídeo no Tocando agora: a capa, o nome, a letra e o botão de escolher um vídeo. A que estava
+    // tocando continua (por trás) e volta ao fechar
+    mostrarSemVideo(item) {
+      if (atual && !atual.semVideo) guardado = { atual, tempo, duracao, estado };
+      atual = { ...item, semVideo: true };
+      el.classList.add('sem-video');
+      mostrarBarra();
+      desenhar();
+      avisar();
+    },
     // a página da música avisa onde fica a telinha do vídeo dela (box) — ou null ao sair da página
     palco(box, youtube = '') {
       tirarDaTelinha(); // a página vai sair (ou ser desenhada de novo): o vídeo volta para fora antes
@@ -1055,7 +1085,8 @@ const player = (() => {
       cancelAnimationFrame(quadro);
       quadro = 0;
       el.hidden = true;
-      el.classList.remove('grande');
+      el.classList.remove('grande', 'sem-video');
+      guardado = null;
       document.body.classList.remove('com-player', 'painel-cheio');
       atual = null;
       estado = 'parado';
@@ -1119,7 +1150,7 @@ const player = (() => {
   // nome, artista, capa, tocar/pausar, anterior/próxima e a barra de tempo
   let sessaoDe = '';
   const sessaoDeMidia = () => {
-    if (!('mediaSession' in navigator) || !atual) return;
+    if (!('mediaSession' in navigator) || !atual || atual.semVideo) return;
     const ms = navigator.mediaSession;
     const chave = `${atual.youtube}|${atual.titulo}|${atual.artista}`;
     if (sessaoDe !== chave && typeof MediaMetadata === 'function') {
@@ -1162,7 +1193,7 @@ const player = (() => {
   window.addEventListener('message', (e) => {
     let h = '';
     try { h = new URL(e.origin).hostname; } catch { return; }
-    if (!/(^|\.)youtube(-nocookie)?\.com$/.test(h) || !atual || e.source !== iframeAtual()?.contentWindow) return;
+    if (!/(^|\.)youtube(-nocookie)?\.com$/.test(h) || !atual || atual.semVideo || e.source !== iframeAtual()?.contentWindow) return;
     try {
       const msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
       // vídeo que o dono não deixa tocar fora do YouTube (erros 101/150) ou que saiu do ar
@@ -1234,7 +1265,8 @@ const player = (() => {
     dlg.addEventListener('click', (e) => {
       if (e.target === dlg) { dlg.close(); return; }
       const ap = e.target.closest('[data-ap]')?.dataset.ap;
-      if (ap === 'tv' && atual) {
+      if (ap === 'tv' && !atual?.youtube) { toast('Esta música ainda não tem vídeo'); dlg.close(); }
+      if (ap === 'tv' && atual?.youtube) {
         if (estado === 'tocando') api.alternar();
         window.open(`https://www.youtube.com/watch?v=${atual.youtube}&t=${Math.floor(api.tempoAgora)}s`, '_blank', 'noopener');
         toast('No YouTube, toque no ícone de transmitir para mandar para a TV');
@@ -1257,10 +1289,10 @@ const player = (() => {
       (atual.href || atual.abrir) && !telaDeCelular() && { valor: 'abrir', rotulo: 'Abrir a música', ic: 'music' },
       { valor: 'salva', rotulo: salva ? 'Adicionar a um repertório' : 'Salvar na biblioteca', ic: salva ? 'plus' : 'download' },
       { valor: 'fila', rotulo: 'Ver a fila', ic: 'queue' },
-      salva && { valor: 'trocar', rotulo: 'Trocar o vídeo', ic: 'refresh' },
-      { valor: 'troca', rotulo: modoCapa() ? 'Mudar para vídeo' : 'Mudar para música', ic: modoCapa() ? 'video' : 'music' },
+      salva && { valor: 'trocar', rotulo: atual.semVideo ? 'Escolher um vídeo' : 'Trocar o vídeo', ic: atual.semVideo ? 'youtube' : 'refresh' },
+      !atual.semVideo && { valor: 'troca', rotulo: modoCapa() ? 'Mudar para vídeo' : 'Mudar para música', ic: modoCapa() ? 'video' : 'music' },
       { valor: 'compartilhar', rotulo: 'Compartilhar', ic: 'share' },
-      { valor: 'youtube', rotulo: 'Abrir no YouTube', ic: 'youtube' },
+      atual.youtube && { valor: 'youtube', rotulo: 'Abrir no YouTube', ic: 'youtube' },
       { valor: 'fechar', rotulo: 'Fechar o player', ic: 'x' },
     ].filter(Boolean);
     const v = await escolherNaLista({ titulo: atual.titulo || 'Tocando agora', opcoes });
@@ -1277,16 +1309,24 @@ const player = (() => {
   // o "Tocando agora" na tela toda (tablet): o botão do canto de cima troca entre expandir e voltar ao painel
   // No celular e no computador a tela toda é o próprio "Tocando agora": o player muda de jeito (html.pp) só enquanto
   // ela está aberta, e o voltar do celular (ou do navegador) fecha a tela em vez de sair da página
-  const painelCheio = (ligar, { semVoltar = false } = {}) => {
+  // manter: vai para a letra na tela toda desta música (continua a mesma música, sem sair da página dela)
+  const painelCheio = (ligar, { semVoltar = false, manter = false, sobre = false } = {}) => {
     const antes = document.body.classList.contains('painel-cheio');
     document.body.classList.toggle('painel-cheio', ligar);
     if (!ehTablet()) {
       document.documentElement.classList.toggle('pp', ligar);
-      if (ligar && !antes) history.pushState({ tocandoAgora: true }, '');
-      if (!ligar && antes && !semVoltar && history.state?.tocandoAgora) history.back();
+      if (ligar && !antes) { history.pushState({ tocandoAgora: true }, ''); sobrePagina = sobre ? location.hash : ''; }
+      if (!ligar && antes && !semVoltar) {
+        // aberto por cima da página da música: fechando, sai dela também (a página antiga não aparece)
+        const sairDaPagina = !manter && sobrePagina && location.hash === sobrePagina;
+        if (history.state?.tocandoAgora) history.go(sairDaPagina ? -2 : -1);
+        else if (sairDaPagina) history.back();
+      }
+      if (!ligar && !manter) sobrePagina = '';
       if (ligar !== antes) { desenhar(); if (!ligar) medirPlayer(); }
       if (ligar) el.scrollTop = 0;
     }
+    if (!ligar && antes && !manter) largarSemVideo();
     if (ligar !== antes) mostrarBarra(); // na página da própria música a barra some; a tela toda aparece por cima dela
     el.querySelectorAll('[data-pl="expandir"]').forEach((b) => {
       b.title = ligar ? 'Voltar' : 'Tocando agora';
@@ -1312,6 +1352,18 @@ const player = (() => {
       return;
     }
     if (!b) return;
+    if (b.dataset.pl === 'play' && atual?.semVideo) {
+      // música sem vídeo: escolher um no YouTube; escolhido, ela fica salva com ele e começa a tocar
+      const s = db.song(atual.songId);
+      if (!s) { toast('Salve a música na biblioteca para escolher um vídeo'); return; }
+      const item = { ...atual };
+      escolherVideo(s).then((url) => {
+        if (!url) return;
+        db.saveSong({ ...db.song(s.id), content: definirMeta(db.song(s.id).content, 'youtube', url) });
+        api.tocar({ ...item, semVideo: false, youtube: youtubeId(url) });
+      });
+      return;
+    }
     if (b.dataset.pl === 'play') api.alternar();
     if (b.dataset.pl === 'salva' && atual) {
       // salva: adicionar a um repertório (como o ✓ do Spotify); não salva: salva ali mesmo, sem precisar abrir a música
@@ -1329,7 +1381,7 @@ const player = (() => {
     }
     if (b.dataset.pl === 'proxima') pular(1);
     if (b.dataset.pl === 'troca') { comCapa = !comCapa; db.setPref('playerCapa', comCapa); desenharCapa(); }
-    if (b.dataset.pl === 'compartilhar' && atual) compartilhar({ title: atual.titulo || 'Vídeo', text: [atual.titulo, atual.artista].filter(Boolean).join(' — '), url: `https://www.youtube.com/watch?v=${atual.youtube}` });
+    if (b.dataset.pl === 'compartilhar' && atual) compartilhar({ title: atual.titulo || 'Vídeo', text: [atual.titulo, atual.artista].filter(Boolean).join(' — '), ...(atual.youtube ? { url: `https://www.youtube.com/watch?v=${atual.youtube}` } : {}) });
     if (b.dataset.pl === 'compartilhar-letra' && atual) compartilhar({ title: atual.titulo || 'Letra', text: `${[atual.titulo, atual.artista].filter(Boolean).join(' — ')}\n\n${linhasDaLetra.join('\n')}` });
     // ouvir em outro aparelho: o vídeo abre no YouTube (de lá vai para a TV ou a caixa de som), do ponto em que está
     if (b.dataset.pl === 'aparelhos' && atual) abrirAparelhos();
@@ -1361,7 +1413,7 @@ const player = (() => {
     if (b.dataset.pl === 'expandir') painelCheio(!document.body.classList.contains('painel-cheio'));
     if (b.dataset.pl === 'trocar') {
       const s = db.song(atual?.songId);
-      if (s) escolherVideo(s).then((url) => { if (!url) return; db.saveSong({ ...db.song(s.id), content: definirMeta(db.song(s.id).content, 'youtube', url) }); api.tocar({ ...atual, youtube: youtubeId(url) }); route(); });
+      if (s) escolherVideo(s).then((url) => { if (!url) return; db.saveSong({ ...db.song(s.id), content: definirMeta(db.song(s.id).content, 'youtube', url) }); api.tocar({ ...atual, semVideo: false, youtube: youtubeId(url) }); route(); });
     }
     if (b.dataset.pl === 'ampliar') { el.classList.toggle('grande'); b.innerHTML = icon(el.classList.contains('grande') ? 'shrink' : 'expand', 18); }
     // abrir a música (o nome no player): a página dela; expandir a letra: a página dela já com a letra na tela toda
@@ -1371,7 +1423,7 @@ const player = (() => {
       // saindo da tela toda (celular/computador) para a página da música: ela toma o lugar da tela toda no histórico.
       // Antes o "voltar" da tela toda corria depois de abrir a página e levava de volta ao início
       const daTela = !ehTablet() && history.state?.tocandoAgora && atual.href && location.hash !== atual.href;
-      painelCheio(false, { semVoltar: daTela });
+      painelCheio(false, { semVoltar: daTela, manter: b.dataset.pl === 'cheio' });
       abrirLetraCheia = b.dataset.pl === 'cheio';
       voltarAoTocando = abrirLetraCheia && !ehTablet();
       if (daTela) location.replace(atual.href);
@@ -6386,10 +6438,15 @@ function viewSong(id, ctx = {}) {
     aoSair(() => player.palco(null));
   }
   // veio da Busca ou da Biblioteca, no celular: toca e abre o "Tocando agora" por cima (fechando, fica a cifra)
-  if (abrirNoTocando) {
-    abrirNoTocando = false;
-    if (song.youtube && telaDeCelular()) { tocar(); player.expandir(); }
+  // celular: a página antiga da música não aparece mais — o Tocando agora abre por cima dela (com vídeo: tocando, se veio
+  // de uma lista, ou pausado; sem vídeo: a capa e o botão de escolher um). Ela fica por baixo só para a letra na tela toda
+  if (telaDeCelular() && !document.body.classList.contains('performance') && !document.body.classList.contains('painel-cheio')) {
+    const item = itemDoPlayer(song, ctx.set ? db.set(ctx.set.id) : null, ctx.set ? ctx.index : -1);
+    if (!song.youtube) player.mostrarSemVideo(item);
+    else if (!player.desta(song.youtube)) { if (abrirNoTocando) tocar(); else player.tocar(item, { pausado: true }); }
+    player.expandir({ sobrePagina: true });
   }
+  abrirNoTocando = false;
 
   const salvarPrevia = () => {
     const existing = db.songBySource(song.source);
