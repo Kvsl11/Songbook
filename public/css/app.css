@@ -3721,3 +3721,20 @@ body:not(.painel-cheio) #player.sem-video { display: none !important; }
 .art-bio.aberta p { display: block; }
 .art-bio a { display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--accent-ink); }
 #player .pl-ver-cifra[hidden] { display: none; }
+
+/* créditos como o SongDNA do Spotify: fotos redondas das pessoas, o nome e o papel; "Explorar" abre todos em grade */
+.pessoa-cred { display: grid; justify-items: center; gap: 4px; min-width: 0; padding: 4px; border: 0; background: none; color: inherit; font: inherit; text-align: center; cursor: pointer; }
+.pessoa-foto { display: grid; place-items: center; width: min(132px, 32vw); aspect-ratio: 1; border-radius: 50%; margin-bottom: 6px;
+  background: rgb(255 255 255 / 0.12) center / cover no-repeat; color: rgb(255 255 255 / 0.85); font-size: 34px; font-weight: 900; box-shadow: 0 8px 22px rgb(0 0 0 / 0.3); }
+.pessoa-foto.com-foto { color: transparent; }
+.pessoa-cred b { font-size: 15px; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
+.pessoa-cred small { color: rgb(255 255 255 / 0.7); font-size: 13px; }
+#player .pl-cred-fotos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 6px 0 12px; }
+#player .pl-cred-pe { margin: 0 0 6px; padding: 0; }
+.dlg-creditos { background: #181818; color: #fff; }
+.dlg-creditos .cred-cab { display: flex; align-items: center; gap: 10px; }
+.dlg-creditos .cred-cab > div { flex: 1; min-width: 0; }
+.dlg-creditos .cred-cab b { display: block; font-size: 18px; font-weight: 800; }
+.dlg-creditos .cred-cab small { color: rgb(255 255 255 / 0.65); }
+.dlg-creditos .cred-tit { margin: 16px 0 10px; font-size: 22px; font-weight: 900; }
+.dlg-creditos .cred-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 18px 10px; max-height: 65vh; overflow-y: auto; }

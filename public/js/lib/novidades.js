@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 270, data: '2026-10-28', titulo: 'Créditos com fotos',
+    itens: [
+      { tipo: 'novo', texto: 'No Tocando agora, os Créditos mostram as fotos de quem participa da música, como no Spotify. "Explorar" abre todos os participantes, e tocar numa pessoa leva para a página dela.' },
+      { tipo: 'correcao', texto: 'Nomes com "&" como "King Gizzard & the Lizard Wizard" não são mais separados em dois.' },
+    ],
+  },
+  {
     versao: 269, data: '2026-10-28', titulo: 'Explorar o artista',
     itens: [
       { tipo: 'novo', texto: 'No cartão "Sobre o artista" do Tocando agora, o botão "Explorar" (como no Spotify) abre a página do artista: músicas mais tocadas, todas as músicas, álbuns e, agora, a biografia.' },
@@ -66,12 +73,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'No ⋯ da letra (Tocando agora), "Sincronizar a letra"; "Trocar o vídeo" e "Mudar para vídeo/música" foram para o ⋯ das músicas nas listas (biblioteca, repertório, playlist).' },
       { tipo: 'correcao', texto: 'No editor de cifra, voltar, cancelar e salvar levam de volta à lista de onde você veio, não à música.' },
       { tipo: 'melhoria', texto: 'Editor mais limpo: os jeitos de editar com o nome (Cifra, Colchetes, Só letra), o texto do tamanho da letra (sem um quadro vazio enorme) e a ajuda "Como escrever" fechada até tocar nela.' },
-    ],
-  },
-  {
-    versao: 260, data: '2026-10-28', titulo: 'Capa animada',
-    itens: [
-      { tipo: 'correcao', texto: 'O ajuste "Capa animada" (antes "Clipe atrás do título") agora vale também no Tocando agora: desligado, o modo música mostra a capa parada e não baixa as cenas do clipe. Muda na hora.' },
     ],
   },
 ];

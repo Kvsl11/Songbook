@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-269';
+export const APP_VERSAO = '2026.10.28-270';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -943,6 +943,7 @@ const player = (() => {
   // embaixo da letra, no painel do tablet (como os cartões do "Tocando agora" do Spotify): o artista com a foto,
   // os créditos (quem canta, compôs, o tom, de onde veio a cifra) e o vídeo, com o que dá para fazer em cada um
   let extraDe = '';
+  let creditosAgora = null;
   const desenharExtra = () => {
     if (!document.documentElement.classList.contains('pp')) return;
     const song = musicaTocando();
@@ -967,9 +968,14 @@ const player = (() => {
         <div class="pl-artista-pe"><span class="grow"><b>${esc(principal)}</b><small>${esc(pessoas[0]?.papeis.join(' • ') || 'Artista')}</small></span>
         <button class="ref-pilula pl-explorar" data-pl="explorar-artista" data-nome="${esc(principal)}" data-slug="${esc(slug || '')}">Explorar</button></div></section>`);
     }
+    // créditos como o SongDNA do Spotify: as fotos dos primeiros participantes, quantos são e "Explorar" (todos, em
+    // grade); tocar numa pessoa abre a página dela
     if (pessoas.length || detalhes.length) {
-      cartoes.push(`<section class="pl-cartao"><h4>Créditos</h4>
-        ${pessoas.map((x) => `<div class="ref-linha"><span class="grow"><b>${esc(x.nome)}</b><small>${esc(x.papeis.join(' • '))}</small></span></div>`).join('')}
+      creditosAgora = { titulo, artista, pessoas };
+      cartoes.push(`<section class="pl-cartao pl-creditos"><h4>Créditos</h4>
+        ${pessoas.length ? `<div class="pl-cred-fotos">${pessoas.slice(0, 2).map(htmlPessoa).join('')}</div>
+        <div class="pl-artista-pe pl-cred-pe"><span class="grow"><b>${esc(titulo)}</b><small>${pessoas.length} participante${pessoas.length === 1 ? '' : 's'}</small></span>
+          <button class="ref-pilula" data-pl="creditos">Explorar</button></div>` : ''}
         ${detalhes.map(([k, v, html]) => `<div class="ref-linha"><span class="grow"><b>${html ? v : esc(v)}</b><small>${esc(k)}</small></span></div>`).join('')}</section>`);
     }
     if (atual?.youtube) {
@@ -980,6 +986,7 @@ const player = (() => {
     }
     box.innerHTML = cartoes.join('');
     box.hidden = !cartoes.length;
+    fotosDasPessoas(box);
     if (principal) fotoDoArtista(principal).then((url) => {
       const f = $('.pl-extra [data-foto]', el);
       if (!url || !f || extraDe !== chave) return;
@@ -1871,6 +1878,8 @@ const player = (() => {
     if (b.dataset.pl === 'fonte+') { mudarFonte(0.1); return; }
     if (b.dataset.pl === 'rolar') { rolar(); return; }
     if (b.dataset.pl === 'explorar-artista') { explorarArtista(b.dataset.nome, b.dataset.slug, b); return; }
+    if (b.dataset.pl === 'pessoa') { explorarArtista(b.dataset.nome, '', b); return; }
+    if (b.dataset.pl === 'creditos' && creditosAgora) { abrirCreditos(creditosAgora); return; }
     if (b.dataset.pl === 'editar' && atual?.songId && db.song(atual.songId)) { location.hash = '#/editar/' + atual.songId; return; }
     if (b.dataset.pl === 'partitura' && atual?.songId) { location.hash = `#/musica/${atual.songId}/partitura`; return; }
     if (b.dataset.pl === 'sinc-ajustar') { ajustando = true; ajustandoVideo = atual?.youtube || ''; mostrarSinc(); letraCheia(true); return; }
@@ -3222,7 +3231,8 @@ function pessoasDosCreditos({ artista = '', titulo = '', compositor = '', letris
     if (ja) { if (!ja.papeis.includes(papel)) ja.papeis.push(papel); } else pessoas.push({ nome, papeis: [papel] });
   };
   // artistas e participações: separados por vírgula, "&", "/" ou " x " (uma dupla como "Zezé Di Camargo e Luciano" fica junta)
-  const SEP_ARTISTA = /\s*(?:[,;&/]|\sx\s)\s*/i;
+  // ("King Gizzard & the Lizard Wizard" é um nome só: o "&" seguido de "the" não separa)
+  const SEP_ARTISTA = /\s*(?:[,;/]|&(?!\s*the\b)|\sx\s)\s*/i;
   lista(principal, SEP_ARTISTA).forEach((n) => juntar(n, 'Artista principal'));
   [...feats, doTitulo].flatMap((f) => lista(f, SEP_ARTISTA)).forEach((n) => juntar(n, 'Participação'));
   // compositores: também separados por " e "
@@ -3230,6 +3240,38 @@ function pessoasDosCreditos({ artista = '', titulo = '', compositor = '', letris
   lista(compositor, SEP_NOMES).forEach((n) => juntar(n, 'Composição'));
   lista(letrista, SEP_NOMES).forEach((n) => juntar(n, 'Letra'));
   return pessoas;
+}
+// uma pessoa dos créditos: a foto redonda (ou as iniciais, até a foto chegar), o nome e o que fez na música
+const htmlPessoa = (x) => `<button class="pessoa-cred" data-pl="pessoa" data-nome="${esc(x.nome)}" title="Ver ${esc(x.nome)}">
+  <span class="pessoa-foto" data-foto-pessoa="${esc(x.nome)}">${esc(x.nome.split(/\s+/).slice(0, 2).map((p) => p[0] || '').join('').toUpperCase())}</span>
+  <b>${esc(x.nome)}</b><small>${esc(x.papeis[0] || '')}${x.papeis.length > 1 ? ` + ${x.papeis.length - 1}` : ''}</small></button>`;
+// as fotos das pessoas (a do Cifra Club, do Deezer ou da Wikipédia), quando chegarem
+function fotosDasPessoas(box) {
+  box.querySelectorAll('[data-foto-pessoa]').forEach((f) => {
+    fotoDoArtista(f.dataset.fotoPessoa).then((url) => {
+      if (!url || !f.isConnected) return;
+      const img = new Image();
+      img.onload = () => { f.style.backgroundImage = `url("${url}")`; f.classList.add('com-foto'); };
+      img.src = url;
+    }).catch(() => {});
+  });
+}
+// "Explorar" dos créditos: todos os participantes da música, em grade, com foto; tocar numa pessoa abre a página dela
+function abrirCreditos({ titulo, artista, pessoas }) {
+  openDialog(`<div class="cred-cab"><div><b>${esc(titulo)}</b><small>${esc(artista || '')}</small></div><button class="icon-btn" data-no aria-label="Fechar">${icon('x', 20)}</button></div>
+    <h3 class="cred-tit">Participantes</h3>
+    <div class="cred-grade">${pessoas.map(htmlPessoa).join('')}</div>`, (dlg, done) => {
+    dlg.classList.add('dlg-creditos');
+    fotosDasPessoas(dlg);
+    $('[data-no]', dlg).onclick = () => done(null);
+    dlg.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-pl="pessoa"]');
+      if (!b) return;
+      e.stopPropagation();
+      done(null);
+      explorarArtista(b.dataset.nome, '', b);
+    });
+  });
 }
 // "Explorar" (cartão do artista no Tocando agora, como no Spotify): a página do artista, com as músicas, os álbuns e a
 // biografia. Sem o endereço do Cifra Club na música, procura o artista pelo nome
