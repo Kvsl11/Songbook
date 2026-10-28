@@ -4,10 +4,24 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 271, data: '2026-10-28', titulo: 'Letra maior no tablet e no computador',
+    itens: [
+      { tipo: 'melhoria', texto: 'No tablet e no computador, a letra na tela toda fica maior, na proporção da tela (com e sem cifra, do mesmo tamanho). No celular continua como estava.' },
+    ],
+  },
+  {
+    versao: 270, data: '2026-10-28', titulo: 'Só a letra, para ler',
+    itens: [
+      { tipo: 'novo', texto: 'Na letra na tela toda, o botão do olho deixa só a letra: some o nome, o aviso e a barra de baixo. Ficam o voltar e o botão da cifra (com a cifra, também tom, capotraste, tamanho e rolagem).' },
+      { tipo: 'correcao', texto: 'O aviso "Letra sincronizada" some sozinho 2 segundos depois, no cartão e na tela toda (antes ficava parado ali).' },
+      { tipo: 'correcao', texto: 'Na letra sincronizada, as marcações das partes (refrão, ponte…) continuam aparecendo, também quando a letra sincronizada tem linhas diferentes da cifra.' },
+      { tipo: 'melhoria', texto: 'Os acordes voltam à cor do fundo da música, agora bem mais clara e viva para se destacar (e na cor do fundo do Tocando agora).' },
+    ],
+  },
+  {
     versao: 269, data: '2026-10-28', titulo: 'Música abre nos dados, cifra em destaque',
     itens: [
       { tipo: 'correcao', texto: 'Tocar numa música da lista abre o Tocando agora com a capa ou o vídeo, o nome e os controles; a letra na tela toda abre pelo cartão da letra (antes abria direto na letra).' },
-      { tipo: 'melhoria', texto: 'Os acordes vêm numa cor que se destaca do fundo da música (antes eram da mesma cor do fundo, só um pouco mais claros).' },
       { tipo: 'correcao', texto: 'Os botões A− e A+ voltaram a mudar o tamanho da letra; letra e cifra têm o mesmo tamanho.' },
       { tipo: 'melhoria', texto: 'Na cifra sincronizada, como na letra: a linha de agora fica acesa, as próximas mais apagadas e as já cantadas mais ainda.' },
     ],
@@ -60,20 +74,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: '"Abrir a cifra" (no ⋯ das listas) abre a página com os acordes, sem o Tocando agora por cima.' },
       { tipo: 'novo', texto: 'Na letra em tela toda, o botão "Cifra" (no canto de cima) e "Ver a cifra" no ⋯ levam para a música com os acordes. Voltar retorna para a lista.' },
-    ],
-  },
-  {
-    versao: 261, data: '2026-10-28', titulo: 'Menus no lugar certo e editor mais limpo',
-    itens: [
-      { tipo: 'melhoria', texto: 'No ⋯ da letra (Tocando agora), "Sincronizar a letra"; "Trocar o vídeo" e "Mudar para vídeo/música" foram para o ⋯ das músicas nas listas (biblioteca, repertório, playlist).' },
-      { tipo: 'correcao', texto: 'No editor de cifra, voltar, cancelar e salvar levam de volta à lista de onde você veio, não à música.' },
-      { tipo: 'melhoria', texto: 'Editor mais limpo: os jeitos de editar com o nome (Cifra, Colchetes, Só letra), o texto do tamanho da letra (sem um quadro vazio enorme) e a ajuda "Como escrever" fechada até tocar nela.' },
-    ],
-  },
-  {
-    versao: 260, data: '2026-10-28', titulo: 'Capa animada',
-    itens: [
-      { tipo: 'correcao', texto: 'O ajuste "Capa animada" (antes "Clipe atrás do título") agora vale também no Tocando agora: desligado, o modo música mostra a capa parada e não baixa as cenas do clipe. Muda na hora.' },
     ],
   },
 ];

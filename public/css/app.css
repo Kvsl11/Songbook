@@ -413,7 +413,7 @@ a.chip.sm { cursor: pointer; }
 .song.lyrics-mode .section-label { color: rgb(255 255 255 / 0.55); font-size: 12px; letter-spacing: 0.14em; }
 /* modo Cifra no mesmo painel: acordes por cima da letra, num tom claro da própria cor do fundo */
 /* a letra tem o mesmo tamanho e formato com ou sem cifra: só os acordes aparecem por cima */
-.song.lyrics-mode.with-chords .chord { display: block; color: var(--tint-cifra, #ffd147); font-size: 0.78em; font-weight: 800; min-height: 1.2em; padding-right: 0.35em; }
+.song.lyrics-mode.with-chords .chord { display: block; color: var(--tint-cifra, #9be7b4); font-size: 0.78em; font-weight: 800; min-height: 1.2em; padding-right: 0.35em; }
 .song.lyrics-mode.with-chords .line.chords-only { display: flex; }
 .song.lyrics-mode.with-chords .comment { display: block; color: rgb(255 255 255 / 0.6); font-weight: 600; font-size: 0.75em; }
 .song.lyrics-mode.with-chords .chunk { display: inline-flex; flex-direction: column; white-space: pre-wrap; max-width: 100%; }
@@ -1044,11 +1044,11 @@ body.performance .convite-instalar { display: none; }
 /* ============================================================ acordes em destaque (Ajustes → Destaque dos acordes) */
 /* padrão "forte": acordes maiores, mais grossos e com um fundo leve, para achar de relance */
 :root[data-destaque="forte"] .song.lyrics-mode.with-chords .chord,
-:root:not([data-destaque]) .song.lyrics-mode.with-chords .chord { font-size: 0.86em; font-weight: 900; color: var(--tint-cifra, #ffd147); text-shadow: 0 1px 8px rgb(0 0 0 / 0.35); letter-spacing: 0.01em; }
-:root[data-destaque="maximo"] .song.lyrics-mode.with-chords .chord { font-size: 0.95em; font-weight: 900; color: var(--tint-cifra, #ffd147); letter-spacing: 0.01em; }
+:root:not([data-destaque]) .song.lyrics-mode.with-chords .chord { font-size: 0.86em; font-weight: 900; color: var(--tint-cifra, #9be7b4); text-shadow: 0 1px 8px rgb(0 0 0 / 0.35); letter-spacing: 0.01em; }
+:root[data-destaque="maximo"] .song.lyrics-mode.with-chords .chord { font-size: 0.95em; font-weight: 900; color: var(--tint-cifra, #9be7b4); letter-spacing: 0.01em; }
 :root[data-destaque="maximo"] .song.lyrics-mode.with-chords .chord:not(:empty) {
   align-self: flex-start; background: rgb(0 0 0 / 0.32); border-radius: 6px; padding: 0 0.22em; margin-bottom: 0.08em;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tint-cifra, #ffd147) 45%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tint-cifra, #9be7b4) 45%, transparent);
 }
 :root[data-destaque="suave"] .song.lyrics-mode.with-chords .chord { font-size: 0.74em; font-weight: 700; opacity: 0.9; }
 :root:not([data-destaque="suave"]) .song .chord { font-weight: 900; }
@@ -1232,7 +1232,7 @@ body.performance .convite-instalar { display: none; }
 /* letra: mesmo peso e cor em tudo; o refrão é marcado só pelo rótulo */
 .song.lyrics-mode { font-weight: 700; }
 .song.lyrics-mode .section-label { display: inline-block; padding: 2px 10px; border-radius: 999px; background: rgb(255 255 255 / 0.12); color: rgb(255 255 255 / 0.8); font-size: 11px; margin-bottom: 6px; }
-.song.lyrics-mode .section.chorus .section-label { background: color-mix(in srgb, var(--tint-cifra, #ffd147) 30%, transparent); color: #fff; }
+.song.lyrics-mode .section.chorus .section-label { background: color-mix(in srgb, var(--tint-cifra, #9be7b4) 30%, transparent); color: #fff; }
 
 /* ============================================================ mini player (fixo acima do menu) */
 #player {
@@ -3100,6 +3100,14 @@ html.pp #player .pl-letra-topo .icon-btn { width: 48px; height: 48px; color: #ff
 #player .pl-ver-cifra { justify-self: end; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; margin-right: 8px; border: 0; border-radius: 999px;
   background: rgb(255 255 255 / 0.16); color: #fff; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
 html.pp #player.letra-cheia .pl-letra-topo { grid-template-columns: 48px minmax(0, 1fr) auto; }
+html.pp #player .pl-letra-dir { justify-self: end; display: flex; align-items: center; gap: 4px; }
+html.pp #player .pl-letra-dir .pl-ver-cifra { margin-right: 8px; }
+html.pp #player .pl-leitura { width: 40px; height: 40px; }
+html.pp #player .pl-leitura[aria-pressed="true"] { background: rgb(255 255 255 / 0.24); color: #fff; }
+/* só a letra (para ler): sem o nome, o aviso da sincronia e a barra de baixo; sem a cifra, nem as ferramentas */
+html.pp #player.letra-cheia.so-letra .pl-letra-nome { visibility: hidden; }
+html.pp #player.letra-cheia.so-letra .pl-letra-pe, html.pp #player.letra-cheia.so-letra .pl-sinc,
+html.pp #player.letra-cheia.so-letra:not(.cifra-on) .pl-ferr { display: none !important; }
 html.pp #player .pl-letra-nome { min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
 html.pp #player .pl-letra-nome b, html.pp #player .pl-letra-nome small { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html.pp #player .pl-letra-nome b { font-size: 17px; font-weight: 800; }
@@ -3107,6 +3115,10 @@ html.pp #player .pl-letra-nome small { font-size: 15px; color: rgb(255 255 255 /
 html.pp #player.letra-cheia .pl-linhas { overflow-y: auto; padding: 14px 0 30%;
   -webkit-mask-image: linear-gradient(180deg, transparent, #000 5%, #000 92%, transparent); mask-image: linear-gradient(180deg, transparent, #000 5%, #000 92%, transparent); }
 html.pp #player.letra-cheia .pl-linhas p { font-size: calc(26px * var(--font-scale)); margin-bottom: 18px; }
+/* tablet (também em pé) e computador: a letra na tela toda maior, como na página da música (32px), com e sem cifra */
+@media (min-width: 768px) {
+  html.pp #player.letra-cheia .pl-linhas p, html.pp #player.letra-cheia .pl-cifra .song.lyrics-mode { font-size: calc(32px * var(--font-scale)); }
+}
 html.pp #player.letra-cheia .pl-letra-pe { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; flex: none; padding-top: 6px; }
 html.pp #player .pl-letra-pe > * { grid-area: auto; order: 0; } /* a barra do tempo tem grid-area e order da barra do player */
 html.pp #player .pl-letra-bts2 { display: flex; align-items: center; margin: 0 -8px; }
