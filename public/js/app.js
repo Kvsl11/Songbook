@@ -1,6 +1,6 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
-import { definirMeta, semInvisiveis, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasCantadas, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
+import { definirMeta, semInvisiveis, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasCantadas, partesCantadas, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
 import { icon, iconeMenu, logo, logoLumen } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-251';
+export const APP_VERSAO = '2026.10.28-252';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -995,14 +995,23 @@ const player = (() => {
     if (chave === letraDe) return;
     letraDe = chave;
     const sinc = song?.sincronia?.video === atual?.youtube ? song.sincronia : null;
-    const linhas = sinc ? sinc.linhas : song ? linhasCantadas(song.content).map(linhaSemCifra).filter(Boolean) : [];
+    // as marcações das partes (Chorus, Bridge, Verse 2…) em cima da linha em que cada uma começa; na letra sincronizada,
+    // só se as linhas dela forem as mesmas da cifra (senão não dá para saber onde cada parte começa)
+    const partes = song ? partesCantadas(song.content).map((p) => ({ ...p, linhas: p.linhas.map(linhaSemCifra).filter(Boolean) })).filter((p) => p.linhas.length) : [];
+    const daCifra = partes.flatMap((p) => p.linhas);
+    const linhas = sinc ? sinc.linhas : daCifra;
+    const marcas = new Map();
+    if (!sinc || sinc.linhas.length === daCifra.length) {
+      let k = 0;
+      for (const p of partes) { if (p.nome && !/^verse$/i.test(p.nome)) marcas.set(k, p.nome); k += p.linhas.length; }
+    }
     tempos = sinc?.tempos || null;
     linhasDaLetra = linhas;
     linhaAcesa = -2;
     $('.pl-frase', el).hidden = !tempos;
     $('.pl-letra', el).hidden = !linhas.length;
     $('.pl-letra', el).classList.toggle('sincronizada', Boolean(tempos));
-    $('.pl-linhas', el).innerHTML = linhas.map((l, k) => `<p data-k="${k}">${esc(l)}</p>`).join('');
+    $('.pl-linhas', el).innerHTML = linhas.map((l, k) => `${marcas.has(k) ? `<h4 class="pl-parte">${esc(marcas.get(k))}</h4>` : ''}<p data-k="${k}">${esc(l)}</p>`).join('');
   };
   let linhaAcesa = -1;
   // a linha cantada fica a um terço da caixa (no cartão, que não rola com o dedo, e na letra na tela toda)
@@ -1138,6 +1147,7 @@ const player = (() => {
       tirarDaTelinha();
       if ('mediaSession' in navigator) { navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none'; }
       sessaoDe = '';
+      mudo?.pause();
       tela.innerHTML = '';
       tela.hidden = true;
       cancelAnimationFrame(quadro);
@@ -1207,10 +1217,38 @@ const player = (() => {
   // Controles na notificação e na tela de bloqueio do celular (e nas teclas de mídia do computador):
   // nome, artista, capa, tocar/pausar, anterior/próxima e a barra de tempo
   let sessaoDe = '';
+  // A notificação da música (celular) e as teclas de mídia mostram a sessão do quadro que está tocando som. Só com o
+  // vídeo, era a do YouTube (o nome do vídeo e o canal, só com pausar). Um áudio silencioso tocando no próprio app, junto
+  // com o vídeo, faz o navegador usar a sessão do app: o nome da música, o artista, a capa e os botões de voltar e pular
+  let mudo = null;
+  const audioMudo = () => {
+    if (mudo) return mudo;
+    const n = 8000; // 1 s de silêncio, 8 kHz, 8 bits
+    const b = new Uint8Array(44 + n);
+    const v = new DataView(b.buffer);
+    const txt = (o, t) => { for (let i = 0; i < t.length; i++) b[o + i] = t.charCodeAt(i); };
+    txt(0, 'RIFF'); v.setUint32(4, 36 + n, true); txt(8, 'WAVE'); txt(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true);
+    v.setUint16(32, 1, true); v.setUint16(34, 8, true); txt(36, 'data'); v.setUint32(40, n, true); b.fill(128, 44);
+    mudo = new Audio(URL.createObjectURL(new Blob([b], { type: 'audio/wav' })));
+    mudo.loop = true;
+    // o sistema pausou o áudio do app (uma ligação, outro app tocando): pausa a música também
+    mudo.addEventListener('pause', () => { if (estado === 'tocando' && atual && !atual.semVideo) api.alternar(); });
+    return mudo;
+  };
+  const acompanharMudo = () => {
+    if (!('mediaSession' in navigator)) return;
+    const tocando = Boolean(atual && !atual.semVideo && estado === 'tocando');
+    if (!tocando) { if (mudo && !mudo.paused) mudo.pause(); return; }
+    const a = audioMudo();
+    if (a.paused) a.play().catch(() => { /* sem permissão para tocar ainda: tenta no próximo toque */ });
+  };
   const sessaoDeMidia = () => {
+    acompanharMudo();
     if (!('mediaSession' in navigator) || !atual || atual.semVideo) return;
     const ms = navigator.mediaSession;
-    const chave = `${atual.youtube}|${atual.titulo}|${atual.artista}`;
+    // muda também quando a música entra ou sai de uma fila (os botões de pular dependem dela)
+    const chave = `${atual.youtube}|${atual.titulo}|${atual.artista}|${atual.capa || ''}|${Boolean(fila())}`;
     if (sessaoDe !== chave && typeof MediaMetadata === 'function') {
       sessaoDe = chave;
       const capa = atual.capa && /^https?:/.test(atual.capa) ? atual.capa : `https://i.ytimg.com/vi/${atual.youtube}/hqdefault.jpg`;
@@ -1226,7 +1264,8 @@ const player = (() => {
       acao('seekbackward', (d) => api.irPara(Math.max(0, tempo - (d.seekOffset || 10))));
       acao('seekforward', (d) => api.irPara(Math.min(duracao || Infinity, tempo + (d.seekOffset || 10))));
       const naFila = Boolean(fila());
-      acao('previoustrack', naFila ? () => { if (tempo > 3 || anteriorIndice() < 0) api.irPara(0); else pular(-1); } : null);
+      // voltar: sempre (fora da fila, volta ao começo); pular: na fila
+      acao('previoustrack', () => { if (!naFila || tempo > 3 || anteriorIndice() < 0) api.irPara(0); else pular(-1); });
       acao('nexttrack', naFila ? () => pular(1) : null);
     }
     ms.playbackState = estado === 'tocando' ? 'playing' : 'paused';
@@ -1288,10 +1327,14 @@ const player = (() => {
   const abrirFila = async () => {
     const f = fila();
     if (!f) { toast('Esta música não está numa fila: salve-a na biblioteca ou toque de um repertório'); return; }
+    // como a fila do Spotify: a capa de cada música (na que toca, as barrinhas por cima), o nome, a parte da missa e o
+    // artista, e a duração à direita
     const opcoes = f.ids.map((id, i) => ({ i, s: db.song(id) })).filter(({ s }) => s?.youtube).map(({ i, s }) => ({
-      valor: i, rotulo: s.title, sub: [f.set?.items[i]?.label, s.artist].filter(Boolean).join(' · '), ic: i === f.i ? 'onda' : 'music',
+      valor: i, rotulo: s.title, sub: [f.set?.items[i]?.label, s.artist].filter(Boolean).join(' · '),
+      capa: `<span class="fila-capa${i === f.i ? ' tocando' : ''}">${capa(s)}${i === f.i ? `<span class="fila-eq" aria-hidden="true"><i></i><i></i><i></i></span>` : ''}</span>`,
+      dir: s.duracao > 0 ? fmtTempo(s.duracao) : '',
     }));
-    const i = await escolherNaLista({ titulo: f.set ? `Fila · ${f.set.name}` : 'Fila · Biblioteca', opcoes, atual: f.i });
+    const i = await escolherNaLista({ titulo: f.set ? `Fila · ${f.set.name}` : 'Fila · Biblioteca', opcoes, atual: f.i, cls: 'lista-fila' });
     if (i === undefined || i === f.i || !atual) return;
     historico.push(f.i);
     tocadas.add(i);
@@ -1302,19 +1345,32 @@ const player = (() => {
   // aparelhos Bluetooth (no Android abre as configurações; nos outros, explica onde fica)
   const abrirAparelhos = async () => {
     const tipo = ehTablet() ? ['tablet', 'Este tablet'] : telaDeCelular() ? ['celular', 'Este celular'] : ['computador', 'Este computador'];
-    let saidas = [];
-    try {
-      saidas = (await navigator.mediaDevices.enumerateDevices())
-        .filter((d) => d.kind === 'audiooutput' && d.label && !['default', 'communications'].includes(d.deviceId));
-    } catch { /* o navegador não lista as saídas */ }
     const dlg = document.createElement('dialog');
     dlg.className = 'lista-dlg lista-menu aparelhos-dlg';
+    // onde o som está saindo: os navegadores só dizem o nome dos fones e das caixas (Bluetooth ou com fio) depois que o
+    // app pode usar o microfone; sem isso a lista vem sem nomes e o app não sabe que há um fone (mostrava "Este celular"
+    // mesmo com o fone). Com o fone conectado, ele aparece como o aparelho que está tocando
+    const desenharCorpo = async () => {
+      let aparelhos = [];
+      try { aparelhos = await navigator.mediaDevices.enumerateDevices(); } catch { /* o navegador não lista */ }
+      const som = aparelhos.filter((d) => /^audio/.test(d.kind));
+      const comNomes = som.some((d) => d.label);
+      const ehFone = (l) => /bluetooth|headset|headphone|fone|buds|airpods|beats|jbl|bose|sony|wh-|wf-|soundcore|edifier|qcy|usb|wired|com fio/i.test(l)
+        && !/earpiece|speakerphone|alto-falante|speaker|default|padrão|communications|comunicações|microphone array|interno|internal|built-in/i.test(l);
+      const nome = (l) => l.replace(/\s*\((?:[0-9a-f]{4}:[0-9a-f]{4}|bluetooth)\)\s*$/i, '').replace(/^(default|padrão|communications|comunicações)\s*-\s*/i, '').trim();
+      const fones = [...new Set(som.filter((d) => d.label && ehFone(d.label)).map((d) => nome(d.label)))];
+      const saidas = [...new Set(som.filter((d) => d.kind === 'audiooutput' && d.label && !['default', 'communications'].includes(d.deviceId)).map((d) => nome(d.label)))]
+        .filter((l) => !fones.includes(l));
+      const fone = fones[0];
+      const musica = esc([atual?.titulo, atual?.artista].filter(Boolean).join(' – '));
+      $('.ap-corpo', dlg).innerHTML = `
+        <div class="ap-atual"><span class="grow"><b>${esc(fone || tipo[1])}</b><small>${fone ? `${musica ? `${musica} · ` : ''}neste ${tipo[0]}` : musica}</small></span>${icon(fone ? 'fone' : tipo[0], 34)}</div>
+        ${fones.length > 1 || saidas.length ? `<h4>Saídas de som</h4>${[...fones.slice(1), ...saidas].map((l) => `<div class="ap-saida">${icon(ehFone(l) ? 'fone' : 'som', 22)}<span>${esc(l)}</span></div>`).join('')}` : ''}
+        ${!comNomes && navigator.mediaDevices?.getUserMedia ? `<button class="ap-ver" data-ap="ver">${icon('fone', 22)}<span class="grow"><b>Mostrar fones e caixas conectados</b><small>O navegador pede para usar o microfone só para dizer os nomes dos aparelhos; nada é gravado</small></span></button>`
+          : !fone && !saidas.length ? '<p class="ap-nada">Nenhum fone ou caixa conectado</p>' : ''}`;
+    };
     dlg.innerHTML = `<div class="lista-cab menu-cab"><span class="menu-alca" aria-hidden="true"></span><h3>Conectar</h3></div>
-      <div class="ap-corpo">
-        <div class="ap-atual"><span class="grow"><b>${tipo[1]}</b><small>${esc([atual.titulo, atual.artista].filter(Boolean).join(' – '))}</small></span>${icon(tipo[0], 34)}</div>
-        ${saidas.length ? `<h4>Saídas de som</h4>${saidas.map((d) => `<div class="ap-saida">${icon(/bluetooth|buds|fone|headset|airpods|jbl|bose|sony/i.test(d.label) ? 'fone' : 'som', 22)}<span>${esc(d.label)}</span></div>`).join('')}`
-          : '<p class="ap-nada">Nenhum outro aparelho encontrado nesta rede</p>'}
-      </div>
+      <div class="ap-corpo"></div>
       <div class="ap-botoes">
         <button class="ap-bt" data-ap="tv">${icon('tv', 24)}<span>Transmitir na TV</span></button>
         <button class="ap-bt" data-ap="bt">${icon('bluetooth', 24)}<span>Procurar aparelhos Bluetooth</span></button>
@@ -1323,6 +1379,11 @@ const player = (() => {
     dlg.addEventListener('click', (e) => {
       if (e.target === dlg) { dlg.close(); return; }
       const ap = e.target.closest('[data-ap]')?.dataset.ap;
+      if (ap === 'ver') {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then((st) => { st.getTracks().forEach((t) => t.stop()); return desenharCorpo(); })
+          .catch(() => toast('Sem a permissão do microfone, o navegador não diz os nomes dos fones e das caixas'));
+      }
       if (ap === 'tv' && !atual?.youtube) { toast('Esta música ainda não tem vídeo'); dlg.close(); }
       if (ap === 'tv' && atual?.youtube) {
         if (estado === 'tocando') api.alternar();
@@ -1336,7 +1397,12 @@ const player = (() => {
         dlg.close();
       }
     });
-    dlg.addEventListener('close', () => dlg.remove());
+    // conectou ou desconectou um fone com a folha aberta: atualiza
+    const mudou = () => desenharCorpo();
+    navigator.mediaDevices?.addEventListener?.('devicechange', mudou);
+    dlg.addEventListener('close', () => { navigator.mediaDevices?.removeEventListener?.('devicechange', mudou); dlg.remove(); });
+    arrastarFolha(dlg);
+    await desenharCorpo();
     dlg.showModal();
   };
   // os "⋮" do topo do painel
@@ -1563,14 +1629,51 @@ function openDialog(html, setup) {
 // opcoes: [{ valor, rotulo, sub, ic (ícone) ou capa (html) }]; devolve o valor escolhido (ou undefined)
 // menu: true = uma folha de ações (os ⋮ de uma música, como no Spotify): a alça em cima, a cabeça (capa e nome) e as
 // opções numa coluna só, sem caixinha nos ícones
-function escolherNaLista({ titulo, opcoes, atual, menu = false, cabeca = '' }) {
+// as folhas que sobem de baixo (com a alça em cima), como no Spotify: arrastando a alça (ou o topo) para cima, a folha
+// cresce até quase a tela toda; para baixo, volta ao tamanho normal ou, puxando bastante, fecha
+function arrastarFolha(dlg) {
+  const cab = dlg.querySelector('.menu-cab');
+  if (!cab) return;
+  let ini = null;
+  cab.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button, a') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    ini = { y: e.clientY, id: e.pointerId, h: dlg.getBoundingClientRect().height };
+    try { cab.setPointerCapture(e.pointerId); } catch { /* segue sem captura */ }
+    dlg.classList.add('folha-arrastando');
+  });
+  cab.addEventListener('pointermove', (e) => {
+    if (!ini || e.pointerId !== ini.id) return;
+    const dy = e.clientY - ini.y;
+    // para baixo a folha desce junto com o dedo; para cima ela cresce (até 94% da tela)
+    dlg.style.transform = dy > 0 ? `translateY(${dy}px)` : '';
+    dlg.style.height = dy < 0 ? `${Math.min(innerHeight * 0.94, ini.h - dy)}px` : '';
+    if (dy < 0) dlg.style.maxHeight = '94dvh';
+  });
+  const soltar = (e) => {
+    if (!ini || e.pointerId !== ini.id) return;
+    const dy = e.clientY - ini.y;
+    const { h } = ini;
+    ini = null;
+    dlg.classList.remove('folha-arrastando');
+    dlg.style.transform = dlg.style.height = dlg.style.maxHeight = '';
+    if (Math.abs(dy) < 8) return; // um toque, não um arraste
+    const cheia = dlg.classList.contains('folha-cheia');
+    if (dy < -50) dlg.classList.add('folha-cheia');
+    else if (dy > Math.max(90, h * 0.35) && !(cheia && dy < h * 0.5)) dlg.close();
+    else if (dy > 50 && cheia) dlg.classList.remove('folha-cheia');
+  };
+  cab.addEventListener('pointerup', soltar);
+  cab.addEventListener('pointercancel', soltar);
+}
+
+function escolherNaLista({ titulo, opcoes, atual, menu = false, cabeca = '', cls = '' }) {
   const dlg = document.createElement('dialog');
-  dlg.className = menu ? 'lista-dlg lista-menu' : 'lista-dlg';
+  dlg.className = `${menu ? 'lista-dlg lista-menu' : 'lista-dlg'} ${cls}`.trim();
   dlg.innerHTML = `${menu ? `<div class="lista-cab menu-cab"><span class="menu-alca" aria-hidden="true"></span>${cabeca || `<h3>${esc(titulo || '')}</h3>`}</div>`
     : `<div class="lista-cab"><h3>${esc(titulo)}</h3><button class="icon-btn" data-fechar aria-label="Fechar">${icon('x', 20)}</button></div>`}
     <div class="lista-opcoes" role="listbox">${opcoes.map((o, i) => `<button class="lista-op${o.perigo ? ' perigo' : ''}" role="option" data-i="${i}" aria-selected="${o.valor === atual}">
       ${o.capa || (o.ic ? `<span class="lista-ic">${icon(o.ic, 18)}</span>` : '')}<span class="lista-txt"><b>${esc(o.rotulo)}</b>${o.sub ? `<small>${esc(o.sub)}</small>` : ''}</span>
-      ${o.valor === atual ? `<span class="lista-ok">${icon('check', 18)}</span>` : ''}</button>`).join('')}</div>`;
+      ${o.dir ? `<span class="lista-dir">${esc(o.dir)}</span>` : ''}${o.valor === atual ? `<span class="lista-ok">${icon('check', 18)}</span>` : ''}</button>`).join('')}</div>`;
   document.body.append(dlg);
   return new Promise((resolve) => {
     let valor;
@@ -1580,6 +1683,7 @@ function escolherNaLista({ titulo, opcoes, atual, menu = false, cabeca = '' }) {
       if (b) { valor = opcoes[Number(b.dataset.i)].valor; dlg.close(); }
     });
     dlg.addEventListener('close', () => { dlg.remove(); resolve(valor); });
+    if (menu) arrastarFolha(dlg);
     dlg.showModal();
     if (!menu) (dlg.querySelector('[aria-selected="true"]') || dlg.querySelector('.lista-op'))?.focus({ preventScroll: false });
   });
