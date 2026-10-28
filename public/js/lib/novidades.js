@@ -3,6 +3,15 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 237, data: '2026-10-28', titulo: 'O Tocando agora do tablet igual ao Spotify',
+    itens: [
+      { tipo: 'melhoria', texto: 'No tablet, o painel Tocando agora ganhou o jeito do Spotify: no topo, o botão do painel, o minimizar e os ⋮ com mais opções; embaixo do vídeo, o nome com o ✓ da biblioteca, a barra com a bolinha, os controles de ponta a ponta e uma linha com ouvir em outro aparelho, compartilhar e a fila.' },
+      { tipo: 'novo', texto: '“Mudar para capa” / “Mudar para vídeo”: mostra a capa da música no lugar do vídeo (a música continua tocando).' },
+      { tipo: 'novo', texto: 'A fila: veja as músicas do repertório (ou da biblioteca) e toque qualquer uma. A letra também pode ser compartilhada pelo cartão Letra.' },
+      { tipo: 'correcao', texto: 'Expandir o Tocando agora não fica mais bagunçado: tudo numa coluna no centro, como no Spotify, e o vídeo não fica mais preto.' },
+    ],
+  },
+  {
     versao: 236, data: '2026-10-25', titulo: 'Visual melhorado para tablets',
     itens: [
       { tipo: 'melhoria', texto: 'Layout adaptado para tablets: navegação lateral em paisagem e menu compacto em retrato, com espaçamento, cartões, botões e seleções refinados.' },
