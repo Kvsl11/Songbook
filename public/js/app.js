@@ -482,6 +482,25 @@ function capaRepertorio(set, cls = '') {
 const ehPlaylist = (set) => set?.tipo === 'playlist';
 const tipoDoSet = (set) => (ehPlaylist(set) ? 'Playlist' : 'Repertório');
 // toca a playlist no player a partir da música i (pula as que não têm vídeo)
+// No celular, os links para uma música (Início, repertórios e a missa montada pela Liturgia) abrem a música tocando no
+// Tocando agora, em vez da página antiga. Música sem vídeo continua abrindo a página (é onde está a cifra)
+document.addEventListener('click', (e) => {
+  if (e.defaultPrevented || e.button || !telaDeCelular()) return;
+  if (/^#\/(musica\/|repertorio\/[^/]+\/\d)/.test(location.hash)) return; // já na página da música (aberta pela cifra): segue nela
+  const a = e.target.closest('a[href^="#/musica/"], a[href^="#/repertorio/"]');
+  if (!a || a.closest('#player, dialog, .menu-mais')) return;
+  const h = a.getAttribute('href');
+  const mm = /^#\/musica\/([^/]+)$/.exec(h);
+  const mr = /^#\/repertorio\/([^/]+)\/(\d+)$/.exec(h);
+  const set = mr && db.set(mr[1]);
+  const i = mr ? Number(mr[2]) : -1;
+  const song = mm ? db.song(mm[1]) : set && db.song(set.items[i]?.songId);
+  if (!song?.youtube) return;
+  e.preventDefault();
+  player.tocar(itemDoPlayer(song, set || null, set ? i : -1));
+  player.expandir();
+});
+
 function tocarPlaylist(set, i = 0) {
   const k = set.items.findIndex((it, j) => j >= i && db.song(it.songId)?.youtube);
   if (k < 0) { toast(set.items.length ? 'Nenhuma música desta playlist tem vídeo ainda' : 'Playlist vazia'); return; }
@@ -7132,7 +7151,7 @@ function viewSet(id, { selecionando = false, marcados = new Set() } = {}) {
     ativarArrastar(ul, (de, para) => { mover(set.items, de, para); db.saveSet(set); viewSet(id); });
     ul.addEventListener('click', (e) => {
       const li = e.target.closest('li[data-i]');
-      if (pl && li && e.target.closest('.info')) { e.preventDefault(); tocarPlaylist(set, Number(li.dataset.i)); return; }
+      if (pl && li && e.target.closest('.info')) { e.preventDefault(); tocarPlaylist(set, Number(li.dataset.i)); if (telaDeCelular() && player.atual) player.expandir(); return; }
       if (li && e.target.closest('[data-menu]')) {
         const i = Number(li.dataset.i);
         menuDaMusica(db.song(set.items[i]?.songId), { set, i }).then((r) => {

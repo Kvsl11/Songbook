@@ -5,7 +5,7 @@ export const NOVIDADES = [
   {
     versao: 244, data: '2026-10-28', titulo: 'No celular, só o Tocando agora',
     itens: [
-      { tipo: 'melhoria', texto: 'No celular, a música aberta da Busca ou da Biblioteca toca e abre direto no Tocando agora, sem passar pela página antiga; fechando, você volta para onde estava.' },
+      { tipo: 'melhoria', texto: 'No celular, a música aberta da Busca, da Biblioteca, do Início, de um repertório (como a missa montada pela Liturgia) ou de uma playlist toca e abre direto no Tocando agora, sem passar pela página antiga; fechando, você volta para onde estava. Música sem vídeo continua abrindo a cifra.' },
       { tipo: 'melhoria', texto: 'Saiu o botão “Abrir a música” do Tocando agora no celular (e tocar no nome não leva mais para a página antiga). A letra e a cifra ficam no expandir da letra; ao fechar, volta para o Tocando agora.' },
     ],
   },
