@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 280, data: '2026-10-28', titulo: 'Capa animada sem piscar no tablet',
+    itens: [
+      { tipo: 'correcao', texto: 'No tablet (em pé e deitado), a capa animada do Tocando agora não pisca mais ao rolar: ela fica parada atrás, o conteúdo rola por cima e ela vai sumindo aos poucos, como no Spotify.' },
+    ],
+  },
+  {
     versao: 279, data: '2026-10-28', titulo: 'Menu do tablet mais limpo',
     itens: [
       { tipo: 'correcao', texto: 'No tablet em pé, a aba ativa do menu de baixo não tem mais o fundo cinza em volta: só o ícone preenchido e o nome em branco, como no tablet deitado.' },
@@ -66,15 +72,6 @@ export const NOVIDADES = [
     versao: 271, data: '2026-10-28', titulo: 'Letra maior no tablet e no computador',
     itens: [
       { tipo: 'melhoria', texto: 'No tablet e no computador, a letra na tela toda fica maior, na proporção da tela (com e sem cifra, do mesmo tamanho). No celular continua como estava.' },
-    ],
-  },
-  {
-    versao: 270, data: '2026-10-28', titulo: 'Só a letra, para ler',
-    itens: [
-      { tipo: 'novo', texto: 'Na letra na tela toda, o botão do olho deixa só a letra: some o nome, o aviso e a barra de baixo. Ficam o voltar e o botão da cifra (com a cifra, também tom, capotraste, tamanho e rolagem).' },
-      { tipo: 'correcao', texto: 'O aviso "Letra sincronizada" some sozinho 2 segundos depois, no cartão e na tela toda (antes ficava parado ali).' },
-      { tipo: 'correcao', texto: 'Na letra sincronizada, as marcações das partes (refrão, ponte…) continuam aparecendo, também quando a letra sincronizada tem linhas diferentes da cifra.' },
-      { tipo: 'melhoria', texto: 'Os acordes voltam à cor do fundo da música, agora bem mais clara e viva para se destacar (e na cor do fundo do Tocando agora).' },
     ],
   },
 ];

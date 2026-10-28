@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-279';
+export const APP_VERSAO = '2026.10.28-280';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -869,6 +869,8 @@ const player = (() => {
   el.addEventListener('scroll', () => {
     const ctrl = $('.pl-ctrl', el);
     el.classList.toggle('rolou', Boolean(ctrl) && el.scrollTop > ctrl.offsetTop + ctrl.offsetHeight);
+    // tablet: a capa animada (parada atrás) some aos poucos enquanto o conteúdo sobe por cima dela
+    if (ehTablet() && !fundo.hidden) el.style.setProperty('--fundo-op', Math.max(0, 1 - el.scrollTop / Math.max(200, fundo.offsetHeight * 0.75)).toFixed(3));
   }, { passive: true });
   const medirPlayer = () => document.body.classList.contains('painel-cheio') && !ehTablet() ? null : document.body.style.setProperty('--player-h', `${el.offsetHeight}px`);
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(medirPlayer).observe(el);
@@ -948,6 +950,8 @@ const player = (() => {
       const song = q ? musicaTocando() : null;
       mini.innerHTML = semCapa ? icon('music', 72) : '';
       fundo.innerHTML = q ? htmlQuadros(q, (song && renderSong(song.content).meta.x_canvas) || 'sd') : '';
+      // todos os quadros já carregados (com "lazy", o quadro que chegava no meio da rolagem aparecia de repente)
+      fundo.querySelectorAll('img[loading]').forEach((img) => { img.loading = 'eager'; });
     }
     mini.classList.toggle('capa-yt', capa && capaYt);
     // no modo vídeo, a capa pequena ao lado do nome (como no Spotify)
