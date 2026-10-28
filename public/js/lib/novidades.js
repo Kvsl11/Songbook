@@ -3,6 +3,14 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 253, data: '2026-10-28', titulo: 'A música da busca vem completa e salva de qualquer jeito',
+    itens: [
+      { tipo: 'correcao', texto: 'Na Busca, o salvar do Tocando agora funciona também na música sem vídeo e na que veio de um vídeo (antes não fazia nada).' },
+      { tipo: 'melhoria', texto: 'Abrindo um vídeo da Busca, o app descobre qual música é e traz junto a letra e a cifra dela (do Cifra Club e do Letras).' },
+      { tipo: 'melhoria', texto: 'Abrindo uma música da Busca, o vídeo vem junto: se a busca de vídeos não responder, vale o vídeo que o Cifra Club ou o Letras mostram com a música.' },
+    ],
+  },
+  {
     versao: 252, data: '2026-10-28', titulo: 'Partes na letra, notificação com pular, fila com capas e Conectar',
     itens: [
       { tipo: 'correcao', texto: 'No Conectar (e nos menus que sobem de baixo), a alça de cima funciona: arrastando para cima a folha cresce, e para baixo ela volta ou fecha.' },

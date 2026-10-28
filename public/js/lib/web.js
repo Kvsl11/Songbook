@@ -68,6 +68,12 @@ export const ehCifraClub = (url) => /^https?:\/\/(www\.|m\.)?cifraclub\.com\.br\
 // Texto de cifra (acordes em cima da letra, partes em [Colchetes]) -> ChordPro com seções
 export const cifraTextoParaChordPro = (texto) => doEditor(texto);
 
+// o vídeo do YouTube que a página (Cifra Club, Letras) mostra junto da música
+// (estrito: só links do YouTube, data-video-id e "youtubeId", e o código com exatamente 11 caracteres, sem ser um número)
+const videoDaPagina = (html, estrito = false) => (estrito
+  ? /(?:youtube(?:-nocookie)?\.com\/(?:embed\/|watch\?v=|vi\/)|youtu\.be\/|data-video-id="|"youtubeId"\s*:\s*")(?!\d{11})([\w-]{11})(?![\w-])/
+  : /(?:youtube(?:-nocookie)?\.com\/(?:embed\/|watch\?v=|vi\/)|youtu\.be\/|data-(?:video-)?id="|"youtubeId"\s*:\s*")([\w-]{11})/).exec(html)?.[1] || '';
+
 const pegar = (html, re) => { const m = re.exec(html); return m ? decodeEntities(m[1].replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim() : ''; };
 
 export function parseCifraClub(html, url = '') {
@@ -83,7 +89,7 @@ export function parseCifraClub(html, url = '') {
   const forma = (/forma de\s*([A-G][#b]?m?)/i.exec(tomTexto) || [])[1] || '';
   const tom = forma || real;
   const capo = (/id="cifra_capo"[\s\S]{0,300}?(\d{1,2})\s*ª?\s*casa/i.exec(html) || /Capotraste(?:<!-- -->)?:\s*<\/span>[\s\S]{0,200}?(\d{1,2})\s*ª?\s*casa/i.exec(html) || [])[1] || '';
-  const yt = /(?:youtube(?:-nocookie)?\.com\/(?:embed\/|watch\?v=|vi\/)|youtu\.be\/|data-(?:video-)?id="|"youtubeId"\s*:\s*")([\w-]{11})/.exec(html)?.[1] || '';
+  const yt = videoDaPagina(html);
   const cab = [`{title: ${titulo}}`];
   if (artista) cab.push(`{artist: ${artista}}`);
   if (isChord(tom)) cab.push(`{key: ${tom}}`);
@@ -338,7 +344,8 @@ export function parseLetras(html, url = '') {
   const titulo = pegar(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i) || doTitulo[0] || 'Sem título';
   const artista = doTitulo.length > 2 ? doTitulo[1] : '';
   const compositor = (/Composição:\s*([^<]+?)\.?\s*</i.exec(html) || [])[1]?.trim() || '';
-  return { titulo, artista, compositor, url, letra: estrofes.join('\n\n') };
+  const yt = videoDaPagina(html, true);
+  return { titulo, artista, compositor, url, letra: estrofes.join('\n\n'), youtube: yt ? `https://www.youtube.com/watch?v=${yt}` : '' };
 }
 
 export async function getLetra(url, opcoes = {}) {
