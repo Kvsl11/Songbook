@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-268';
+export const APP_VERSAO = '2026.10.28-269';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -292,7 +292,13 @@ function setTab(name) {
   if (name === 'liturgia') name = 'oracoes'; // a liturgia fica dentro de Orações
   document.querySelectorAll('.nav a[data-tab]').forEach((a) => a.classList.toggle('active', a.dataset.tab === name));
 }
-// --tint: cor de fundo da página; --tint-cifra: mesma cor, mais viva e clara, para os acordes
+// --tint: cor de fundo da página; --tint-cifra: a cor dos acordes, que se destaca do fundo (na mesma cor dele os
+// acordes quase sumiam): um âmbar dourado ou, num fundo já amarelado/alaranjado, um ciano claro
+function corDaCifra(cor) {
+  const h = matizDe(cor);
+  const longeDoAmbar = Math.abs(((h - 45 + 540) % 360) - 180);
+  return longeDoAmbar < 45 ? 'hsl(190 95% 70%)' : 'hsl(45 100% 64%)';
+}
 function matizDe(cor) {
   const h = /^hsl\(\s*([\d.]+)/.exec(cor);
   if (h) return Number(h[1]);
@@ -307,7 +313,7 @@ function matizDe(cor) {
 const setTint = (cor) => {
   const st = document.documentElement.style;
   st.setProperty('--tint', cor);
-  st.setProperty('--tint-cifra', `hsl(${matizDe(cor)} 90% 72%)`);
+  st.setProperty('--tint-cifra', corDaCifra(cor));
 };
 
 function download(name, text, type = 'text/plain') {
@@ -1251,6 +1257,14 @@ const player = (() => {
     });
     if (mapaCifra) {
       const linha = pausa === null && k >= 0 ? mapaCifra[k] : null;
+      // como na letra: as linhas já cantadas mais apagadas (numa pausa, a última cantada também)
+      // (a linha da frase k ou, se ela não tem par na cifra, a da frase anterior que tem)
+      let f = k;
+      while (f >= 0 && !mapaCifra[f]) f--;
+      const alcancada = f >= 0 ? mapaCifra[f] : null;
+      const todas = [...$('.pl-cifra', el).querySelectorAll('.line')];
+      const j = alcancada ? todas.indexOf(alcancada) : -1;
+      todas.forEach((l, n) => l.classList.toggle('cantada', n < j || (n === j && l !== linha)));
       $('.pl-cifra', el).querySelectorAll('.line.agora').forEach((l) => { if (l !== linha) l.classList.remove('agora'); });
       if (linha && !linha.classList.contains('agora')) {
         linha.classList.add('agora');
@@ -1325,16 +1339,19 @@ const player = (() => {
     // vai para o segundo s do vídeo (se ele ainda está abrindo, vai assim que puder)
     // a página da música tocando abriu (ex.: vídeo da busca que virou música): nome, artista e cor dela
     atualizar(dados) { if (!atual) return; atual = { ...atual, ...dados }; desenhar(); },
-    // a tela da música (a página da música chama ao abrir): o Tocando agora com a letra na tela toda, por cima da página
-    // (que fica escondida); cifra: já mostrando os acordes ("Abrir a cifra")
+    // a tela da música (a página da música chama ao abrir): o Tocando agora por cima da página (que fica escondida),
+    // com a capa ou o vídeo, o nome, os controles e o cartão da letra; a letra na tela toda abre pelo cartão.
+    // cifra: já na letra na tela toda, mostrando os acordes ("Abrir a cifra")
     abrirMusica({ cifra = false } = {}) {
       if (!atual) return;
       if (cifra && !modoCifra) definirModoCifra(true);
       if (!document.body.classList.contains('painel-cheio')) painelCheio(true, { sobre: true });
       else if (!sobrePagina) sobrePagina = location.hash;
-      letraDaPagina = true;
       document.body.classList.add('musica-na-letra');
-      if (!el.classList.contains('letra-cheia')) { el.classList.add('letra-cheia'); document.body.classList.add('com-letra-cheia'); }
+      if (cifra) {
+        letraDaPagina = true;
+        if (!el.classList.contains('letra-cheia')) { el.classList.add('letra-cheia'); document.body.classList.add('com-letra-cheia'); }
+      }
       letraDe = '';
       desenhar();
     },
@@ -1719,6 +1736,8 @@ const player = (() => {
       if (ligar !== antes) { desenhar(); if (!ligar) medirPlayer(); }
       if (ligar) el.scrollTop = 0;
     }
+    // tablet: fechando o Tocando agora aberto como a tela da música, sai da página dela (que está escondida)
+    if (ehTablet() && !ligar && antes && !semVoltar && !manter && document.body.classList.contains('musica-na-letra')) history.back();
     if (!ligar && antes && !manter) largarSemVideo();
     if (ligar !== antes) mostrarBarra(); // na página da própria música a barra some; a tela toda aparece por cima dela
     el.querySelectorAll('[data-pl="expandir"]').forEach((b) => {
