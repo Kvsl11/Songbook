@@ -1516,9 +1516,23 @@ const player = (() => {
       return;
     }
     if (!b) return;
+    // a música aberta da busca (a prévia, ainda não salva) é a que está no player?
+    const daPrevia = () => Boolean(preview && atual && (atual.songId === 'previa' || atual.href === '#/musica/previa')
+      && (!atual.youtube || youtubeId(renderSong(preview.content).meta.youtube) === atual.youtube));
+    // salva a prévia na biblioteca e o player passa a ser da música salva
+    const salvarDaPrevia = () => {
+      const ja = db.songBySource(preview.source);
+      const salva = ja || db.saveSong({ content: preview.content, source: preview.source, transpose: preview.transpose || 0, capo: preview.capo || 0 });
+      api.atualizar({ songId: salva.id, href: `#/musica/${salva.id}` });
+      toast(ja ? 'Já estava na biblioteca' : 'Salva na biblioteca');
+      if (location.hash === '#/musica/previa') location.replace('#/musica/' + salva.id);
+      else if (/^#\/biblioteca/.test(location.hash)) route();
+      return salva;
+    };
     if ((b.dataset.pl === 'play' || b.dataset.pl === 'troca') && atual?.semVideo) {
       // música sem vídeo: escolher um no YouTube; escolhido, ela fica salva com ele e começa a tocar
-      const s = db.song(atual.songId);
+      // (a música da busca, ainda não salva, é salva antes)
+      const s = db.song(atual.songId) || (daPrevia() ? salvarDaPrevia() : null);
       if (!s) { toast('Salve a música na biblioteca para escolher um vídeo'); return; }
       const item = { ...atual };
       escolherVideo(s).then((url) => {
@@ -1533,15 +1547,13 @@ const player = (() => {
       // salva: adicionar a um repertório (como o ✓ do Spotify); não salva: salva ali mesmo, sem precisar abrir a música
       // (a música aberta da busca fica guardada na sessão; um vídeo solto, sem cifra, abre a música para salvar)
       if (atual.songId && db.song(atual.songId)) addToSetDialog(atual.songId, atual.parte || '');
-      else if (preview && atual.songId === 'previa' && youtubeId(renderSong(preview.content).meta.youtube) === atual.youtube) {
-        const ja = db.songBySource(preview.source);
-        const salva = ja || db.saveSong({ content: preview.content, source: preview.source, transpose: preview.transpose || 0, capo: preview.capo || 0 });
-        api.atualizar({ songId: salva.id, href: `#/musica/${salva.id}` });
-        toast(ja ? 'Já estava na biblioteca' : 'Salva na biblioteca');
-        if (location.hash === '#/musica/previa') location.replace('#/musica/' + salva.id);
-        else if (/^#\/biblioteca/.test(location.hash)) route();
-      } else if (atual.href && location.hash !== atual.href) location.hash = atual.href;
-      else if (!atual.href && atual.abrir) atual.abrir();
+      // (também a música sem vídeo e a que veio de um vídeo da busca)
+      else if (daPrevia()) salvarDaPrevia();
+      else if (atual.href && location.hash !== atual.href) location.hash = atual.href;
+      else if (!atual.href && atual.abrir) {
+        // vídeo tocado direto da busca: abre como música (com a cifra e a letra) e já salva
+        Promise.resolve(atual.abrir()).then(() => { if (daPrevia()) salvarDaPrevia(); });
+      }
     }
     if (b.dataset.pl === 'proxima') pular(1);
     if (b.dataset.pl === 'troca') { comCapa = !comCapa; db.setPref('playerCapa', comCapa); desenharCapa(); }
@@ -1984,7 +1996,7 @@ async function salvarDaInternet(tipo, item) {
   toast('Trazendo a música…');
   let r;
   try {
-    r = await trazerMusica(tipo === 'video' ? { ...nomesDoVideo(item), video: item, artistaIncerto: true } : item);
+    r = await trazerMusica(tipo === 'video' ? await musicaDoVideo(item) : item);
   } catch (e) {
     toast('Não consegui trazer: ' + e.message);
     return null;
@@ -2558,10 +2570,36 @@ async function acharNoCifraClub(titulo, artista = '', artistaIncerto = false) {
 }
 
 // "Padre Marcelo Rossi - Deus Está Aqui (Noites Traiçoeiras) ft. Belo" -> artista e título
+// ("Ninguém Te Ama Como Eu | Frei Gilson": com a barra, o título vem antes)
+const tituloCruDoVideo = (t) => String(t || '').replace(/\s*[([{【][^)\]}】]*[)\]}】]/g, ' ').replace(/\s+/g, ' ').trim();
 function nomesDoVideo(v) {
-  const limpo = tituloDoVideo(v.titulo).replace(/\s+(ft\.?|feat\.?|part\.?|com)\s.+$/i, '').trim();
-  const [artista, titulo] = / - /.test(limpo) ? [limpo.split(' - ')[0].trim(), limpo.split(' - ').slice(1).join(' - ').trim()] : [v.canal || '', limpo];
+  const semFeat = (x) => x.replace(/\s+(ft\.?|feat\.?|part\.?|com)\s.+$/i, '').trim();
+  const cru = tituloCruDoVideo(v.titulo);
+  if (/ \| /.test(cru) && !/ [-–—] /.test(cru)) {
+    const [a, b] = cru.split(' | ').map((x) => x.trim());
+    const [titulo, artista] = mesmoNome(a, v.canal) ? [b, a] : [a, b];
+    return { titulo: tituloLimpo(semFeat(titulo)) || titulo, artista };
+  }
+  const limpo = semFeat(tituloDoVideo(v.titulo));
+  const [artista, titulo] = / [-–—] /.test(limpo) ? [limpo.split(/ [-–—] /)[0].trim(), limpo.split(/ [-–—] /).slice(1).join(' - ').trim()] : [v.canal || '', limpo];
   return { titulo: tituloLimpo(titulo) || titulo, artista };
+}
+
+// Vídeo escolhido na busca: qual música é? Procura no Cifra Club e no Letras pelo título do vídeo inteiro e fica com
+// a música cujo título está no título do vídeo (de preferência do artista que aparece no título ou no canal).
+// Assim o vídeo vem com a cifra e a letra certas; sem achar, segue pelo nome tirado do título do vídeo
+async function musicaDoVideo(v) {
+  const cru = tituloCruDoVideo(v.titulo);
+  const noVideo = ` ${normalizar(cru)} `;
+  const quem = ` ${normalizar(`${cru} ${v.canal || ''}`)} `;
+  const lista = await buscarMusicas(cru.replace(/\s[|–—-]\s/g, ' ')).catch(() => []);
+  const tit = (r) => normalizar(tituloLimpo(r.titulo));
+  const cabe = lista.filter((r) => tit(r).length >= 3 && noVideo.includes(` ${tit(r)} `));
+  const doArtista = cabe.filter((r) => r.artista && artistasDe('', r.artista).some((a) => quem.includes(` ${normalizar(a)} `)));
+  const maior = (l) => [...l].sort((a, b) => tit(b).length - tit(a).length)[0];
+  const r = maior(doArtista) || maior(cabe);
+  if (r) return { titulo: r.titulo, artista: r.artista, cifra: r.cifra || '', letra: r.letra || null, video: v };
+  return { ...nomesDoVideo(v), video: v, artistaIncerto: true };
 }
 
 // Traz tudo de uma vez: a cifra do Cifra Club (que já tem a letra); sem cifra, a letra do Letras; e o
@@ -2576,8 +2614,14 @@ async function trazerMusica({ titulo, artista = '', cifra = '', letra = null, vi
     return { ...c, url };
   })().catch(() => null);
   // com o link da cifra na mão, o vídeo é procurado pelo nome que vem na cifra
-  const pVideo = (video ? Promise.resolve([video])
+  const pBusca = (video ? Promise.resolve([video])
     : cifra ? pCifra.then((c) => buscarYoutube(c ? `${c.titulo} ${c.artista || ''}` : termo)) : buscarYoutube(termo)).catch(() => []);
+  // a busca de vídeos não respondeu ou não achou: o vídeo que a página da letra (Letras) mostra
+  const pVideo = pBusca.then(async (vs) => {
+    if (vs.length) return vs;
+    const l = await pLetra;
+    return l?.youtube ? [{ id: youtubeId(l.youtube), url: l.youtube }] : [];
+  });
   const pLetra = (async () => {
     // no Letras: pelo título com o artista e, se não achar, só pelo título
     let item = letra || mesmaMusica(await buscarLetras(termo).catch(() => []), titulo, artista, artistaIncerto);
@@ -2595,10 +2639,12 @@ async function trazerMusica({ titulo, artista = '', cifra = '', letra = null, vi
     // o Letras costuma ter o compositor: entra nos créditos se chegar logo
     const l = await Promise.race([pLetra, new Promise((r) => setTimeout(() => r(null), 1500))]);
     if (l?.compositor && !renderSong(content).meta.composer) content = definirMeta(content, 'composer', l.compositor);
+    if (l?.youtube && !youtubeId(renderSong(content).meta.youtube)) content = definirMeta(content, 'youtube', l.youtube);
   } else {
     const l = await pLetra;
     if (l) {
       content = letraParaChordPro({ titulo: l.titulo, artista: l.artista, compositor: l.compositor, letra: l.letra, fonte: l.url });
+      if (l.youtube) content = definirMeta(content, 'youtube', l.youtube); // o vídeo que o Letras mostra com a letra
       source = l.url;
     } else {
       content = `{title: ${titulo}}\n${artista ? `{artist: ${artista}}\n` : ''}\n{comment: Não achei a letra nem a cifra: toque em Editar → Trazer da internet}\n`;
@@ -2620,7 +2666,8 @@ async function abrirMusica(dados, back, el) {
   if (acts) acts.innerHTML = '<span class="spin"></span>';
   else toast('Trazendo a música…');
   try {
-    const r = await trazerMusica(dados);
+    // vídeo da busca: primeiro descobre qual música é (para vir com a cifra e a letra dela)
+    const r = await trazerMusica(dados.video && !dados.cifra && !dados.letra ? await musicaDoVideo(dados.video) : dados);
     await abrirPrevia(r.content, r.source, back, r.video);
   } catch (e) {
     abrirNoTocando = false;
@@ -2631,7 +2678,9 @@ async function abrirMusica(dados, back, el) {
 // vídeo tocado direto da busca: abre como música, com a cifra e a letra
 async function abrirVideoComoMusica(v) {
   await abrirMusica({ ...nomesDoVideo(v), video: v, artistaIncerto: true }, location.hash);
-  if (player.atual?.youtube === v.id) player.tocar({ ...player.atual, href: '#/musica/previa' });
+  // o player passa a ser desta música (a prévia, ou a salva, se já estava na biblioteca): o salvar dele funciona
+  const id = /^#\/musica\/([^/?]+)/.exec(location.hash)?.[1];
+  if (id && player.atual?.youtube === v.id) player.atualizar({ songId: id, href: '#/musica/' + id, abrir: null });
 }
 
 // leva para a Buscar já procurando cifras desta música
@@ -2666,7 +2715,8 @@ async function abrirPrevia(content, source, back, videoJa = null, { espera = 300
   const novo = { id: 'previa', content, source, transpose: 0, capo: capoDaCifra(content), back }; // capo da cifra (Cifra Club)
   const m = renderSong(content).meta;
   if (!youtubeId(m.youtube) && !String(source || '').startsWith('cnbb:')) {
-    const busca = (videoJa ? videoJa.then((vs) => vs[0] || null) : videoDaMusica(m.title, m.artist, source)).catch(() => null);
+    // a busca que veio junto não achou: procura de novo pelo título e o artista da música
+    const busca = (videoJa ? videoJa.then((vs) => vs[0] || videoDaMusica(m.title, m.artist, source)) : videoDaMusica(m.title, m.artist, source)).catch(() => null);
     const v = await Promise.race([busca, new Promise((r) => setTimeout(() => r(undefined), espera))]);
     if (v) novo.content = definirMeta(content, 'youtube', v.url);
     else if (v === null) novo.semVideo = true; // procurou e não achou

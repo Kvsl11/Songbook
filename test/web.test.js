@@ -138,6 +138,10 @@ test('Letras.mus.br: busca e página da letra', () => {
   assert.equal(l.artista, 'Padre Marcelo Rossi');
   assert.equal(l.compositor, 'Carlos Papae');
   assert.equal(l.letra, 'Deus está aqui\nneste momento\n\nE ainda se vier\nnoite traíçoeira');
+  assert.equal(l.youtube, '');
+  // o vídeo que a página mostra com a letra vem junto (um data-id numérico não é vídeo)
+  const comVideo = parseLetras(html.replace('<h1>', '<div data-id="12345678901234"></div><div data-video-id="dQw4w9WgXcQ"></div><h1>'), 'u');
+  assert.equal(comVideo.youtube, 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
 });
 
 test('partes vindas da IA: só coloca as marcações, sem mudar a letra', () => {
