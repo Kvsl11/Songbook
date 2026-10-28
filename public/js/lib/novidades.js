@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 261, data: '2026-10-28', titulo: 'Menus no lugar certo e editor mais limpo',
+    itens: [
+      { tipo: 'melhoria', texto: 'No ⋯ da letra (Tocando agora), "Sincronizar a letra"; "Trocar o vídeo" e "Mudar para vídeo/música" foram para o ⋯ das músicas nas listas (biblioteca, repertório, playlist).' },
+      { tipo: 'correcao', texto: 'No editor de cifra, voltar, cancelar e salvar levam de volta à lista de onde você veio, não à música.' },
+      { tipo: 'melhoria', texto: 'Editor mais limpo: os jeitos de editar com o nome (Cifra, Colchetes, Só letra), o texto do tamanho da letra (sem um quadro vazio enorme) e a ajuda "Como escrever" fechada até tocar nela.' },
+    ],
+  },
+  {
     versao: 260, data: '2026-10-28', titulo: 'Capa animada',
     itens: [
       { tipo: 'correcao', texto: 'O ajuste "Capa animada" (antes "Clipe atrás do título") agora vale também no Tocando agora: desligado, o modo música mostra a capa parada e não baixa as cenas do clipe. Muda na hora.' },
@@ -68,12 +76,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'A letra do Tocando agora (no cartão e na tela toda) voltou a mostrar as marcações das partes: Chorus, Bridge, Verse 2 e as outras.' },
       { tipo: 'melhoria', texto: 'A notificação da música no celular agora mostra o nome, o artista e a capa da música, com os botões de voltar e pular.' },
       { tipo: 'melhoria', texto: 'A fila mostra a capa de cada música, a duração e, na que está tocando, as barrinhas mexendo por cima da capa.' },
-    ],
-  },
-  {
-    versao: 251, data: '2026-10-28', titulo: 'Capa com movimento na tela toda',
-    itens: [
-      { tipo: 'melhoria', texto: 'Em "Mudar para música", os quadros do clipe passam atrás de toda a parte de cima do Tocando agora, até o cartão da letra, e somem num degradê na cor do fundo, como o Canvas do Spotify.' },
     ],
   },
 ];
