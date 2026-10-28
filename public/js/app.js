@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-267';
+export const APP_VERSAO = '2026.10.28-268';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1125,11 +1125,14 @@ const player = (() => {
   };
   let acesaChave = ''; // o que está aceso agora: a linha (o número) ou a pausa ("p" e o número)
   let linhaAcesa = -1;
+  // onde a linha está dentro da caixa que rola (o offsetTop é medido do player inteiro no cartão, o que levava a
+  // rolagem para muito além da frase cantada)
+  const topoNaCaixa = (linha, caixa) => caixa.scrollTop + linha.getBoundingClientRect().top - caixa.getBoundingClientRect().top;
   // a linha cantada fica a um terço da caixa (no cartão, que não rola com o dedo, e na letra na tela toda)
   const rolarLetra = (behavior = 'smooth') => {
     const caixa = $('.pl-linhas', el);
     const p = caixa.querySelector('p.agora') || caixa.querySelector(`p[data-k="${linhaAcesa}"]`);
-    if (p) caixa.scrollTo({ top: p.offsetTop - caixa.clientHeight / 3, behavior });
+    if (p) caixa.scrollTo({ top: topoNaCaixa(p, caixa) - caixa.clientHeight / 3, behavior });
   };
   // a letra na tela toda, como no Spotify: o nome em cima, a letra inteira rolando e, embaixo, compartilhar, os ⋮, a
   // barra do tempo e o play. No painel ela é só um cartão, com as primeiras linhas (ou as de agora, sincronizada)
@@ -1251,7 +1254,7 @@ const player = (() => {
       $('.pl-cifra', el).querySelectorAll('.line.agora').forEach((l) => { if (l !== linha) l.classList.remove('agora'); });
       if (linha && !linha.classList.contains('agora')) {
         linha.classList.add('agora');
-        if (!rolando) { const box = $('.pl-cifra', el); box.scrollTo({ top: linha.offsetTop - box.clientHeight / 3, behavior: 'smooth' }); }
+        if (!rolando) { const box = $('.pl-cifra', el); box.scrollTo({ top: topoNaCaixa(linha, box) - box.clientHeight / 3, behavior: 'smooth' }); }
       }
     }
     caixa.querySelectorAll('p[data-pausa]').forEach((p) => {
