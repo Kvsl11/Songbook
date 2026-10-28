@@ -3,6 +3,14 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 255, data: '2026-10-28', titulo: 'Busca com cifra, letra e vídeo numa lista só',
+    itens: [
+      { tipo: 'melhoria', texto: 'Na Busca, os vídeos não ficam mais à parte: cada música da lista já vem com o vídeo dela, e os sinais mostram o que ela tem (cifra, letra e vídeo). Abrindo ou salvando (+), ela entra com tudo junto.' },
+      { tipo: 'melhoria', texto: 'Um vídeo que não é de nenhuma música da lista entra nela como música: ao abrir, o app descobre qual é e traz a cifra e a letra. Outros vídeos da mesma música não se repetem.' },
+      { tipo: 'melhoria', texto: 'No "Adicionar música" do repertório, a mesma lista única.' },
+    ],
+  },
+  {
     versao: 254, data: '2026-10-28', titulo: 'Vídeo da busca mais rápido e capa com movimento no celular',
     itens: [
       { tipo: 'correcao', texto: 'Abrindo uma música da Busca, o vídeo vem junto: a busca de vídeos pergunta a todos os servidores ao mesmo tempo (antes esperava os que estavam fora do ar) e começa junto com a cifra.' },
