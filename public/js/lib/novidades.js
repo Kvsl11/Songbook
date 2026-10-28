@@ -3,6 +3,16 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 252, data: '2026-10-28', titulo: 'Partes na letra, notificação com pular, fila com capas e Conectar',
+    itens: [
+      { tipo: 'correcao', texto: 'No Conectar (e nos menus que sobem de baixo), a alça de cima funciona: arrastando para cima a folha cresce, e para baixo ela volta ou fecha.' },
+      { tipo: 'melhoria', texto: 'O Conectar mostra o fone ou a caixa que está tocando, em vez de "Este celular". O navegador só diz os nomes depois de liberar o microfone: o botão "Mostrar fones e caixas conectados" pede isso uma vez (nada é gravado).' },
+      { tipo: 'melhoria', texto: 'A letra do Tocando agora (no cartão e na tela toda) voltou a mostrar as marcações das partes: Chorus, Bridge, Verse 2 e as outras.' },
+      { tipo: 'melhoria', texto: 'A notificação da música no celular agora mostra o nome, o artista e a capa da música, com os botões de voltar e pular.' },
+      { tipo: 'melhoria', texto: 'A fila mostra a capa de cada música, a duração e, na que está tocando, as barrinhas mexendo por cima da capa.' },
+    ],
+  },
+  {
     versao: 251, data: '2026-10-28', titulo: 'Capa com movimento na tela toda',
     itens: [
       { tipo: 'melhoria', texto: 'Em "Mudar para música", os quadros do clipe passam atrás de toda a parte de cima do Tocando agora, até o cartão da letra, e somem num degradê na cor do fundo, como o Canvas do Spotify.' },

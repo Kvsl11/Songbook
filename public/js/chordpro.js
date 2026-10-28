@@ -670,6 +670,30 @@ export function linhasCantadas(src) {
   return out;
 }
 
+// as mesmas linhas de linhasCantadas, em partes com o nome de cada uma (Chorus, Bridge, Verse 2…; '' para a letra solta
+// antes da primeira marcação): para a letra do Tocando agora mostrar as marcações. Um refrão repetido entra de novo,
+// com o nome dele
+export function partesCantadas(src) {
+  const out = [];
+  let refrao = null; // o último refrão: { nome, linhas }
+  let atual = null;
+  let noRefrao = false;
+  const nova = (nome) => { atual = { nome, linhas: [] }; out.push(atual); return atual; };
+  for (const l of paraEditor(src).split('\n')) {
+    const cab = ehCabecalho(l);
+    if (cab) {
+      if (/^(repetir|repeat)\b/i.test(cab.nome)) { if (refrao) nova(refrao.nome).linhas.push(...refrao.linhas); atual = null; noRefrao = false; continue; }
+      noRefrao = tipoDaParte(cab.nome) === 'chorus';
+      nova(tipoDaParte(cab.nome) === 'comment' ? '' : cab.nome); // a letra depois de "[Intro] G D" não é a introdução
+      if (noRefrao) refrao = atual;
+      continue;
+    }
+    if (!ehLinhaDeLetra(l)) continue;
+    (atual || nova('')).linhas.push(l.replace(/\s+/g, ' ').trim());
+  }
+  return out.filter((p) => p.linhas.length);
+}
+
 // partes: [{ inicio: nº da linha (1 = primeira), tipo: 'refrao' | 'estrofe' | 'ponte' | 'pre-refrao' | 'intro' | 'final' }]
 export function aplicarEstrutura(src, partes) {
   const inicios = new Map((partes || []).filter((p) => Number.isInteger(p.inicio) && NOMES_PARTE[p.tipo]).map((p) => [p.inicio, p.tipo]));
