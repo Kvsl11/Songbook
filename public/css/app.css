@@ -2921,9 +2921,15 @@ html.pp #player.modo-capa .pl-video.capa-yt { background-size: auto 134%; }
 html.pp #player .pl-frase { order: 2; margin: 6px 2px 0; font-size: 16px; font-weight: 800; line-height: 1.3; color: #fff; min-height: 1.3em; }
 html.pp #player .pl-frase[hidden] { display: none; }
 /* "Mudar para vídeo / capa": a pílula escura */
-html.pp #player .pl-troca { order: 3; align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px 0 12px; border: 0; border-radius: 10px;
-  background: rgb(0 0 0 / 0.55); color: #fff; font: 800 15px var(--sans); cursor: pointer; }
-html.pp #player .pl-troca:active { transform: scale(0.97); }
+/* a pílula de vidro: clara e translúcida sobre a cor da música, com o ícone num círculo. flex: none — no painel que
+   rola, a coluna espremia a pílula e ela ficava achatada (o fundo preto fininho) */
+html.pp #player .pl-troca { order: 3; flex: none; align-self: flex-start; display: inline-flex; align-items: center; gap: 9px; height: 38px; margin-top: 2px; padding: 0 16px 0 5px;
+  border: 1px solid rgb(255 255 255 / 0.18); border-radius: 999px; background: rgb(255 255 255 / 0.1); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  color: #fff; font: 700 14px/1 var(--sans); letter-spacing: 0.01em; cursor: pointer; transition: background 0.2s, border-color 0.2s, transform 0.15s; }
+html.pp #player .pl-troca .pl-troca-ic { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 50%; background: #fff; color: #111; }
+html.pp #player .pl-troca:hover { background: rgb(255 255 255 / 0.18); border-color: rgb(255 255 255 / 0.3); }
+html.pp #player .pl-troca:active { transform: scale(0.96); }
+html.pp #player > * { flex-shrink: 0; }
 /* o nome e o artista, com o ✓/+ da biblioteca à direita */
 html.pp #player .pl-meio { order: 4; display: flex; align-items: center; gap: 12px; }
 html.pp #player .pl-info { flex: 1; min-width: 0; padding: 0 2px; margin: 0; }
