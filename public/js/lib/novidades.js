@@ -4,6 +4,15 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 269, data: '2026-10-28', titulo: 'Música abre nos dados, cifra em destaque',
+    itens: [
+      { tipo: 'correcao', texto: 'Tocar numa música da lista abre o Tocando agora com a capa ou o vídeo, o nome e os controles; a letra na tela toda abre pelo cartão da letra (antes abria direto na letra).' },
+      { tipo: 'melhoria', texto: 'Os acordes vêm numa cor que se destaca do fundo da música (antes eram da mesma cor do fundo, só um pouco mais claros).' },
+      { tipo: 'correcao', texto: 'Os botões A− e A+ voltaram a mudar o tamanho da letra; letra e cifra têm o mesmo tamanho.' },
+      { tipo: 'melhoria', texto: 'Na cifra sincronizada, como na letra: a linha de agora fica acesa, as próximas mais apagadas e as já cantadas mais ainda.' },
+    ],
+  },
+  {
     versao: 268, data: '2026-10-28', titulo: 'Cartão da letra acompanha a música',
     itens: [
       { tipo: 'correcao', texto: 'O cartão da letra no Tocando agora começa no início da música e acompanha o que está sendo cantado, com a frase de agora acesa e em relevo (antes ele rolava para longe da frase).' },
@@ -65,12 +74,6 @@ export const NOVIDADES = [
     versao: 260, data: '2026-10-28', titulo: 'Capa animada',
     itens: [
       { tipo: 'correcao', texto: 'O ajuste "Capa animada" (antes "Clipe atrás do título") agora vale também no Tocando agora: desligado, o modo música mostra a capa parada e não baixa as cenas do clipe. Muda na hora.' },
-    ],
-  },
-  {
-    versao: 259, data: '2026-10-28', titulo: 'Novidades mais curtas',
-    itens: [
-      { tipo: 'melhoria', texto: 'A tela de Novidades mostra só as 10 últimas atualizações.' },
     ],
   },
 ];
