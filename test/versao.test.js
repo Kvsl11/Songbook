@@ -21,6 +21,7 @@ test('versão: as Novidades começam pela versão atual', async () => {
   const doSw = Number(/const VERSION = 'songbook-v(\d+)'/.exec(sw)?.[1]);
   assert.equal(NOVIDADES[0].versao, doSw, 'escreva em lib/novidades.js o que mudou nesta versão');
   assert.ok(NOVIDADES.every((n) => n.titulo && n.itens.length));
+  assert.ok(NOVIDADES.length <= 10, 'as Novidades guardam só as 10 últimas versões: apague a mais antiga');
   assert.deepEqual(novidadesNaoVistas(doSw), []);
   assert.deepEqual(novidadesNaoVistas(doSw - 2).map((n) => n.versao), [doSw, doSw - 1]);
   assert.equal(novidadesNaoVistas(0).length, 1);
