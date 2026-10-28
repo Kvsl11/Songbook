@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-265';
+export const APP_VERSAO = '2026.10.28-266';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1045,6 +1045,7 @@ const player = (() => {
         if (r === 'ok') sincEstado.set(yt, { tipo: 'ok', texto: 'Letra sincronizada' });
         else if (r === 'ajustar') sincEstado.set(yt, { tipo: 'ajustar' });
         else if (r === 'nada') sincEstado.set(yt, { tipo: 'falhou', texto: 'Não achei a letra sincronizada desta música' });
+        else if (r === 'erro') sincEstado.set(yt, { tipo: 'falhou', texto: 'O banco de letras não respondeu agora', deNovo: true });
         else sincEstado.delete(yt);
         mostrarSinc();
       });
@@ -1078,7 +1079,7 @@ const player = (() => {
       someAviso = setTimeout(() => { e.visto = true; mostrarSinc(); }, 6000);
     } else if (e?.tipo === 'falhou' || e?.tipo === 'erro') {
       html = `<span class="pl-sinc-ic erro">${icon('alerta', 15)}</span><span class="pl-sinc-txt">${esc(e.texto || 'Não sincronizou')}</span>
-        ${botaoSinc('sinc-marcar', 'Sincronizar à mão', true)}${servidorIA().url ? botaoSinc('sinc-servidor', 'Ouvir o vídeo') : ''}`;
+        ${e.deNovo ? botaoSinc('sinc-tentar', 'Tentar de novo', true) : ''}${botaoSinc('sinc-marcar', 'Sincronizar à mão', !e.deNovo)}${servidorIA().url ? botaoSinc('sinc-servidor', 'Ouvir o vídeo') : ''}`;
     }
     box.innerHTML = html;
     box.hidden = !html;
@@ -1684,6 +1685,7 @@ const player = (() => {
     };
     sincronizarMusica(alvo, { refazer, status }).then((r) => {
       if (r === 'ajustar') { sincEstado.set(yt, { tipo: 'ajustar' }); mostrarSinc(); }
+      if (r === 'erro' || r === 'nada') { sincEstado.set(yt, { ...(sincEstado.get(yt) || {}), tipo: 'falhou', deNovo: r === 'erro' }); mostrarSinc(); }
     });
   };
   // o "Tocando agora" na tela toda (tablet): o botão do canto de cima troca entre expandir e voltar ao painel
@@ -1883,6 +1885,7 @@ const player = (() => {
       return;
     }
     if (b.dataset.pl === 'sinc-agora') { marcarFrase(); return; }
+    if (b.dataset.pl === 'sinc-tentar' && atual?.youtube) { lrclibTentado.delete(atual.youtube); sincEstado.delete(atual.youtube); letraDe = ''; desenharLetra(); return; }
     if (b.dataset.pl === 'sinc-desfazer' && marcando) {
       marcando.tempos.pop();
       const n = marcando.tempos.length;
@@ -8975,10 +8978,12 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
   const guardar = (sinc) => guardarSincronia(song, sinc);
   // primeiro, sem servidor: a letra já sincronizada do LRCLIB (na hora), se for da mesma música e tiver a duração do
   // vídeo. O "Refazer" (sincronia errada) e as músicas que não estão lá vão para o servidor, que ouve o áudio
-  if (!refazer) {
+  // (sem servidor, o "de novo" também tenta o LRCLIB: senão daria erro na certa)
+  let lrclibFalhou = false;
+  if (!refazer || soLrclib || !servidorIA().url) {
     status('carregando', 'Procurando a letra sincronizada…');
     const duracao = (player.desta(song.youtube) && player.duracao) || await duracaoDaMusica(song).catch(() => 0);
-    const lrc = await letraSincronizada({ titulo: tituloLimpo(song.title), artista: song.artist || '', duracao }).catch(() => null);
+    const lrc = await letraSincronizada({ titulo: tituloLimpo(song.title), artista: song.artist || '', duracao }).catch(() => { lrclibFalhou = true; return null; });
     if (lrc) {
       guardar({ video: song.youtube, linhas: lrc.linhas, tempos: lrc.tempos, fonte: 'lrclib', ...(lrc.ajustar ? { ajustar: true } : {}) });
       sincronizando.delete(song.id);
@@ -8989,12 +8994,12 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
       return lrc.ajustar ? 'ajustar' : 'ok';
     }
   }
-  if (soLrclib) { sincronizando.delete(song.id); return 'nada'; }
+  if (soLrclib) { sincronizando.delete(song.id); return lrclibFalhou ? 'erro' : 'nada'; }
   if (!servidorIA().url) {
     sincronizando.delete(song.id);
-    if (!sozinho) status('erro', refazer ? 'O servidor da IA não está disponível agora. Tente de novo daqui a pouco.'
-      : 'Esta música não tem letra sincronizada pronta, e o servidor que ouve o vídeo não está disponível agora.');
-    return 'erro';
+    if (!sozinho) status('erro', lrclibFalhou ? 'O banco de letras sincronizadas não respondeu agora. Tente de novo daqui a pouco ou sincronize à mão.'
+      : 'Não achei a letra sincronizada desta música. Sincronize à mão: toque em "Agora" no começo de cada frase.');
+    return lrclibFalhou ? 'erro' : 'nada';
   }
   status('carregando', refazer ? 'Sincronizando de novo, com mais precisão…' : 'Sincronizando a letra com o vídeo…');
   try {

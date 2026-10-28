@@ -378,3 +378,14 @@ test('letra sincronizada do LRCLIB: LRC -> linhas e tempos da sincronia', async 
   // sem letra sincronizada: null (o app vai para o servidor)
   assert.equal(await letraSincronizada({ titulo: 'Noites Traiçoeiras', artista: 'Padre Marcelo Rossi' }, async () => resp([{ ...lista[2], syncedLyrics: null }])), null);
 });
+
+test('letra sincronizada: o LRCLIB ocupado (503) tenta de novo; sem resposta nenhuma, é erro', async () => {
+  const lrc = '[00:10.00] Eu preciso tanto\n[00:14.00] do teu colo de mãe';
+  const ok = { ok: true, status: 200, json: async () => [{ id: 5, trackName: 'Colo de Mãe (Ao Vivo)', artistName: 'Frei Gilson', duration: 265, syncedLyrics: lrc }] };
+  const ocupado = { ok: false, status: 503, json: async () => ({ message: 'The server is busy, please retry in a moment' }) };
+  let n = 0;
+  const r = await letraSincronizada({ titulo: 'Colo de Mãe', artista: 'Frei Gilson', duracao: 263 }, async () => (++n < 3 ? ocupado : ok), { espera: 1 });
+  assert.equal(r.id, 5);
+  assert.equal(n, 3);
+  await assert.rejects(letraSincronizada({ titulo: 'Colo de Mãe', artista: 'Frei Gilson' }, async () => ocupado, { espera: 1 }), /não respondeu|ocupado/);
+});

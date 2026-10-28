@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 266, data: '2026-10-28', titulo: 'Letra sincronizada sem servidor, mais firme',
+    itens: [
+      { tipo: 'correcao', texto: 'Quando o banco de letras sincronizadas (LRCLIB) está ocupado, o app tenta de novo sozinho em vez de desistir e cair no servidor (que dava erro).' },
+      { tipo: 'correcao', texto: 'Sem servidor, "Sincronizar a letra de novo" também usa o banco de letras. Se ele não responder, o aviso mostra "Tentar de novo" e "Sincronizar à mão".' },
+    ],
+  },
+  {
     versao: 265, data: '2026-10-28', titulo: 'Uma tela só para a música',
     itens: [
       { tipo: 'melhoria', texto: 'A música abre sempre na tela nova da letra, em todos os aparelhos; a página antiga saiu. Fechando, você volta para a lista.' },
@@ -66,13 +73,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'melhoria', texto: 'A tela de Ajustes ficou enxuta: sem os números e os atalhos do topo, títulos simples e textos curtos. Aparência, Música (destaque e desenho dos acordes, clipe atrás do título), PowerPoint, Backup, Avançado e Sobre.' },
       { tipo: 'melhoria', texto: 'A conta do YouTube e o servidor no computador (partitura e letra sincronizada pelo áudio) ficam guardados em "Avançado", fechado.' },
-    ],
-  },
-  {
-    versao: 256, data: '2026-10-28', titulo: 'Abrir música sem piscar e tom mais discreto no artista',
-    itens: [
-      { tipo: 'correcao', texto: 'Abrindo uma música da Busca no celular, o Tocando agora aparece de uma vez: a página antiga da música não pisca mais por baixo (nem ao fechar).' },
-      { tipo: 'melhoria', texto: 'Na página do artista, o tom de cada música fica num selo pequeno ao lado do salvar, sem o "Tom" escrito; embaixo do nome, o artista.' },
     ],
   },
 ];
