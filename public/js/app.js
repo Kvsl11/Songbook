@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-245';
+export const APP_VERSAO = '2026.10.28-246';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -848,9 +848,9 @@ const player = (() => {
     $('.pl-txt b', el).textContent = atual.titulo || 'Vídeo';
     // o tempo vai junto do artista no celular; no computador ele fica na barra de tempo, no centro
     $('.pl-txt small', el).innerHTML = esc([atual.parte, atual.artista].filter(Boolean).join(' · ')) + (duracao ? `<span class="pl-tmini">${atual.parte || atual.artista ? ' · ' : ''}${fmt(tempo)} / ${fmt(duracao)}</span>` : '');
-    // música sem vídeo: o botão grande escolhe um vídeo do YouTube para ela
-    $('.pl-play', el).innerHTML = icon(atual.semVideo ? 'youtube' : estado === 'tocando' ? 'pause' : 'play', 20);
-    $('.pl-play', el).title = atual.semVideo ? 'Escolher um vídeo para esta música' : '';
+    // música sem vídeo: o play é o de sempre; tocando nele (ou na pílula "Escolher um vídeo"), escolhe um vídeo do YouTube
+    $('.pl-play', el).innerHTML = icon(estado === 'tocando' && !atual.semVideo ? 'pause' : 'play', 20);
+    $('.pl-play', el).title = atual.semVideo ? 'Escolher um vídeo para tocar' : '';
     // a bolinha de salva (na barrinha recolhida do tablet): ✓ se a música está na biblioteca, + se não
     const salva = Boolean(atual.songId && db.song(atual.songId));
     const bs = $('.pl-salva', el);
@@ -890,7 +890,8 @@ const player = (() => {
     if (mini.classList.contains('sem-capa') !== semCapa) { mini.classList.toggle('sem-capa', semCapa); mini.innerHTML = semCapa ? icon('music', 72) : ''; }
     mini.classList.toggle('capa-yt', capa && !(atual?.capa && /^(https?:|data:)/.test(atual.capa)));
     const b = $('.pl-troca', el);
-    b.innerHTML = `${icon(capa ? 'video' : 'music', 18)}<span>${capa ? 'Mudar para vídeo' : 'Mudar para música'}</span>`;
+    b.innerHTML = atual?.semVideo ? `${icon('youtube', 18)}<span>Escolher um vídeo</span>`
+      : `${icon(capa ? 'video' : 'music', 18)}<span>${capa ? 'Mudar para vídeo' : 'Mudar para música'}</span>`;
   };
   // embaixo da letra, no painel do tablet (como os cartões do "Tocando agora" do Spotify): o artista com a foto,
   // os créditos (quem canta, compôs, o tom, de onde veio a cifra) e o vídeo, com o que dá para fazer em cada um
@@ -1352,7 +1353,7 @@ const player = (() => {
       return;
     }
     if (!b) return;
-    if (b.dataset.pl === 'play' && atual?.semVideo) {
+    if ((b.dataset.pl === 'play' || b.dataset.pl === 'troca') && atual?.semVideo) {
       // música sem vídeo: escolher um no YouTube; escolhido, ela fica salva com ele e começa a tocar
       const s = db.song(atual.songId);
       if (!s) { toast('Salve a música na biblioteca para escolher um vídeo'); return; }
