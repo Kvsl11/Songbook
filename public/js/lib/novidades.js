@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 273, data: '2026-10-28', titulo: 'Salvar e tirar sem piscar',
+    itens: [
+      { tipo: 'correcao', texto: 'Salvar a música aberta pela busca no Tocando agora não faz mais a tela piscar: só a bolinha vira ✓.' },
+      { tipo: 'correcao', texto: 'Tocar no ✓ de novo tira a música da biblioteca (ela continua tocando). Adicionar a um repertório fica no menu ⋮.' },
+    ],
+  },
+  {
     versao: 272, data: '2026-10-28', titulo: 'Créditos com as fotos',
     itens: [
       { tipo: 'novo', texto: 'Os créditos da música mostram as pessoas com a foto, como no Spotify: as duas primeiras no cartão, com quantos participantes; "Explorar" abre todos em detalhe, cada um com a foto, o nome e o que fez na música.' },
@@ -66,14 +73,6 @@ export const NOVIDADES = [
       { tipo: 'novo', texto: 'Em cima da letra (no cartão e na tela toda), um aviso mostra que a letra está sincronizando e, depois, que sincronizou.' },
       { tipo: 'correcao', texto: 'Vídeos com uma parte antes da música (como o clipe de "Speed Demon") agora trazem a letra sincronizada: toque em "Acertar" e depois na frase no momento em que ela for cantada. "Ajustar" faz o mesmo quando a letra ficar fora do tempo.' },
       { tipo: 'novo', texto: 'Se não achar a letra sincronizada, "Sincronizar à mão": a música toca do começo e você toca em "Agora" quando cada frase começar.' },
-    ],
-  },
-  {
-    versao: 263, data: '2026-10-28', titulo: 'Letra que acompanha a música',
-    itens: [
-      { tipo: 'novo', texto: 'Ao tocar uma música, o app procura sozinho a letra sincronizada (LRCLIB, sem servidor): o cartão da letra passa a acompanhar o que está sendo cantado.' },
-      { tipo: 'melhoria', texto: 'A frase de agora fica em branco, maior e com relevo; as outras mais apagadas.' },
-      { tipo: 'novo', texto: 'Nas partes só de música (introdução, solos e o fim) aparecem as notinhas ♪, que pulam enquanto tocam.' },
     ],
   },
 ];

@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-272';
+export const APP_VERSAO = '2026.10.28-273';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -888,7 +888,7 @@ const player = (() => {
       bs.hidden = false;
       bs.classList.toggle('salva', salva);
       bs.innerHTML = icon(salva ? 'check' : 'plus', 16);
-      bs.title = salva ? 'Na sua biblioteca: adicionar a um repertório' : 'Abrir para salvar na biblioteca';
+      bs.title = salva ? 'Na sua biblioteca (tocar para tirar)' : 'Salvar na biblioteca';
       bs.setAttribute('aria-label', bs.title);
     }
     // arrastando a barra, ela fica onde está o dedo (o vídeo só vai para lá ao soltar)
@@ -1244,6 +1244,12 @@ const player = (() => {
       rolando = requestAnimationFrame(passo);
     };
     rolando = requestAnimationFrame(passo);
+  };
+  // muda o endereço da página da música (salvou ou tirou da biblioteca) sem desenhar a página de novo; fechando o
+  // Tocando agora, ainda sai dela
+  const trocarEndereco = (hash) => {
+    if (sobrePagina === location.hash) sobrePagina = hash;
+    history.replaceState(history.state, '', hash);
   };
   // fecha a tela da música: sai da página dela, de volta para a lista (a página antiga não aparece no caminho)
   const fecharMusica = () => {
@@ -1700,7 +1706,7 @@ const player = (() => {
     const sincronizada = song?.sincronia?.video && song.sincronia.video === atual.youtube;
     const opcoes = [
       !naLetra && (atual.href || atual.abrir) && !telaDeCelular() && { valor: 'abrir', rotulo: 'Abrir a música', ic: 'music' },
-      { valor: 'salva', rotulo: salva ? 'Adicionar a um repertório' : 'Salvar na biblioteca', ic: salva ? 'plus' : 'download' },
+      salva ? { valor: 'add-repertorio', rotulo: 'Adicionar a um repertório', ic: 'plus' } : { valor: 'salva', rotulo: 'Salvar na biblioteca', ic: 'download' },
       { valor: 'fila', rotulo: 'Ver a fila', ic: 'queue' },
       { valor: 'ver-cifra', rotulo: naLetra && modoCifra ? 'Ver só a letra' : 'Ver a cifra', ic: naLetra && modoCifra ? 'text' : 'chord' },
       naLetra && atual.youtube && !atual.semVideo && { valor: 'ver-video', rotulo: 'Ver o vídeo', ic: 'video' },
@@ -1857,9 +1863,25 @@ const player = (() => {
       const salva = ja || db.saveSong({ content: preview.content, source: preview.source, transpose: preview.transpose || 0, capo: preview.capo || 0 });
       api.atualizar({ songId: salva.id, href: `#/musica/${salva.id}` });
       toast(ja ? 'Já estava na biblioteca' : 'Salva na biblioteca');
-      if (location.hash === '#/musica/previa') location.replace('#/musica/' + salva.id);
+      // na página da música (escondida atrás do Tocando agora), só o endereço muda: ir para ele redesenhava a página
+      // e fechava e reabria o Tocando agora (a tela piscava)
+      if (location.hash === '#/musica/previa') trocarEndereco('#/musica/' + salva.id);
       else if (/^#\/biblioteca/.test(location.hash)) route();
       return salva;
+    };
+    // tirar da biblioteca sem parar a música: ela continua tocando como a música da busca (a prévia), e o ✓ volta a +
+    const tirarDoPlayer = async (s) => {
+      const reps = db.sets().filter((st) => st.items.some((it) => it.songId === s.id));
+      if (reps.length && !(await ask({ title: 'Tirar da biblioteca?', text: `“${s.title}” está em ${reps.length > 1 ? `${reps.length} repertórios` : `“${reps[0].name}”`} e sai de lá também.`, ok: 'Tirar', danger: true }))) return;
+      const naPagina = location.hash === `#/musica/${s.id}`;
+      preview = { id: 'previa', content: s.content, source: s.source, transpose: s.transpose || 0, capo: s.capo || 0, back: '#/biblioteca/musicas' };
+      guardarPrevia();
+      db.deleteSong(s.id);
+      api.atualizar({ songId: 'previa', href: '#/musica/previa' });
+      desenharLateral();
+      toast('Removida da biblioteca');
+      if (naPagina) trocarEndereco('#/musica/previa');
+      else if (/^#\/biblioteca/.test(location.hash)) route();
     };
     if ((b.dataset.pl === 'play' || b.dataset.pl === 'troca') && atual?.semVideo) {
       // música sem vídeo: escolher um no YouTube; escolhido, ela fica salva com ele e começa a tocar
@@ -1878,7 +1900,8 @@ const player = (() => {
     if (b.dataset.pl === 'salva' && atual) {
       // salva: adicionar a um repertório (como o ✓ do Spotify); não salva: salva ali mesmo, sem precisar abrir a música
       // (a música aberta da busca fica guardada na sessão; um vídeo solto, sem cifra, abre a música para salvar)
-      if (atual.songId && db.song(atual.songId)) addToSetDialog(atual.songId, atual.parte || '');
+      // salva: tocar de novo tira da biblioteca (como no Spotify); adicionar a um repertório fica nos ⋮
+      if (atual.songId && db.song(atual.songId)) tirarDoPlayer(db.song(atual.songId));
       // (também a música sem vídeo e a que veio de um vídeo da busca)
       else if (daPrevia()) salvarDaPrevia();
       else if (atual.href && location.hash !== atual.href) location.hash = atual.href;
@@ -1887,6 +1910,7 @@ const player = (() => {
         Promise.resolve(atual.abrir()).then(() => { if (daPrevia()) salvarDaPrevia(); });
       }
     }
+    if (b.dataset.pl === 'add-repertorio' && atual?.songId && db.song(atual.songId)) addToSetDialog(atual.songId, atual.parte || '');
     if (b.dataset.pl === 'proxima') pular(1);
     if (b.dataset.pl === 'troca') { comCapa = !comCapa; db.setPref('playerCapa', comCapa); desenharCapa(); }
     if (b.dataset.pl === 'compartilhar' && atual) compartilhar({ title: atual.titulo || 'Vídeo', text: [atual.titulo, atual.artista].filter(Boolean).join(' — '), ...(atual.youtube ? { url: `https://www.youtube.com/watch?v=${atual.youtube}` } : {}) });
