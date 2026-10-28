@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 269, data: '2026-10-28', titulo: 'Explorar o artista',
+    itens: [
+      { tipo: 'novo', texto: 'No cartão "Sobre o artista" do Tocando agora, o botão "Explorar" (como no Spotify) abre a página do artista: músicas mais tocadas, todas as músicas, álbuns e, agora, a biografia.' },
+      { tipo: 'melhoria', texto: 'Nas músicas sem cifra (o app não achou os acordes), o botão "Cifra" não aparece mais na letra.' },
+    ],
+  },
+  {
     versao: 268, data: '2026-10-28', titulo: 'Cartão da letra acompanha a música',
     itens: [
       { tipo: 'correcao', texto: 'O cartão da letra no Tocando agora começa no início da música e acompanha o que está sendo cantado, com a frase de agora acesa e em relevo (antes ele rolava para longe da frase).' },
@@ -65,12 +72,6 @@ export const NOVIDADES = [
     versao: 260, data: '2026-10-28', titulo: 'Capa animada',
     itens: [
       { tipo: 'correcao', texto: 'O ajuste "Capa animada" (antes "Clipe atrás do título") agora vale também no Tocando agora: desligado, o modo música mostra a capa parada e não baixa as cenas do clipe. Muda na hora.' },
-    ],
-  },
-  {
-    versao: 259, data: '2026-10-28', titulo: 'Novidades mais curtas',
-    itens: [
-      { tipo: 'melhoria', texto: 'A tela de Novidades mostra só as 10 últimas atualizações.' },
     ],
   },
 ];

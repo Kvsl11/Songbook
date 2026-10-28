@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-268';
+export const APP_VERSAO = '2026.10.28-269';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -965,7 +965,7 @@ const player = (() => {
     if (principal) {
       cartoes.push(`<section class="pl-cartao pl-artista"><div class="pl-artista-foto" data-foto><span>${esc(principal.split(/\s+/).slice(0, 2).map((x) => x[0] || '').join('').toUpperCase())}</span><h4>Sobre o artista</h4></div>
         <div class="pl-artista-pe"><span class="grow"><b>${esc(principal)}</b><small>${esc(pessoas[0]?.papeis.join(' • ') || 'Artista')}</small></span>
-        ${slug ? `<a class="ref-pilula" href="#/artista/${encodeURIComponent(slug)}/${encodeURIComponent(principal)}">Ver artista</a>` : ''}</div></section>`);
+        <button class="ref-pilula pl-explorar" data-pl="explorar-artista" data-nome="${esc(principal)}" data-slug="${esc(slug || '')}">Explorar</button></div></section>`);
     }
     if (pessoas.length || detalhes.length) {
       cartoes.push(`<section class="pl-cartao"><h4>Créditos</h4>
@@ -1152,15 +1152,19 @@ const player = (() => {
   const desenharCifra = () => {
     const box = $('.pl-cifra', el);
     if (!box) return;
-    el.classList.toggle('cifra-on', modoCifra);
+    const song = musicaTocando();
+    // sem acordes (o app não achou a cifra): só a letra, sem o botão "Cifra"
+    const temAcordes = Boolean(song?.content && temCifra(song.content));
+    const cifraAqui = modoCifra && temAcordes;
+    el.classList.toggle('cifra-on', cifraAqui);
     const bt = $('.pl-ver-cifra', el);
+    bt.hidden = !temAcordes;
     bt.setAttribute('aria-pressed', String(modoCifra));
     bt.innerHTML = modoCifra ? `${icon('text', 15)}<span>Letra</span>` : `${icon('chord', 15)}<span>Cifra</span>`;
     bt.title = modoCifra ? 'Mostrar só a letra' : 'Mostrar os acordes';
-    const song = musicaTocando();
     mapaCifra = null;
     acesaChave = '';
-    if (!modoCifra || !song?.content) { box.innerHTML = ''; return; }
+    if (!cifraAqui) { box.innerHTML = ''; return; }
     const transpose = song.transpose || 0;
     const capo = song.capo || 0;
     const r = renderSong(song.content, { transpose, capo, key: song.key || '' });
@@ -1656,7 +1660,7 @@ const player = (() => {
       !naLetra && (atual.href || atual.abrir) && !telaDeCelular() && { valor: 'abrir', rotulo: 'Abrir a música', ic: 'music' },
       { valor: 'salva', rotulo: salva ? 'Adicionar a um repertório' : 'Salvar na biblioteca', ic: salva ? 'plus' : 'download' },
       { valor: 'fila', rotulo: 'Ver a fila', ic: 'queue' },
-      { valor: 'ver-cifra', rotulo: naLetra && modoCifra ? 'Ver só a letra' : 'Ver a cifra', ic: naLetra && modoCifra ? 'text' : 'chord' },
+      song?.content && temCifra(song.content) && { valor: 'ver-cifra', rotulo: naLetra && modoCifra ? 'Ver só a letra' : 'Ver a cifra', ic: naLetra && modoCifra ? 'text' : 'chord' },
       naLetra && atual.youtube && !atual.semVideo && { valor: 'ver-video', rotulo: 'Ver o vídeo', ic: 'video' },
       naLetra && atual.songId && db.song(atual.songId) && { valor: 'editar', rotulo: 'Editar a cifra', ic: 'edit' },
       naLetra && atual.songId && { valor: 'partitura', rotulo: 'Partitura', ic: 'score' },
@@ -1866,6 +1870,7 @@ const player = (() => {
     if (b.dataset.pl === 'fonte-') { mudarFonte(-0.1); return; }
     if (b.dataset.pl === 'fonte+') { mudarFonte(0.1); return; }
     if (b.dataset.pl === 'rolar') { rolar(); return; }
+    if (b.dataset.pl === 'explorar-artista') { explorarArtista(b.dataset.nome, b.dataset.slug, b); return; }
     if (b.dataset.pl === 'editar' && atual?.songId && db.song(atual.songId)) { location.hash = '#/editar/' + atual.songId; return; }
     if (b.dataset.pl === 'partitura' && atual?.songId) { location.hash = `#/musica/${atual.songId}/partitura`; return; }
     if (b.dataset.pl === 'sinc-ajustar') { ajustando = true; ajustandoVideo = atual?.youtube || ''; mostrarSinc(); letraCheia(true); return; }
@@ -3226,6 +3231,39 @@ function pessoasDosCreditos({ artista = '', titulo = '', compositor = '', letris
   lista(letrista, SEP_NOMES).forEach((n) => juntar(n, 'Letra'));
   return pessoas;
 }
+// "Explorar" (cartão do artista no Tocando agora, como no Spotify): a página do artista, com as músicas, os álbuns e a
+// biografia. Sem o endereço do Cifra Club na música, procura o artista pelo nome
+async function explorarArtista(nome, slug = '', bt = null) {
+  if (!nome) return;
+  if (!slug) {
+    if (bt) bt.disabled = true;
+    const a = artistaCerto(await buscarArtistasCifraClub(nome).catch(() => []), nome);
+    if (bt) bt.disabled = false;
+    if (!a) { toast(`Não achei ${nome} no Cifra Club`); return; }
+    slug = a.slug;
+  }
+  location.hash = `#/artista/${encodeURIComponent(slug)}/${encodeURIComponent(nome)}`;
+}
+// a biografia de um artista (o resumo da Wikipédia, em português e, sem ele, em inglês); só vale a página de um
+// músico, banda ou cantor, para não trazer outra pessoa com o mesmo nome
+async function bioDoArtista(nome) {
+  const musico = (r) => r?.type === 'standard' && r.extract && /m[uú]sic|cantor|cantora|\bband\b|banda|grupo|dupla|\bduo\b|singer|rapper|compositor|songwriter|\bDJ\b|minist[ée]rio|padre|frei|worship/i.test(`${r.description || ''} ${r.extract}`);
+  const resumo = (lingua, titulo) => fetch(`https://${lingua}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(titulo.replace(/ /g, '_'))}`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+  for (const [lingua, extra] of [['pt', 'música cantor banda'], ['en', 'band singer musician']]) {
+    // pelo nome; se a página for outra coisa (ou desambiguação, como "Justice"), pela busca do nome com "música"
+    let r = await resumo(lingua, nome);
+    if (!musico(r)) {
+      const busca = await fetch(`https://${lingua}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(`${nome} ${extra}`)}&srlimit=3&format=json&origin=*`).then((x) => x.json()).catch(() => null);
+      for (const h of busca?.query?.search || []) {
+        if (!normalizar(h.title).includes(normalizar(nome).split(' ')[0])) continue;
+        r = await resumo(lingua, h.title);
+        if (musico(r)) break;
+      }
+    }
+    if (musico(r)) return { texto: r.extract, url: r.content_urls?.mobile?.page || r.content_urls?.desktop?.page || '' };
+  }
+  return null;
+}
 // a foto de um artista pelo nome (a do Cifra Club); guardada na sessão, para não buscar de novo a cada música
 const fotosArtistas = new Map();
 // (primeiro o Cifra Club; se não tiver, o Deezer, que tem a foto de quase todo artista; por fim a Wikipédia)
@@ -3508,11 +3546,20 @@ async function viewArtista(slug, nome) {
   view.innerHTML = `
     <section class="page-hero artista-hero"><div class="cover" id="art-foto">${icon('mic', 48)}</div>
       <div><div class="kind">Artista</div><h2>${esc(nome || slug)}</h2><div class="meta" id="art-meta">Do <a href="https://www.cifraclub.com.br/${esc(slug)}/" target="_blank" rel="noopener">Cifra Club</a></div></div></section>
+    <div class="art-bio" id="art-bio" hidden></div>
     <label class="field">${icon('search', 18)}<input class="search" id="art-busca" type="search" placeholder="Buscar nas músicas de ${esc(nome || 'artista')}"></label>
     <div class="chips" id="art-abas" style="margin:12px 0 4px">
       <button class="chip" data-aba="top">Mais tocadas</button><button class="chip" data-aba="todas">Todas as músicas</button><button class="chip" data-aba="albuns">Álbuns</button></div>
     <div id="art-conteudo"><div class="loading-note"><span class="spin"></span>Carregando as músicas…</div></div>`;
   const d = carregarArtista(slug, nome);
+  // biografia (Wikipédia): um resumo, que abre inteiro ao tocar
+  bioDoArtista(nome || slug).then((bio) => {
+    const box = $('#art-bio');
+    if (!bio || !box) return;
+    box.innerHTML = `<h3>Sobre</h3><p>${esc(bio.texto)}</p>${bio.url ? `<a href="${esc(bio.url)}" target="_blank" rel="noopener">Ler na Wikipédia</a>` : ''}`;
+    box.hidden = false;
+    box.onclick = (e) => { if (!e.target.closest('a')) box.classList.toggle('aberta'); };
+  });
   let lista = [];
   let foto = '';
   const box = () => $('#art-conteudo');

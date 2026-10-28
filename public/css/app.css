@@ -3713,3 +3713,11 @@ html.tablet .pt-atalho-txt small { font-size: 15px; }
 body:not(.painel-cheio) #player.sem-video { display: none !important; }
 #player .pl-video.sem-capa, html.pp #player.modo-capa .pl-video.sem-capa { display: grid; place-items: center; color: rgb(255 255 255 / 0.9);
   background: linear-gradient(135deg, color-mix(in srgb, var(--cor-musica, var(--tint)) 80%, #fff 10%), color-mix(in srgb, var(--cor-musica, var(--tint)) 55%, #000)); }
+
+/* página do artista: a biografia (resumo da Wikipédia), em 4 linhas; tocando, abre inteira */
+.art-bio { margin: 4px 0 14px; padding: 14px 16px; border-radius: var(--radius); background: var(--bg-elev); cursor: pointer; }
+.art-bio h3 { margin: 0 0 6px; font-size: 16px; font-weight: 800; }
+.art-bio p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.art-bio.aberta p { display: block; }
+.art-bio a { display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--accent-ink); }
+#player .pl-ver-cifra[hidden] { display: none; }
