@@ -3,6 +3,12 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 250, data: '2026-10-28', titulo: 'Barra do tempo que funciona',
+    itens: [
+      { tipo: 'correcao', texto: 'A barra do tempo do Tocando agora e da letra na tela toda voltou a funcionar: tocando nela ou arrastando, a música vai para aquele ponto. A área de toque ficou maior, para o dedo acertar.' },
+    ],
+  },
+  {
     versao: 249, data: '2026-10-28', titulo: 'Letra num cartão e na tela toda',
     itens: [
       { tipo: 'melhoria', texto: 'No Tocando agora, a letra virou um cartão menor, que não mostra a letra inteira. Tocando nele (ou no expandir), a letra abre na tela toda, como no Spotify: o nome e o artista em cima, a letra rolando e, embaixo, compartilhar, mais opções, a barra do tempo e o play.' },

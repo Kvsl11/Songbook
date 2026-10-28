@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-249';
+export const APP_VERSAO = '2026.10.28-250';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -712,7 +712,8 @@ const player = (() => {
   let estado = 'parado'; // tocando | pausado | parado
   let tempo = 0;
   let marcaTempo = 0;
-  let pendente = null; // ida para um ponto do vídeo pedida antes de ele estar pronto
+  let pendente = null;
+  let arrasto = null; // a barra do tempo sendo arrastada: { prog, id, fracao } // ida para um ponto do vídeo pedida antes de ele estar pronto
   let tentativasIda = 0;
   let duracao = 0;
   // na página da própria música o vídeo toca lá (na telinha das Referências); fora dela, no mini player
@@ -738,7 +739,7 @@ const player = (() => {
       <button class="icon-btn pl-pulo" data-pl="proxima" aria-label="Próxima música" title="Próxima">${icon('skipFwd', 18)}</button>
       <button class="icon-btn pl-modo pl-repetir" data-pl="repetir" aria-pressed="false" aria-label="Repetir" title="Repetir">${icon('repeat', 18)}<i class="pl-um">1</i></button>
     </div>
-    <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
+    <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" role="slider" tabindex="0" aria-label="Tempo da música" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
     <div class="pl-lado">
       <button class="icon-btn pl-so-pc" data-pl="expandir" aria-label="Tocando agora" title="Tocando agora">${icon('sidebar', 18)}</button>
       <button class="icon-btn pl-so-pc" data-pl="fila" aria-label="Fila" title="Fila">${icon('queue', 18)}</button>
@@ -759,7 +760,7 @@ const player = (() => {
     </div>
     <section class="pl-letra" hidden><div class="pl-letra-topo"><button class="icon-btn" data-pl="letra-fechar" aria-label="Fechar a letra" title="Fechar">${icon('down', 24)}</button><span class="pl-letra-nome"><b></b><small></small></span><span></span></div><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-linhas"></div>
       <div class="pl-letra-pe"><div class="pl-letra-bts2"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 22)}</button><span class="grow"></span><button class="icon-btn pl-mais" data-pl="menu" aria-label="Mais opções" title="Mais opções">${icon('more', 22)}</button></div>
-        <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
+        <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" role="slider" tabindex="0" aria-label="Tempo da música" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
         <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button></div></section>
     <div class="pl-extra" hidden></div>`;
   // no tablet o player é o painel "Tocando agora" à direita, fora da coluna principal (que não o corta)
@@ -864,7 +865,10 @@ const player = (() => {
       bs.title = salva ? 'Na sua biblioteca: adicionar a um repertório' : 'Abrir para salvar na biblioteca';
       bs.setAttribute('aria-label', bs.title);
     }
-    el.querySelectorAll('.pl-prog i').forEach((i) => { i.style.width = duracao ? `${Math.min(100, (tempo / duracao) * 100)}%` : '0'; });
+    // arrastando a barra, ela fica onde está o dedo (o vídeo só vai para lá ao soltar)
+    const fracao = arrasto ? arrasto.fracao : duracao ? Math.min(1, tempo / duracao) : 0;
+    el.querySelectorAll('.pl-prog i').forEach((i) => { i.style.width = `${fracao * 100}%`; });
+    el.querySelectorAll('.pl-prog').forEach((b) => { b.setAttribute('aria-valuemin', '0'); b.setAttribute('aria-valuemax', String(Math.round(duracao))); b.setAttribute('aria-valuenow', String(Math.round(fracao * duracao))); });
     sessaoDeMidia();
     // voltar, pular e aleatório: numa música do repertório ou da biblioteca (a fila)
     const f = fila();
@@ -876,7 +880,7 @@ const player = (() => {
     $('[data-pl="anterior"]', el).disabled = !f || (anteriorIndice() < 0 && tempo < 3);
     $('[data-pl="proxima"]', el).disabled = !f || proximoIndice() < 0;
     desenharModos();
-    el.querySelectorAll('.pl-t0').forEach((t) => { t.textContent = duracao ? fmt(tempo) : ''; });
+    el.querySelectorAll('.pl-t0').forEach((t) => { t.textContent = duracao ? fmt(arrasto ? arrasto.fracao * duracao : tempo) : ''; });
     el.querySelectorAll('.pl-t1').forEach((t) => { t.textContent = duracao ? fmt(duracao) : ''; });
     $('.pl-letra-nome b', el).textContent = atual.titulo || '';
     $('.pl-letra-nome small', el).textContent = atual.artista || '';
@@ -1081,6 +1085,7 @@ const player = (() => {
       tempo = Math.max(0, seg);
       marcaTempo = performance.now();
       pendente = tempo;
+      tentativasIda = 0;
       comando('seekTo', [tempo, true]);
       if (estado !== 'tocando') { comando('playVideo'); estado = 'tocando'; desenhar(); avisar(); }
     },
@@ -1374,6 +1379,41 @@ const player = (() => {
       b.setAttribute('aria-label', ligar ? 'Voltar' : 'Abrir o Tocando agora');
     });
   };
+  // a barra do tempo: tocar nela ou arrastar (com o dedo ou o mouse) leva a música para aquele ponto. Antes só o clique
+  // contava, numa faixa de 4px que o dedo quase nunca acertava, e arrastar não fazia nada
+  const fracaoDa = (prog, x) => { const r = prog.getBoundingClientRect(); return r.width ? Math.max(0, Math.min(1, (x - r.left) / r.width)) : 0; };
+  // cada barra com o seu ouvinte (e role="slider"): o celular ajusta o toque para o elemento clicável mais perto e,
+  // com o ouvinte só no player, um toque um pouco acima da barra ia parar no nome da música
+  const comecarArrasto = (e) => {
+    const prog = e.currentTarget;
+    if (!duracao || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    e.preventDefault();
+    try { prog.setPointerCapture(e.pointerId); } catch { /* sem captura: segue pelos eventos da barra */ }
+    arrasto = { prog, id: e.pointerId, fracao: fracaoDa(prog, e.clientX) };
+    el.classList.add('arrastando');
+    desenhar();
+  };
+  el.querySelectorAll('.pl-prog').forEach((prog) => prog.addEventListener('pointerdown', comecarArrasto));
+  // pelo teclado: as setas andam 5 segundos
+  el.addEventListener('keydown', (e) => {
+    if (!e.target.closest?.('.pl-prog') || !duracao || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+    e.preventDefault();
+    api.irPara(Math.max(0, Math.min(duracao, api.tempoAgora + (e.key === 'ArrowRight' ? 5 : -5))));
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!arrasto || e.pointerId !== arrasto.id) return;
+    arrasto.fracao = fracaoDa(arrasto.prog, e.clientX);
+    desenhar();
+  });
+  const soltarArrasto = (e) => {
+    if (!arrasto || e.pointerId !== arrasto.id) return;
+    const { fracao } = arrasto;
+    arrasto = null;
+    el.classList.remove('arrastando');
+    if (e.type === 'pointerup') api.irPara(fracao * duracao); else desenhar();
+  };
+  el.addEventListener('pointerup', soltarArrasto);
+  el.addEventListener('pointercancel', soltarArrasto);
   window.addEventListener('popstate', () => {
     if (voltaDaLetra) { voltaDaLetra = false; return; }
     // o voltar com a letra na tela toda fecha só ela (volta para o Tocando agora)
@@ -1383,8 +1423,7 @@ const player = (() => {
   window.addEventListener('hashchange', () => { letraCheia(false); painelCheio(false); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('painel-cheio') && !document.querySelector('dialog[open]')) painelCheio(false); });
   el.addEventListener('click', (e) => {
-    const prog = e.target.closest('.pl-prog');
-    if (prog && duracao) { const r = prog.getBoundingClientRect(); api.irPara(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * duracao); return; }
+    if (e.target.closest('.pl-prog')) return; // a barra do tempo é tratada no toque (abaixo): tocar ou arrastar
     const b = e.target.closest('[data-pl]');
     // tablet: tocar na barrinha recolhida (fora dos botões) abre o painel "Tocando agora"; a tela inteira fica no topo dele
     if (document.body.classList.contains('painel-recolhido') && ehTablet() && (!b || b.dataset.pl === 'abrir')) {

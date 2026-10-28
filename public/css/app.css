@@ -1267,6 +1267,11 @@ body.performance .convite-instalar { display: none; }
 #player .pl-t0 { text-align: right; }
 #player .pl-prog { flex: 1; height: 3px; background: rgb(255 255 255 / 0.2); border-radius: 2px; overflow: hidden; }
 #player .pl-prog i { display: block; height: 100%; width: 0; background: #fff; transition: width 0.5s linear; }
+/* a área de tocar na barra vai bem além dos poucos pixels dela (o dedo acerta); arrastando, a barra segue o dedo sem atraso */
+#player .pl-prog { position: relative; touch-action: none; cursor: pointer; }
+#player .pl-prog::before { content: ""; position: absolute; left: -6px; right: -6px; top: -14px; bottom: -14px; }
+#player.arrastando .pl-prog i { transition: none; }
+html.pp #player.arrastando .pl-prog i::after { transform: scale(1.35); }
 /* ampliado: o vídeo grande em cima da barra */
 #player.grande { grid-template-areas: "video video video video" "info info play lado" "tempo tempo tempo tempo"; }
 #player.grande .pl-video { width: auto; margin: 8px 8px 0; }
