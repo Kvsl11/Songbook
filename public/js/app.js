@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-256';
+export const APP_VERSAO = '2026.10.28-257';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -8115,36 +8115,24 @@ function viewSettings() {
   const p = db.prefs();
   const accent = p.accent || COR_PADRAO;
   const personalizada = /^#/.test(accent) && !CORES_DESTAQUE.some(([c]) => c === accent);
-  const nMusicas = db.songs().length;
-  const nRepertorios = db.sets().length;
-  const nVideos = db.songs().filter((s) => s.youtube).length;
-  // seção com título, ícone e uma linha explicando; o atalho do topo leva até ela
-  const SECOES = [['aparencia', 'palette', 'Aparência'], ['cifras', 'chord', 'Cifras'], ['musica', 'music', 'Música'], ['pptx', 'grid', 'PowerPoint'], ['dados', 'database', 'Dados'], ['sobre', 'info', 'Sobre']];
-  const secao = (id, sub, corpo) => {
-    const [, ic, nome] = SECOES.find(([k]) => k === id);
-    return `<section class="aj-sec" id="aj-${id}"><h3 class="aj-titulo"><span class="aj-titulo-ic">${icon(ic, 16)}</span>${nome}</h3>${sub ? `<p class="aj-sub">${sub}</p>` : ''}${corpo}</section>`;
-  };
+  // tela enxuta: um título por seção, cada ajuste numa linha só; o que é técnico fica fechado em "Avançado"
+  const secao = (titulo, corpo, extra = '') => `<section class="aj-sec"${extra}><h3 class="aj-titulo">${titulo}</h3>${corpo}</section>`;
+  const chave = (id, ic, t, sub, ligado, cls = '') => `<label class="setting ${cls}"><span class="ico">${icon(ic, 18)}</span><div class="grow"><div class="t">${t}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div><input type="checkbox" class="switch" id="${id}" ${ligado ? 'checked' : ''}></label>`;
   view.innerHTML = `
     <div class="ajustes">
     <section class="aj-topo">
-      <span class="aj-logo">${logo(52)}</span>
-      <div class="aj-ident"><div class="kind">Songbook Litúrgico</div><h2>Ajustes</h2><span class="aj-versao">versão ${APP_VERSAO}</span></div>
-      <div class="aj-stats">
-        <div><b>${nMusicas}</b><span>música${nMusicas === 1 ? '' : 's'}</span></div>
-        <div><b>${nRepertorios}</b><span>repertório${nRepertorios === 1 ? '' : 's'}</span></div>
-        <div><b>${nVideos}</b><span>com vídeo</span></div>
-      </div>
+      <span class="aj-logo">${logo(44)}</span>
+      <div class="aj-ident"><h2>Ajustes</h2><span class="aj-versao">Songbook Litúrgico · versão ${APP_VERSAO}</span></div>
     </section>
-    <nav class="aj-atalhos" aria-label="Ir para">${SECOES.map(([k, ic, n]) => `<button class="chip" data-ir="${k}">${icon(ic, 14)} ${n}</button>`).join('')}</nav>
 
-    ${secao('aparencia', 'Modo claro ou escuro e a cor de destaque do app', `
+    ${secao('Aparência', `
     <div class="settings-group aj-aparencia">
       <div class="aj-bloco"><div class="aj-rotulo">Modo</div>
         <div class="theme-cards" id="theme">
           ${[['dark', 'Escuro'], ['light', 'Claro'], ['auto', 'Automático']].map(([v, l]) => `
             <button class="theme-card ${v}" data-v="${v}" aria-pressed="${(p.theme || 'dark') === v}"><div class="prev"><i></i><b></b></div>${l}</button>`).join('')}
         </div></div>
-      <div class="aj-bloco"><div class="aj-rotulo">Cor do site</div>
+      <div class="aj-bloco"><div class="aj-rotulo">Cor de destaque</div>
         <div class="swatches" id="cores">
           ${CORES_DESTAQUE.map(([c, n]) => `<button class="swatch" style="--c:${c}" data-c="${c}" aria-pressed="${accent === c}" title="${n}" aria-label="${n}"></button>`).join('')}
           <button class="swatch lit" data-c="liturgico" aria-pressed="${accent === 'liturgico'}" title="Cor litúrgica do dia" aria-label="Cor litúrgica do dia"></button>
@@ -8154,48 +8142,41 @@ function viewSettings() {
         <p class="swatch-label" id="cor-nome" style="margin:10px 0 0"></p></div>
     </div>`)}
 
-    ${secao('cifras', 'Como os acordes aparecem nas músicas', `
+    ${secao('Música', `
     <div class="settings-group">
-      <label class="setting"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Desenho dos acordes</div><div class="s">Como montar cada acorde no violão: tabela no início da música e ao tocar num acorde</div></div><input type="checkbox" class="switch" id="diagramas" ${p.diagramas ? 'checked' : ''}></label>
-      <label class="setting so-largo"><span class="ico">${icon('columns', 18)}</span><div class="grow"><div class="t">Duas colunas</div><div class="s">Em telas grandes (tablet deitado, computador)</div></div><input type="checkbox" class="switch" id="cols" ${p.columns !== false ? 'checked' : ''}></label>
-      <div class="setting wrap"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div><div class="s">Tamanho, cor e fundo dos acordes sobre a letra</div></div>
+      <div class="setting wrap"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
+      ${chave('diagramas', 'grid', 'Desenho dos acordes', 'Como montar cada acorde no violão', p.diagramas)}
+      ${chave('cols', 'columns', 'Duas colunas', 'Em telas grandes', p.columns !== false, 'so-largo')}
+      ${chave('video-fundo', 'video', 'Clipe atrás do título', 'Desligue para economizar dados', p.videoFundo !== false)}
     </div>`)}
 
-    ${secao('musica', 'A página de cada música', `
-    <div class="settings-group">
-      <a class="setting" href="#/youtube"><span class="ico">${icon('youtube', 18)}</span><div class="grow"><div class="t">Conta do YouTube</div><div class="s">Para o app baixar o áudio dos vídeos sozinho: partitura e letra sincronizada</div></div>${icon('next', 18)}</a>
-      <div class="setting wrap" id="servidor-pc"><span class="ico">${icon('database', 18)}</span><div class="grow"><div class="t">Servidor no seu computador</div><div class="s" id="servidor-pc-estado">${p.servidorPc ? 'Verificando…' : 'Partitura e letra sincronizada pelo seu PC, de graça. Ligue o servidor no PC e leia o QR code da página dele'}</div></div>
-        <form class="aj-servidor" id="servidor-pc-form"><input type="url" class="input" id="servidor-pc-url" placeholder="https://….trycloudflare.com" value="${esc(p.servidorPc || '')}" aria-label="Endereço do servidor"><button class="btn small primary">Salvar</button>${p.servidorPc ? '<button type="button" class="btn small" id="servidor-pc-tirar">Tirar</button>' : ''}</form></div>
-      <label class="setting"><span class="ico">${icon('video', 18)}</span><div class="grow"><div class="t">Vídeo no topo da música</div><div class="s">Quadros do clipe passam sem som atrás do título, como no Spotify (o vídeo toca nas Referências). Desligue para economizar dados</div></div><input type="checkbox" class="switch" id="video-fundo" ${p.videoFundo !== false ? 'checked' : ''}></label>
-    </div>
-    ${jaInstalado() ? '' : `<div class="settings-group">
-      <div class="setting acao"><span class="ico" style="background:none">${logo(36)}</span><div class="grow"><div class="t">Instalar o Songbook</div><div class="s">Ícone na tela inicial, abre em tela cheia e funciona sem internet</div></div><div class="setting-acoes"><button class="btn small primary" id="instalar">Instalar</button></div></div>
-    </div>`}`)}
-
-    ${secao('pptx', 'O arquivo do seu grupo: no repertório, “PowerPoint” gera os slides com as letras', `
+    ${secao('PowerPoint', `
     <div class="settings-group"><div class="aj-pptx" id="pptx"><div class="aj-pptx-vazio muted">Verificando…</div></div></div>`)}
 
-    ${secao('dados', 'Tudo fica guardado neste aparelho. Faça um backup de vez em quando', `
+    ${secao('Backup', `
     <div class="aj-dados">
-      <button class="aj-dado" id="exp"><span class="ico">${icon('download', 20)}</span><b>Exportar backup</b><small>Todas as músicas e repertórios num arquivo .json</small></button>
-      <button class="aj-dado" id="imp"><span class="ico">${icon('upload', 20)}</span><b>Importar</b><small>Backup .json, ChordPro (.cho, .pro) ou texto</small></button>
-    </div>
-    <div class="settings-group aj-perigo">
-      <div class="setting acao"><span class="ico">${icon('trash', 18)}</span><div class="grow"><div class="t">Apagar tudo</div><div class="s">Remove as músicas, os repertórios e os ajustes deste aparelho</div></div><div class="setting-acoes"><button class="btn small danger" id="clr">Apagar tudo</button></div></div>
+      <button class="aj-dado" id="exp"><span class="ico">${icon('download', 20)}</span><b>Exportar</b><small>Músicas e repertórios num arquivo</small></button>
+      <button class="aj-dado" id="imp"><span class="ico">${icon('upload', 20)}</span><b>Importar</b><small>Backup, ChordPro ou texto</small></button>
     </div>`)}
 
-    ${secao('sobre', '', `
-    <div class="settings-group aj-sobre">
-      <div class="aj-sobre-cab"><span class="aj-logo">${logo(40)}</span><div><b>Songbook Litúrgico</b><span class="chip sm">versão ${APP_VERSAO}</span></div></div>
-      <a class="setting" href="#/novidades"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Novidades</div><div class="s">O que foi corrigido e melhorado em cada atualização</div></div>${icon('next', 18)}</a>
-      <p>Cifras e letras com transposição, capotraste, rolagem automática, repertórios e vídeos do YouTube, integrado à Liturgia Diária da CNBB, aos cantos de cindyferrarezi.com e do Músicas para Missa e às cifras do Cifra Club.</p>
+    ${secao('Avançado', `
+    <details class="aj-avancado"${p.servidorPc ? ' open' : ''}><summary>Partitura e letra sincronizada pelo áudio</summary>
+    <div class="settings-group">
+      <a class="setting" href="#/youtube"><span class="ico">${icon('youtube', 18)}</span><div class="grow"><div class="t">Conta do YouTube</div><div class="s">Para baixar o áudio dos vídeos</div></div>${icon('next', 18)}</a>
+      <div class="setting wrap" id="servidor-pc"><span class="ico">${icon('database', 18)}</span><div class="grow"><div class="t">Servidor no computador</div><div class="s" id="servidor-pc-estado">${p.servidorPc ? 'Verificando…' : 'Leia o QR code da página do servidor no PC'}</div></div>
+        <form class="aj-servidor" id="servidor-pc-form"><input type="url" class="input" id="servidor-pc-url" placeholder="https://….trycloudflare.com" value="${esc(p.servidorPc || '')}" aria-label="Endereço do servidor"><button class="btn small primary">Salvar</button>${p.servidorPc ? '<button type="button" class="btn small" id="servidor-pc-tirar">Tirar</button>' : ''}</form></div>
+    </div></details>
+    <div class="settings-group">
+      <div class="setting"><span class="ico aj-perigo-ic">${icon('trash', 18)}</span><div class="grow"><div class="t">Apagar tudo</div><div class="s">Músicas, repertórios e ajustes deste aparelho</div></div><button class="btn small danger" id="clr">Apagar</button></div>
+    </div>`)}
+
+    ${secao('Sobre', `
+    <div class="settings-group">
+      ${jaInstalado() ? '' : `<div class="setting"><span class="ico">${icon('download', 18)}</span><div class="grow"><div class="t">Instalar o app</div><div class="s">Ícone na tela inicial e funciona sem internet</div></div><button class="btn small primary" id="instalar">Instalar</button></div>`}
+      <a class="setting" href="#/novidades"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Novidades</div><div class="s">O que mudou em cada versão</div></div>${icon('next', 18)}</a>
     </div>`)}
     </div>`;
-  view.querySelector('.aj-atalhos').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-ir]');
-    if (b) $('#aj-' + b.dataset.ir).scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
   const nomeCor = () => {
     const a = db.prefs().accent || COR_PADRAO;
     const txt = a === 'liturgico'
@@ -8232,7 +8213,7 @@ function viewSettings() {
         <small>PowerPoint · ${(m.tamanho / 1048576).toFixed(1)} MB · ${m.partes.length} parte${m.partes.length === 1 ? '' : 's'}</small></div></div>
       ${m.partes.length ? `<div class="aj-rotulo">Partes do modelo</div><div class="aj-pptx-partes">${m.partes.map((x) => `<span class="chip sm">${esc(x.nome)}</span>`).join('')}</div>` : ''}
       <div class="aj-pptx-acoes"><button class="btn small" id="pptx-enviar">${icon('refresh', 15)} Trocar</button><button class="btn small danger" id="pptx-apagar">${icon('trash', 15)} Remover</button></div>`
-      : `<div class="setting acao"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Modelo do grupo</div><div class="s">Envie o arquivo “cru” do PowerPoint da missa. Depois, no repertório, toque em “PowerPoint” para gerar com as letras</div></div>
+      : `<div class="setting acao"><span class="ico">${icon('grid', 18)}</span><div class="grow"><div class="t">Modelo do grupo</div><div class="s">O PowerPoint da missa do seu grupo: no repertório, ele sai com as letras</div></div>
         <div class="setting-acoes"><button class="btn small primary" id="pptx-enviar">${icon('upload', 15)} Enviar modelo</button></div></div>`;
     $('#pptx-enviar').onclick = async () => { if (await enviarModeloPptx()) infoModelo(); };
     const apagar = $('#pptx-apagar');
