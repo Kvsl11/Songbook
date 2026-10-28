@@ -718,7 +718,7 @@ dialog { max-height: calc(100dvh - 24px); overflow-y: auto; overflow-x: hidden; 
 .editor.cheio .barra > * { flex: none; }
 .editor.cheio .chord-pal { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; flex: none; }
 .editor.cheio .editor-split { flex: 1; min-height: 0; display: flex; }
-.editor.cheio .editor-split textarea { flex: 1; min-height: 0; height: 100%; resize: none; }
+.editor.cheio .editor-split textarea { flex: 1; min-height: 0; height: 100% !important; resize: none; overflow-y: auto; }
 .editor.cheio .editor-prev { flex: 1; overflow: auto; }
 body.editando-cheio .nav, body.editando-cheio #player { display: none !important; }
 
@@ -778,9 +778,11 @@ body.editando-cheio .nav, body.editando-cheio #player { display: none !important
 .ed-barra .icon-btn { width: 38px; height: 38px; }
 .ed-barra .icon-btn:disabled { opacity: 0.35; }
 @media (max-width: 600px) {
-  .ed-modos button span { display: none; } /* no celular, só o ícone de cada jeito de editar */
-  .ed-modos button { padding: 0 10px !important; }
-  .ed-barra { gap: 2px; }
+  /* no celular, os jeitos de editar numa linha só deles, com o nome (Cifra, Colchetes, Só letra); embaixo,
+     desfazer, refazer, prévia e tela cheia */
+  .ed-barra { gap: 2px; flex-wrap: wrap; row-gap: 6px; }
+  .ed-modos { order: -1; flex: 1 1 100%; }
+  .ed-modos button { flex: 1; justify-content: center; padding: 0 8px !important; }
   .ed-barra .icon-btn { width: 34px; height: 34px; }
 }
 .ed-linha { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; padding: 2px 0; mask-image: linear-gradient(90deg, #000 92%, transparent); }
@@ -795,7 +797,7 @@ body.editando-cheio .nav, body.editando-cheio #player { display: none !important
 .ed2 .chord-pal .chip.mais { color: var(--muted); font-family: var(--sans); font-weight: 700; }
 .ed-estrutura:empty { display: none; }
 .ed-estrutura .chip { background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); font-weight: 700; }
-.ed2 .editor-split textarea { min-height: max(50vh, 320px); border-radius: 12px; background: var(--bg-elev); font-size: 15px; line-height: 1.75; caret-color: var(--accent); tab-size: 4; }
+.ed2 .editor-split textarea { min-height: 280px; overflow-y: hidden; border-radius: 12px; background: var(--bg-elev); font-size: 15px; line-height: 1.75; caret-color: var(--accent); tab-size: 4; }
 .ed2 .editor-prev { border-radius: 12px; }
 .ed2 .editor-split:not(.so-previa) .editor-prev, .ed2 .editor-split.so-previa textarea { display: none; }
 .ed-status { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 0 4px; color: var(--muted); font-size: 12px; font-weight: 600; }
@@ -2378,6 +2380,13 @@ dialog.lista-dlg[open] { display: flex; flex-direction: column; overflow: hidden
   background: color-mix(in srgb, var(--accent) 4%, var(--bg-elev)); border: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
 }
 .ed-guia-cab { display: flex; align-items: center; gap: 8px; color: var(--accent-ink); }
+/* a guia fica fechada: abre ao tocar em "Como escrever" */
+.ed-guia-dobra { display: grid; gap: 10px; }
+.ed-guia-dobra > summary { cursor: pointer; list-style: none; }
+.ed-guia-dobra > summary::-webkit-details-marker { display: none; }
+.ed-guia-dobra > summary > svg:last-child { margin-left: auto; color: var(--muted); transition: transform 0.2s; }
+.ed-guia-dobra[open] > summary > svg:last-child { transform: rotate(180deg); }
+.ed-guia-dobra[open] > summary { margin-bottom: 10px; }
 .ed-guia-cab b { color: var(--text); font-size: 15px; font-weight: 800; }
 .ed-guia-cab .chip { background: var(--accent-soft); color: var(--accent-ink); font-weight: 800; }
 .ed-guia-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
