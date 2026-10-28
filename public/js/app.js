@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-271';
+export const APP_VERSAO = '2026.10.28-272';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -952,6 +952,7 @@ const player = (() => {
   // embaixo da letra, no painel do tablet (como os cartões do "Tocando agora" do Spotify): o artista com a foto,
   // os créditos (quem canta, compôs, o tom, de onde veio a cifra) e o vídeo, com o que dá para fazer em cada um
   let extraDe = '';
+  let dadosCreditos = null; // o que o "Explorar" dos créditos mostra
   const desenharExtra = () => {
     if (!document.documentElement.classList.contains('pp')) return;
     const song = musicaTocando();
@@ -976,9 +977,12 @@ const player = (() => {
         <div class="pl-artista-pe"><span class="grow"><b>${esc(principal)}</b><small>${esc(pessoas[0]?.papeis.join(' • ') || 'Artista')}</small></span>
         ${slug ? `<a class="ref-pilula" href="#/artista/${encodeURIComponent(slug)}/${encodeURIComponent(principal)}">Ver artista</a>` : ''}</div></section>`);
     }
+    // créditos como o SongDNA do Spotify: as pessoas com a foto e o "Explorar"; embaixo, a lista (com a foto pequena)
+    dadosCreditos = { titulo: titulo || 'Música', artista, capa: song ? capaDaMusica(song) : '', cor: atual?.cor || '', pessoas, detalhes };
+    if (pessoas.length) cartoes.push(cartaoPessoas({ titulo: titulo || 'Música', pessoas, explorar: 'data-pl="explorar-creditos"', classe: 'pl-cartao ref-pessoas pl-pessoas' }));
     if (pessoas.length || detalhes.length) {
       cartoes.push(`<section class="pl-cartao"><h4>Créditos</h4>
-        ${pessoas.map((x) => `<div class="ref-linha"><span class="grow"><b>${esc(x.nome)}</b><small>${esc(x.papeis.join(' • '))}</small></span></div>`).join('')}
+        ${pessoas.map((x, i) => `<div class="ref-linha cr-linha">${avatarDe(x, i, 'ref-avatar cr-mini')}<span class="grow"><b>${esc(x.nome)}</b><small>${esc(x.papeis.join(' • '))}</small></span></div>`).join('')}
         ${detalhes.map(([k, v, html]) => `<div class="ref-linha"><span class="grow"><b>${html ? v : esc(v)}</b><small>${esc(k)}</small></span></div>`).join('')}</section>`);
     }
     if (atual?.youtube) {
@@ -989,6 +993,7 @@ const player = (() => {
     }
     box.innerHTML = cartoes.join('');
     box.hidden = !cartoes.length;
+    porFotos(box, pessoas);
     if (principal) fotoDoArtista(principal).then((url) => {
       const f = $('.pl-extra [data-foto]', el);
       if (!url || !f || extraDe !== chave) return;
@@ -1909,6 +1914,7 @@ const player = (() => {
     if (b.dataset.pl === 'fonte-') { mudarFonte(-0.1); return; }
     if (b.dataset.pl === 'fonte+') { mudarFonte(0.1); return; }
     if (b.dataset.pl === 'rolar') { rolar(); return; }
+    if (b.dataset.pl === 'explorar-creditos' && dadosCreditos) { explorarCreditos(dadosCreditos); return; }
     if (b.dataset.pl === 'leitura') { definirLeitura(!el.classList.contains('so-letra')); return; }
     if (b.dataset.pl === 'editar' && atual?.songId && db.song(atual.songId)) { location.hash = '#/editar/' + atual.songId; return; }
     if (b.dataset.pl === 'partitura' && atual?.songId) { location.hash = `#/musica/${atual.songId}/partitura`; return; }
@@ -3269,6 +3275,45 @@ function pessoasDosCreditos({ artista = '', titulo = '', compositor = '', letris
   lista(compositor, SEP_NOMES).forEach((n) => juntar(n, 'Composição'));
   lista(letrista, SEP_NOMES).forEach((n) => juntar(n, 'Letra'));
   return pessoas;
+}
+// ---- créditos como o SongDNA do Spotify: as pessoas da música em bolinhas, com a foto de cada uma (ou as iniciais
+// numa cor dela), e o "Explorar", que abre todas elas em detalhe
+const iniciaisDe = (n) => n.split(/\s+/).filter((x) => /^\p{L}/u.test(x)).slice(0, 2).map((x) => x[0]).join('').toUpperCase() || '♪';
+const corDaPessoa = (n) => `hsl(${[...n].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)} 45% 38%)`;
+const papeisCurtos = (p) => p.papeis[0] + (p.papeis.length > 1 ? ` + ${p.papeis.length - 1}` : '');
+const avatarDe = (p, i, classe = 'ref-avatar') => `<span class="${classe}" data-foto="${i}" style="background:${corDaPessoa(p.nome)}">${esc(iniciaisDe(p.nome))}</span>`;
+// a foto de cada pessoa nas bolinhas [data-foto] da caixa (as que não têm foto ficam com as iniciais)
+function porFotos(box, pessoas) {
+  pessoas.forEach((p, i) => fotoDoArtista(p.nome).then((url) => {
+    if (!url || !box.isConnected) return;
+    const img = new Image();
+    img.onload = () => box.querySelectorAll(`[data-foto="${i}"]`).forEach((av) => { av.textContent = ''; av.classList.add('com-foto'); av.style.backgroundImage = `url("${url}")`; });
+    img.src = url;
+  }).catch(() => {}));
+}
+// o cartão: as duas primeiras pessoas, o nome da música, quantas pessoas e o "Explorar" (explorar: atributos do botão)
+const cartaoPessoas = ({ titulo, pessoas, explorar, classe = 'ref-cartao ref-pessoas' }) => `<section class="${classe}">
+  <div class="ref-rodas">${pessoas.slice(0, 2).map((p, i) => `<div class="ref-roda">${avatarDe(p, i)}<b>${esc(p.nome)}</b><small>${esc(papeisCurtos(p))}</small></div>`).join('')}</div>
+  <div class="ref-pessoas-pe"><span class="grow"><b>${esc(titulo)}</b><small>${pessoas.length} ${pessoas.length === 1 ? 'participante' : 'participantes'}</small></span>
+    <button class="ref-explorar" ${explorar}>Explorar</button></div>
+  <p>Conheça quem está por trás da música.</p></section>`;
+// o detalhe (tela toda): a música em cima e todas as pessoas, cada uma com a foto, o nome e todos os papéis; embaixo
+// os detalhes (álbum, ano, tom, de onde veio)
+function explorarCreditos({ titulo, artista, capa, cor, pessoas, detalhes = [] }) {
+  const dlg = document.createElement('dialog');
+  dlg.className = 'creditos-dlg';
+  if (cor) dlg.style.setProperty('--cor-creditos', cor);
+  dlg.innerHTML = `<div class="cr-topo"><button class="icon-btn" data-cr="fechar" aria-label="Voltar" title="Voltar">${icon('back', 22)}</button><b>Créditos</b><span></span></div>
+    <div class="cr-musica">${capa ? `<span class="cr-capa" style="background-image:url('${esc(capa)}')"></span>` : `<span class="cr-capa">${icon('music', 26)}</span>`}
+      <span class="grow"><b>${esc(titulo)}</b><small>${esc(artista || '')}</small></span></div>
+    <h3>Participantes</h3>
+    <div class="cr-pessoas${pessoas.length === 1 ? ' uma' : ''}">${pessoas.map((p, i) => `<div class="cr-pessoa">${avatarDe(p, i, 'ref-avatar cr-avatar')}<b>${esc(p.nome)}</b><small>${esc(p.papeis.join(' • '))}</small></div>`).join('')}</div>
+    ${detalhes.length ? `<h3>Detalhes</h3><div class="cr-detalhes">${detalhes.map(([k, v, html]) => `<div class="ref-linha"><span class="grow"><b>${html ? v : esc(v)}</b><small>${esc(k)}</small></span></div>`).join('')}</div>` : ''}`;
+  document.body.append(dlg);
+  dlg.addEventListener('click', (e) => { if (e.target.closest('[data-cr="fechar"]')) dlg.close(); });
+  dlg.addEventListener('close', () => dlg.remove());
+  dlg.showModal();
+  porFotos(dlg, pessoas);
 }
 // a foto de um artista pelo nome (a do Cifra Club); guardada na sessão, para não buscar de novo a cada música
 const fotosArtistas = new Map();
@@ -6887,26 +6932,14 @@ function viewSong(id, ctx = {}) {
   // a página do artista (do Cifra Club) quando a cifra veio de lá: o "Seguir" do Spotify vira "Ver artista"
   const slugArtista = /cifraclub\.com\.br\/([^/?#]+)/.exec(song.source || '')?.[1];
   const verArtista = slugArtista && song.artist ? `<a class="ref-pilula" href="#/artista/${encodeURIComponent(slugArtista)}/${encodeURIComponent(song.artist)}">Ver artista</a>` : '';
-  const iniciais = (n) => n.split(/\s+/).filter((x) => /^\p{L}/u.test(x)).slice(0, 2).map((x) => x[0]).join('').toUpperCase() || '♪';
-  const corDaPessoa = (n) => `hsl(${[...n].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)} 45% 38%)`;
-  const papeisCurtos = (p) => p.papeis[0] + (p.papeis.length > 1 ? ` + ${p.papeis.length - 1}` : '');
-  // o cartão tem a cor do fundo da letra; cada pessoa, a foto dela (do Cifra Club) quando houver, senão as iniciais
-  const roda = pessoas.length ? `<section class="ref-cartao ref-pessoas">
-    <div class="ref-rodas">${pessoas.slice(0, 2).map((p, i) => `<div class="ref-roda"><span class="ref-avatar" data-foto="${i}" style="background:${corDaPessoa(p.nome)}">${esc(iniciais(p.nome))}</span>
-      <b>${esc(p.nome)}</b><small>${esc(papeisCurtos(p))}</small></div>`).join('')}</div>
-    <div class="ref-pessoas-pe"><span class="grow"><b>${esc(song.title)}</b><small>${pessoas.length} ${pessoas.length === 1 ? 'pessoa' : 'pessoas'} nos créditos</small></span></div>
-    <p>Conheça quem está por trás da música.</p></section>` : '';
+  // o cartão tem a cor do fundo da letra; cada pessoa, a foto dela quando houver, senão as iniciais
+  const roda = pessoas.length ? cartaoPessoas({ titulo: song.title, pessoas, explorar: 'data-explorar-creditos' }) : '';
   $('#creditos').innerHTML = pessoas.length || detalhes.length ? `${roda}<section class="ref-cartao ref-creditos"><div class="ref-creditos-cab"><h3 class="ref-cab">Créditos</h3>
     ${isPreview ? '' : `<a class="ref-mais" href="#/editar/${song.id}">Editar</a>`}</div>
     ${pessoas.map((p, i) => `<div class="ref-linha"><span class="grow"><b>${esc(p.nome)}</b><small>${esc(p.papeis.join(' • '))}</small></span>${i === 0 ? verArtista : ''}</div>`).join('')}
     ${detalhes.map(([k, v, html]) => `<div class="ref-linha"><span class="grow"><b>${html ? v : esc(v)}</b><small>${esc(k)}</small></span></div>`).join('')}</section>` : '';
-  pessoas.slice(0, 2).forEach((p, i) => fotoDoArtista(p.nome).then((url) => {
-    const av = $(`#creditos [data-foto="${i}"]`);
-    if (!url || !av) return;
-    const img = new Image();
-    img.onload = () => { av.textContent = ''; av.classList.add('com-foto'); av.style.backgroundImage = `url("${url}")`; };
-    img.src = url;
-  }));
+  porFotos($('#creditos'), pessoas);
+  $('#creditos [data-explorar-creditos]')?.addEventListener('click', () => explorarCreditos({ titulo: song.title, artista: song.artist, capa: capaDaMusica(song), cor: corDe(song), pessoas, detalhes }));
 
   // vídeo do YouTube: escolher/trocar e tocar no player do app
   const salvarVideo = (url) => {
