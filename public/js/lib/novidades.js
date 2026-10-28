@@ -3,6 +3,13 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 239, data: '2026-10-28', titulo: 'O Tocando agora também no celular e no computador',
+    itens: [
+      { tipo: 'novo', texto: 'No celular, tocar na barrinha do player abre o Tocando agora na tela toda, como no Spotify: a setinha para fechar, o vídeo (ou a capa), o nome com o ✓, a barra, os controles, compartilhar, a fila, a letra e os cartões do artista. O voltar do celular fecha a tela.' },
+      { tipo: 'novo', texto: 'No computador, a barra de baixo ganhou o ✓ da biblioteca ao lado do nome e, à direita, os botões Tocando agora, Fila e Ouvir em outro aparelho. O Tocando agora abre na área principal, com o menu da esquerda à vista.' },
+    ],
+  },
+  {
     versao: 238, data: '2026-10-28', titulo: 'Os ⋮ nas listas de música',
     itens: [
       { tipo: 'melhoria', texto: 'Nas listas de música (biblioteca, repertórios e playlists), cada música agora tem só os ⋮, como no Spotify. Tocar neles abre uma folha com a capa e o nome e todas as opções: compartilhar, adicionar a uma playlist ou repertório, remover desta playlist, parte da missa, tocar, abrir e editar a cifra, ir para o artista e excluir da biblioteca.' },
