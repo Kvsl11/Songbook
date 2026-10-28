@@ -5,7 +5,7 @@
 //   (a anterior continua) e tenta de novo depois;
 // - dados (liturgia, músicas, partituras, API): "rede primeiro", com a cópia local como reserva offline;
 // - ao publicar uma versão nova, mude VERSION: o app baixa o pacote novo e recarrega sozinho com ele.
-const VERSION = 'songbook-v242';
+const VERSION = 'songbook-v243';
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/store.js', 'js/render.js', 'js/chordpro.js', 'js/icons.js', 'js/pdf.js', 'js/powerpoint.js', 'js/lib/pptx-missa.js', 'js/lib/pptx-simples.js', 'js/fonte.js', 'js/lib/html.js', 'js/lib/cnbb.js', 'js/lib/cindy.js', 'js/lib/missa.js', 'js/lib/mpm.js', 'js/lib/pocket.js', 'js/lib/web.js', 'js/lib/acervo.js', 'js/lib/hinario.js', 'js/lib/sugestoes-liturgicas.js', 'js/lib/revisor.js', 'js/lib/ensaio.js', 'js/lib/partitura.js', 'js/lib/alinhamento.js', 'js/lib/cores.js', 'js/lib/avisos.js', 'js/lib/novidades.js', 'js/lib/piano.js', 'js/acordes.js', 'icon.svg', 'icon-192-v7.png', 'icon-512-v7.png', 'apple-touch-icon-v7.png', 'manifest.webmanifest'];
 
 // caminhos (absolutos) dos arquivos do pacote, para reconhecer as requisições
