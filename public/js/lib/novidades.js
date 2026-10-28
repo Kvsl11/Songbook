@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 262, data: '2026-10-28', titulo: 'Ver a cifra de novo',
+    itens: [
+      { tipo: 'correcao', texto: '"Abrir a cifra" (no ⋯ das listas) abre a página com os acordes, sem o Tocando agora por cima.' },
+      { tipo: 'novo', texto: 'Na letra em tela toda, o botão "Cifra" (no canto de cima) e "Ver a cifra" no ⋯ levam para a música com os acordes. Voltar retorna para a lista.' },
+    ],
+  },
+  {
     versao: 261, data: '2026-10-28', titulo: 'Menus no lugar certo e editor mais limpo',
     itens: [
       { tipo: 'melhoria', texto: 'No ⋯ da letra (Tocando agora), "Sincronizar a letra"; "Trocar o vídeo" e "Mudar para vídeo/música" foram para o ⋯ das músicas nas listas (biblioteca, repertório, playlist).' },
@@ -66,16 +73,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'Na Busca, o salvar do Tocando agora funciona também na música sem vídeo e na que veio de um vídeo (antes não fazia nada).' },
       { tipo: 'melhoria', texto: 'Abrindo um vídeo da Busca, o app descobre qual música é e traz junto a letra e a cifra dela (do Cifra Club e do Letras).' },
       { tipo: 'melhoria', texto: 'Abrindo uma música da Busca, o vídeo vem junto: se a busca de vídeos não responder, vale o vídeo que o Cifra Club ou o Letras mostram com a música.' },
-    ],
-  },
-  {
-    versao: 252, data: '2026-10-28', titulo: 'Partes na letra, notificação com pular, fila com capas e Conectar',
-    itens: [
-      { tipo: 'correcao', texto: 'No Conectar (e nos menus que sobem de baixo), a alça de cima funciona: arrastando para cima a folha cresce, e para baixo ela volta ou fecha.' },
-      { tipo: 'melhoria', texto: 'O Conectar mostra o fone ou a caixa que está tocando, em vez de "Este celular". O navegador só diz os nomes depois de liberar o microfone: o botão "Mostrar fones e caixas conectados" pede isso uma vez (nada é gravado).' },
-      { tipo: 'melhoria', texto: 'A letra do Tocando agora (no cartão e na tela toda) voltou a mostrar as marcações das partes: Chorus, Bridge, Verse 2 e as outras.' },
-      { tipo: 'melhoria', texto: 'A notificação da música no celular agora mostra o nome, o artista e a capa da música, com os botões de voltar e pular.' },
-      { tipo: 'melhoria', texto: 'A fila mostra a capa de cada música, a duração e, na que está tocando, as barrinhas mexendo por cima da capa.' },
     ],
   },
 ];
