@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-237';
+export const APP_VERSAO = '2026.10.28-238';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1308,11 +1308,14 @@ function openDialog(html, setup) {
 
 // lista de escolha do app (no lugar do <select> do sistema): folha que sobe do rodapé no celular, janela no PC.
 // opcoes: [{ valor, rotulo, sub, ic (ícone) ou capa (html) }]; devolve o valor escolhido (ou undefined)
-function escolherNaLista({ titulo, opcoes, atual }) {
+// menu: true = uma folha de ações (os ⋮ de uma música, como no Spotify): a alça em cima, a cabeça (capa e nome) e as
+// opções numa coluna só, sem caixinha nos ícones
+function escolherNaLista({ titulo, opcoes, atual, menu = false, cabeca = '' }) {
   const dlg = document.createElement('dialog');
-  dlg.className = 'lista-dlg';
-  dlg.innerHTML = `<div class="lista-cab"><h3>${esc(titulo)}</h3><button class="icon-btn" data-fechar aria-label="Fechar">${icon('x', 20)}</button></div>
-    <div class="lista-opcoes" role="listbox">${opcoes.map((o, i) => `<button class="lista-op" role="option" data-i="${i}" aria-selected="${o.valor === atual}">
+  dlg.className = menu ? 'lista-dlg lista-menu' : 'lista-dlg';
+  dlg.innerHTML = `${menu ? `<div class="lista-cab menu-cab"><span class="menu-alca" aria-hidden="true"></span>${cabeca || `<h3>${esc(titulo || '')}</h3>`}</div>`
+    : `<div class="lista-cab"><h3>${esc(titulo)}</h3><button class="icon-btn" data-fechar aria-label="Fechar">${icon('x', 20)}</button></div>`}
+    <div class="lista-opcoes" role="listbox">${opcoes.map((o, i) => `<button class="lista-op${o.perigo ? ' perigo' : ''}" role="option" data-i="${i}" aria-selected="${o.valor === atual}">
       ${o.capa || (o.ic ? `<span class="lista-ic">${icon(o.ic, 18)}</span>` : '')}<span class="lista-txt"><b>${esc(o.rotulo)}</b>${o.sub ? `<small>${esc(o.sub)}</small>` : ''}</span>
       ${o.valor === atual ? `<span class="lista-ok">${icon('check', 18)}</span>` : ''}</button>`).join('')}</div>`;
   document.body.append(dlg);
@@ -1325,7 +1328,7 @@ function escolherNaLista({ titulo, opcoes, atual }) {
     });
     dlg.addEventListener('close', () => { dlg.remove(); resolve(valor); });
     dlg.showModal();
-    (dlg.querySelector('[aria-selected="true"]') || dlg.querySelector('.lista-op'))?.focus({ preventScroll: false });
+    if (!menu) (dlg.querySelector('[aria-selected="true"]') || dlg.querySelector('.lista-op'))?.focus({ preventScroll: false });
   });
 }
 
@@ -1687,7 +1690,7 @@ function ativarArrastar(lista, aoSoltar) {
   const rolador = () => lista.closest('main, dialog .tracks, .dlg .tracks') || view;
   const linhaDe = (alvo) => {
     const item = alvo.closest('li');
-    if (!item || !lista.contains(item) || alvo.closest('[data-rm], [data-editar], [data-play], input, select')) return null;
+    if (!item || !lista.contains(item) || alvo.closest('[data-rm], [data-editar], [data-play], [data-menu], input, select')) return null;
     return item;
   };
   lista.addEventListener('contextmenu', (e) => { if (e.target.closest('li')) e.preventDefault(); });
@@ -1805,6 +1808,9 @@ function resumoRepertorio(set) {
   return `${n} ${n === 1 ? 'música' : 'músicas'}${total ? `, ${faltam ? 'cerca de ' : ''}${fmtDuracaoTotal(total)}` : ''}`;
 }
 
+// os ⋮ de uma linha de música (abrem o menuDaMusica)
+const botaoMais = (nome) => `<button class="icon-btn mais-linha" data-menu aria-label="Mais opções para ${esc(nome)}" title="Mais opções">${icon('more', 20)}</button>`;
+
 function linhaItemRepertorio(set, it, i, { atual = -1, fila = false } = {}) {
   const s = db.song(it.songId);
   return `<li class="track set-item ${i === atual ? 'atual' : ''}" data-i="${i}">
@@ -1812,11 +1818,38 @@ function linhaItemRepertorio(set, it, i, { atual = -1, fila = false } = {}) {
     <a class="info" href="#/repertorio/${set.id}/${i}" ${fila ? 'data-ir' : ''}><div class="t ${i === atual ? 'playing' : ''}">${i === atual ? icon('music', 13, 'style="display:inline;vertical-align:-1px;margin-right:4px"') : ''}${esc(s?.title || '(música removida)')}</div>
       <div class="s">${it.label ? `<b class="parte-tag">${esc(it.label)}</b> ` : ''}${indicadores(s)}${esc(s?.artist || '')}<span class="dur-faixa">${s?.duracao ? ` · ${fmtTempo(s.duracao)}` : ''}</span></div></a>
     ${s?.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '<span></span>'}
-    <span class="acts">
-      <button class="icon-btn" data-parte aria-label="Parte da missa" title="${it.label ? 'Trocar a parte da missa (' + esc(it.label) + ')' : 'Definir a parte da missa'}">${icon('list', 17)}</button>
-      ${s ? `<a class="icon-btn" href="#/editar/${s.id}" aria-label="Editar cifra" title="Editar" data-editar>${icon('edit', 17)}</a>` : ''}
-      <button class="icon-btn danger" data-rm aria-label="Remover do repertório" title="Remover">${icon('x', 18)}</button>
-    </span></li>`;
+    <span class="acts">${s ? botaoMais(s.title) : `<button class="icon-btn danger" data-rm aria-label="Remover do repertório" title="Remover">${icon('x', 18)}</button>`}</span></li>`;
+}
+
+// Os ⋮ de uma música numa lista (como no Spotify): uma folha com a capa, o nome e o que dá para fazer com ela.
+// set/i: a música está num repertório ou playlist (aí dá para remover dele e trocar a parte da missa).
+// O que mexe na lista (remover, parte, excluir) volta para quem chamou: 'remover' | 'parte' | 'excluir'
+async function menuDaMusica(song, { set = null, i = -1 } = {}) {
+  if (!song) return null;
+  const pl = set && ehPlaylist(set);
+  const slug = /cifraclub\.com\.br\/([^/?#]+)/.exec(song.source || '')?.[1];
+  const opcoes = [
+    { valor: 'compartilhar', rotulo: 'Compartilhar', ic: 'share' },
+    { valor: 'playlist', rotulo: 'Adicionar a uma playlist ou repertório', ic: 'maisCirculo' },
+    set && { valor: 'remover', rotulo: pl ? 'Remover desta playlist' : 'Remover deste repertório', ic: 'menosCirculo' },
+    set && { valor: 'parte', rotulo: set.items[i]?.label ? `Parte da missa: ${set.items[i].label}` : 'Definir a parte da missa', ic: 'list' },
+    song.youtube && { valor: 'tocar', rotulo: player.tocandoAgora(song.youtube) ? 'Pausar' : 'Tocar a referência', ic: player.tocandoAgora(song.youtube) ? 'pause' : 'play' },
+    { valor: 'abrir', rotulo: 'Abrir a cifra', ic: 'music' },
+    { valor: 'editar', rotulo: 'Editar a cifra', ic: 'edit' },
+    slug && song.artist && { valor: 'artista', rotulo: 'Ir para o artista', ic: 'pessoa' },
+    !set && { valor: 'excluir', rotulo: 'Excluir da biblioteca', ic: 'trash', perigo: true },
+  ].filter(Boolean);
+  const v = await escolherNaLista({ menu: true, cabeca: `${capa(song)}<span class="lista-txt"><b>${esc(song.title)}</b><small>${esc(song.artist || (song.source ? host(song.source) : 'Cifra própria'))}</small></span>`, opcoes });
+  if (v === 'compartilhar') {
+    const url = /^https?:/.test(song.source || '') ? song.source : song.youtube ? `https://www.youtube.com/watch?v=${song.youtube}` : '';
+    compartilhar({ title: song.title, text: [song.title, song.artist].filter(Boolean).join(' — '), ...(url ? { url } : {}) });
+  }
+  if (v === 'playlist') addToSetDialog(song.id, set?.items[i]?.label || '');
+  if (v === 'tocar') { if (player.desta(song.youtube)) player.alternar(); else tocarReferencia(song); }
+  if (v === 'abrir') location.hash = set ? `#/repertorio/${set.id}/${i}` : `#/musica/${song.id}`;
+  if (v === 'editar') location.hash = `#/editar/${song.id}`;
+  if (v === 'artista') location.hash = `#/artista/${encodeURIComponent(slug)}/${encodeURIComponent(song.artist)}`;
+  return ['remover', 'parte', 'excluir'].includes(v) ? v : null;
 }
 
 // Escolhe a parte da missa de uma música no repertório. Devolve o nome, '' (sem parte) ou null (cancelou)
@@ -1883,6 +1916,19 @@ function abrirFila(set, atualIdx) {
         else if (i === atual) atual = Math.min(atual, set.items.length - 1);
         db.saveSet(set);
         desenhar();
+        return;
+      }
+      if (e.target.closest('[data-menu]')) {
+        menuDaMusica(db.song(set.items[i].songId), { set, i }).then((r) => {
+          if (r === 'parte') trocarParte(set, i).then((mudou) => mudou && desenhar());
+          if (r === 'remover') {
+            set.items.splice(i, 1);
+            if (i < atual) atual--;
+            else if (i === atual) atual = Math.min(atual, set.items.length - 1);
+            db.saveSet(set);
+            desenhar();
+          }
+        });
         return;
       }
       if (e.target.closest('[data-parte]')) { trocarParte(set, i).then((mudou) => mudou && desenhar()); return; }
@@ -3223,7 +3269,7 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
         <span class="acts">${s.items.length ? (ehPlaylist(s) ? `<button class="icon-btn" data-tocar-set="${s.id}" aria-label="Ouvir">${icon('play', 16)}</button>` : `<a class="icon-btn" href="#/repertorio/${s.id}/0" aria-label="Tocar">${icon('play', 16)}</a>`) : ''}${lixeira(s.id, s.name)}</span></li>`
     : (s) => `<li class="track clickable lib-item" data-k="${s.id}">${marca(s.id)}${capa(s)}
         <div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>
-        <span class="acts">${s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : ''}${s.youtube ? `<button class="icon-btn" data-play="${s.id}" aria-label="Tocar referência">${icon('play', 16)}</button>` : ''}${lixeira(s.id, s.title)}</span></li>`;
+        <span class="acts">${s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : ''}${botaoMais(s.title)}</span></li>`;
   const vazio = ehRep
     ? ehPl ? `<div class="empty"><div class="bubble">${icon('disc', 32)}</div><h3>Crie sua primeira playlist</h3><p>Playlists são para ouvir: as músicas tocam uma atrás da outra no player. Em Buscar → Missas completas, crie a da missa de hoje.</p>
         <div class="row"><button class="btn primary" id="vazio-pl">Nova playlist</button><a class="btn" href="#/setor/fixas/missas-completas">Missa de hoje</a></div></div>`
@@ -3335,6 +3381,10 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
       e.preventDefault();
       if (marcados.has(li.dataset.k)) marcados.delete(li.dataset.k); else marcados.add(li.dataset.k);
       atualizarSel();
+      return;
+    }
+    if (!ehRep && e.target.closest('[data-menu]')) {
+      menuDaMusica(db.song(li.dataset.k)).then((r) => { if (r === 'excluir') excluir([li.dataset.k]); });
       return;
     }
     const p = e.target.closest('[data-play]');
@@ -7012,6 +7062,14 @@ function viewSet(id, { selecionando = false, marcados = new Set() } = {}) {
     ul.addEventListener('click', (e) => {
       const li = e.target.closest('li[data-i]');
       if (pl && li && e.target.closest('.info')) { e.preventDefault(); tocarPlaylist(set, Number(li.dataset.i)); return; }
+      if (li && e.target.closest('[data-menu]')) {
+        const i = Number(li.dataset.i);
+        menuDaMusica(db.song(set.items[i]?.songId), { set, i }).then((r) => {
+          if (r === 'parte') trocarParte(set, i).then((mudou) => mudou && viewSet(id));
+          if (r === 'remover') { set.items.splice(i, 1); db.saveSet(set); desenharLateral(); toast(pl ? 'Removida da playlist' : 'Removida do repertório'); viewSet(id); }
+        });
+        return;
+      }
       if (li && e.target.closest('[data-parte]')) { trocarParte(set, Number(li.dataset.i)).then((mudou) => mudou && viewSet(id)); return; }
       if (!li || !e.target.closest('[data-rm]')) return;
       set.items.splice(Number(li.dataset.i), 1);
