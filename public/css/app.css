@@ -2939,12 +2939,14 @@ html.pp #player.modo-capa .pl-video.capa-yt { background-size: auto 134%; }
    do Spotify. z-index -1: fica sobre o fundo do painel e embaixo de tudo; some num degradê no fundo do painel (mask) e
    escurece um pouco em cima e embaixo, para os textos e os botões ficarem legíveis. O lugar da capa fica vazio */
 #player .pl-fundo { display: none; }
-html.pp body:not(.painel-recolhido) #player.modo-capa .pl-fundo:not([hidden]) { display: block; position: absolute; z-index: -1; top: 0; left: 0; right: 0;
+html.pp:not(.tablet) #player.modo-capa .pl-fundo:not([hidden]),
+html.pp.tablet body:not(.painel-recolhido) #player.modo-capa .pl-fundo:not([hidden]) { display: block; position: absolute; z-index: -1; top: 0; left: 0; right: 0;
   width: auto !important; align-self: stretch !important; height: var(--fundo-h, 100%);
   overflow: hidden; pointer-events: none;
   -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%); }
 html.pp #player .pl-fundo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(0 0 0 / 0.35) 0%, transparent 22%, transparent 45%, rgb(0 0 0 / 0.45) 75%, rgb(0 0 0 / 0.45) 100%); }
-html.pp body:not(.painel-recolhido) #player.modo-capa .pl-video.com-fundo { background-image: none !important; background-color: transparent; box-shadow: none; }
+html.pp:not(.tablet) #player.modo-capa .pl-video.com-fundo,
+html.pp.tablet body:not(.painel-recolhido) #player.modo-capa .pl-video.com-fundo { background-image: none !important; background-color: transparent; box-shadow: none; }
 /* ao trocar entre vídeo e música, a capa (ou o vídeo) aparece com um zoom suave */
 html.pp #player.modo-capa .pl-video { animation: pop 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
 /* a frase cantada agora (com a letra sincronizada), em cima do nome */

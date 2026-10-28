@@ -471,17 +471,22 @@ export function videosDoPiped(json) {
 export async function buscarYoutube(termo, { fetchImpl, instancias = PIPED, filtro = 'videos' } = {}) {
   const q = String(termo || '').trim();
   if (!q) return [];
-  let erro = new Error('Busca de vídeos indisponível agora');
-  for (const base of instancias) {
-    try {
-      const res = await buscar(`${base}/search?filter=${filtro}&q=${encodeURIComponent(q)}`, { fetchImpl, timeout: 9000 });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return videosDoPiped(await res.json()).slice(0, 15);
-    } catch (e) {
-      erro = e;
-    }
+  // todas as instâncias ao mesmo tempo: vale a primeira que responder (uma por vez, as fora do ar faziam esperar
+  // o tempo limite de cada uma antes de chegar à que funciona)
+  const uma = async (base) => {
+    const res = await buscar(`${base}/search?filter=${filtro}&q=${encodeURIComponent(q)}`, { fetchImpl, timeout: 12000 });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const lista = videosDoPiped(await res.json()).slice(0, 15);
+    if (!lista.length) { respondeu = true; throw new Error('nenhum vídeo'); } // outra instância pode achar
+    return lista;
+  };
+  let respondeu = false;
+  try {
+    return await Promise.any(instancias.map(uma));
+  } catch {
+    if (respondeu) return [];
+    throw new Error('Busca de vídeos indisponível agora');
   }
-  throw erro;
 }
 
 // confere um link colado (título e canal), sem login, pelo oEmbed do YouTube

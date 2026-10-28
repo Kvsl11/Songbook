@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-252';
+export const APP_VERSAO = '2026.10.28-254';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -766,7 +766,8 @@ const player = (() => {
     <div class="pl-extra" hidden></div>`;
   // no tablet o player é o painel "Tocando agora" à direita, fora da coluna principal (que não o corta)
   const casa = ehTablet() ? document.body : $('.main-col');
-  document.body.classList.toggle('painel-recolhido', Boolean(db.prefs().painelRecolhido));
+  // (o painel recolhido é só do tablet: no celular, a preferência guardada desligava a capa com movimento)
+  document.body.classList.toggle('painel-recolhido', ehTablet() && Boolean(db.prefs().painelRecolhido));
   // html.pp: o player com o jeito do "Tocando agora" (o painel do tablet; no celular e no computador, só na tela toda)
   document.documentElement.classList.toggle('pp', ehTablet());
   casa.append(el);
@@ -2613,9 +2614,10 @@ async function trazerMusica({ titulo, artista = '', cifra = '', letra = null, vi
     const c = await getCifraClub(url).catch(() => getCifraClub(url));
     return { ...c, url };
   })().catch(() => null);
-  // com o link da cifra na mão, o vídeo é procurado pelo nome que vem na cifra
+  // o vídeo é procurado junto com a cifra (pelo título e o artista da busca); só com o link da cifra, sem o nome,
+  // espera a cifra para procurar pelo nome que vem nela
   const pBusca = (video ? Promise.resolve([video])
-    : cifra ? pCifra.then((c) => buscarYoutube(c ? `${c.titulo} ${c.artista || ''}` : termo)) : buscarYoutube(termo)).catch(() => []);
+    : cifra && !tituloLimpo(titulo) ? pCifra.then((c) => buscarYoutube(c ? `${c.titulo} ${c.artista || ''}` : termo)) : buscarYoutube(termo)).catch(() => []);
   // a busca de vídeos não respondeu ou não achou: o vídeo que a página da letra (Letras) mostra
   const pVideo = pBusca.then(async (vs) => {
     if (vs.length) return vs;
@@ -6696,6 +6698,9 @@ function viewSong(id, ctx = {}) {
     if (!song.youtube) player.mostrarSemVideo(item);
     else if (!player.desta(song.youtube)) { if (abrirNoTocando) tocar(); else player.tocar(item, { pausado: true }); }
     player.expandir({ sobrePagina: true });
+  } else if (song.youtube && player.atual?.semVideo && player.atual.songId === song.id) {
+    // o vídeo chegou depois de a música abrir (a busca demorou): o Tocando agora, já aberto sem vídeo, passa a tocá-lo
+    player.tocar(itemDoPlayer(song, ctx.set ? db.set(ctx.set.id) : null, ctx.set ? ctx.index : -1));
   }
   abrirNoTocando = false;
 

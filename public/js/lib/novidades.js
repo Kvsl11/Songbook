@@ -3,6 +3,14 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 254, data: '2026-10-28', titulo: 'Vídeo da busca mais rápido e capa com movimento no celular',
+    itens: [
+      { tipo: 'correcao', texto: 'Abrindo uma música da Busca, o vídeo vem junto: a busca de vídeos pergunta a todos os servidores ao mesmo tempo (antes esperava os que estavam fora do ar) e começa junto com a cifra.' },
+      { tipo: 'correcao', texto: 'Se o vídeo chega depois de a música abrir, o Tocando agora já aberto passa a tocá-lo (antes ficava em "Escolher um vídeo").' },
+      { tipo: 'correcao', texto: 'No celular, "Mudar para música" volta a mostrar os quadros do clipe passando atrás da parte de cima, até o cartão da letra (uma preferência do painel do tablet desligava isso).' },
+    ],
+  },
+  {
     versao: 253, data: '2026-10-28', titulo: 'A música da busca vem completa e salva de qualquer jeito',
     itens: [
       { tipo: 'correcao', texto: 'Na Busca, o salvar do Tocando agora funciona também na música sem vídeo e na que veio de um vídeo (antes não fazia nada).' },
