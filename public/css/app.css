@@ -2923,6 +2923,9 @@ html.tablet .nav a { flex-direction: column; justify-content: center; gap: 5px; 
 html.tablet .nav a svg { width: 31px; height: 31px; }
 html.tablet .nav a em { display: block; }
 html.tablet .nav a.active { color: var(--text); }
+/* em pé o tablet cai na faixa do menu lateral (700–1199 px), que pintava o ícone e o nome ativos de azul: no tablet
+   ficam brancos, como deitado */
+html.tablet .nav a.active span, html.tablet .nav a:hover span { color: inherit; }
 html.tablet .topbar { padding: 12px 24px; }
 /* no tablet a tela fica mais longe dos olhos: botões, filtros, listas e textos um pouco maiores (como no Spotify) */
 html.tablet .chip { height: 40px; padding: 0 17px; font-size: 15.5px; gap: 8px; }

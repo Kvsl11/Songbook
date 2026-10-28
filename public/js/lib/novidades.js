@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 277, data: '2026-10-28', titulo: 'Partitura mais fiel, sem servidor',
+    itens: [
+      { tipo: 'melhoria', texto: 'Gerar a partitura pelo aparelho (sem servidor) ficou bem mais fiel à música: a IA ouve a música inteira de uma vez (antes eram pedaços de 5 segundos, que cortavam e repetiam notas), separa a voz dos instrumentos pelo estéreo, confere a afinação da voz e limpa o eco, o vibrato e os estalos, como o servidor faz.' },
+      { tipo: 'melhoria', texto: 'Enquanto gera, a tela mostra as etapas (abrindo o áudio, ouvindo as notas, separando a voz, conferindo a afinação, escrevendo) com a porcentagem.' },
+      { tipo: 'correcao', texto: 'No tablet em pé, o ícone e o nome da aba do menu ficam brancos (antes ficavam azuis), como no tablet deitado.' },
+    ],
+  },
+  {
     versao: 276, data: '2026-10-28', titulo: 'Liturgia com visual novo',
     itens: [
       { tipo: 'melhoria', texto: 'O cartão da liturgia de hoje (na Início e na Liturgia) ganhou visual novo: o dia num quadradinho de calendário, o tempo e a semana, a cor do dia, o refrão do salmo e cada leitura com o nome (1ª Leitura, Salmo, Evangelho). Na Início, "Montar a missa" e "Ler a liturgia".' },
@@ -67,12 +75,6 @@ export const NOVIDADES = [
     versao: 268, data: '2026-10-28', titulo: 'Cartão da letra acompanha a música',
     itens: [
       { tipo: 'correcao', texto: 'O cartão da letra no Tocando agora começa no início da música e acompanha o que está sendo cantado, com a frase de agora acesa e em relevo (antes ele rolava para longe da frase).' },
-    ],
-  },
-  {
-    versao: 267, data: '2026-10-28', titulo: 'Notinhas só nas partes de instrumentos',
-    itens: [
-      { tipo: 'correcao', texto: 'As notinhas ♪ na letra aparecem só onde a música fica 10 segundos ou mais sem voz (introdução, solos e final), não mais em cada pausa entre as estrofes.' },
     ],
   },
 ];

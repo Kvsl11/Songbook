@@ -12,7 +12,7 @@ import { comPedal, destacarVoz, voltaDaSala, duracaoTotal, FUNDO, nomearVozes, n
 import {
   acordesDoTom as acordesDaArmadura, alterar, alturaPeloNome, CLAVES, COMPASSOS, deMusicXML, distribuirLetra, DURACOES, emCompassos, frequenciaDa, midiDa, moverGrau,
   mudarOitava, NOMES_NOTA, nomeDaAltura, nomeDoTom, nomeDuracao, novaPartitura, paraMusicXML, tiquesDoCompasso,
-  claveDaVoz, estimarAndamento, estimarCompasso, estimarTom, faixaDoModo, FAIXA_CORAL, juntarPedaco, melodiaDasNotas, tempoDaGrade, tomDaCifra, vozesDasNotas, colocarLetra, letraEmSilabas, temLetra, silabasDaLetra, temCifra as temCifraNaPartitura,
+  claveDaVoz, estimarAndamento, estimarCompasso, estimarTom, faixaDoModo, FAIXA_CORAL, melodiaDasNotas, tempoDaGrade, tomDaCifra, vozesDasNotas, colocarLetra, letraEmSilabas, temLetra, silabasDaLetra, temCifra as temCifraNaPartitura,
 } from './lib/partitura.js';
 import { corCss, corDominante } from './lib/cores.js';
 import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-276';
+export const APP_VERSAO = '2026.10.28-277';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -5850,37 +5850,59 @@ function escolherMusica(titulo) {
 }
 
 // ---------------------------------------------------------------- Gerar a partitura com IA
-// O som vem de um arquivo de áudio da música (escolhido aqui ou trazido pelo "Compartilhar" do celular). O modelo
-// Basic Pitch (Spotify, código aberto) roda no próprio aparelho e transforma o som em notas; o app escolhe a
-// melodia, acha tom e andamento e põe no compasso. Sai um rascunho para conferir e corrigir no editor.
+// O som vem de um arquivo de áudio da música (escolhido aqui ou trazido pelo "Compartilhar" do celular). Sem servidor,
+// tudo roda no próprio aparelho, com o mesmo caminho do servidor (lib/transcricao.js): o Basic Pitch (Spotify, código
+// aberto) ouve a música inteira de uma vez (antes eram pedaços de 5 s, que cortavam e repetiam notas na emenda), a voz
+// é separada da banda pelo estéreo (o meio e os lados), a afinação da voz é conferida (YIN) e as notas são limpas (o eco
+// do grave, o vibrato que partia a nota, os estalos). O app escolhe a melodia, acha tom e andamento e põe no compasso.
 const BASIC_PITCH = 'https://cdn.jsdelivr.net/npm/@spotify/basic-pitch@1.0.1';
+const LIB_TRANSCRICAO = new URL('./lib/transcricao.js', import.meta.url).href;
 const SR_IA = 22050; // o modelo ouve em 22050 Hz, mono
 // A IA roda num Worker (outra linha de execução): analisar o áudio é pesado e, na mesma linha da tela, o app travava
 const CODIGO_IA = `
 import * as bp from '${BASIC_PITCH}/+esm';
+import * as tr from '${LIB_TRANSCRICAO}';
 let modelo = null;
+// as notas de um canal (o meio ou o lado do estéreo) e onde o modelo ouviu começo de nota (para não juntar duas
+// sílabas na mesma altura). Começo de nota no padrão do modelo (0,5: mais baixo, o vibrato vira começos) e nota
+// mínima de 5 quadros (58 ms: a sílaba rápida)
+async function ouvir(amostras, fonte, avisar) {
+  modelo ||= new bp.BasicPitch('${BASIC_PITCH}/model/model.json');
+  const f = [], o = [];
+  await modelo.evaluateModel(amostras, (a, b) => { f.push(...a); o.push(...b); }, avisar);
+  const notas = bp.noteFramesToTime(bp.outputToNotesPoly(f, o, 0.5, 0.3, 5, true, 2100, 40, true));
+  return { notas: tr.deBasicPitch(notas, fonte), quebra: tr.rearticulacoes(o) };
+}
 self.onmessage = async (e) => {
-  const { id, amostras } = e.data;
+  const { id, meio, lado } = e.data;
+  const etapa = (nome, p = null) => self.postMessage({ id, etapa: nome, p });
   try {
-    modelo ||= new bp.BasicPitch('${BASIC_PITCH}/model/model.json');
-    const f = [], o = [], c = [];
-    await modelo.evaluateModel(amostras, (a, b, d) => { f.push(...a); o.push(...b); c.push(...d); }, () => {});
-    // o começo de nota no padrão do modelo (0,5): com 0,3, o vibrato da voz virava "começos" e cada nota cantada
-    // longa saía partida em vários pedaços (a melodia ficava picada, cheia de notas repetidas que não existem)
-    const notas = bp.noteFramesToTime(bp.addPitchBendsToNoteEvents(c, bp.outputToNotesPoly(f, o, 0.5, 0.3, 5)));
-    self.postMessage({ id, notas: notas.map((n) => ({ startTimeSeconds: n.startTimeSeconds, durationSeconds: n.durationSeconds, pitchMidi: n.pitchMidi, amplitude: n.amplitude })) });
+    etapa('notas', 0);
+    const m = await ouvir(meio, 'mistura', (p) => etapa('notas', Math.min(0.99, p)));
+    let l = { notas: [], quebra: null };
+    if (lado) {
+      etapa('separando', 0);
+      l = await ouvir(lado, 'banda', (p) => etapa('separando', Math.min(0.99, p)));
+    }
+    etapa('afinacao');
+    const afin = tr.afinacaoYin(meio, ${SR_IA});
+    etapa('escrevendo');
+    const r = tr.limpar({ meio: m.notas, lado: l.notas, afin, quebraMeio: m.quebra, quebraLado: l.quebra, separado: Boolean(lado) });
+    self.postMessage({ id, notas: r.notas, tipo: r.tipo, separado: Boolean(lado) });
   } catch (err) { self.postMessage({ id, erro: String(err?.message || err) }); }
 };`;
 let workerIA = null;
 let pedidoIA = 0;
 const esperandoIA = new Map();
-function notasDoAudio(amostras) {
+// o meio e o lado do estéreo (lado null: áudio mono) → { notas, tipo, separado }; aoEtapa(nome, progresso 0–1)
+function notasNoAparelho({ meio, lado }, aoEtapa = () => {}) {
   if (!workerIA) {
     workerIA = new Worker(URL.createObjectURL(new Blob([CODIGO_IA], { type: 'text/javascript' })), { type: 'module' });
     workerIA.onmessage = (e) => {
       const p = esperandoIA.get(e.data.id);
+      if (e.data.etapa) { p?.etapa(e.data.etapa, e.data.p); return; }
       esperandoIA.delete(e.data.id);
-      if (e.data.erro) p?.erro(new Error(e.data.erro)); else p?.ok(e.data.notas);
+      if (e.data.erro) p?.erro(new Error(e.data.erro)); else p?.ok(e.data);
     };
     workerIA.onerror = (e) => {
       for (const p of esperandoIA.values()) p.erro(new Error(e.message || 'não foi possível carregar a IA (sem internet?)'));
@@ -5889,108 +5911,43 @@ function notasDoAudio(amostras) {
     };
   }
   const id = ++pedidoIA;
-  const copia = new Float32Array(amostras);
   return new Promise((ok, erro) => {
-    esperandoIA.set(id, { ok, erro });
-    workerIA.postMessage({ id, amostras: copia }, [copia.buffer]);
+    esperandoIA.set(id, { ok, erro, etapa: aoEtapa });
+    workerIA.postMessage({ id, meio, lado }, [meio.buffer, ...(lado ? [lado.buffer] : [])]);
   });
 }
-// áudio de arquivo em qualquer formato → mono, 22050 Hz; no máximo 6 minutos
+// áudio de arquivo em qualquer formato → o meio (esquerda + direita) e o lado (esquerda − direita) do estéreo, em
+// 22050 Hz, no máximo 6 minutos. O lado quase sem som (áudio mono, ou tudo no meio) não serve para separar: fica null.
+// O volume baixo é aumentado (a IA quase não ouve o áudio fraco), igual nos dois
 async function audioParaModelo(arrayBuffer) {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   const buf = await ctx.decodeAudioData(arrayBuffer);
   ctx.close?.();
   const dur = Math.min(buf.duration, 360);
-  const off = new OfflineAudioContext(1, Math.ceil(dur * SR_IA), SR_IA);
+  const off = new OfflineAudioContext(2, Math.ceil(dur * SR_IA), SR_IA);
   const src = off.createBufferSource();
   src.buffer = buf;
   src.connect(off.destination);
   src.start();
-  return { amostras: (await off.startRendering()).getChannelData(0), cortado: buf.duration > 360 };
-}
-// A IA ouvindo aos poucos: o áudio chega em pedaços e é analisado a cada 5 s (com 2 s de contexto antes, para não
-// perder nem cortar a nota que atravessa o corte: um pouco mais lento, mais completo). As notas vão aparecendo
-// enquanto a música toca.
-function criarLeitor(aoAtualizar) {
-  const PEDACO = 5 * SR_IA;
-  const ANTES = 2 * SR_IA;
-  let audio = new Float32Array(SR_IA * 60);
-  let total = 0;
-  let analisado = 0;
-  let notas = [];
-  let pendentes = [];
-  let rodando = null;
-  let erro = null;
-  const guardar = (x) => {
-    if (total + x.length > audio.length) { const maior = new Float32Array(Math.max(audio.length * 2, total + x.length)); maior.set(audio.subarray(0, total)); audio = maior; }
-    audio.set(x, total);
-    total += x.length;
-  };
-  async function processar(final = false) {
-    while (!erro && (total - analisado >= PEDACO || (final && total > analisado))) {
-      const ini = analisado;
-      const fim = Math.min(total, ini + PEDACO);
-      const de = Math.max(0, ini - ANTES);
-      try {
-        // volume: áudio baixo chega fraco e a IA quase não ouve; o pedaço é aumentado até perto do máximo
-        const trecho = audio.slice(de, fim);
-        let pico = 0;
-        for (let i = 0; i < trecho.length; i++) pico = Math.max(pico, Math.abs(trecho[i]));
-        if (pico > 0.002 && pico < 0.6) { const g = Math.min(0.9 / pico, 40); for (let i = 0; i < trecho.length; i++) trecho[i] *= g; }
-        const achadas = await notasDoAudio(trecho);
-        pendentes = juntarPedaco(notas, pendentes, achadas, { de: de / SR_IA, t0: ini / SR_IA, t1: fim / SR_IA });
-      } catch (e) { erro = e; break; }
-      analisado = fim;
-      aoAtualizar();
-    }
+  const r = await off.startRendering();
+  const esq = r.getChannelData(0);
+  const dir = r.numberOfChannels > 1 ? r.getChannelData(1) : esq;
+  const meio = new Float32Array(esq.length);
+  const lado = new Float32Array(esq.length);
+  let pico = 0;
+  let em = 0;
+  let el = 0;
+  for (let i = 0; i < esq.length; i++) {
+    meio[i] = (esq[i] + dir[i]) / 2;
+    lado[i] = (esq[i] - dir[i]) / 2;
+    pico = Math.max(pico, Math.abs(meio[i]));
+    em += meio[i] * meio[i];
+    el += lado[i] * lado[i];
   }
-  const pedir = (final) => { rodando = (rodando || Promise.resolve()).then(() => processar(final)); return rodando; };
-  return {
-    alimentar(x) { guardar(x); if (total - analisado >= PEDACO) pedir(false); aoAtualizar(); },
-    async terminar() { await pedir(true); if (erro) throw erro; return notas; },
-    get notas() { return notas; },
-    get segundos() { return total / SR_IA; },
-    get analisados() { return analisado / SR_IA; },
-  };
-}
-
-// faixa das notas ouvidas (como um rolo de piano): cada nota é uma barrinha na altura dela, passando da direita para
-// a esquerda; a linha à direita é o "agora"
-function desenharRolo(canvas, notas, agora, { janela = 10 } = {}) {
-  const dpr = devicePixelRatio || 1;
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
-  if (canvas.width !== Math.round(w * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); }
-  const g = canvas.getContext('2d');
-  g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  g.clearRect(0, 0, w, h);
-  const css = getComputedStyle(document.documentElement);
-  const acento = css.getPropertyValue('--accent').trim() || '#06b6d4';
-  const linha = css.getPropertyValue('--surface-3').trim() || '#333';
-  const vis = notas.filter((n) => n.pitchMidi >= 40 && n.pitchMidi <= 88);
-  const [lo, hi] = vis.length ? [Math.min(...vis.map((n) => n.pitchMidi)) - 2, Math.max(...vis.map((n) => n.pitchMidi)) + 2] : [55, 79];
-  const faixa = Math.max(12, hi - lo);
-  const y = (p) => h - 8 - ((p - lo) / faixa) * (h - 16);
-  const xAgora = w - 24;
-  const x = (t) => xAgora - ((agora - t) / janela) * (xAgora - 8);
-  g.strokeStyle = linha;
-  g.lineWidth = 1;
-  for (let p = Math.ceil(lo / 12) * 12; p <= lo + faixa; p += 12) { g.beginPath(); g.moveTo(0, y(p)); g.lineTo(w, y(p)); g.stroke(); } // os Dós
-  const altura = Math.max(3, Math.min(9, (h - 16) / faixa));
-  for (const n of vis) {
-    const x0 = x(n.startTimeSeconds);
-    const x1 = x(n.startTimeSeconds + n.durationSeconds);
-    if (x1 < 0 || x0 > w) continue;
-    g.globalAlpha = 0.35 + 0.65 * Math.min(1, n.amplitude ?? 1);
-    g.fillStyle = acento;
-    g.beginPath();
-    g.roundRect?.(x0, y(n.pitchMidi) - altura / 2, Math.max(3, x1 - x0), altura, altura / 2);
-    if (!g.roundRect) g.rect(x0, y(n.pitchMidi) - altura / 2, Math.max(3, x1 - x0), altura);
-    g.fill();
-  }
-  g.globalAlpha = 1;
-  g.fillStyle = acento;
-  g.fillRect(xAgora, 4, 2, h - 8);
+  const g = pico > 0.002 && pico < 0.6 ? Math.min(0.9 / pico, 40) : 1;
+  if (g !== 1) for (let i = 0; i < meio.length; i++) { meio[i] *= g; lado[i] *= g; }
+  const estereo = buf.numberOfChannels > 1 && Math.sqrt(el / (em || 1)) > 0.08;
+  return { meio, lado: estereo ? lado : null, cortado: buf.duration > 360 };
 }
 
 async function gerarComIA(song, titulo) {
@@ -6031,100 +5988,7 @@ async function gerarComIA(song, titulo) {
     solte.ondrop = (e) => { e.preventDefault(); solte.classList.remove('sobre'); const f = e.dataTransfer.files[0]; if (f) lerArquivo(f); };
   }
 
-  // a tela da leitura: o rolo com as notas chegando, o que a IA já sabe (tom, andamento) e a partitura nascendo
-  function telaLeitura() {
-    osmdVivo = null;
-    rolo = 0;
-    nVivo = 0;
-    passo.innerHTML = `<div class="ia-leitura">
-      <div class="ia-progresso-card">
-        <div class="ia-estado"><span class="ia-pulso" id="ia-pulso"></span><b id="ia-status">Preparando…</b><span class="ia-relogio" id="ia-pct"></span></div>
-        <div class="ia-progresso" id="ia-progresso"><i></i></div>
-        <small class="ia-dica">A IA ouve o áudio nota por nota · <span id="ia-tempo">0:00</span> analisados</small>
-      </div>
-      <canvas class="ia-rolo" id="ia-rolo" aria-label="Notas que a IA está ouvindo"></canvas>
-      <div class="ia-numeros"><span><small>Notas</small><b id="ia-n">0</b></span><span><small>Tom provável</small><b id="ia-tom-vivo">—</b></span><span><small>Andamento</small><b id="ia-bpm-vivo">—</b></span></div>
-      <div class="ia-nasce"><div class="ia-nasce-cab">${icon('score', 16)} <b>A partitura nascendo</b><small id="ia-analisado"></small></div><div class="osmd-box" id="ia-viva"><p class="muted">As primeiras notas aparecem em alguns segundos…</p></div></div>
-      <div class="row ia-fim"><button class="btn ghost" id="ia-cancelar">${icon('x', 16)} Cancelar</button></div></div>`;
-  }
-  let osmdVivo = null;
-  let ultimoVivo = 0;
-  let nVivo = 0;
-  async function partituraViva(notas) {
-    // a cada pedaço analisado, a melodia até ali vira partitura (os últimos compassos ficam à vista)
-    if (!notas.length || notas.length === nVivo || Date.now() - ultimoVivo < 1500) return;
-    ultimoVivo = Date.now();
-    nVivo = notas.length;
-    const tomC = tomDaCifra(renderSong(song.content).key || song.key);
-    const { fifths, modo } = tomC || estimarTom(notas);
-    const bpm = estimarAndamento(notas, { faixa: faixaDoModo(modoIA) });
-    const { clave, centro } = claveDaVoz(notas, modoIA);
-    $('#ia-tom-vivo') && ($('#ia-tom-vivo').textContent = nomeDoTom(fifths, modo));
-    $('#ia-bpm-vivo') && ($('#ia-bpm-vivo').textContent = `♩ ${Math.round(bpm)}`);
-    const { compasso, anacruse } = estimarCompasso(notas, { bpm, faixa: faixaDoModo(modoIA) });
-    const m = novaPartitura({ titulo, fifths, modo, bpm, compasso });
-    m.pautas[0].clave = clave;
-    m.pautas[0].nome = modoIA === 'voz' ? 'Voz' : 'Melodia';
-    m.pautas[0].ev = melodiaDasNotas(notas, { bpm, fifths, modo: modoIA, centro });
-    if (!m.pautas[0].ev.length) return;
-    // só os últimos ~8 compassos (a tela não fica enorme e o desenho é rápido); a anacruse entra como pausa no começo
-    const cheio = tiquesDoCompasso(m.compasso);
-    if (anacruse) m.pautas[0].ev.unshift({ a: [], d: cheio - anacruse, l: [], c: '' });
-    let soma = 0;
-    let corte = m.pautas[0].ev.length;
-    while (corte > 0 && soma + m.pautas[0].ev[corte - 1].d <= cheio * 8) soma += m.pautas[0].ev[--corte].d;
-    const inicioCompasso = m.pautas[0].ev.slice(0, corte).reduce((a, e) => a + e.d, 0) % cheio;
-    m.pautas[0].ev = m.pautas[0].ev.slice(corte);
-    if (inicioCompasso) m.pautas[0].ev.unshift({ a: [], d: inicioCompasso, l: [], c: '' });
-    try {
-      await carregarScript(OSMD_JS);
-      const caixa = $('#ia-viva');
-      if (!caixa) return;
-      if (!osmdVivo || !caixa.contains(osmdVivo.container)) {
-        caixa.innerHTML = '';
-        osmdVivo = new opensheetmusicdisplay.OpenSheetMusicDisplay(caixa, { autoResize: false, backend: 'svg', drawTitle: false, drawPartNames: false, drawMeasureNumbers: false, defaultFontFamily: 'Figtree, sans-serif' });
-        osmdVivo.container = caixa;
-      }
-      const cor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#f2f2f2';
-      osmdVivo.setOptions({ defaultColorMusic: cor, defaultColorNotehead: cor, defaultColorStem: cor, defaultColorRest: cor, defaultColorLabel: cor });
-      await osmdVivo.load(paraMusicXML(m));
-      osmdVivo.zoom = innerWidth < 640 ? 0.6 : 0.8;
-      osmdVivo.render();
-      caixa.classList.remove('chegou');
-      void caixa.offsetWidth;
-      caixa.classList.add('chegou');
-    } catch { /* a prévia é só para acompanhar */ }
-  }
-
-  function ligarLeitor() {
-    const leitor = criarLeitor(() => {
-      $('#ia-n') && ($('#ia-n').textContent = leitor.notas.length);
-      const a = $('#ia-analisado');
-      if (a) a.textContent = leitor.analisados ? `IA analisou até ${fmtSeg(leitor.analisados)}` : '';
-      partituraViva(leitor.notas);
-    });
-    return leitor;
-  }
   const fmtSeg = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-  // a animação: o rolo anda com o tempo ouvido e o pulso mostra o volume que está chegando
-  // a faixa acompanha (suave) o ponto até onde a IA já analisou: as notas surgem à direita e vão andando
-  let rolo = 0;
-  function animar(leitor, estado) {
-    const canvas = $('#ia-rolo');
-    if (!canvas) return;
-    const alvo = Math.max(10, leitor.analisados + 1);
-    rolo = rolo < 1 ? alvo : rolo + (alvo - rolo) * 0.06;
-    desenharRolo(canvas, leitor.notas, rolo);
-    $('#ia-tempo') && ($('#ia-tempo').textContent = fmtSeg(leitor.analisados || 0));
-    if (estado.pct !== undefined) {
-      $('#ia-pct').textContent = `${estado.pct}%`;
-      $('#ia-progresso').style.setProperty('--pct', `${estado.pct}%`);
-    }
-    $('#ia-progresso')?.classList.toggle('fim', !!estado.fim);
-    const pulso = $('#ia-pulso');
-    if (pulso) { pulso.style.setProperty('--nivel', String(estado.nivel || 0)); pulso.classList.toggle('pausa', !estado.ouvindo); }
-    $('#ia-status').textContent = estado.texto;
-  }
 
   // com o servidor da IA, o áudio vai inteiro para ele (a voz separada da banda, mais fiel) e as notas voltam prontas;
   // se ele não responde, o arquivo é lido aqui mesmo, no aparelho
@@ -6136,6 +6000,14 @@ async function gerarComIA(song, titulo) {
     ['enviando', 'Enviando o áudio', 'upload'],
     ['separando', 'Separando a voz dos instrumentos', 'mic'],
     ['notas', 'Ouvindo as notas', 'music'],
+    ['afinacao', 'Conferindo a afinação da voz', 'chord'],
+    ['escrevendo', 'Escrevendo a partitura', 'score'],
+  ];
+  // no aparelho: as mesmas etapas, sem baixar nem enviar (o lado do estéreo só existe no áudio estéreo)
+  const ETAPAS_APARELHO = [
+    ['abrindo', 'Abrindo o áudio', 'music'],
+    ['notas', 'Ouvindo as notas', 'music'],
+    ['separando', 'Separando a voz dos instrumentos', 'mic'],
     ['afinacao', 'Conferindo a afinação da voz', 'chord'],
     ['escrevendo', 'Escrevendo a partitura', 'score'],
   ];
@@ -6245,59 +6117,42 @@ async function gerarComIA(song, titulo) {
       // não conseguiu nem falar com o servidor (sem internet, fora do ar): o arquivo ainda dá para ler no aparelho, e a
       // tela diz por quê (antes trocava de tela calada e parecia que as etapas nem rodavam). Se o servidor caiu no meio,
       // mostra o erro e o "tente de novo", em vez de recomeçar tudo no aparelho
-      if (arquivo && e.conexao) { lerNoAparelho(arquivo, 'O servidor da IA não respondeu, então a partitura está sendo feita aqui no aparelho (mais simples, sem separar a voz).'); return; }
+      if (arquivo && e.conexao) { lerNoAparelho(arquivo, 'O servidor da IA não respondeu, então a partitura está sendo feita aqui no próprio aparelho.'); return; }
       telaFontes(erroExplicado(e));
       if (e.status === 403) passo.querySelector('.aviso')?.insertAdjacentHTML('beforeend', `<a class="btn small primary" href="#/youtube">${icon('youtube', 15)} Conectar o YouTube</a>`);
     }
   }
   async function lerNoAparelho(arquivo, motivo = '') {
-    telaLeitura();
-    if (motivo) passo.querySelector('.ia-leitura').insertAdjacentHTML('afterbegin', `<div class="aviso">${icon('info', 16)}<span>${esc(motivo)}</span></div>`);
-    $('#ia-status').textContent = 'Gerando a partitura…';
-    let leitor;
+    telaEtapas(ETAPAS_APARELHO);
+    if (motivo) passo.querySelector('.ia-etapas').insertAdjacentHTML('afterbegin', `<div class="aviso">${icon('info', 16)}<span>${esc(motivo)}</span></div>`);
+    const etapas = etapasEmSequencia();
+    etapas.avisar('abrindo');
+    let cancelado = false;
+    $('#ia-cancelar').onclick = () => { cancelado = true; telaFontes(); };
+    const t0 = Date.now();
+    const relogio = setInterval(() => { const t = $('#ia-etapa-tempo'); if (t) t.textContent = `${fmtSeg((Date.now() - t0) / 1000)} · no próprio aparelho, sem servidor`; }, 1000);
     try {
-      const { amostras, cortado } = await audioParaModelo(await arquivo.arrayBuffer());
-      if (cortado) toast('Usei só os primeiros 6 minutos');
-      leitor = ligarLeitor();
-      $('#ia-cancelar').onclick = () => { leitor = null; telaFontes(); };
-      // o arquivo entra em pedaços, como se estivesse tocando (a tela acompanha a análise)
-      for (let i = 0; i < amostras.length && leitor; i += SR_IA * 5) {
-        leitor.alimentar(amostras.subarray(i, Math.min(amostras.length, i + SR_IA * 5)));
-        const pct = () => Math.min(99, Math.round((leitor.analisados / (amostras.length / SR_IA)) * 100));
-        animar(leitor, { nivel: 0.6, ouvindo: true, texto: 'Gerando a partitura', pct: pct() });
-        await new Promise((r) => setTimeout(r, 0));
-        while (leitor && leitor.segundos - leitor.analisados > 10) {
-          await new Promise((r) => setTimeout(r, 120));
-          animar(leitor, { nivel: 0.6, ouvindo: true, texto: 'Gerando a partitura', pct: pct() });
-        }
-      }
-      if (leitor) await concluir(leitor);
+      const audio = await audioParaModelo(await arquivo.arrayBuffer());
+      if (cancelado || !view.contains(passo)) return;
+      if (audio.cortado) toast('Usei só os primeiros 6 minutos');
+      // áudio mono: não dá para separar a voz pelo estéreo (a etapa fica de fora)
+      if (!audio.lado) passo.querySelector('[data-etapa="separando"]')?.remove();
+      const r = await notasNoAparelho(audio, (nome, p) => { if (!cancelado) etapas.avisar(nome, p); });
+      clearInterval(relogio);
+      if (cancelado || !view.contains(passo)) return;
+      await etapas.concluir();
+      if (cancelado || !view.contains(passo)) return;
+      notas = r.notas || [];
+      if (!notas.length) { telaFontes('A IA não encontrou notas neste áudio. Tente de novo ou use outro arquivo de áudio da música.'); return; }
+      resultado();
     } catch (e) {
+      clearInterval(relogio);
+      if (cancelado) return;
       console.error(e);
       telaFontes(e.name === 'EncodingError' ? 'Este aparelho não conseguiu abrir esse arquivo. Tente em MP3 ou WAV.' : FALHOU_IA);
     }
   }
   let notas = null;
-  async function concluir(leitor) {
-    const st = $('#ia-status');
-    if (st) st.textContent = 'Quase pronto';
-    // a IA pode estar alguns segundos atrás da gravação: mostra quanto falta e a faixa continua andando
-    const falta = setInterval(() => {
-      animar(leitor, { nivel: 0.3, ouvindo: true, texto: 'Quase pronto…', pct: 99, fim: true });
-    }, 100);
-    try {
-      notas = await leitor.terminar();
-    } catch (e) {
-      clearInterval(falta);
-      console.error(e);
-      telaFontes(FALHOU_IA);
-      return;
-    }
-    clearInterval(falta);
-    if (!view.contains(passo)) return;
-    if (!notas.length) { telaFontes('A IA não encontrou notas neste áudio. Tente de novo ou use outro arquivo de áudio da música.'); return; }
-    resultado();
-  }
 
   // resultado: ajustes (andamento, tom, compasso, oitava) e a prévia; depois abre no editor
   function resultado() {
