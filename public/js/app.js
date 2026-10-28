@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-277';
+export const APP_VERSAO = '2026.10.28-278';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -736,6 +736,8 @@ const player = (() => {
   el.hidden = true;
   el.innerHTML = `
     <div class="pl-fundo quadros" aria-hidden="true" hidden></div>
+    <div class="pl-fixo"><div class="pl-fixo-barra"><span class="pl-fixo-txt"><b></b><small></small></span>
+      <button class="icon-btn pl-play pl-fixo-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 18)}</button></div></div>
     <div class="pl-video"></div>
     <p class="pl-frase" hidden></p>
     <button class="pl-troca" data-pl="troca">${icon('music', 18)}<span>Mudar para música</span></button>
@@ -862,6 +864,12 @@ const player = (() => {
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
   const avisar = () => ouvintes.forEach((fn) => fn());
   // a altura do player (muda ao ampliar o vídeo) vai para o CSS: as barras flutuantes da página ficam acima dele
+  // rolando o Tocando agora na tela toda para baixo dos controles, a barrinha de cima (o nome e o play) aparece, como no
+  // Spotify
+  el.addEventListener('scroll', () => {
+    const ctrl = $('.pl-ctrl', el);
+    el.classList.toggle('rolou', Boolean(ctrl) && el.scrollTop > ctrl.offsetTop + ctrl.offsetHeight);
+  }, { passive: true });
   const medirPlayer = () => document.body.classList.contains('painel-cheio') && !ehTablet() ? null : document.body.style.setProperty('--player-h', `${el.offsetHeight}px`);
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(medirPlayer).observe(el);
   const mostrarBarra = () => {
@@ -877,6 +885,8 @@ const player = (() => {
     el.style.setProperty('--cor-musica', corDoFundo);
     el.style.setProperty('--tint-cifra', corDaCifra(corDoFundo)); // os acordes na cor do fundo do player, mais clara
     $('.pl-txt b', el).textContent = atual.titulo || 'Vídeo';
+    $('.pl-fixo b', el).textContent = atual.titulo || 'Vídeo';
+    $('.pl-fixo small', el).textContent = atual.artista || '';
     // o tempo vai junto do artista no celular; no computador ele fica na barra de tempo, no centro
     $('.pl-txt small', el).innerHTML = esc([atual.parte, atual.artista].filter(Boolean).join(' · ')) + (duracao ? `<span class="pl-tmini">${atual.parte || atual.artista ? ' · ' : ''}${fmt(tempo)} / ${fmt(duracao)}</span>` : '');
     // música sem vídeo: o play é o de sempre; tocando nele (ou na pílula "Escolher um vídeo"), escolhe um vídeo do YouTube
@@ -1735,7 +1745,9 @@ const player = (() => {
       atual.youtube && { valor: 'youtube', rotulo: 'Abrir no YouTube', ic: 'youtube' },
       { valor: 'fechar', rotulo: 'Fechar o player', ic: 'x' },
     ].filter(Boolean);
-    const v = await escolherNaLista({ titulo: atual.titulo || 'Tocando agora', opcoes });
+    // no tablet, a folha que sobe do rodapé, numa coluna só, com a capa e o nome em cima (como os ⋯ das listas)
+    const capaMenu = capa({ title: atual.titulo || '', cover: song?.cover || (atual.youtube ? `https://i.ytimg.com/vi/${atual.youtube}/mqdefault.jpg` : '') });
+    const v = await escolherNaLista({ menu: ehTablet(), titulo: atual.titulo || 'Tocando agora', cabeca: `${capaMenu}<span class="lista-txt"><b>${esc(atual.titulo || 'Tocando agora')}</b><small>${esc(atual.artista || 'Tocando agora')}</small></span>`, opcoes });
     if (!v || !atual) return;
     if (v === 'youtube') { window.open(`https://www.youtube.com/watch?v=${atual.youtube}&t=${Math.floor(api.tempoAgora)}s`, '_blank', 'noopener'); return; }
     if (v === 'sincronizar') { sincronizarDoPlayer(song, sincronizada); return; }
@@ -5612,6 +5624,8 @@ function editorPartitura(song, titulo) {
   // ⋯ do editor: só o que é arquivo (os ajustes têm o seu botão, ver a partitura é o voltar, apagar fica na partitura)
   async function maisOpcoes() {
     const v = await escolherNaLista({
+      menu: ehTablet(), // no tablet, a folha que sobe do rodapé
+      cabeca: '<span class="lista-txt"><b>Arquivo da partitura</b><small>PDF e MusicXML</small></span>',
       titulo: 'Arquivo da partitura',
       opcoes: [
         { valor: 'pdf', rotulo: 'Imprimir ou salvar em PDF', sub: 'Em preto e branco', ic: 'file' },

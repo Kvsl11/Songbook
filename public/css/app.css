@@ -3194,7 +3194,7 @@ html.pp #player .pl-artista-pe small { color: rgb(255 255 255 / 0.7); font-size:
 html.pp body.painel-cheio #player { z-index: 40; left: 8px; width: auto; padding: 16px 28px 28px; gap: 16px; }
 html.tablet body.painel-cheio .nav { display: none; }
 @media (max-width: 899px) { html.pp body.painel-cheio .nav { display: none; } } /* no computador o menu da esquerda fica */
-html.pp body.painel-cheio #player > :not(.pl-cab):not(.pl-troca):not(.pl-video) { width: min(100%, 860px); align-self: center; }
+html.pp body.painel-cheio #player > :not(.pl-cab):not(.pl-troca):not(.pl-video):not(.pl-fixo) { width: min(100%, 860px); align-self: center; }
 html.pp body.painel-cheio #player .pl-video { align-self: center; }
 /* o vídeo acompanha o painel: na tela toda o painel sobe (z-index 40), e o vídeo tem de ficar acima dele (antes ficava preto) */
 html.pp body.painel-cheio #pl-tela:not(.no-palco):not(.na-telinha) { z-index: 41; }
@@ -3212,6 +3212,30 @@ html.pp body.painel-cheio #player .pl-play { width: 72px; height: 72px; }
 html.pp body.painel-cheio #player .pl-letra { height: 380px; }
 html.pp body.painel-cheio #player:not(.letra-cheia) .pl-letra .pl-linhas p { font-size: 28px; }
 html.pp body.painel-cheio #player .pl-extra { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: start; }
+/* tablet (em pé e deitado), como o Spotify do tablet: uma coluna só, no centro e mais estreita, com os cartões um
+   embaixo do outro (letra, artista, participantes, créditos, vídeo). Antes a grade automática fazia três colunas
+   desencontradas, e os participantes ficavam empilhados */
+html.tablet body.painel-cheio #player > :not(.pl-cab):not(.pl-troca):not(.pl-video):not(.pl-fixo) { width: min(100%, 680px); }
+html.tablet body.painel-cheio #player .pl-troca { margin-left: max(0px, calc((100% - 680px) / 2)); }
+html.tablet body.painel-cheio #player .pl-video { width: clamp(280px, calc((100dvh - 440px) * 16 / 9), min(100%, 680px)); }
+html.tablet body.painel-cheio #player.modo-capa .pl-video { width: clamp(220px, calc(100dvh - 460px), min(100%, 520px)); }
+html.tablet body.painel-cheio #player .pl-extra { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+/* a barrinha de cima (só no tablet), ao rolar para baixo dos controles: o nome, o artista e o play (o lugar dela não ocupa espaço:
+   altura zero e a margem desfaz o espaço entre os itens) */
+#player .pl-fixo { display: none; }
+html.tablet body.painel-cheio #player:not(.letra-cheia) .pl-fixo { display: block; order: -1; position: sticky; top: 0; z-index: 6; height: 0; margin-bottom: -16px; align-self: stretch; width: auto; }
+html.tablet body.painel-cheio #player .pl-fixo-barra { position: absolute; top: -16px; left: -28px; right: -28px; display: flex; align-items: center; gap: 12px;
+  padding: 10px 28px; background: color-mix(in srgb, var(--cor-musica, var(--tint)) 70%, #000); box-shadow: 0 6px 18px rgb(0 0 0 / 0.35);
+  opacity: 0; transform: translateY(-8px); pointer-events: none; transition: opacity 0.2s, transform 0.2s; }
+html.tablet body.painel-cheio #player.rolou .pl-fixo-barra { opacity: 1; transform: none; pointer-events: auto; }
+html.tablet #player .pl-fixo-txt { flex: 1; min-width: 0; display: grid; }
+html.tablet #player .pl-fixo-txt b { font-size: 16px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.tablet #player .pl-fixo-txt small { font-size: 13.5px; color: rgb(255 255 255 / 0.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.tablet body.painel-cheio #player .pl-fixo-play { width: 40px; height: 40px; flex: none; }
+/* tablet: os dois participantes sempre lado a lado, em qualquer largura do cartão */
+html.tablet #player .pl-pessoas .ref-rodas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html.tablet #player .pl-pessoas .ref-avatar { width: min(140px, 100%); }
+html.tablet #player .pl-pessoas .ref-roda b { max-width: 100%; }
 @media (orientation: portrait) {
   html.pp body.painel-cheio #player .pl-video { width: min(100%, 720px); }
   html.pp body.painel-cheio #player.modo-capa .pl-video { width: min(100%, 560px); }

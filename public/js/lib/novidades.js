@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 278, data: '2026-10-28', titulo: 'Tocando agora do tablet como o Spotify',
+    itens: [
+      { tipo: 'melhoria', texto: 'No tablet (em pé e deitado), o Tocando agora fica numa coluna só, no centro, com os cartões um embaixo do outro: letra, artista, participantes, créditos e vídeo (antes eram três colunas desencontradas).' },
+      { tipo: 'novo', texto: 'No tablet, rolando para baixo dos controles, aparece no alto uma barrinha com o nome, o artista e o play.' },
+      { tipo: 'melhoria', texto: 'No tablet, o menu ⋯ do Tocando agora (e o do editor de partitura) sobe do rodapé, numa coluna só, como os outros ⋯.' },
+    ],
+  },
+  {
     versao: 277, data: '2026-10-28', titulo: 'Partitura mais fiel, sem servidor',
     itens: [
       { tipo: 'melhoria', texto: 'Gerar a partitura pelo aparelho (sem servidor) ficou bem mais fiel à música: a IA ouve a música inteira de uma vez (antes eram pedaços de 5 segundos, que cortavam e repetiam notas), separa a voz dos instrumentos pelo estéreo, confere a afinação da voz e limpa o eco, o vibrato e os estalos, como o servidor faz.' },
@@ -69,12 +77,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'Tocar numa música da lista abre o Tocando agora com a capa ou o vídeo, o nome e os controles; a letra na tela toda abre pelo cartão da letra (antes abria direto na letra).' },
       { tipo: 'correcao', texto: 'Os botões A− e A+ voltaram a mudar o tamanho da letra; letra e cifra têm o mesmo tamanho.' },
       { tipo: 'melhoria', texto: 'Na cifra sincronizada, como na letra: a linha de agora fica acesa, as próximas mais apagadas e as já cantadas mais ainda.' },
-    ],
-  },
-  {
-    versao: 268, data: '2026-10-28', titulo: 'Cartão da letra acompanha a música',
-    itens: [
-      { tipo: 'correcao', texto: 'O cartão da letra no Tocando agora começa no início da música e acompanha o que está sendo cantado, com a frase de agora acesa e em relevo (antes ele rolava para longe da frase).' },
     ],
   },
 ];
