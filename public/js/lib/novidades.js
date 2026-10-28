@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 268, data: '2026-10-28', titulo: 'Cartão da letra acompanha a música',
+    itens: [
+      { tipo: 'correcao', texto: 'O cartão da letra no Tocando agora começa no início da música e acompanha o que está sendo cantado, com a frase de agora acesa e em relevo (antes ele rolava para longe da frase).' },
+    ],
+  },
+  {
     versao: 267, data: '2026-10-28', titulo: 'Notinhas só nas partes de instrumentos',
     itens: [
       { tipo: 'correcao', texto: 'As notinhas ♪ na letra aparecem só onde a música fica 10 segundos ou mais sem voz (introdução, solos e final), não mais em cada pausa entre as estrofes.' },
@@ -65,13 +71,6 @@ export const NOVIDADES = [
     versao: 259, data: '2026-10-28', titulo: 'Novidades mais curtas',
     itens: [
       { tipo: 'melhoria', texto: 'A tela de Novidades mostra só as 10 últimas atualizações.' },
-    ],
-  },
-  {
-    versao: 258, data: '2026-10-28', titulo: 'Letra sincronizada sem servidor',
-    itens: [
-      { tipo: 'novo', texto: 'Sincronizar a letra agora procura primeiro a letra já sincronizada do LRCLIB (banco aberto de letras): vem na hora, sem servidor, quando é a mesma música e a duração bate com a do vídeo.' },
-      { tipo: 'melhoria', texto: 'Se a música não estiver lá (os cantos de missa quase nunca estão) ou ficar fora do tempo ("Ouvir o vídeo"), o app usa o servidor que ouve o áudio, como antes.' },
     ],
   },
 ];
