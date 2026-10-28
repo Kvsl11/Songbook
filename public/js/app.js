@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-269';
+export const APP_VERSAO = '2026.10.28-270';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -292,12 +292,13 @@ function setTab(name) {
   if (name === 'liturgia') name = 'oracoes'; // a liturgia fica dentro de Orações
   document.querySelectorAll('.nav a[data-tab]').forEach((a) => a.classList.toggle('active', a.dataset.tab === name));
 }
-// --tint: cor de fundo da página; --tint-cifra: a cor dos acordes, que se destaca do fundo (na mesma cor dele os
-// acordes quase sumiam): um âmbar dourado ou, num fundo já amarelado/alaranjado, um ciano claro
+// --tint: cor de fundo da página; --tint-cifra: a mesma cor do fundo, bem mais viva e clara, para os acordes se
+// destacarem dele sem sair da cor da música (num fundo cinza, um cinza claro)
 function corDaCifra(cor) {
-  const h = matizDe(cor);
-  const longeDoAmbar = Math.abs(((h - 45 + 540) % 360) - 180);
-  return longeDoAmbar < 45 ? 'hsl(190 95% 70%)' : 'hsl(45 100% 64%)';
+  const m = /^#?([\da-f]{6})$/i.exec(cor);
+  const s = /^hsl\(\s*[\d.]+(?:deg)?[\s,]+([\d.]+)%/.exec(cor);
+  const cinza = m ? (() => { const v = [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)); return Math.max(...v) - Math.min(...v) < 16; })() : s ? Number(s[1]) < 8 : false;
+  return cinza ? 'hsl(0 0% 84%)' : `hsl(${matizDe(cor)} 100% 80%)`;
 }
 function matizDe(cor) {
   const h = /^hsl\(\s*([\d.]+)/.exec(cor);
@@ -769,7 +770,7 @@ const player = (() => {
       <button class="icon-btn" data-pl="compartilhar" aria-label="Compartilhar" title="Compartilhar">${icon('share', 20)}</button>
       <button class="icon-btn" data-pl="fila" aria-label="Fila" title="Fila">${icon('queue', 20)}</button>
     </div>
-    <section class="pl-letra" hidden><div class="pl-letra-topo"><button class="icon-btn" data-pl="letra-fechar" aria-label="Fechar a letra" title="Fechar">${icon('down', 24)}</button><span class="pl-letra-nome"><b></b><small></small></span><button class="pl-ver-cifra" data-pl="ver-cifra" aria-pressed="false" aria-label="Mostrar os acordes" title="Mostrar os acordes">${icon('chord', 15)}<span>Cifra</span></button></div><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-sinc" hidden aria-live="polite"></div><div class="pl-ferr">
+    <section class="pl-letra" hidden><div class="pl-letra-topo"><button class="icon-btn" data-pl="letra-fechar" aria-label="Fechar a letra" title="Fechar">${icon('down', 24)}</button><span class="pl-letra-nome"><b></b><small></small></span><span class="pl-letra-dir"><button class="icon-btn pl-leitura" data-pl="leitura" aria-pressed="false" aria-label="Só a letra, para ler" title="Só a letra (tira o resto da tela)">${icon('eye', 18)}</button><button class="pl-ver-cifra" data-pl="ver-cifra" aria-pressed="false" aria-label="Mostrar os acordes" title="Mostrar os acordes">${icon('chord', 15)}<span>Cifra</span></button></span></div><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-sinc" hidden aria-live="polite"></div><div class="pl-ferr">
       <span class="pl-ferr-g so-cifra"><button data-pl="tom-" aria-label="Baixar meio tom" title="Baixar meio tom">−</button><b class="pl-tom"></b><button data-pl="tom+" aria-label="Subir meio tom" title="Subir meio tom">+</button></span>
       <span class="pl-ferr-g so-cifra"><button data-pl="capo-" aria-label="Capotraste uma casa abaixo" title="Capotraste: uma casa abaixo">−</button><b class="pl-capo"></b><button data-pl="capo+" aria-label="Capotraste uma casa acima" title="Capotraste: uma casa acima">+</button></span>
       <span class="pl-ferr-g"><button data-pl="fonte-" aria-label="Letra menor" title="Letra menor">A−</button><button data-pl="fonte+" aria-label="Letra maior" title="Letra maior">A+</button></span>
@@ -872,7 +873,9 @@ const player = (() => {
   const desenhar = () => {
     if (!atual) return;
     // a barra tem a cor do fundo da letra da música que está tocando (não a da tela em que se está)
-    el.style.setProperty('--cor-musica', atual.cor || corDaMusica(atual.titulo || ''));
+    const corDoFundo = atual.cor || corDaMusica(atual.titulo || '');
+    el.style.setProperty('--cor-musica', corDoFundo);
+    el.style.setProperty('--tint-cifra', corDaCifra(corDoFundo)); // os acordes na cor do fundo do player, mais clara
     $('.pl-txt b', el).textContent = atual.titulo || 'Vídeo';
     // o tempo vai junto do artista no celular; no computador ele fica na barra de tempo, no centro
     $('.pl-txt small', el).innerHTML = esc([atual.parte, atual.artista].filter(Boolean).join(' · ')) + (duracao ? `<span class="pl-tmini">${atual.parte || atual.artista ? ' · ' : ''}${fmt(tempo)} / ${fmt(duracao)}</span>` : '');
@@ -1015,16 +1018,26 @@ const player = (() => {
     letraDe = chave;
     const sinc = !marcando && song?.sincronia?.video === atual?.youtube ? song.sincronia : null;
     if (sinc?.ajustar && !sincEstado.has(atual.youtube)) { sincEstado.set(atual.youtube, { tipo: 'ajustar' }); mostrarSinc(); }
-    // as marcações das partes (Chorus, Bridge, Verse 2…) em cima da linha em que cada uma começa; na letra sincronizada,
-    // só se as linhas dela forem as mesmas da cifra (senão não dá para saber onde cada parte começa)
+    // as marcações das partes (Chorus, Bridge, Verse 2…) em cima da linha em que cada uma começa; na letra sincronizada
+    // (que pode ter linhas a mais ou a menos que a cifra, e o refrão repetido), cada frase cantada casa com a linha da
+    // cifra e a marcação entra onde a parte muda (a frase sem par fica na parte de antes)
     const partes = song ? partesCantadas(song.content).map((p) => ({ ...p, linhas: p.linhas.map(linhaSemCifra).filter(Boolean) })).filter((p) => p.linhas.length) : [];
     const daCifra = partes.flatMap((p) => p.linhas);
     const linhas = marcando ? marcando.linhas : sinc ? sinc.linhas : daCifra;
+    const parteDaLinha = partes.flatMap((p, n) => p.linhas.map(() => n));
+    const casadas = linhas === daCifra ? daCifra.map((_, i) => i) : casarLinhas(linhas, daCifra);
     const marcas = new Map();
-    if (!sinc || sinc.linhas.length === daCifra.length) {
-      let k = 0;
-      for (const p of partes) { if (p.nome && !/^verse$/i.test(p.nome)) marcas.set(k, p.nome); k += p.linhas.length; }
-    }
+    let parteAntes = -1;
+    casadas.forEach((i, k) => {
+      if (i < 0) return;
+      const n = parteDaLinha[i];
+      // a parte muda (ou o refrão recomeça pela primeira linha dele)
+      if (n !== parteAntes || ((i === 0 || parteDaLinha[i - 1] !== n) && casadas[k - 1] !== i)) {
+        const nome = partes[n].nome;
+        if (nome && !/^verse$/i.test(nome)) marcas.set(k, nome);
+      }
+      parteAntes = n;
+    });
     tempos = sinc?.tempos || null;
     linhasDaLetra = linhas;
     linhaAcesa = -2;
@@ -1082,7 +1095,10 @@ const player = (() => {
       html = `<span class="pl-sinc-eq" aria-hidden="true"><i></i><i></i><i></i></span><span class="pl-sinc-txt">${esc(e.texto || 'Sincronizando a letra…')}</span>`;
     } else if (e?.tipo === 'ok' && !e.visto) {
       html = `<span class="pl-sinc-ic ok">${icon('check', 15)}</span><span class="pl-sinc-txt">${esc(e.texto || 'Letra sincronizada')}</span>${botaoSinc('sinc-ajustar', 'Ajustar')}`;
-      someAviso = setTimeout(() => { e.visto = true; mostrarSinc(); }, 6000);
+      // some sozinho 2 s depois de aparecer (o prazo fica no aviso: o painel redesenha várias vezes e, contando de novo a
+      // cada vez, ele nunca sumia)
+      e.ate ||= Date.now() + 2000;
+      someAviso = setTimeout(() => { e.visto = true; mostrarSinc(); }, Math.max(0, e.ate - Date.now()));
     } else if (e?.tipo === 'falhou' || e?.tipo === 'erro') {
       html = `<span class="pl-sinc-ic erro">${icon('alerta', 15)}</span><span class="pl-sinc-txt">${esc(e.texto || 'Não sincronizou')}</span>
         ${e.deNovo ? botaoSinc('sinc-tentar', 'Tentar de novo', true) : ''}${botaoSinc('sinc-marcar', 'Sincronizar à mão', !e.deNovo)}${servidorIA().url ? botaoSinc('sinc-servidor', 'Ouvir o vídeo') : ''}`;
@@ -1181,6 +1197,14 @@ const player = (() => {
       mapaCifra = casarLinhas(sinc.linhas, textos).map((i) => (i >= 0 ? linhasTela[i] : null));
     }
   };
+  // só a letra (na tela toda), para ler: sem o nome, o aviso da sincronia e a barra de baixo (compartilhar, tempo, play);
+  // ficam o voltar, este botão e o da cifra (com a cifra, também tom, capotraste, tamanho e rolagem). Fica guardado
+  const definirLeitura = (ligar) => {
+    el.classList.toggle('so-letra', ligar);
+    $('.pl-leitura', el).setAttribute('aria-pressed', String(ligar));
+    db.setPref('letraLeitura', ligar);
+  };
+  definirLeitura(Boolean(db.prefs().letraLeitura));
   // tom e capotraste da música (guardados nela) e o tamanho da letra (para todas)
   const mudarCifra = (campo, d) => {
     const song = musicaTocando();
@@ -1885,6 +1909,7 @@ const player = (() => {
     if (b.dataset.pl === 'fonte-') { mudarFonte(-0.1); return; }
     if (b.dataset.pl === 'fonte+') { mudarFonte(0.1); return; }
     if (b.dataset.pl === 'rolar') { rolar(); return; }
+    if (b.dataset.pl === 'leitura') { definirLeitura(!el.classList.contains('so-letra')); return; }
     if (b.dataset.pl === 'editar' && atual?.songId && db.song(atual.songId)) { location.hash = '#/editar/' + atual.songId; return; }
     if (b.dataset.pl === 'partitura' && atual?.songId) { location.hash = `#/musica/${atual.songId}/partitura`; return; }
     if (b.dataset.pl === 'sinc-ajustar') { ajustando = true; ajustandoVideo = atual?.youtube || ''; mostrarSinc(); letraCheia(true); return; }
