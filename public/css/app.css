@@ -3020,6 +3020,25 @@ html.pp #player .pl-letra.sincronizada .pl-linhas p { color: rgb(255 255 255 / 0
 html.pp #player .pl-letra.sincronizada .pl-linhas p.cantada { color: rgb(255 255 255 / 0.32); }
 html.pp #player .pl-letra.sincronizada .pl-linhas p.agora { color: #fff; transform: scale(1.04);
   text-shadow: 0 1px 0 rgb(0 0 0 / 0.35), 0 3px 8px rgb(0 0 0 / 0.35), 0 0 22px rgb(255 255 255 / 0.45); animation: linha-salta 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+/* o aviso da sincronia, em cima da letra (cartão e tela toda): sincronizando (barrinhas), sincronizada (✓), falta
+   acertar o começo, não achou (com "Sincronizar à mão") e a marcação à mão (com o botão "Agora") */
+#player .pl-sinc { display: none; }
+html.pp #player .pl-sinc:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: none; margin: 0 0 12px; padding: 8px 10px;
+  border-radius: 12px; background: rgb(0 0 0 / 0.24); color: #fff; font-size: 13px; font-weight: 600; line-height: 1.35; cursor: default; }
+html.pp #player .pl-sinc-txt { flex: 1 1 150px; min-width: 0; }
+html.pp #player .pl-sinc-ic { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: rgb(255 255 255 / 0.16); flex: none; }
+html.pp #player .pl-sinc-ic.ok { background: #1db954; }
+html.pp #player .pl-sinc-ic.erro { background: rgb(255 120 90 / 0.3); }
+html.pp #player .pl-sinc button { height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: rgb(255 255 255 / 0.16); color: #fff;
+  font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; flex: none; }
+html.pp #player .pl-sinc button.forte { background: #fff; color: #111; }
+html.pp #player .pl-letra.marcando .pl-sinc button[data-pl="sinc-agora"] { min-width: 96px; height: 38px; font-size: 15px; }
+html.pp #player .pl-sinc-eq { display: inline-flex; align-items: flex-end; gap: 2px; width: 24px; height: 16px; flex: none; justify-content: center; }
+html.pp #player .pl-sinc-eq i { width: 3px; height: 100%; border-radius: 2px; background: #fff; animation: sinc-barra 0.9s ease-in-out infinite; }
+html.pp #player .pl-sinc-eq i:nth-child(2) { animation-delay: 0.15s; }
+html.pp #player .pl-sinc-eq i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes sinc-barra { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+html.pp #player.letra-cheia .pl-sinc:not([hidden]) { margin: 4px 0 6px; }
 /* partes só de música: três notinhas; enquanto tocam, acendem e pulam uma depois da outra */
 html.pp #player .pl-linhas p.pl-pausa { display: flex; gap: 10px; cursor: default; color: rgb(255 255 255 / 0.32); font-size: 22px; }
 html.pp #player .pl-linhas p.pl-pausa i { font-style: normal; display: inline-block; }

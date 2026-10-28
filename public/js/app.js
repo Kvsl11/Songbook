@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-263';
+export const APP_VERSAO = '2026.10.28-264';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -766,7 +766,7 @@ const player = (() => {
       <button class="icon-btn" data-pl="compartilhar" aria-label="Compartilhar" title="Compartilhar">${icon('share', 20)}</button>
       <button class="icon-btn" data-pl="fila" aria-label="Fila" title="Fila">${icon('queue', 20)}</button>
     </div>
-    <section class="pl-letra" hidden><div class="pl-letra-topo"><button class="icon-btn" data-pl="letra-fechar" aria-label="Fechar a letra" title="Fechar">${icon('down', 24)}</button><span class="pl-letra-nome"><b></b><small></small></span><button class="pl-ver-cifra" data-pl="ver-cifra" aria-label="Ver a cifra" title="Ver a cifra">${icon('chord', 15)}<span>Cifra</span></button></div><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-linhas"></div>
+    <section class="pl-letra" hidden><div class="pl-letra-topo"><button class="icon-btn" data-pl="letra-fechar" aria-label="Fechar a letra" title="Fechar">${icon('down', 24)}</button><span class="pl-letra-nome"><b></b><small></small></span><button class="pl-ver-cifra" data-pl="ver-cifra" aria-label="Ver a cifra" title="Ver a cifra">${icon('chord', 15)}<span>Cifra</span></button></div><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-sinc" hidden aria-live="polite"></div><div class="pl-linhas"></div>
       <div class="pl-letra-pe"><div class="pl-letra-bts2"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 22)}</button><span class="grow"></span><button class="icon-btn pl-mais" data-pl="menu" aria-label="Mais opções" title="Mais opções">${icon('more', 22)}</button></div>
         <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" role="slider" tabindex="0" aria-label="Tempo da música" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
         <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button></div></section>
@@ -1000,15 +1000,19 @@ const player = (() => {
   const desenharLetra = () => {
     if (!document.documentElement.classList.contains('pp')) return;
     const song = musicaTocando();
-    const chave = `${atual?.youtube}|${song?.sincronia?.tempos?.length || 0}|${song?.content?.length || 0}`;
+    if (marcando && marcando.video !== atual?.youtube) marcando = null; // trocou de música no meio da marcação
+    if (!marcando) ajustando = ajustando && ajustandoVideo === atual?.youtube;
+    mostrarSinc();
+    const chave = `${atual?.youtube}|${song?.sincronia?.tempos?.length || 0}|${song?.sincronia?.tempos?.[0]?.inicio}|${song?.content?.length || 0}|${marcando ? 'm' : ''}`;
     if (chave === letraDe) return;
     letraDe = chave;
-    const sinc = song?.sincronia?.video === atual?.youtube ? song.sincronia : null;
+    const sinc = !marcando && song?.sincronia?.video === atual?.youtube ? song.sincronia : null;
+    if (sinc?.ajustar && !sincEstado.has(atual.youtube)) { sincEstado.set(atual.youtube, { tipo: 'ajustar' }); mostrarSinc(); }
     // as marcações das partes (Chorus, Bridge, Verse 2…) em cima da linha em que cada uma começa; na letra sincronizada,
     // só se as linhas dela forem as mesmas da cifra (senão não dá para saber onde cada parte começa)
     const partes = song ? partesCantadas(song.content).map((p) => ({ ...p, linhas: p.linhas.map(linhaSemCifra).filter(Boolean) })).filter((p) => p.linhas.length) : [];
     const daCifra = partes.flatMap((p) => p.linhas);
-    const linhas = sinc ? sinc.linhas : daCifra;
+    const linhas = marcando ? marcando.linhas : sinc ? sinc.linhas : daCifra;
     const marcas = new Map();
     if (!sinc || sinc.linhas.length === daCifra.length) {
       let k = 0;
@@ -1020,7 +1024,8 @@ const player = (() => {
     acesaChave = '';
     $('.pl-frase', el).hidden = !tempos;
     $('.pl-letra', el).hidden = !linhas.length;
-    $('.pl-letra', el).classList.toggle('sincronizada', Boolean(tempos));
+    $('.pl-letra', el).classList.toggle('sincronizada', Boolean(tempos) || Boolean(marcando));
+    $('.pl-letra', el).classList.toggle('marcando', Boolean(marcando));
     // na letra sincronizada, as partes só de música (a introdução e as pausas de 4 s ou mais entre as frases, e o fim)
     // ganham as notinhas ♪, que acendem e pulam enquanto tocam
     const nota = (id) => `<p class="pl-pausa" data-pausa="${id}" aria-label="Só música"><i>♪</i><i>♪</i><i>♪</i></p>`;
@@ -1028,10 +1033,82 @@ const player = (() => {
     $('.pl-linhas', el).innerHTML = linhas.map((l, k) => `${marcas.has(k) ? `<h4 class="pl-parte">${esc(marcas.get(k))}</h4>` : ''}${pausaAntes(k) ? nota(k) : ''}<p data-k="${k}">${esc(l)}</p>`).join('')
       + (tempos?.length ? nota('fim') : '');
     // sem sincronia: procura sozinha a letra sincronizada no LRCLIB (grátis, sem servidor), uma vez por vídeo
-    if (!sinc && song && atual?.youtube && !atual.semVideo && !lrclibTentado.has(atual.youtube)) {
-      lrclibTentado.add(atual.youtube);
-      sincronizarMusica(alvoDaMusica(song), { soLrclib: true, sozinho: true });
+    // (o aviso em cima da letra diz que está sincronizando, se deu certo ou, se não achou, como sincronizar à mão)
+    if (!sinc && !marcando && song && atual?.youtube && !atual.semVideo && !lrclibTentado.has(atual.youtube)) {
+      const yt = atual.youtube;
+      lrclibTentado.add(yt);
+      sincEstado.set(yt, { tipo: 'buscando', texto: 'Sincronizando a letra…' });
+      mostrarSinc();
+      sincronizarMusica(alvoDaMusica(song), { soLrclib: true, sozinho: true }).then((r) => {
+        if (r === 'ok') sincEstado.set(yt, { tipo: 'ok', texto: 'Letra sincronizada' });
+        else if (r === 'ajustar') sincEstado.set(yt, { tipo: 'ajustar' });
+        else if (r === 'nada') sincEstado.set(yt, { tipo: 'falhou', texto: 'Não achei a letra sincronizada desta música' });
+        else sincEstado.delete(yt);
+        mostrarSinc();
+      });
     }
+  };
+  // ---- o aviso da sincronia, em cima da letra (no cartão e na tela toda), e a sincronia à mão
+  const sincEstado = new Map(); // vídeo -> { tipo: buscando | servidor | ok | ajustar | falhou | erro, texto, visto }
+  let ajustando = false; // tocar numa frase, no momento em que ela é cantada, acerta o tempo da letra inteira
+  let ajustandoVideo = '';
+  let marcando = null; // a sincronia à mão: { video, linhas, tempos }, tocando em "Agora" no começo de cada frase
+  let someAviso = 0;
+  const botaoSinc = (pl, txt, forte = false) => `<button class="${forte ? 'forte' : ''}" data-pl="${pl}">${txt}</button>`;
+  const mostrarSinc = () => {
+    const box = $('.pl-sinc', el);
+    if (!box) return;
+    clearTimeout(someAviso);
+    const yt = atual?.youtube;
+    const e = yt && !atual.semVideo ? sincEstado.get(yt) : null;
+    let html = '';
+    if (marcando) {
+      const n = marcando.tempos.length;
+      html = `<span class="pl-sinc-txt">${n ? `Frase ${n} de ${marcando.linhas.length}. ` : ''}Toque em <b>Agora</b> quando cada frase começar</span>
+        ${n ? botaoSinc('sinc-desfazer', 'Desfazer') : ''}${botaoSinc('sinc-cancelar', 'Cancelar')}${botaoSinc('sinc-agora', 'Agora', true)}`;
+    } else if (ajustando || e?.tipo === 'ajustar') {
+      html = `<span class="pl-sinc-ic">${icon('info', 15)}</span><span class="pl-sinc-txt">${ajustando ? 'Toque na frase no momento em que ela for cantada' : 'O vídeo tem uma parte antes da música: acerte o começo da letra'}</span>
+        ${ajustando ? botaoSinc('sinc-pronto', 'Pronto') : botaoSinc('sinc-ajustar', 'Acertar', true)}`;
+    } else if (e?.tipo === 'buscando' || e?.tipo === 'servidor') {
+      html = `<span class="pl-sinc-eq" aria-hidden="true"><i></i><i></i><i></i></span><span class="pl-sinc-txt">${esc(e.texto || 'Sincronizando a letra…')}</span>`;
+    } else if (e?.tipo === 'ok' && !e.visto) {
+      html = `<span class="pl-sinc-ic ok">${icon('check', 15)}</span><span class="pl-sinc-txt">${esc(e.texto || 'Letra sincronizada')}</span>${botaoSinc('sinc-ajustar', 'Ajustar')}`;
+      someAviso = setTimeout(() => { e.visto = true; mostrarSinc(); }, 6000);
+    } else if (e?.tipo === 'falhou' || e?.tipo === 'erro') {
+      html = `<span class="pl-sinc-ic erro">${icon('alerta', 15)}</span><span class="pl-sinc-txt">${esc(e.texto || 'Não sincronizou')}</span>
+        ${botaoSinc('sinc-marcar', 'Sincronizar à mão', true)}${servidorIA().url ? botaoSinc('sinc-servidor', 'Ouvir o vídeo') : ''}`;
+    }
+    box.innerHTML = html;
+    box.hidden = !html;
+  };
+  // acerta o tempo da letra inteira pela frase tocada agora (o vídeo com uma parte antes da música, ou fora do tempo)
+  const ajustarPelaFrase = (k) => {
+    const song = musicaTocando();
+    const sinc = song?.sincronia;
+    if (!sinc?.tempos?.[k]) return;
+    const d = api.tempoAgora - sinc.tempos[k].inicio;
+    const novo = { ...sinc, tempos: sinc.tempos.map((x) => ({ inicio: Math.max(0, Math.round((x.inicio + d) * 100) / 100), fim: Math.max(0, Math.round((x.fim + d) * 100) / 100) })) };
+    delete novo.ajustar;
+    ajustando = false;
+    sincEstado.set(atual.youtube, { tipo: 'ok', texto: 'Tempo da letra acertado' });
+    guardarSincronia(alvoDaMusica(song), novo);
+  };
+  const marcarFrase = () => {
+    if (!marcando) return;
+    const t = api.tempoAgora;
+    const n = marcando.tempos.length;
+    if (n) marcando.tempos[n - 1].fim = Math.max(marcando.tempos[n - 1].inicio + 0.2, t);
+    marcando.tempos.push({ inicio: t, fim: t + 5 });
+    const caixa = $('.pl-linhas', el);
+    caixa.querySelectorAll('p[data-k]').forEach((p) => { const i = Number(p.dataset.k); p.classList.toggle('agora', i === n); p.classList.toggle('cantada', i < n); });
+    rolarLetra();
+    if (marcando.tempos.length < marcando.linhas.length) { mostrarSinc(); return; }
+    // última frase: guarda
+    const { video, linhas, tempos: ts } = marcando;
+    marcando = null;
+    sincEstado.set(video, { tipo: 'ok', texto: 'Letra sincronizada à mão' });
+    letraDe = '';
+    guardarSincronia(alvoDaMusica(musicaTocando()), { video, linhas, tempos: ts.map((x) => ({ inicio: Math.round(x.inicio * 100) / 100, fim: Math.round(x.fim * 100) / 100 })), fonte: 'manual' });
   };
   const PAUSA_MUSICA = 4;
   const lrclibTentado = new Set();
@@ -1062,7 +1139,7 @@ const player = (() => {
     if (linhaAcesa >= 0) requestAnimationFrame(() => rolarLetra('auto')); else caixa.scrollTop = 0;
   };
   setInterval(() => {
-    if (!tempos || !atual || el.hidden) return;
+    if (!tempos || !atual || el.hidden || marcando) return;
     const t = api.tempoAgora;
     const k = linhaNoTempo(tempos, t);
     const caixa = $('.pl-linhas', el);
@@ -1090,8 +1167,11 @@ const player = (() => {
   }, 80);
   el.addEventListener('click', (e) => {
     // no cartão, tocar na letra abre ela na tela toda; na tela toda, tocar numa linha leva o vídeo para ela
+    const frase = e.target.closest('.pl-linhas p[data-k]');
+    if (ajustando && frase && !marcando) { ajustarPelaFrase(Number(frase.dataset.k)); return; }
+    if (marcando && e.target.closest('.pl-linhas')) { marcarFrase(); return; } // marcando: tocar na letra também vale "Agora"
     if (e.target.closest('.pl-linhas') && !el.classList.contains('letra-cheia')) { letraCheia(true); return; }
-    const p = e.target.closest('.pl-linhas p[data-k]');
+    const p = frase;
     if (p && tempos?.[p.dataset.k]) api.irPara(Math.max(0, tempos[p.dataset.k].inicio - 0.3));
   });
   // cria o vídeo (só quando muda de vídeo)
@@ -1504,16 +1584,14 @@ const player = (() => {
   // ganha os dados que a página da música calcula: título, artista e vídeo)
   const sincronizarDoPlayer = (song, refazer) => {
     const alvo = alvoDaMusica(song);
-    let volta = 0;
+    const yt = atual.youtube;
     const status = (tipo, texto) => {
-      const sm = $('.pl-letra-nome small', el);
-      if (!sm) return;
-      clearTimeout(volta);
-      sm.textContent = texto;
-      sm.classList.toggle('sinc-andamento', tipo === 'carregando');
-      if (tipo !== 'carregando') volta = setTimeout(() => { sm.classList.remove('sinc-andamento'); desenhar(); }, tipo === 'ok' ? 4000 : 8000);
+      sincEstado.set(yt, { tipo: tipo === 'carregando' ? 'servidor' : tipo === 'ok' ? 'ok' : 'erro', texto });
+      mostrarSinc();
     };
-    sincronizarMusica(alvo, { refazer, status });
+    sincronizarMusica(alvo, { refazer, status }).then((r) => {
+      if (r === 'ajustar') { sincEstado.set(yt, { tipo: 'ajustar' }); mostrarSinc(); }
+    });
   };
   // o "Tocando agora" na tela toda (tablet): o botão do canto de cima troca entre expandir e voltar ao painel
   // No celular e no computador a tela toda é o próprio "Tocando agora": o player muda de jeito (html.pp) só enquanto
@@ -1656,6 +1734,39 @@ const player = (() => {
     if (b.dataset.pl === 'cheio') { letraCheia(true); return; }
     if (b.dataset.pl === 'letra-fechar') { letraCheia(false); return; }
     if (b.dataset.pl === 'ver-cifra' && atual?.href) { verCifra(atual.href); return; }
+    if (b.dataset.pl === 'sinc-ajustar') { ajustando = true; ajustandoVideo = atual?.youtube || ''; mostrarSinc(); letraCheia(true); return; }
+    if (b.dataset.pl === 'sinc-pronto') {
+      ajustando = false;
+      const song = musicaTocando();
+      if (song?.sincronia?.ajustar) { const sinc = { ...song.sincronia }; delete sinc.ajustar; guardarSincronia(alvoDaMusica(song), sinc); }
+      sincEstado.set(atual.youtube, { tipo: 'ok', texto: 'Letra sincronizada', visto: true });
+      mostrarSinc();
+      return;
+    }
+    if (b.dataset.pl === 'sinc-marcar') {
+      const song = musicaTocando();
+      const linhas = song ? linhasCantadas(song.content).map(linhaSemCifra).filter(Boolean) : [];
+      if (!linhas.length) { toast('Esta música não tem letra para sincronizar'); return; }
+      marcando = { video: atual.youtube, linhas, tempos: [] };
+      ajustando = false;
+      letraDe = '';
+      desenharLetra();
+      letraCheia(true);
+      api.irPara(0); // do começo, tocando: um toque em "Agora" quando cada frase começar
+      return;
+    }
+    if (b.dataset.pl === 'sinc-agora') { marcarFrase(); return; }
+    if (b.dataset.pl === 'sinc-desfazer' && marcando) {
+      marcando.tempos.pop();
+      const n = marcando.tempos.length;
+      if (n) marcando.tempos[n - 1].fim = marcando.tempos[n - 1].inicio + 5;
+      $('.pl-linhas', el).querySelectorAll('p[data-k]').forEach((p) => { const i = Number(p.dataset.k); p.classList.toggle('agora', i === n - 1); p.classList.toggle('cantada', i < n - 1); });
+      if (n) api.irPara(Math.max(0, marcando.tempos[n - 1].inicio - 2));
+      mostrarSinc();
+      return;
+    }
+    if (b.dataset.pl === 'sinc-cancelar') { marcando = null; letraDe = ''; desenharLetra(); return; }
+    if (b.dataset.pl === 'sinc-servidor') { const song = musicaTocando(); if (song) sincronizarDoPlayer(song, true); return; }
     if (b.dataset.pl === 'aleatorio') {
       aleatorio = !aleatorio;
       db.setPref('aleatorio', aleatorio);
@@ -8729,19 +8840,17 @@ const tentouSincronizar = new Set();
 const ETAPAS_SINC = { baixando: 'Baixando o áudio do vídeo…', separando: 'Separando a voz…', ouvindo: 'Ouvindo a letra no vídeo…', alinhando: 'Acertando cada linha…', fila: 'Esperando a vez no servidor…' };
 const sincronizando = new Set();
 // soLrclib: a busca automática do Tocando agora (só o LRCLIB: sem servidor e sem avisos)
+// Devolve o que aconteceu: 'ok', 'ajustar' (a letra veio, falta acertar onde a música começa no vídeo), 'nada' (não
+// achou, só LRCLIB), 'erro' ou undefined (já sincronizando, sem letra)
 async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrclib = false, status = () => {} } = {}) {
-  if (sincronizando.has(song.id)) return;
+  if (sincronizando.has(song.id)) return undefined;
   const cantadas = linhasCantadas(song.content).map(linhaSemCifra).filter(Boolean);
-  if (!cantadas.length) { if (!sozinho) status('erro', 'Esta música não tem letra para sincronizar'); return; }
+  if (!cantadas.length) { if (!sozinho) status('erro', 'Esta música não tem letra para sincronizar'); return undefined; }
   sincronizando.add(song.id);
   if (!soLrclib) tentouSincronizar.add(song.youtube);
   const isPreview = song.id === 'previa';
   const aqui = isPreview ? '' : `#/musica/${song.id}`;
-  const guardar = (sinc) => {
-    song.sincronia = sinc;
-    if (isPreview) { if (preview) preview.sincronia = sinc; } else db.updateSong(song.id, { sincronia: sinc });
-    player.atualizar({}); // a letra do Tocando agora passa a acompanhar
-  };
+  const guardar = (sinc) => guardarSincronia(song, sinc);
   // primeiro, sem servidor: a letra já sincronizada do LRCLIB (na hora), se for da mesma música e tiver a duração do
   // vídeo. O "Refazer" (sincronia errada) e as músicas que não estão lá vão para o servidor, que ouve o áudio
   if (!refazer) {
@@ -8749,20 +8858,21 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
     const duracao = (player.desta(song.youtube) && player.duracao) || await duracaoDaMusica(song).catch(() => 0);
     const lrc = await letraSincronizada({ titulo: tituloLimpo(song.title), artista: song.artist || '', duracao }).catch(() => null);
     if (lrc) {
-      guardar({ video: song.youtube, linhas: lrc.linhas, tempos: lrc.tempos, fonte: 'lrclib' });
+      guardar({ video: song.youtube, linhas: lrc.linhas, tempos: lrc.tempos, fonte: 'lrclib', ...(lrc.ajustar ? { ajustar: true } : {}) });
       sincronizando.delete(song.id);
-      status('ok', `Letra sincronizada: ${lrc.linhas.length} linhas (LRCLIB). Dê play e ela acompanha.`,
+      if (lrc.ajustar) status('ok', 'A letra veio, mas o vídeo tem uma parte antes da música: no Tocando agora, toque na frase quando ela for cantada.');
+      else status('ok', `Letra sincronizada: ${lrc.linhas.length} linhas (LRCLIB). Dê play e ela acompanha.`,
         `<button class="btn small" data-sinc="de-novo" data-refazer="1">${icon('refresh', 14)} Ficou fora do tempo? Ouvir o vídeo</button>`);
       if (!sozinho) notificar('Dê play: a letra acompanha, e tocar numa linha vai até ela.', { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
-      return;
+      return lrc.ajustar ? 'ajustar' : 'ok';
     }
   }
-  if (soLrclib) { sincronizando.delete(song.id); return; }
+  if (soLrclib) { sincronizando.delete(song.id); return 'nada'; }
   if (!servidorIA().url) {
     sincronizando.delete(song.id);
     if (!sozinho) status('erro', refazer ? 'O servidor da IA não está disponível agora. Tente de novo daqui a pouco.'
       : 'Esta música não tem letra sincronizada pronta, e o servidor que ouve o vídeo não está disponível agora.');
-    return;
+    return 'erro';
   }
   status('carregando', refazer ? 'Sincronizando de novo, com mais precisão…' : 'Sincronizando a letra com o vídeo…');
   try {
@@ -8772,6 +8882,7 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
     status('ok', `Letra sincronizada: ${r.achadas} de ${r.total} linhas. Dê play e ela acompanha.`,
       refazer ? '' : `<button class="btn small" data-sinc="de-novo" data-refazer="1">${icon('refresh', 14)} Ficou errada? Refazer</button>`);
     notificar(`${r.achadas} de ${r.total} linhas ouvidas no vídeo. Dê play: a letra acompanha, e tocar numa linha vai até ela.`, { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
+    return 'ok';
   } catch (e) {
     const motivo = erroExplicado(e);
     status('erro', `Não sincronizou: ${motivo}`, e.status === 403
@@ -8783,7 +8894,14 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
     // servidor ocupado (com a partitura ou a letra de outra música) ou sem resposta: não foi culpa desta música,
     // então tenta de novo da próxima vez que ela abrir (antes ficava sem sincronizar até fechar e abrir o app)
     if (e.status === 503 || !e.status) tentouSincronizar.delete(song.youtube);
+    return 'erro';
   } finally { sincronizando.delete(song.id); }
+}
+// guarda a sincronia na música (a salva ou a prévia da busca) e o Tocando agora passa a acompanhar
+function guardarSincronia(song, sinc) {
+  song.sincronia = sinc;
+  if (song.id === 'previa') { if (preview) preview.sincronia = sinc; } else if (db.song(song.id)) db.updateSong(song.id, { sincronia: sinc });
+  player.atualizar({});
 }
 
 

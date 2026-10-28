@@ -448,8 +448,9 @@ export function sincroniaDoLrc(lrc, duracao = 0) {
 }
 
 // A letra com o tempo de cada linha, do LRCLIB (aberto, com CORS: sem servidor). Só vale a da mesma música (título e,
-// quando se sabe, artista) e, sabendo a duração do vídeo, a de duração parecida (até 4 s de diferença): o tempo do
-// LRC é o da gravação; um clipe com introdução ou uma versão ao vivo sairiam fora do tempo
+// quando se sabe, artista). O tempo do LRC é o da gravação: com a duração do vídeo parecida (até 4 s de diferença),
+// vale como está; com a duração bem diferente (um clipe com uma cena antes da música, como o de "Speed Demon", ou uma
+// versão editada), vem com ajustar: true: a letra está certa, mas falta acertar onde a música começa no vídeo
 export async function letraSincronizada({ titulo = '', artista = '', duracao = 0 } = {}, fetchImpl) {
   const t = String(titulo || '').trim();
   const a = String(artista || '').trim();
@@ -463,14 +464,21 @@ export async function letraSincronizada({ titulo = '', artista = '', duracao = 0
     a && `track_name=${encodeURIComponent(t)}&artist_name=${encodeURIComponent(a)}`,
     `q=${encodeURIComponent(`${t} ${a}`.trim())}`,
   ].filter(Boolean);
+  const bate = (r) => !(duracao > 0) || !(r.duration > 0) || Math.abs(r.duration - duracao) <= 4;
+  let fora = null; // a mesma música, mas com outra duração
   for (const params of tentativas) {
     const lista = await pedir(params).catch(() => []);
-    const achada = (Array.isArray(lista) ? lista : []).find((r) => r.syncedLyrics && !r.instrumental && mesmoTitulo(r.trackName, t)
-      && (!a || mesmoArtista(r.artistName, a)) && (!(duracao > 0) || !(r.duration > 0) || Math.abs(r.duration - duracao) <= 4));
+    const mesmas = (Array.isArray(lista) ? lista : []).filter((r) => r.syncedLyrics && !r.instrumental && mesmoTitulo(r.trackName, t) && (!a || mesmoArtista(r.artistName, a)));
+    const achada = mesmas.find(bate);
     if (achada) {
       const sinc = sincroniaDoLrc(achada.syncedLyrics, achada.duration || duracao);
       if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: achada.id };
     }
+    fora = fora || mesmas[0] || null;
+  }
+  if (fora) {
+    const sinc = sincroniaDoLrc(fora.syncedLyrics, fora.duration);
+    if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: fora.id, ajustar: true };
   }
   return null;
 }
