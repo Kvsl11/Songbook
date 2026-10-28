@@ -7,6 +7,7 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'novo', texto: 'No celular, tocar na barrinha do player abre o Tocando agora na tela toda, como no Spotify: a setinha para fechar, o vídeo (ou a capa), o nome com o ✓, a barra, os controles, compartilhar, a fila, a letra e os cartões do artista. O voltar do celular fecha a tela.' },
       { tipo: 'novo', texto: 'No computador, a barra de baixo ganhou o ✓ da biblioteca ao lado do nome e, à direita, os botões Tocando agora, Fila e Ouvir em outro aparelho. O Tocando agora abre na área principal, com o menu da esquerda à vista.' },
+      { tipo: 'correcao', texto: 'Os controles do player ficaram alinhados no celular e no computador: o repetir e o aleatório aparecem sempre, um em cada ponta (aleatório, anterior, tocar, próxima, repetir). Sem fila, o aleatório fica apagado.' },
     ],
   },
   {

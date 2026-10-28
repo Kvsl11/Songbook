@@ -1522,10 +1522,17 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 #player .pl-modo.ligado::after { content: ""; position: absolute; left: 50%; bottom: 2px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: currentColor; }
 #player .pl-um { display: none; position: absolute; top: 5px; right: 4px; min-width: 12px; height: 12px; border-radius: 6px; background: var(--accent); color: var(--on-accent); font: 800 9px/12px var(--sans); text-align: center; font-style: normal; }
 #player .pl-repetir.uma .pl-um { display: block; }
-/* celular: a barra é estreita — aleatório e repetir aparecem com o vídeo ampliado */
+/* celular: aleatório e repetir sempre nas pontas dos controles (simétricos: aleatório | anterior tocar próxima | repetir;
+   sem fila, aleatório fica apagado). Para caber, sai o ampliar: tocar na barrinha já abre o Tocando agora na tela toda */
+#player .pl-aleat { display: grid; }
+#player .pl-modo:disabled { opacity: 0.35; cursor: default; }
 @media (max-width: 599px) {
-  #player .pl-modo, #player.com-fila .pl-aleat { display: none; }
-  #player.grande .pl-repetir, #player.grande.com-fila .pl-aleat { display: grid; }
+  html:not(.tablet) #player .pl-lado [data-pl="ampliar"] { display: none; }
+  html:not(.tablet) #player .pl-modo { width: 30px; height: 30px; }
+  html:not(.tablet) #player .pl-modo svg { width: 16px; height: 16px; }
+  html:not(.tablet) #player .pl-ctrl { gap: 0; }
+  html:not(.tablet):not(.pp) #player .pl-video { width: 72px; }
+  html:not(.tablet):not(.pp) #player .pl-info { padding: 6px 4px 6px 8px; }
 }
 
 /* letra: entra e sai em degradês longos (do vídeo para a letra e da letra para as Referências) */
