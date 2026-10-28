@@ -3551,3 +3551,10 @@ dialog.aparelhos-dlg[open] { display: flex; flex-direction: column; }
 html.tablet .pt-topo h2 { font-size: 34px; }
 html.tablet .pt-atalho-txt b { font-size: 17.5px; }
 html.tablet .pt-atalho-txt small { font-size: 15px; }
+
+/* música sem vídeo no Tocando agora (celular): a capa (ou a cor da música com uma nota), sem a pílula de trocar; fora
+   da tela toda ela não vira barrinha (a que tocava antes continua lá) */
+body:not(.painel-cheio) #player.sem-video { display: none !important; }
+html.pp #player.sem-video .pl-troca { display: none; }
+#player .pl-video.sem-capa, html.pp #player.modo-capa .pl-video.sem-capa { display: grid; place-items: center; color: rgb(255 255 255 / 0.9);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cor-musica, var(--tint)) 80%, #fff 10%), color-mix(in srgb, var(--cor-musica, var(--tint)) 55%, #000)); }
