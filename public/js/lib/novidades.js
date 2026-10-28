@@ -3,6 +3,13 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 243, data: '2026-10-28', titulo: 'Partituras mais limpas',
+    itens: [
+      { tipo: 'melhoria', texto: 'A tela de Partituras ficou limpa e moderna: o título, dois atalhos simples (Nova partitura e Gerar com IA), as suas partituras em lista com ensaiar e os ⋮ (editar, abrir a cifra, apagar) e o Acervo litúrgico.' },
+      { tipo: 'correcao', texto: 'Expandir a letra pelo Tocando agora e fechar volta para o Tocando agora, e não mais para a página antiga da música.' },
+    ],
+  },
+  {
     versao: 242, data: '2026-10-28', titulo: 'Tocando agora: letra, busca e aparelhos',
     itens: [
       { tipo: 'correcao', texto: 'Expandir a letra no Tocando agora abre a letra na tela toda (antes voltava para o início).' },
