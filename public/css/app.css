@@ -2887,120 +2887,159 @@ html.tablet .quick .cover { width: 72px; height: 72px; }
   html.tablet .quick .cover { width: 84px; height: 84px; }
 }
 /* o painel "Tocando agora" */
-html.tablet #player {
+html.pp #player {
   position: fixed; z-index: 25; top: 8px; right: 8px; bottom: 8px; left: auto; width: var(--painel-w); height: auto;
   display: flex; flex-direction: column; gap: 14px; padding: 16px 18px 18px; overflow-y: auto; overscroll-behavior: contain;
   border-radius: var(--radius); box-shadow: none; animation: surgir 0.3s both;
   background: linear-gradient(180deg, color-mix(in srgb, var(--cor-musica, var(--tint)) 88%, #000) 0%, color-mix(in srgb, var(--cor-musica, var(--tint)) 45%, #121212) 55%, #121212 100%);
 }
-html.tablet #player[hidden] { display: none; }
-html.tablet #player > * { grid-area: auto; align-self: stretch; justify-self: auto; max-width: none; }
+html.pp #player[hidden] { display: none; }
+html.pp #player > * { grid-area: auto; align-self: stretch; justify-self: auto; max-width: none; }
 /* o topo, como no Spotify do tablet: à esquerda o painel (expandir/voltar) e o minimizar, no meio de onde toca, à direita os ⋮ */
-html.tablet #player .pl-cab { order: 0; display: grid; grid-template-columns: 1fr minmax(0, auto) 1fr; align-items: center; gap: 8px; min-height: 40px; margin: -4px -6px 0; }
-html.tablet #player .pl-cab-esq { display: flex; gap: 2px; justify-self: start; }
-html.tablet #player .pl-cab-dir { display: flex; justify-self: end; }
-html.tablet #player .pl-cab-meio { min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
-html.tablet #player .pl-cab small { font-size: 12px; color: rgb(255 255 255 / 0.75); }
-html.tablet #player .pl-cab b { font-size: 15px; font-weight: 800; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-html.tablet #player .pl-cab b:empty { display: none; }
-html.tablet #player .pl-cab .icon-btn { width: 40px; height: 40px; flex: none; color: rgb(255 255 255 / 0.85); }
-html.tablet #player .pl-mais svg { transform: rotate(90deg); } /* os ⋮ em pé */
-html.tablet #player .pl-lado { display: none; }
-html.tablet #player .pl-video { order: 1; width: 100%; margin: 0; border-radius: 12px; box-shadow: 0 12px 30px rgb(0 0 0 / 0.4); flex: none; }
+html.pp #player .pl-cab { order: 0; display: grid; grid-template-columns: 1fr minmax(0, auto) 1fr; align-items: center; gap: 8px; min-height: 40px; margin: -4px -6px 0; }
+html.pp #player .pl-cab-esq { display: flex; gap: 2px; justify-self: start; }
+html.pp #player .pl-cab-dir { display: flex; justify-self: end; }
+html.pp #player .pl-cab-meio { min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
+html.pp #player .pl-cab small { font-size: 12px; color: rgb(255 255 255 / 0.75); }
+html.pp #player .pl-cab b { font-size: 15px; font-weight: 800; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.pp #player .pl-cab b:empty { display: none; }
+html.pp #player .pl-cab .icon-btn { width: 40px; height: 40px; flex: none; color: rgb(255 255 255 / 0.85); }
+html.pp #player .pl-mais svg { transform: rotate(90deg); } /* os ⋮ em pé */
+html.pp #player .pl-lado { display: none; }
+html.pp #player .pl-video { order: 1; width: 100%; margin: 0; border-radius: 12px; box-shadow: 0 12px 30px rgb(0 0 0 / 0.4); flex: none; }
 /* a capa no lugar do vídeo ("Mudar para capa"): quadrada; o quadro do YouTube tem faixas pretas em cima e embaixo, que ficam de fora */
-html.tablet #player.modo-capa .pl-video { aspect-ratio: 1 / 1; background: #000 center / cover no-repeat; }
-html.tablet #player.modo-capa .pl-video.capa-yt { background-size: auto 134%; }
+html.pp #player.modo-capa .pl-video { aspect-ratio: 1 / 1; background: #000 center / cover no-repeat; }
+html.pp #player.modo-capa .pl-video.capa-yt { background-size: auto 134%; }
 /* a frase cantada agora (com a letra sincronizada), em cima do nome */
-html.tablet #player .pl-frase { order: 2; margin: 6px 2px 0; font-size: 16px; font-weight: 800; line-height: 1.3; color: #fff; min-height: 1.3em; }
-html.tablet #player .pl-frase[hidden] { display: none; }
+html.pp #player .pl-frase { order: 2; margin: 6px 2px 0; font-size: 16px; font-weight: 800; line-height: 1.3; color: #fff; min-height: 1.3em; }
+html.pp #player .pl-frase[hidden] { display: none; }
 /* "Mudar para vídeo / capa": a pílula escura */
-html.tablet #player .pl-troca { order: 3; align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px 0 12px; border: 0; border-radius: 10px;
+html.pp #player .pl-troca { order: 3; align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px 0 12px; border: 0; border-radius: 10px;
   background: rgb(0 0 0 / 0.55); color: #fff; font: 800 15px var(--sans); cursor: pointer; }
-html.tablet #player .pl-troca:active { transform: scale(0.97); }
+html.pp #player .pl-troca:active { transform: scale(0.97); }
 /* o nome e o artista, com o ✓/+ da biblioteca à direita */
-html.tablet #player .pl-meio { order: 4; display: flex; align-items: center; gap: 12px; }
-html.tablet #player .pl-info { flex: 1; min-width: 0; padding: 0 2px; margin: 0; }
-html.tablet #player .pl-salva { display: inline-grid; width: 34px; height: 34px; border-color: rgb(255 255 255 / 0.85); color: #fff; }
-html.tablet #player .pl-salva.salva { border-color: var(--accent); color: var(--on-accent); }
-html.tablet #player .pl-txt b { font-size: 22px; letter-spacing: -0.01em; white-space: normal; }
-html.tablet #player .pl-txt small { font-size: 15px; margin-top: 2px; }
-html.tablet #player .pl-tmini { display: none; }
-html.tablet #player .pl-tempo { order: 5; display: grid; grid-template-columns: 1fr 1fr; grid-template-areas: "barra barra" "t0 t1"; gap: 6px 0; margin: 0; }
-html.tablet #player .pl-prog { grid-area: barra; height: 4px; overflow: visible; cursor: pointer; }
-html.tablet #player .pl-prog i { position: relative; }
-html.tablet #player .pl-prog i::after { content: ""; position: absolute; right: -6px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; background: #fff; }
-html.tablet #player .pl-t0, html.tablet #player .pl-t1 { display: block; min-width: 0; }
-html.tablet #player .pl-t0 { grid-area: t0; text-align: left; }
-html.tablet #player .pl-t1 { grid-area: t1; text-align: right; }
-html.tablet #player .pl-ctrl { order: 6; justify-content: space-between; gap: 6px; padding: 0; }
-html.tablet #player .pl-aleat { display: grid; }
-html.tablet #player .pl-modo:disabled { opacity: 0.35; cursor: default; }
+html.pp #player .pl-meio { order: 4; display: flex; align-items: center; gap: 12px; }
+html.pp #player .pl-info { flex: 1; min-width: 0; padding: 0 2px; margin: 0; }
+html.pp #player .pl-salva { display: inline-grid; width: 34px; height: 34px; border-color: rgb(255 255 255 / 0.85); color: #fff; }
+html.pp #player .pl-salva.salva { border-color: var(--accent); color: var(--on-accent); }
+html.pp #player .pl-txt b { font-size: 22px; letter-spacing: -0.01em; white-space: normal; }
+html.pp #player .pl-txt small { font-size: 15px; margin-top: 2px; }
+html.pp #player .pl-tmini { display: none; }
+html.pp #player .pl-tempo { order: 5; display: grid; grid-template-columns: 1fr 1fr; grid-template-areas: "barra barra" "t0 t1"; gap: 6px 0; margin: 0; }
+html.pp #player .pl-prog { grid-area: barra; height: 4px; overflow: visible; cursor: pointer; }
+html.pp #player .pl-prog i { position: relative; }
+html.pp #player .pl-prog i::after { content: ""; position: absolute; right: -6px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; background: #fff; }
+html.pp #player .pl-t0, html.pp #player .pl-t1 { display: block; min-width: 0; }
+html.pp #player .pl-t0 { grid-area: t0; text-align: left; }
+html.pp #player .pl-t1 { grid-area: t1; text-align: right; }
+html.pp #player .pl-ctrl { order: 6; justify-content: space-between; gap: 6px; padding: 0; }
+html.pp #player .pl-aleat, html.pp #player .pl-repetir { display: grid; }
+html.pp #player .pl-modo:disabled { opacity: 0.35; cursor: default; }
 /* embaixo dos controles: ouvir em outro aparelho à esquerda; compartilhar e a fila à direita */
-html.tablet #player .pl-acoes { order: 7; display: flex; align-items: center; gap: 4px; margin: -6px -8px 0; }
-html.tablet #player .pl-acoes .grow { flex: 1; }
-html.tablet #player .pl-acoes .icon-btn { color: rgb(255 255 255 / 0.9); }
-html.tablet #player .pl-play { width: 64px; height: 64px; background: #fff; color: #000; border-radius: 50%; }
-html.tablet #player .pl-pulo { display: grid; width: 48px; height: 48px; }
-html.tablet #player .pl-modo { width: 44px; height: 44px; }
-html.tablet #player .pl-letra { order: 8; flex: 1 0 auto; display: flex; flex-direction: column; min-height: 240px; max-height: 60vh; padding: 16px 18px; border-radius: 14px;
+html.pp #player .pl-acoes { order: 7; display: flex; align-items: center; gap: 4px; margin: -6px -8px 0; }
+html.pp #player .pl-acoes .grow { flex: 1; }
+html.pp #player .pl-acoes .icon-btn { color: rgb(255 255 255 / 0.9); }
+html.pp #player .pl-play { width: 64px; height: 64px; background: #fff; color: #000; border-radius: 50%; }
+html.pp #player .pl-pulo { display: grid; width: 48px; height: 48px; }
+html.pp #player .pl-modo { width: 44px; height: 44px; }
+html.pp #player .pl-letra { order: 8; flex: 1 0 auto; display: flex; flex-direction: column; min-height: 240px; max-height: 60vh; padding: 16px 18px; border-radius: 14px;
   background: color-mix(in srgb, var(--cor-musica, var(--tint)) 60%, #000); }
-html.tablet #player .pl-letra[hidden] { display: none; }
-html.tablet #player .pl-letra-cab { display: flex; align-items: center; justify-content: space-between; margin: -4px -6px 8px 0; }
-html.tablet #player .pl-letra h3 { margin: 0; font-size: 17px; font-weight: 800; }
-html.tablet #player .pl-letra-bts { display: flex; gap: 8px; }
-html.tablet #player .pl-letra-cab .icon-btn { width: 34px; height: 34px; background: rgb(0 0 0 / 0.25); }
-html.tablet #player .pl-linhas { flex: 1; min-height: 0; overflow-y: auto; scroll-behavior: smooth; }
-html.tablet #player .pl-linhas p { margin: 0 0 12px; font-size: 21px; font-weight: 800; line-height: 1.3; color: rgb(255 255 255 / 0.95); }
-html.tablet #player .pl-letra.sincronizada .pl-linhas p { color: rgb(0 0 0 / 0.55); cursor: pointer; transform-origin: left center; transition: color 0.18s, transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
-html.tablet #player .pl-letra.sincronizada .pl-linhas p.cantada { color: rgb(255 255 255 / 0.55); }
-html.tablet #player .pl-letra.sincronizada .pl-linhas p.agora { color: #fff; transform: scale(1.03); text-shadow: 0 0 16px rgb(255 255 255 / 0.3); animation: linha-salta 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+html.pp #player .pl-letra[hidden] { display: none; }
+html.pp #player .pl-letra-cab { display: flex; align-items: center; justify-content: space-between; margin: -4px -6px 8px 0; }
+html.pp #player .pl-letra h3 { margin: 0; font-size: 17px; font-weight: 800; }
+html.pp #player .pl-letra-bts { display: flex; gap: 8px; }
+html.pp #player .pl-letra-cab .icon-btn { width: 34px; height: 34px; background: rgb(0 0 0 / 0.25); }
+html.pp #player .pl-linhas { flex: 1; min-height: 0; overflow-y: auto; scroll-behavior: smooth; }
+html.pp #player .pl-linhas p { margin: 0 0 12px; font-size: 21px; font-weight: 800; line-height: 1.3; color: rgb(255 255 255 / 0.95); }
+html.pp #player .pl-letra.sincronizada .pl-linhas p { color: rgb(0 0 0 / 0.55); cursor: pointer; transform-origin: left center; transition: color 0.18s, transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+html.pp #player .pl-letra.sincronizada .pl-linhas p.cantada { color: rgb(255 255 255 / 0.55); }
+html.pp #player .pl-letra.sincronizada .pl-linhas p.agora { color: #fff; transform: scale(1.03); text-shadow: 0 0 16px rgb(255 255 255 / 0.3); animation: linha-salta 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
 #player .pl-cab, #player .pl-letra, #player .pl-salva, #player .pl-extra, #player .pl-frase, #player .pl-troca, #player .pl-acoes { display: none; }
 #player .pl-meio { display: contents; }
 /* embaixo da letra: os cartões do artista, dos créditos e do vídeo (rolando o painel) */
-html.tablet #player .pl-extra { order: 9; display: grid; gap: 12px; flex: none; }
-html.tablet #player .pl-extra[hidden] { display: none; }
-html.tablet #player .pl-cartao { --text: #fff; --muted: rgb(255 255 255 / 0.7); display: grid; gap: 2px; padding: 16px 18px 12px; border-radius: 14px; color: #fff;
+html.pp #player .pl-extra { order: 9; display: grid; gap: 12px; flex: none; }
+html.pp #player .pl-extra[hidden] { display: none; }
+html.pp #player .pl-cartao { --text: #fff; --muted: rgb(255 255 255 / 0.7); display: grid; gap: 2px; padding: 16px 18px 12px; border-radius: 14px; color: #fff;
   background: color-mix(in srgb, var(--cor-musica, var(--tint)) 35%, #1c1c1c); }
-html.tablet #player .pl-cartao h4 { margin: 0 0 8px; font-size: 17px; font-weight: 800; }
-html.tablet #player .pl-cartao .ref-pilula { border-color: rgb(255 255 255 / 0.55); color: #fff; }
-html.tablet #player .pl-cartao .ref-linha a { color: #fff; }
-html.tablet #player .pl-artista { padding: 0; overflow: hidden; }
-html.tablet #player .pl-artista-foto { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 10; background: color-mix(in srgb, var(--cor-musica, var(--tint)) 70%, #000) center 25% / cover no-repeat; }
-html.tablet #player .pl-artista-foto span { font-size: 54px; font-weight: 900; color: rgb(255 255 255 / 0.85); }
-html.tablet #player .pl-artista-foto.com-foto span { display: none; }
-html.tablet #player .pl-artista-foto::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(0 0 0 / 0.45) 0%, transparent 35%, transparent 70%, rgb(0 0 0 / 0.35) 100%); }
-html.tablet #player .pl-artista-foto h4 { position: absolute; z-index: 1; left: 18px; top: 14px; margin: 0; text-shadow: 0 1px 8px rgb(0 0 0 / 0.5); }
-html.tablet #player .pl-artista-pe { display: flex; align-items: center; gap: 12px; padding: 14px 18px 16px; }
-html.tablet #player .pl-artista-pe .grow { flex: 1; min-width: 0; display: grid; gap: 2px; }
-html.tablet #player .pl-artista-pe b { font-size: 18px; font-weight: 800; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-html.tablet #player .pl-artista-pe small { color: rgb(255 255 255 / 0.7); font-size: 13.5px; }
+html.pp #player .pl-cartao h4 { margin: 0 0 8px; font-size: 17px; font-weight: 800; }
+html.pp #player .pl-cartao .ref-pilula { border-color: rgb(255 255 255 / 0.55); color: #fff; }
+html.pp #player .pl-cartao .ref-linha a { color: #fff; }
+html.pp #player .pl-artista { padding: 0; overflow: hidden; }
+html.pp #player .pl-artista-foto { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 10; background: color-mix(in srgb, var(--cor-musica, var(--tint)) 70%, #000) center 25% / cover no-repeat; }
+html.pp #player .pl-artista-foto span { font-size: 54px; font-weight: 900; color: rgb(255 255 255 / 0.85); }
+html.pp #player .pl-artista-foto.com-foto span { display: none; }
+html.pp #player .pl-artista-foto::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(0 0 0 / 0.45) 0%, transparent 35%, transparent 70%, rgb(0 0 0 / 0.35) 100%); }
+html.pp #player .pl-artista-foto h4 { position: absolute; z-index: 1; left: 18px; top: 14px; margin: 0; text-shadow: 0 1px 8px rgb(0 0 0 / 0.5); }
+html.pp #player .pl-artista-pe { display: flex; align-items: center; gap: 12px; padding: 14px 18px 16px; }
+html.pp #player .pl-artista-pe .grow { flex: 1; min-width: 0; display: grid; gap: 2px; }
+html.pp #player .pl-artista-pe b { font-size: 18px; font-weight: 800; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+html.pp #player .pl-artista-pe small { color: rgb(255 255 255 / 0.7); font-size: 13.5px; }
 
 /* "Tocando agora" na tela toda (o botão do painel, no canto de cima), como no Spotify do tablet: uma coluna só, no
    centro — o vídeo (ou a capa) em cima, a frase, o nome com o ✓, a barra, os controles de ponta a ponta, os botões de
    baixo e a letra num cartão; o topo vai de canto a canto. O menu de baixo fica escondido */
-html.tablet body.painel-cheio #player { z-index: 40; left: 8px; width: auto; padding: 16px 28px 28px; gap: 16px; }
+html.pp body.painel-cheio #player { z-index: 40; left: 8px; width: auto; padding: 16px 28px 28px; gap: 16px; }
 html.tablet body.painel-cheio .nav { display: none; }
-html.tablet body.painel-cheio #player > :not(.pl-cab):not(.pl-troca):not(.pl-video) { width: min(100%, 860px); align-self: center; }
-html.tablet body.painel-cheio #player .pl-video { align-self: center; }
+@media (max-width: 899px) { html.pp body.painel-cheio .nav { display: none; } } /* no computador o menu da esquerda fica */
+html.pp body.painel-cheio #player > :not(.pl-cab):not(.pl-troca):not(.pl-video) { width: min(100%, 860px); align-self: center; }
+html.pp body.painel-cheio #player .pl-video { align-self: center; }
 /* o vídeo acompanha o painel: na tela toda o painel sobe (z-index 40), e o vídeo tem de ficar acima dele (antes ficava preto) */
-html.tablet body.painel-cheio #pl-tela:not(.no-palco):not(.na-telinha) { z-index: 41; }
-html.tablet #pl-tela:not(.no-palco):not(.na-telinha) { border-radius: 12px; }
+html.pp body.painel-cheio #pl-tela:not(.no-palco):not(.na-telinha) { z-index: 41; }
+html.pp #pl-tela:not(.no-palco):not(.na-telinha) { border-radius: 12px; }
 html.tablet body.painel-recolhido #pl-tela:not(.no-palco):not(.na-telinha) { border-radius: 8px; }
-html.tablet body.painel-cheio #player .pl-troca { margin-left: max(0px, calc((100% - 860px) / 2)); }
-html.tablet body.painel-cheio #player .pl-recolher { display: none; }
+html.pp body.painel-cheio #player .pl-troca { margin-left: max(0px, calc((100% - 860px) / 2)); }
+html.pp body.painel-cheio #player .pl-recolher { display: none; }
 /* o vídeo no centro, do tamanho que cabe com os controles na tela; a capa, quadrada */
-html.tablet body.painel-cheio #player .pl-video { width: clamp(280px, calc((100dvh - 440px) * 16 / 9), min(100%, 720px)); box-shadow: 0 18px 44px rgb(0 0 0 / 0.5); }
-html.tablet body.painel-cheio #player.modo-capa .pl-video { width: clamp(220px, calc(100dvh - 460px), min(100%, 460px)); }
-html.tablet body.painel-cheio #player .pl-frase { margin-top: 18px; font-size: 18px; }
-html.tablet body.painel-cheio #player .pl-txt b { font-size: 26px; }
-html.tablet body.painel-cheio #player .pl-txt small { font-size: 18px; }
-html.tablet body.painel-cheio #player .pl-play { width: 72px; height: 72px; }
-html.tablet body.painel-cheio #player .pl-letra { min-height: 320px; max-height: 62vh; }
-html.tablet body.painel-cheio #player .pl-letra .pl-linhas p { font-size: 28px; }
-html.tablet body.painel-cheio #player .pl-extra { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: start; }
+html.pp body.painel-cheio #player .pl-video { width: clamp(280px, calc((100dvh - 440px) * 16 / 9), min(100%, 720px)); box-shadow: 0 18px 44px rgb(0 0 0 / 0.5); }
+html.pp body.painel-cheio #player.modo-capa .pl-video { width: clamp(220px, calc(100dvh - 460px), min(100%, 460px)); }
+html.pp body.painel-cheio #player .pl-frase { margin-top: 18px; font-size: 18px; }
+html.pp body.painel-cheio #player .pl-txt b { font-size: 26px; }
+html.pp body.painel-cheio #player .pl-txt small { font-size: 18px; }
+html.pp body.painel-cheio #player .pl-play { width: 72px; height: 72px; }
+html.pp body.painel-cheio #player .pl-letra { min-height: 320px; max-height: 62vh; }
+html.pp body.painel-cheio #player .pl-letra .pl-linhas p { font-size: 28px; }
+html.pp body.painel-cheio #player .pl-extra { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: start; }
 @media (orientation: portrait) {
-  html.tablet body.painel-cheio #player .pl-video { width: min(100%, 720px); }
-  html.tablet body.painel-cheio #player.modo-capa .pl-video { width: min(100%, 560px); }
+  html.pp body.painel-cheio #player .pl-video { width: min(100%, 720px); }
+  html.pp body.painel-cheio #player.modo-capa .pl-video { width: min(100%, 560px); }
+}
+
+/* celular e computador: o "Tocando agora" é a tela toda, aberta pela barrinha do player (no celular, tocando nela; no
+   computador, pelo botão do painel na barra), com o mesmo jeito do tablet. Fica dentro da coluna principal (no computador
+   o menu da esquerda continua à vista, como no Spotify) */
+html.pp:not(.tablet) body.painel-cheio #player { position: absolute; inset: 0; z-index: 40; width: auto; height: auto; border-radius: 0; box-shadow: none; animation: subir-tela 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+html.pp:not(.tablet) body.painel-cheio #pl-tela:not(.no-palco):not(.na-telinha) { z-index: 41; }
+@keyframes subir-tela { from { transform: translateY(24px); opacity: 0; } }
+/* no celular: o topo é a setinha (fechar), de onde toca e os ⋮, como no Spotify do celular; tudo mais junto */
+html.pp:not(.tablet) body.painel-cheio #player .pl-cab-esq [data-pl="expandir"] { display: none; }
+html.pp:not(.tablet) body.painel-cheio #player .pl-recolher { display: grid; }
+@media (max-width: 899px) {
+  html.pp:not(.tablet) body.painel-cheio #player { padding: calc(10px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)); gap: 14px; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-video { width: 100%; margin-top: 10px; }
+  html.pp:not(.tablet) body.painel-cheio #player.modo-capa .pl-video { width: min(100%, 420px); }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-frase { margin-top: 8px; font-size: 16px; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-txt b { font-size: 22px; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-txt small { font-size: 16px; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-ctrl { padding: 0; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-play { width: 64px; height: 64px; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-letra { min-height: 280px; max-height: 60dvh; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-letra .pl-linhas p { font-size: 22px; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-extra { grid-template-columns: minmax(0, 1fr); }
+}
+/* no computador o topo é o botão do painel (voltar à barra), de onde toca e os ⋮, como no tablet deitado */
+@media (min-width: 900px) {
+  html.pp:not(.tablet) body.painel-cheio #player .pl-cab-esq [data-pl="expandir"] { display: grid; }
+  html.pp:not(.tablet) body.painel-cheio #player .pl-recolher { display: none; }
+}
+/* a barra do computador (como a do Spotify): o ✓ da biblioteca ao lado do nome e, à direita, o Tocando agora, a fila e
+   ouvir em outro aparelho, antes de ampliar e fechar. No celular esses botões não cabem: tocar na barrinha abre a tela */
+#player .pl-so-pc { display: none; }
+@media (min-width: 900px) {
+  html:not(.tablet) #player .pl-so-pc { display: grid; color: rgb(255 255 255 / 0.8); }
+  html:not(.tablet) #player .pl-so-pc:hover { color: #fff; }
+  html:not(.tablet):not(.pp) #player .pl-salva { display: inline-grid; grid-area: esq; justify-self: end; align-self: center; width: 28px; height: 28px; border-color: rgb(255 255 255 / 0.75); color: #fff; }
+  html:not(.tablet):not(.pp) #player .pl-salva.salva { border-color: var(--accent); color: var(--on-accent); }
+  html:not(.tablet):not(.pp) #player .pl-info { padding-right: 40px; }
 }
 
 /* ---------------------------------------------------------------- Gerar com IA pelo servidor: as etapas */

@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-238';
+export const APP_VERSAO = '2026.10.28-239';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -707,6 +707,9 @@ const player = (() => {
     </div>
     <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
     <div class="pl-lado">
+      <button class="icon-btn pl-so-pc" data-pl="expandir" aria-label="Tocando agora" title="Tocando agora">${icon('sidebar', 18)}</button>
+      <button class="icon-btn pl-so-pc" data-pl="fila" aria-label="Fila" title="Fila">${icon('queue', 18)}</button>
+      <button class="icon-btn pl-so-pc" data-pl="aparelhos" aria-label="Ouvir em outro aparelho" title="Ouvir em outro aparelho">${icon('aparelhos', 18)}</button>
       <button class="icon-btn" data-pl="ampliar" aria-label="Ampliar o vídeo" title="Ampliar o vídeo">${icon('expand', 18)}</button>
       <button class="icon-btn" data-pl="fechar" aria-label="Fechar o player" title="Fechar">${icon('x', 18)}</button>
     </div>
@@ -726,6 +729,8 @@ const player = (() => {
   // no tablet o player é o painel "Tocando agora" à direita, fora da coluna principal (que não o corta)
   const casa = ehTablet() ? document.body : $('.main-col');
   document.body.classList.toggle('painel-recolhido', Boolean(db.prefs().painelRecolhido));
+  // html.pp: o player com o jeito do "Tocando agora" (o painel do tablet; no celular e no computador, só na tela toda)
+  document.documentElement.classList.toggle('pp', ehTablet());
   casa.append(el);
   // O vídeo é UM só e nunca é recriado (recriar pausa e repete o anúncio): ele fica numa "tela"
   // solta e só muda de lugar, acompanhando a telinha da página da música ou o espaço do mini player.
@@ -736,7 +741,7 @@ const player = (() => {
   const mini = $('.pl-video', el); // espaço reservado no mini player
   // tablet, como o "Mudar para vídeo" do Spotify: a capa no lugar do vídeo (o vídeo continua tocando, só não aparece)
   let comCapa = Boolean(db.prefs().playerCapa);
-  const modoCapa = () => comCapa && document.documentElement.classList.contains('tablet');
+  const modoCapa = () => comCapa && document.documentElement.classList.contains('pp');
   // a música tocando é esta?
   const desta = (id) => Boolean(atual && id && atual.youtube === id);
   const noPalco = () => Boolean(atual && palco?.isConnected && desta(palcoDe));
@@ -796,7 +801,7 @@ const player = (() => {
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
   const avisar = () => ouvintes.forEach((fn) => fn());
   // a altura do player (muda ao ampliar o vídeo) vai para o CSS: as barras flutuantes da página ficam acima dele
-  const medirPlayer = () => document.body.style.setProperty('--player-h', `${el.offsetHeight}px`);
+  const medirPlayer = () => document.body.classList.contains('painel-cheio') && !ehTablet() ? null : document.body.style.setProperty('--player-h', `${el.offsetHeight}px`);
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(medirPlayer).observe(el);
   const mostrarBarra = () => {
     const ver = Boolean(atual) && !noPalco();
@@ -854,7 +859,7 @@ const player = (() => {
   // os créditos (quem canta, compôs, o tom, de onde veio a cifra) e o vídeo, com o que dá para fazer em cada um
   let extraDe = '';
   const desenharExtra = () => {
-    if (!document.documentElement.classList.contains('tablet')) return;
+    if (!document.documentElement.classList.contains('pp')) return;
     const song = atual?.songId && db.song(atual.songId);
     const titulo = song?.title || atual?.titulo || '';
     const artista = song?.artist || atual?.artista || '';
@@ -909,7 +914,7 @@ const player = (() => {
   let tempos = null;
   let linhasDaLetra = [];
   const desenharLetra = () => {
-    if (!document.documentElement.classList.contains('tablet')) return;
+    if (!document.documentElement.classList.contains('pp')) return;
     const song = atual?.songId && db.song(atual.songId);
     const chave = `${atual?.youtube}|${song?.sincronia?.tempos?.length || 0}|${song?.content?.length || 0}`;
     if (chave === letraDe) return;
@@ -1194,12 +1199,24 @@ const player = (() => {
     alvoBt.remove();
   };
   // o "Tocando agora" na tela toda (tablet): o botão do canto de cima troca entre expandir e voltar ao painel
+  // No celular e no computador a tela toda é o próprio "Tocando agora": o player muda de jeito (html.pp) só enquanto
+  // ela está aberta, e o voltar do celular (ou do navegador) fecha a tela em vez de sair da página
   const painelCheio = (ligar) => {
+    const antes = document.body.classList.contains('painel-cheio');
     document.body.classList.toggle('painel-cheio', ligar);
-    const b = $('[data-pl="expandir"]', el);
-    b.title = ligar ? 'Voltar ao painel' : 'Expandir';
-    b.setAttribute('aria-label', ligar ? 'Voltar ao painel' : 'Expandir o Tocando agora');
+    if (!ehTablet()) {
+      document.documentElement.classList.toggle('pp', ligar);
+      if (ligar && !antes) history.pushState({ tocandoAgora: true }, '');
+      if (!ligar && antes && history.state?.tocandoAgora) history.back();
+      if (ligar !== antes) { desenhar(); if (!ligar) medirPlayer(); }
+      if (ligar) el.scrollTop = 0;
+    }
+    el.querySelectorAll('[data-pl="expandir"]').forEach((b) => {
+      b.title = ligar ? 'Voltar' : 'Tocando agora';
+      b.setAttribute('aria-label', ligar ? 'Voltar' : 'Abrir o Tocando agora');
+    });
   };
+  window.addEventListener('popstate', () => { if (document.body.classList.contains('painel-cheio') && !ehTablet()) painelCheio(false); });
   window.addEventListener('hashchange', () => painelCheio(false));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('painel-cheio')) painelCheio(false); });
   el.addEventListener('click', (e) => {
@@ -1210,6 +1227,11 @@ const player = (() => {
     if (document.body.classList.contains('painel-recolhido') && ehTablet() && (!b || b.dataset.pl === 'abrir')) {
       document.body.classList.remove('painel-recolhido');
       db.setPref('painelRecolhido', false);
+      return;
+    }
+    // celular: tocar na barrinha (fora dos botões) abre o "Tocando agora" na tela toda, como no Spotify
+    if (!ehTablet() && !document.body.classList.contains('painel-cheio') && matchMedia('(max-width: 899px)').matches && (!b || b.dataset.pl === 'abrir')) {
+      painelCheio(true);
       return;
     }
     if (!b) return;
@@ -1259,6 +1281,7 @@ const player = (() => {
     if (b.dataset.pl === 'anterior') { if (tempo > 3 || anteriorIndice() < 0) api.irPara(0); else pular(-1); }
     if (b.dataset.pl === 'fechar') api.fechar();
     // tablet: minimizar o painel (vira uma barrinha embaixo; tocar nela abre de novo) — saindo também da tela toda
+    if (b.dataset.pl === 'recolher' && !ehTablet()) { painelCheio(false); return; }
     if (b.dataset.pl === 'recolher') { painelCheio(false); document.body.classList.add('painel-recolhido'); db.setPref('painelRecolhido', true); }
     // tablet: expandir o "Tocando agora" para a tela toda (o vídeo grande e a letra ao lado) ou voltar ao painel
     if (b.dataset.pl === 'expandir') painelCheio(!document.body.classList.contains('painel-cheio'));
