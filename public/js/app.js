@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-259';
+export const APP_VERSAO = '2026.10.28-260';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -909,7 +909,8 @@ const player = (() => {
     // Tocando agora, sumindo num degradê no fundo; o lugar da capa fica vazio, mostrando os quadros (como o Canvas do
     // Spotify). O primeiro quadro aparece aos poucos, sobre a cor do fundo
     const semCapa = capa && !url;
-    const q = capa && !atual?.semVideo && atual?.youtube ? atual.youtube : '';
+    // (só com "Capa animada" ligada nos Ajustes; desligada, fica a capa parada e não baixa os quadros)
+    const q = capa && !atual?.semVideo && atual?.youtube && db.prefs().videoFundo !== false ? atual.youtube : '';
     mini.style.backgroundImage = capa && url ? `url("${url}")` : ''; // (com os quadros no fundo, o CSS a esconde)
     mini.classList.toggle('com-fundo', Boolean(q));
     fundo.hidden = !q;
@@ -8170,7 +8171,7 @@ function viewSettings() {
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
       ${chave('diagramas', 'grid', 'Desenho dos acordes', 'Como montar cada acorde no violão', p.diagramas)}
       ${chave('cols', 'columns', 'Duas colunas', 'Em telas grandes', p.columns !== false, 'so-largo')}
-      ${chave('video-fundo', 'video', 'Clipe atrás do título', 'Desligue para economizar dados', p.videoFundo !== false)}
+      ${chave('video-fundo', 'video', 'Capa animada', 'Cenas do clipe passam atrás da música, sem som. Desligue para economizar dados', p.videoFundo !== false)}
     </div>`)}
 
     ${secao('PowerPoint', `
@@ -8252,7 +8253,8 @@ function viewSettings() {
     applyTheme();
     $('#destaque').querySelectorAll('[data-v]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   };
-  $('#video-fundo').onchange = (e) => db.setPref('videoFundo', e.target.checked);
+  // vale na hora também no player (o Tocando agora no modo música)
+  $('#video-fundo').onchange = (e) => { db.setPref('videoFundo', e.target.checked); player.atualizar({}); };
   // servidor no computador: diz se responde agora; salvar ou tirar vale na próxima vez que o app abrir
   const estadoPc = $('#servidor-pc-estado');
   if (p.servidorPc) Promise.all([responde(p.servidorPc), servidorCarregado]).then(([ok]) => { estadoPc.textContent = ok ? `Ligado: ${SERVIDOR_IA.pc ? 'o app está usando ele' : 'reabra o app para usar'}` : 'Não responde. O PC está ligado? Ao religar, o endereço muda: leia o QR code de novo'; });
