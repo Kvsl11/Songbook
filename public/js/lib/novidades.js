@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 276, data: '2026-10-28', titulo: 'Liturgia com visual novo',
+    itens: [
+      { tipo: 'melhoria', texto: 'O cartão da liturgia de hoje (na Início e na Liturgia) ganhou visual novo: o dia num quadradinho de calendário, o tempo e a semana, a cor do dia, o refrão do salmo e cada leitura com o nome (1ª Leitura, Salmo, Evangelho). Na Início, "Montar a missa" e "Ler a liturgia".' },
+      { tipo: 'novo', texto: 'Na Liturgia, a semana aparece em pílulas para trocar de dia num toque (as setas pulam uma semana), e "Hoje" volta para o dia de hoje.' },
+      { tipo: 'melhoria', texto: 'As partes da missa vêm separadas pelos momentos da celebração (Ritos iniciais, Liturgia da Palavra, Liturgia Eucarística e Ritos finais), em cartões arredondados; Missa litúrgica e Missa popular viraram um seletor só.' },
+    ],
+  },
+  {
     versao: 275, data: '2026-10-28', titulo: 'Só a letra quando não há cifra',
     itens: [
       { tipo: 'melhoria', texto: 'Na letra na tela toda, a música sem cifra não mostra mais o botão Cifra/Letra (nem tom e capotraste): fica só a letra.' },
@@ -65,13 +73,6 @@ export const NOVIDADES = [
     versao: 267, data: '2026-10-28', titulo: 'Notinhas só nas partes de instrumentos',
     itens: [
       { tipo: 'correcao', texto: 'As notinhas ♪ na letra aparecem só onde a música fica 10 segundos ou mais sem voz (introdução, solos e final), não mais em cada pausa entre as estrofes.' },
-    ],
-  },
-  {
-    versao: 266, data: '2026-10-28', titulo: 'Letra sincronizada sem servidor, mais firme',
-    itens: [
-      { tipo: 'correcao', texto: 'Quando o banco de letras sincronizadas (LRCLIB) está ocupado, o app tenta de novo sozinho em vez de desistir e cair no servidor (que dava erro).' },
-      { tipo: 'correcao', texto: 'Sem servidor, "Sincronizar a letra de novo" também usa o banco de letras. Se ele não responder, o aviso mostra "Tentar de novo" e "Sincronizar à mão".' },
     ],
   },
 ];
