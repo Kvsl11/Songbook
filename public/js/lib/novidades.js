@@ -3,6 +3,13 @@
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }
 export const NOVIDADES = [
   {
+    versao: 256, data: '2026-10-28', titulo: 'Abrir música sem piscar e tom mais discreto no artista',
+    itens: [
+      { tipo: 'correcao', texto: 'Abrindo uma música da Busca no celular, o Tocando agora aparece de uma vez: a página antiga da música não pisca mais por baixo (nem ao fechar).' },
+      { tipo: 'melhoria', texto: 'Na página do artista, o tom de cada música fica num selo pequeno ao lado do salvar, sem o "Tom" escrito; embaixo do nome, o artista.' },
+    ],
+  },
+  {
     versao: 255, data: '2026-10-28', titulo: 'Busca com cifra, letra e vídeo numa lista só',
     itens: [
       { tipo: 'melhoria', texto: 'Na Busca, os vídeos não ficam mais à parte: cada música da lista já vem com o vídeo dela, e os sinais mostram o que ela tem (cifra, letra e vídeo). Abrindo ou salvando (+), ela entra com tudo junto.' },

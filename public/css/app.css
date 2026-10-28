@@ -333,6 +333,7 @@ a.chip.sm { cursor: pointer; }
 .track .t.playing { color: var(--accent-ink); }
 .track .s { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
 .track .acts { display: flex; align-items: center; }
+.track .acts .chip.key { margin-right: 8px; } /* o tom, ao lado do salvar */
 .track.clickable { cursor: pointer; }
 @media (max-width: 600px) { .track .acts .icon-btn { width: 32px; height: 32px; } .track .n { display: none; } }
 
@@ -3099,6 +3100,7 @@ html.pp body.painel-cheio #player .pl-extra { grid-template-columns: repeat(auto
 html.pp:not(.tablet) body.painel-cheio #player { position: absolute; inset: 0; z-index: 40; width: auto; height: auto; border-radius: 0; box-shadow: none; animation: subir-tela 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
 html.pp:not(.tablet) body.painel-cheio #pl-tela:not(.no-palco):not(.na-telinha) { z-index: 41; }
 @keyframes subir-tela { from { transform: translateY(24px); opacity: 0; } }
+html.pp:not(.tablet) body.painel-cheio #player.sem-subir { animation: none; }
 /* no celular: o topo é a setinha (fechar), de onde toca e os ⋮, como no Spotify do celular; tudo mais junto */
 html.pp:not(.tablet) body.painel-cheio #player .pl-cab-esq [data-pl="expandir"] { display: none; }
 html.pp:not(.tablet) body.painel-cheio #player .pl-recolher { display: grid; }
