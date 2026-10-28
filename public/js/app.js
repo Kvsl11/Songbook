@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-282';
+export const APP_VERSAO = '2026.10.28-283';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -735,7 +735,9 @@ const player = (() => {
   el.innerHTML = `
     <div class="pl-fundo quadros" aria-hidden="true" hidden></div>
     <div class="pl-fixo"><div class="pl-fixo-barra"><span class="pl-fixo-txt"><b></b><small></small></span>
-      <button class="icon-btn pl-play pl-fixo-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 18)}</button></div></div>
+      <button class="salvar-btn pl-fixo-salva" data-pl="salva" aria-label="Salvar na biblioteca">${icon('plus', 16)}</button>
+      <button class="icon-btn pl-play pl-fixo-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 18)}</button>
+      <span class="pl-fixo-prog" aria-hidden="true"><i></i></span></div></div>
     <div class="pl-video"></div>
     <p class="pl-frase" hidden></p>
     <button class="pl-troca" data-pl="troca">${icon('music', 18)}<span>Mudar para música</span></button>
@@ -904,10 +906,16 @@ const player = (() => {
       bs.innerHTML = icon(salva ? 'check' : 'plus', 16);
       bs.title = salva ? 'Na sua biblioteca (tocar para tirar)' : 'Salvar na biblioteca';
       bs.setAttribute('aria-label', bs.title);
+      // o mesmo ✓/+ na barrinha de cima (rolando)
+      const fs = $('.pl-fixo-salva', el);
+      fs.classList.toggle('salva', salva);
+      fs.innerHTML = icon(salva ? 'check' : 'plus', 16);
+      fs.title = bs.title;
+      fs.setAttribute('aria-label', bs.title);
     }
     // arrastando a barra, ela fica onde está o dedo (o vídeo só vai para lá ao soltar)
     const fracao = arrasto ? arrasto.fracao : duracao ? Math.min(1, tempo / duracao) : 0;
-    el.querySelectorAll('.pl-prog i').forEach((i) => { i.style.width = `${fracao * 100}%`; });
+    el.querySelectorAll('.pl-prog i, .pl-fixo-prog i').forEach((i) => { i.style.width = `${fracao * 100}%`; });
     el.querySelectorAll('.pl-prog').forEach((b) => { b.setAttribute('aria-valuemin', '0'); b.setAttribute('aria-valuemax', String(Math.round(duracao))); b.setAttribute('aria-valuenow', String(Math.round(fracao * duracao))); });
     sessaoDeMidia();
     // voltar, pular e aleatório: numa música do repertório ou da biblioteca (a fila)
