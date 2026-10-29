@@ -197,8 +197,14 @@ def baixar(video: str, pasta: str, etapa=lambda nome, progresso=None: None) -> d
                 raise HTTPException(403, "o YouTube recusou a conta conectada (os cookies venceram). Exporte o arquivo de "
                                          "novo, numa janela anônima, e conecte outra vez")
             raise HTTPException(403, "o YouTube bloqueou o download pelo servidor (pede login)")
-        # o motivo do yt-dlp vai junto (a última linha, sem o "ERROR: [youtube] id:"), para saber o que corrigir
-        motivo = re.sub(r"^(ERROR:\s*)?(\[[^\]]+\]\s*)?([\w-]{11}:\s*)?", "", str(e).strip().splitlines()[-1] if str(e).strip() else "")
+        # o motivo do yt-dlp vai junto (a última linha, sem as cores do terminal e sem o "ERROR: [youtube] id:"),
+        # para saber o que corrigir
+        texto = re.sub(r"\x1b\[[0-9;]*m", "", str(e)).strip()
+        motivo = re.sub(r"^(ERROR:\s*)?(\[[^\]]+\]\s*)?([\w-]{11}:\s*)?", "", texto.splitlines()[-1] if texto else "")
+        # 403 no download: o YouTube recusa servidores na nuvem (o Codespaces, o Modal) mesmo depois do "não é robô"
+        if "403" in motivo:
+            raise HTTPException(403, "o YouTube bloqueou o download por este servidor (na nuvem o YouTube costuma "
+                                     "recusar). Escolha o arquivo de áudio da música ou conecte a conta do YouTube")
         raise HTTPException(502, "não consegui baixar o áudio deste vídeo" + (f" ({motivo[:160]})" if motivo else ""))
 
 
