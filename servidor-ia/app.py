@@ -26,6 +26,8 @@ import re
 import shutil
 import tempfile
 import threading
+import time
+import uuid
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -86,10 +88,67 @@ def ouvir(caminho: str | None, separar: bool, etapa=lambda nome, progresso=None:
 PREENCHER = int(os.environ.get("IA_PREENCHER") or (16384 if os.environ.get("CODESPACE_NAME") else 0))
 
 
-def com_etapas(trabalho, etapas: bool, pasta: str | None = None):
-    """Roda trabalho(etapa). Com etapas=True, a resposta vai saindo aos poucos, uma linha JSON por vez
+# as tarefas em andamento (tarefa=1): o app recebe o número na hora e pergunta em GET /tarefa/{id} em que etapa está.
+# Sem nenhuma conexão aberta durante os minutos do trabalho: no Codespaces quem encaminha a porta segurava a resposta
+# aos poucos (as etapas não apareciam) e a conexão comprida caía no meio, e a partitura nunca chegava
+_tarefas: dict[str, dict] = {}
+_tarefas_trava = threading.Lock()
+GUARDAR_TAREFA = 30 * 60  # depois de pronta, a resposta fica 30 minutos à espera do app
+
+
+def nova_tarefa(trabalho, pasta: str | None = None) -> dict:
+    """Roda trabalho(etapa) numa linha à parte e devolve {"tarefa": id} na hora."""
+    tid = uuid.uuid4().hex
+    estado = {"etapa": None, "progresso": None, "criada": time.time()}
+    with _tarefas_trava:
+        agora = time.time()
+        for k in [k for k, v in _tarefas.items() if v.get("fim") and agora - v["fim"] > GUARDAR_TAREFA]:
+            _tarefas.pop(k, None)
+        _tarefas[tid] = estado
+
+    def aviso(nome, progresso=None):
+        estado["etapa"], estado["progresso"] = nome, (None if progresso is None else round(progresso, 3))
+
+    def rodar():
+        try:
+            estado["resultado"] = trabalho(aviso)
+        except HTTPException as e:
+            estado["erro"], estado["status"] = e.detail, e.status_code
+        except Exception as e:
+            log.exception("falha no trabalho")
+            estado["erro"], estado["status"] = f"erro no servidor ({type(e).__name__})", 500
+        finally:
+            if pasta:
+                shutil.rmtree(pasta, ignore_errors=True)
+            estado["fim"] = time.time()
+
+    threading.Thread(target=rodar, daemon=True).start()
+    return {"tarefa": tid}
+
+
+@app.get("/tarefa/{tid}", dependencies=[Depends(conferir_chave)])
+def ver_tarefa(tid: str):
+    """Em que etapa a tarefa está; no fim, o resultado (ou o erro e o status)."""
+    estado = _tarefas.get(tid)
+    if estado is None:
+        raise HTTPException(404, "o servidor reiniciou e perdeu este trabalho. Tente de novo")
+    r = {"etapa": estado["etapa"]}
+    if estado["progresso"] is not None:
+        r["progresso"] = estado["progresso"]
+    for k in ("resultado", "erro", "status"):
+        if k in estado:
+            r[k] = estado[k]
+    return r
+
+
+def com_etapas(trabalho, etapas: bool, pasta: str | None = None, tarefa: bool = False):
+    """Roda trabalho(etapa). Com tarefa=True, devolve na hora o número da tarefa (o app acompanha por GET
+    /tarefa/{id}). Com etapas=True, a resposta vai saindo aos poucos, uma linha JSON por vez
     ({"etapa": "baixando"}… e no fim {"resultado": …} ou {"erro": …, "status": …}): o app mostra em que parte está.
     A pasta temporária (o áudio) é apagada no fim, com erro ou não."""
+    if tarefa:
+        return nova_tarefa(trabalho, pasta)
+
     def apagar():
         if pasta:
             shutil.rmtree(pasta, ignore_errors=True)
@@ -170,7 +229,8 @@ def saude():
 
 
 @app.post("/transcrever", dependencies=[Depends(conferir_chave)])
-def transcrever(arquivo: UploadFile = File(...), separar: str = Form("1"), etapas: bool = Query(False)):
+def transcrever(arquivo: UploadFile = File(...), separar: str = Form("1"), etapas: bool = Query(False),
+                tarefa: bool = Query(False)):
     # o arquivo fica numa pasta temporária, apagada assim que as notas saem (com erro ou não)
     pasta = tempfile.mkdtemp(prefix="songbook-up-")
     ext = os.path.splitext(arquivo.filename or "")[1][:8] or ".audio"
@@ -185,7 +245,7 @@ def transcrever(arquivo: UploadFile = File(...), separar: str = Form("1"), etapa
             f.write(bloco)
     # (o campo vai como texto: com bool, o FastAPI lia o campo ausente como "não separar" e a voz nunca era separada)
     separar_voz = separar.strip().lower() not in ("0", "false", "nao", "não", "no")
-    return com_etapas(lambda etapa: ouvir(caminho, separar_voz, etapa), etapas, pasta)
+    return com_etapas(lambda etapa: ouvir(caminho, separar_voz, etapa), etapas, pasta, tarefa)
 
 
 class PedidoYoutube(BaseModel):
@@ -235,7 +295,7 @@ def audio_do_video(video: str, pasta: str, etapa) -> tuple:
 
 
 @app.post("/youtube", dependencies=[Depends(conferir_chave)])
-def do_youtube(pedido: PedidoYoutube, etapas: bool = Query(False)):
+def do_youtube(pedido: PedidoYoutube, etapas: bool = Query(False), tarefa: bool = Query(False)):
     video = youtube.id_do_video(pedido.url)
     if not video:
         raise HTTPException(400, "link do YouTube inválido")
@@ -246,7 +306,7 @@ def do_youtube(pedido: PedidoYoutube, etapas: bool = Query(False)):
         y, cortado, titulo = audio_do_video(video, pasta, etapa)
         return {**ouvir(None, pedido.separar, etapa, audio=(y, cortado), video=video), "video": video, "titulo": titulo}
 
-    return com_etapas(trabalho, etapas, pasta)
+    return com_etapas(trabalho, etapas, pasta, tarefa)
 
 
 class PedidoLetra(BaseModel):
@@ -260,7 +320,7 @@ _letras: dict[str, dict] = {}  # a mesma letra no mesmo vídeo: a resposta guard
 
 
 @app.post("/letra", dependencies=[Depends(conferir_chave)])
-def letra_sincronizada(pedido: PedidoLetra, etapas: bool = Query(False)):
+def letra_sincronizada(pedido: PedidoLetra, etapas: bool = Query(False), tarefa: bool = Query(False)):
     """O instante de cada linha da letra no vídeo do YouTube (para a letra seguir a música, como no Spotify)."""
     if not letra.tem_whisper():
         raise HTTPException(501, "este servidor não tem o Whisper (pip install faster-whisper)")
@@ -271,7 +331,7 @@ def letra_sincronizada(pedido: PedidoLetra, etapas: bool = Query(False)):
         raise HTTPException(400, "a música não tem letra")
     chave = hashlib.sha1(json.dumps([video, pedido.linhas, pedido.separar]).encode()).hexdigest()
     if chave in _letras and not pedido.refazer:
-        return com_etapas(lambda etapa: _letras[chave], etapas)
+        return com_etapas(lambda etapa: _letras[chave], etapas, tarefa=tarefa)
     pasta = tempfile.mkdtemp(prefix="songbook-letra-")
 
     def trabalho(etapa):
@@ -290,7 +350,7 @@ def letra_sincronizada(pedido: PedidoLetra, etapas: bool = Query(False)):
         _letras[chave] = r
         return r
 
-    return com_etapas(trabalho, etapas, pasta)
+    return com_etapas(trabalho, etapas, pasta, tarefa)
 
 
 class PedidoDuvida(BaseModel):

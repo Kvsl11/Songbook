@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 302, data: '2026-10-29', titulo: 'Partitura pelo servidor sem cair no meio',
+    itens: [
+      { tipo: 'correcao', texto: 'Pelo servidor no GitHub, a partitura do arquivo importado ficava parada em “Enviando o áudio” e às vezes falhava no fim. Agora o app envia o áudio e vai perguntando ao servidor em que etapa ele está: as etapas andam na tela e a partitura chega mesmo depois de vários minutos.' },
+    ],
+  },
+  {
     versao: 301, data: '2026-10-29', titulo: 'As etapas da partitura andando no servidor do GitHub',
     itens: [
       { tipo: 'correcao', texto: 'Com o servidor no GitHub, a tela da partitura ficava parada em “Enviando o áudio 0%” até o fim: agora cada etapa (enviando, separando a voz, ouvindo as notas…) aparece na hora em que o servidor passa por ela.' },
@@ -63,12 +69,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'Na cifra com a letra sincronizada, muito mais linhas acendem na hora certa: antes só acendia a linha escrita igualzinho nas duas fontes, e qualquer diferença ("pra"/"para", um "oh" a mais, uma linha quebrada em duas) deixava a linha apagada. As falas das gravações ao vivo, que não estão na cifra, continuam sem acender.' },
       { tipo: 'melhoria', texto: 'No celular, a barra da música embaixo mostra só o nome e o artista, sem o tempo (que cortava o nome do artista).' },
-    ],
-  },
-  {
-    versao: 292, data: '2026-10-29', titulo: 'Notinhas nos solos do meio da música',
-    itens: [
-      { tipo: 'melhoria', texto: 'Na letra sincronizada, as notinhas ♪ das partes só de instrumentos aparecem também nos solos do meio da música (antes, quase sempre, só na introdução). Só nas partes mais longas, de uns 12 segundos ou mais: um respiro curto entre as estrofes não ganha as notinhas.' },
     ],
   },
 ];

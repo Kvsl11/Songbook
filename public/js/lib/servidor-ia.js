@@ -59,87 +59,95 @@ export async function chamar(cfg, rota, { json, form, metodo, sinal, tempo = 15 
   } finally { clearTimeout(fim); }
 }
 
-// a mesma chamada, com o andamento: o servidor manda uma linha por etapa ({"etapa": "separando"}…) e no fim o
-// resultado; aoEtapa(nome, progresso) é chamada a cada etapa (progresso de 0 a 1 no download do áudio, senão null;
-// "fila" = esperando outra música terminar no servidor). O erro vem com a mensagem e o status do servidor
+// a mesma chamada, com o andamento: o servidor devolve na hora o número da tarefa ({"tarefa": id}) e o app pergunta a
+// cada pouco em que etapa ela está (GET /tarefa/{id}), até vir o resultado. Antes a resposta ficava aberta os minutos
+// todos, uma linha por etapa: no Codespaces quem encaminha a porta segurava as linhas (a tela parava em "Enviando o
+// áudio") e a conexão comprida caía no meio. aoEtapa(nome, progresso) é chamada a cada etapa nova (progresso de 0 a 1
+// no envio e no download do áudio, senão null; "fila" = esperando outra música terminar no servidor). O erro vem com
+// a mensagem e o status do servidor; erro.conexao: nem chegou a falar com ele (o app pode ler o arquivo no aparelho)
 export async function chamarComEtapas(cfg, rota, { json, form, sinal, tempo = 20 * 60e3 } = {}, aoEtapa = () => {}) {
   const base = baseDoServidor(cfg?.url);
   if (!base) throw new Error('A IA do servidor ainda não está disponível');
-  if (form && typeof XMLHttpRequest !== 'undefined') return enviarComEtapas(cfg, `${base}${rota}${rota.includes('?') ? '&' : '?'}etapas=1`, form, sinal, tempo, aoEtapa);
-  const ctrl = new AbortController();
-  const fim = setTimeout(() => ctrl.abort(), tempo);
-  sinal?.addEventListener('abort', () => ctrl.abort());
-  const headers = cabecalhos(base, cfg.chave);
-  if (json) headers['Content-Type'] = 'application/json';
-  try {
-    const r = await fetch(`${base}${rota}${rota.includes('?') ? '&' : '?'}etapas=1`, { method: 'POST', headers, body: json ? JSON.stringify(json) : form, signal: ctrl.signal });
-    if (!r.ok) throw erroDaResposta(r.status, await r.text().catch(() => ''));
-    const leitor = r.body.getReader();
-    const texto = new TextDecoder();
-    let resto = '';
-    for (;;) {
-      const { value, done } = await leitor.read();
-      resto += texto.decode(value || new Uint8Array(), { stream: !done });
-      const linhas = resto.split('\n');
-      resto = done ? '' : linhas.pop();
-      for (const l of linhas) {
-        if (!l.trim()) continue;
-        const m = JSON.parse(l);
-        if (m.etapa) aoEtapa(m.etapa, typeof m.progresso === 'number' ? m.progresso : null);
-        if (m.erro) throw Object.assign(new Error(m.erro), { status: m.status || 500 });
-        if (m.resultado) return m.resultado;
-      }
-      if (done) throw new Error('O servidor parou no meio. Tente de novo');
+  const url = `${base}${rota}${rota.includes('?') ? '&' : '?'}tarefa=1`;
+  const limite = Date.now() + tempo;
+  let r;
+  if (form && typeof XMLHttpRequest !== 'undefined') r = await enviarArquivo(cfg, url, form, sinal, tempo, aoEtapa);
+  else {
+    const headers = cabecalhos(base, cfg.chave);
+    if (json) headers['Content-Type'] = 'application/json';
+    let resp;
+    try {
+      resp = await fetch(url, { method: 'POST', headers, body: json ? JSON.stringify(json) : form, signal: sinal });
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error('Cancelado');
+      throw Object.assign(new Error('Não consegui falar com o servidor da IA'), { conexao: true });
     }
-  } catch (e) {
-    if (e.name === 'AbortError') throw new Error(sinal?.aborted ? 'Cancelado' : 'O servidor demorou demais');
-    if (e instanceof TypeError) throw Object.assign(new Error('Não consegui falar com o servidor da IA'), { conexao: true });
-    throw e;
-  } finally { clearTimeout(fim); }
+    const texto = await resp.text().catch(() => '');
+    if (!resp.ok) throw erroDaResposta(resp.status, texto);
+    try { r = JSON.parse(texto); } catch { r = {}; }
+  }
+  // servidor de antes das tarefas: a resposta já é o resultado
+  if (!r?.tarefa) return r;
+  return acompanharTarefa(cfg, base, r.tarefa, { sinal, limite, aoEtapa });
+}
+
+const esperar = (ms, sinal) => new Promise((ok, falha) => {
+  const t = setTimeout(ok, ms);
+  sinal?.addEventListener('abort', () => { clearTimeout(t); falha(new Error('Cancelado')); }, { once: true });
+});
+
+// pergunta pela tarefa a cada 1,5 s; uma pergunta que falha (a internet do celular oscilou) é repetida, e só depois de
+// um minuto sem resposta o app desiste
+async function acompanharTarefa(cfg, base, id, { sinal, limite, aoEtapa }) {
+  let ultima = '';
+  let semResposta = 0;
+  for (;;) {
+    if (sinal?.aborted) throw new Error('Cancelado');
+    if (Date.now() > limite) throw new Error('O servidor demorou demais');
+    let estado = null;
+    try {
+      const resp = await fetch(`${base}/tarefa/${id}`, { headers: cabecalhos(base, cfg.chave), signal: sinal, cache: 'no-store' });
+      const texto = await resp.text().catch(() => '');
+      if (!resp.ok) throw erroDaResposta(resp.status, texto);
+      estado = JSON.parse(texto);
+      semResposta = 0;
+    } catch (e) {
+      if (e.name === 'AbortError' || sinal?.aborted) throw new Error('Cancelado');
+      if (e.status) throw e;
+      if (++semResposta >= 40) throw new Error('O servidor parou de responder no meio. Ele está ligado? Tente de novo');
+    }
+    if (estado) {
+      const agora = `${estado.etapa}|${estado.progresso ?? ''}`;
+      if (estado.etapa && agora !== ultima) { ultima = agora; aoEtapa(estado.etapa, typeof estado.progresso === 'number' ? estado.progresso : null); }
+      if (estado.erro) throw Object.assign(new Error(estado.erro), { status: estado.status || 500 });
+      if ('resultado' in estado) return estado.resultado;
+    }
+    await esperar(1500, sinal);
+  }
 }
 
 // o arquivo enviado (o áudio da partitura): pelo XMLHttpRequest, que diz quanto do envio já foi (o fetch não diz) —
-// aoEtapa('enviando', 0…1) —, e a resposta é lida aos poucos, linha por linha, como no fetch. erro.conexao: não
-// chegou a falar com o servidor (sem internet, envio caiu); aí o app pode ler o arquivo no próprio aparelho
-function enviarComEtapas(cfg, url, form, sinal, tempo, aoEtapa) {
+// aoEtapa('enviando', 0…1). A resposta é o número da tarefa. erro.conexao: não chegou a falar com o servidor (sem
+// internet, envio caiu); aí o app pode ler o arquivo no próprio aparelho
+function enviarArquivo(cfg, url, form, sinal, tempo, aoEtapa) {
   return new Promise((ok, falha) => {
     const xhr = new XMLHttpRequest();
-    let lido = 0;
-    let respondeu = false;
     let fim = false;
     const terminar = (fn, v) => { if (fim) return; fim = true; clearTimeout(relogio); fn(v); };
     const relogio = setTimeout(() => { xhr.abort(); terminar(falha, new Error('O servidor demorou demais')); }, tempo);
     sinal?.addEventListener('abort', () => { xhr.abort(); terminar(falha, new Error('Cancelado')); });
-    const linhas = () => {
-      const texto = xhr.responseText || '';
-      const k = texto.lastIndexOf('\n');
-      if (k < lido) return;
-      for (const l of texto.slice(lido, k).split('\n')) {
-        if (!l.trim()) continue;
-        let m;
-        try { m = JSON.parse(l); } catch { continue; }
-        respondeu = true;
-        if (m.etapa) aoEtapa(m.etapa, typeof m.progresso === 'number' ? m.progresso : null);
-        if (m.erro) { xhr.abort(); terminar(falha, Object.assign(new Error(m.erro), { status: m.status || 500 })); return; }
-        if (m.resultado) { terminar(ok, m.resultado); return; }
-      }
-      lido = k + 1;
-    };
     xhr.open('POST', url);
     for (const [k, v] of Object.entries(cabecalhos(url, cfg.chave))) xhr.setRequestHeader(k, v);
     xhr.upload.onprogress = (e) => { if (e.lengthComputable && e.total) aoEtapa('enviando', Math.min(1, e.loaded / e.total)); };
     // o envio terminou (mesmo sem nenhum aviso de andamento no caminho): a tela já passa para a etapa seguinte
     xhr.upload.onload = () => aoEtapa('enviando', 1);
-    xhr.onprogress = () => { if (xhr.status === 200) linhas(); };
     xhr.onload = () => {
-      if (xhr.status !== 200) {
-        terminar(falha, erroDaResposta(xhr.status, xhr.responseText || ''));
-        return;
-      }
-      linhas();
-      terminar(falha, new Error('O servidor parou no meio. Tente de novo'));
+      if (xhr.status !== 200) { terminar(falha, erroDaResposta(xhr.status, xhr.responseText || '')); return; }
+      let r = {};
+      try { r = JSON.parse(xhr.responseText || '{}'); } catch { /* resposta vazia */ }
+      terminar(ok, r);
     };
-    xhr.onerror = () => terminar(falha, Object.assign(new Error(respondeu ? 'A conexão caiu no meio. Tente de novo' : 'Não consegui falar com o servidor da IA'), { conexao: !respondeu }));
+    xhr.onerror = () => terminar(falha, Object.assign(new Error('Não consegui falar com o servidor da IA'), { conexao: true }));
     xhr.send(form);
   });
 }
