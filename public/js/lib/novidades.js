@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 300, data: '2026-10-29', titulo: 'Ligar o servidor do GitHub pelo celular',
+    itens: [
+      { tipo: 'melhoria', texto: 'Com o servidor da partitura no GitHub desligado (ele dorme quando ninguém usa), a tela Importar o áudio mostra “Ligar no GitHub” e “Já liguei”: liga pelo próprio celular, sem o computador e sem ler o QR code de novo.' },
+    ],
+  },
+  {
     versao: 299, data: '2026-10-29', titulo: 'Servidor da partitura na nuvem do GitHub',
     itens: [
       { tipo: 'novo', texto: 'O servidor da partitura também roda no GitHub Codespaces: um computador na nuvem, aberto pelo navegador, sem instalar nada no notebook (bom quando o antivírus da empresa bloqueia). A página dele mostra o QR code para ligar o celular.' },
@@ -62,14 +68,6 @@ export const NOVIDADES = [
     versao: 291, data: '2026-10-29', titulo: 'Capa na barra do celular',
     itens: [
       { tipo: 'correcao', texto: 'No celular, com o Tocando agora em “Mudar para música”, a barra da música embaixo mostra a capa (como no tablet) em vez do vídeo; em “Mudar para vídeo”, volta a mostrar o vídeo. A música continua tocando normalmente.' },
-    ],
-  },
-  {
-    versao: 290, data: '2026-10-29', titulo: 'Busca de cara nova',
-    itens: [
-      { tipo: 'melhoria', texto: 'A abertura da Busca ficou mais limpa: no lugar do aviso corrido, um cartão “Qualquer música, pronta para tocar”, com o que vem junto (cifra, letra e vídeo) e o “Cole aqui” para cifras de outros sites.' },
-      { tipo: 'melhoria', texto: 'Os cartões dos setores ficaram maiores e mais bonitos, com o desenho grande no canto; no tablet, os quatro numa fileira só (o último não fica mais sozinho embaixo).' },
-      { tipo: 'melhoria', texto: 'No tablet, as Católicas em alta e as músicas da busca aparecem em duas colunas, e as em alta mostram a posição de cada uma na capa.' },
     ],
   },
 ];
