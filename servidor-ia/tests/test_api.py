@@ -119,3 +119,22 @@ def test_tarefa_com_erro_devolve_a_mensagem_e_o_status(monkeypatch):
             break
         time.sleep(0.02)
     assert estado["erro"] == "sem notas" and estado["status"] == 422
+
+
+def test_letra_do_arquivo_enviado(monkeypatch):
+    import letra
+
+    pedidos = []
+    monkeypatch.setattr(letra, "tem_whisper", lambda: True)
+    monkeypatch.setattr(transcricao, "carregar", lambda caminho, maximo: (np.zeros(16000, dtype=np.float32), False))
+
+    def sincronizar(caminho, linhas, **k):
+        pedidos.append((linhas, k["video"], k["referencia"], k["preciso"]))
+        return {"linhas": [{"inicio": 1.0, "fim": 2.0, "confianca": 0.9}], "achadas": 1, "total": 1}
+    monkeypatch.setattr(letra, "sincronizar", sincronizar)
+    c = TestClient(app.app)
+    r = c.post("/letra/arquivo", files={"arquivo": ("ensaio.m4a", b"xx", "audio/mp4")},
+               data={"linhas": '["Santo, santo"]', "referencia": '[{"inicio": 3}]', "refazer": "1"})
+    assert r.status_code == 200 and r.json()["achadas"] == 1
+    assert pedidos == [(["Santo, santo"], None, [{"inicio": 3}], True)]
+    assert c.post("/letra/arquivo", files={"arquivo": ("a.wav", b"x", "audio/wav")}, data={"linhas": "[]"}).status_code == 400

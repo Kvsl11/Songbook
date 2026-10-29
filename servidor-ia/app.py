@@ -392,6 +392,54 @@ def letra_sincronizada(pedido: PedidoLetra, etapas: bool = Query(False), tarefa:
     return com_etapas(trabalho, etapas, pasta, tarefa)
 
 
+@app.post("/letra/arquivo", dependencies=[Depends(conferir_chave)])
+def letra_do_arquivo(arquivo: UploadFile = File(...), linhas: str = Form(...), referencia: str = Form(""),
+                     refazer: str = Form("0"), separar: str = Form("1"), etapas: bool = Query(False),
+                     tarefa: bool = Query(False)):
+    """A letra sincronizada com um áudio da própria pessoa (a gravação do ensaio, o MP3 dela): o mesmo que o /letra,
+    mas com o arquivo enviado no lugar do vídeo do YouTube. linhas e referencia vão como JSON (o formulário só leva
+    texto)."""
+    if not letra.tem_whisper():
+        raise HTTPException(501, "este servidor não tem o Whisper (pip install faster-whisper)")
+    try:
+        lista = [str(l) for l in json.loads(linhas)]
+        ref = json.loads(referencia) if referencia.strip() else None
+    except (ValueError, TypeError):
+        raise HTTPException(400, "linhas ou referência inválidas")
+    if not any(l.strip() for l in lista):
+        raise HTTPException(400, "a música não tem letra")
+    sim = lambda v: v.strip().lower() not in ("0", "false", "nao", "não", "no")
+    pasta = tempfile.mkdtemp(prefix="songbook-letra-")
+    ext = os.path.splitext(arquivo.filename or "")[1][:8] or ".audio"
+    caminho = os.path.join(pasta, "audio" + ext)
+    total = 0
+    with open(caminho, "wb") as f:
+        while bloco := arquivo.file.read(1 << 20):
+            total += len(bloco)
+            if total > MAX_MB << 20:
+                shutil.rmtree(pasta, ignore_errors=True)
+                raise HTTPException(413, f"arquivo grande demais (máximo {MAX_MB} MB)")
+            f.write(bloco)
+
+    def trabalho(etapa):
+        try:
+            # (até 15 minutos, como o áudio dos vídeos)
+            audio = transcricao.carregar(caminho, transcricao.MAX_SEGUNDOS_VIDEO)
+        except Exception as e:
+            log.warning("não abriu o áudio enviado: %s", e)
+            raise HTTPException(422, f"não consegui abrir este áudio ({type(e).__name__})")
+        esperar_vaga(etapa)
+        try:
+            return letra.sincronizar(None, lista, separar_voz=sim(separar), etapa=etapa, audio=audio, video=None,
+                                     preciso=sim(refazer), referencia=ref)
+        except ValueError as e:
+            raise HTTPException(422, str(e))
+        finally:
+            vagas.release()
+
+    return com_etapas(trabalho, etapas, pasta, tarefa)
+
+
 class PedidoDuvida(BaseModel):
     pergunta: str
     historico: list[dict] = []

@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 310, data: '2026-10-29', titulo: 'Toque o seu próprio áudio',
+    itens: [
+      { tipo: 'novo', texto: 'Use um áudio seu na música (a gravação do ensaio, um MP3): no ⋯ da música, “Usar um áudio seu”. Ele fica guardado no aparelho e toca no modo música; o clipe continua no modo vídeo.' },
+      { tipo: 'novo', texto: 'A letra sincroniza sozinha com o seu áudio: pelo banco de letras, se for a mesma gravação, ou pela IA do servidor, que ouve o áudio e encaixa a letra. Sem servidor, dá para sincronizar à mão.' },
+    ],
+  },
+  {
     versao: 309, data: '2026-10-29', titulo: 'Música e vídeo, como no Spotify',
     itens: [
       { tipo: 'novo', texto: 'Música com videoclipe (com cenas antes ou no meio da música) ganha duas versões: no modo música toca o áudio oficial da gravação, com a letra sincronizada certinha; no modo vídeo, o clipe, sem a letra acompanhando.' },
@@ -63,12 +70,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'Com o servidor no GitHub, a tela da partitura ficava parada em “Enviando o áudio 0%” até o fim: agora cada etapa (enviando, separando a voz, ouvindo as notas…) aparece na hora em que o servidor passa por ela.' },
       { tipo: 'melhoria', texto: 'O servidor no GitHub usa todos os núcleos da máquina para separar a voz e ouvir as notas: a partitura sai mais rápido.' },
-    ],
-  },
-  {
-    versao: 300, data: '2026-10-29', titulo: 'Ligar o servidor do GitHub pelo celular',
-    itens: [
-      { tipo: 'melhoria', texto: 'Com o servidor da partitura no GitHub desligado (ele dorme quando ninguém usa), a tela Importar o áudio mostra “Ligar no GitHub” e “Já liguei”: liga pelo próprio celular, sem o computador e sem ler o QR code de novo.' },
     ],
   },
 ];
