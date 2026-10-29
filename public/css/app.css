@@ -4015,3 +4015,6 @@ html.pp #player .pl-artista-mais { all: unset; position: absolute; right: 0; bot
 .sa-links a span { flex: 1; }
 .sa-links a svg:last-child { color: rgb(255 255 255 / 0.5); }
 @media (min-width: 700px) { .sa-fotos img { width: min(46%, 460px); } .sa-texto, .sa-numeros { padding-left: 32px; padding-right: 32px; } .sa-links { margin: 12px 24px 0; } }
+/* artista sem apresentação: só o "ver mais", embaixo do nome */
+html.pp #player .pl-artista-bio.so-mais p { display: none; }
+html.pp #player .pl-artista-bio.so-mais .pl-artista-mais { position: static; padding: 0; background: none; }

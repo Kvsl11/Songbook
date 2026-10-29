@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 296, data: '2026-10-29', titulo: 'Mais fotos e os seguidores do Spotify',
+    itens: [
+      { tipo: 'melhoria', texto: 'Na tela “Sobre o artista”, muito mais fotos (até 10): as fotos de divulgação dele e quadros dos vídeos do canal oficial no YouTube.' },
+      { tipo: 'melhoria', texto: 'Os números grandes agora mostram os seguidores no Spotify e os inscritos no canal do YouTube, além dos fãs no Deezer (os que houver para o artista).' },
+      { tipo: 'correcao', texto: 'O canal oficial de artistas com um complemento no nome (como “Frei Gilson / Som do Monte - OFICIAL”) agora é reconhecido, para a foto e os números.' },
+    ],
+  },
+  {
     versao: 295, data: '2026-10-29', titulo: 'Sobre o artista, como no Spotify',
     itens: [
       { tipo: 'novo', texto: 'No cartão “Sobre o artista” do Tocando agora, o “ver mais” no fim do texto abre a tela do artista: as fotos dele passando para o lado, os fãs e os álbuns, a apresentação inteira e atalhos para as músicas e os álbuns dele, a Wikipédia e o YouTube.' },
@@ -62,15 +70,6 @@ export const NOVIDADES = [
     versao: 287, data: '2026-10-29', titulo: 'Letra com respiro no topo',
     itens: [
       { tipo: 'correcao', texto: 'Na letra na tela toda, a primeira linha não fica mais colada no topo e meio apagada: desceu um pouco, e dá para ver bem a linha que está sendo cantada desde o começo da música.' },
-    ],
-  },
-  {
-    versao: 286, data: '2026-10-29', titulo: 'Repertório como songbook e letra que sincroniza sozinha',
-    itens: [
-      { tipo: 'novo', texto: 'Repertório e playlist como songbook: com a letra na tela toda (ou só a letra, no olho), passar o dedo para o lado vai para a próxima música (ou volta para a anterior), já com a letra dela. No computador, setas dos lados da tela e as setas do teclado.' },
-      { tipo: 'melhoria', texto: 'A letra sincroniza sozinha ao tocar a música (pelo banco de letras sincronizadas, sem servidor), também no celular e no computador. Se o banco de letras estava ocupado, tenta de novo sozinho em vez de desistir.' },
-      { tipo: 'melhoria', texto: 'Sua biblioteca, repertórios e playlists ficam guardados com mais segurança: o navegador é avisado para não apagar os dados do app e fica uma segunda cópia, que volta sozinha se os dados sumirem.' },
-      { tipo: 'melhoria', texto: 'Partitura sem depender de servidor: "Gerar com IA" virou "Importar o áudio". Escolha o arquivo de áudio da música e o app escreve a partitura aqui mesmo, no aparelho (antes tentava baixar o áudio do vídeo num servidor, que travava em 0% e dava erro). Para começar do zero, continua a "Nova partitura", nota por nota.' },
     ],
   },
 ];
