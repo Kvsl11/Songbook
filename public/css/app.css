@@ -3916,3 +3916,15 @@ body:not(.painel-cheio) #player.sem-video { display: none !important; }
 #partes .opcao { border-radius: 12px; }
 #lit ~ .cta-bar, .cta-bar { border-radius: 20px; }
 :root[data-theme="light"] .lit-semana a.hoje { box-shadow: inset 0 0 0 1.5px var(--accent); }
+
+/* botões sem a "sombra" atrás: a Cifra, o olho (só a letra), a rolagem e o expandir da letra ficam só com o ícone e o
+   nome, sem fundo cinza; ligados, ficam brancos e em negrito (desligados, um pouco apagados) */
+#player .pl-ver-cifra, html.pp #player .pl-leitura, html.pp #player .pl-ferr-rolar, html.pp #player .pl-letra-cab .icon-btn {
+  background: none !important; box-shadow: none !important; color: rgb(255 255 255 / 0.72) !important; font-weight: 700; }
+#player .pl-ver-cifra[aria-pressed="true"], html.pp #player .pl-leitura[aria-pressed="true"], html.pp #player .pl-ferr-rolar[aria-pressed="true"] {
+  background: none !important; color: #fff !important; font-weight: 900; }
+#player .pl-ver-cifra[aria-pressed="true"] svg, html.pp #player .pl-leitura[aria-pressed="true"] svg, html.pp #player .pl-ferr-rolar[aria-pressed="true"] svg { stroke-width: 2.8; }
+html.pp #player .pl-letra-cab .icon-btn { color: #fff !important; }
+/* tocando num botão, nada fica marcado atrás dele depois (o contorno de foco só aparece usando o teclado) */
+html.toque :focus-visible { outline: none !important; }
+html.toque .date-field:focus-visible, html.toque .cal-dias button:focus-visible, html.toque .pptx-parte:focus-visible, html.toque .part-acao:focus-visible { box-shadow: none; }

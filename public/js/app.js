@@ -43,6 +43,27 @@ travarEmPe();
 document.addEventListener('fullscreenchange', travarEmPe);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) travarEmPe(); });
 screen.orientation?.addEventListener?.('change', travarEmPe);
+// Tocando num botão, nada fica marcado atrás dele. Na tela de toque o "passar o mouse por cima" (:hover) fica preso
+// no último botão tocado, com o fundo cinza dele, até tocar em outro lugar: lá as regras de :hover saem do CSS. E o
+// contorno de foco só aparece usando o teclado (html.toque esconde enquanto se usa o dedo ou o mouse)
+const semHover = () => {
+  if (!matchMedia('(hover: none)').matches) return;
+  const limpar = (regras) => {
+    for (let i = regras.length - 1; i >= 0; i--) {
+      const r = regras[i];
+      if (r.cssRules) limpar(r.cssRules);
+      if (!r.selectorText?.includes(':hover')) continue;
+      const resto = r.selectorText.split(/,(?![^(]*\))/).filter((x) => !x.includes(':hover'));
+      if (resto.length) r.selectorText = resto.join(',');
+      else (r.parentRule || r.parentStyleSheet).deleteRule(i);
+    }
+  };
+  for (const folha of document.styleSheets) { try { limpar(folha.cssRules); } catch { /* folha de outro site */ } }
+};
+semHover();
+window.addEventListener('load', semHover);
+document.addEventListener('pointerdown', () => document.documentElement.classList.add('toque'), { capture: true, passive: true });
+document.addEventListener('keydown', (e) => { if (!e.metaKey && !e.ctrlKey) document.documentElement.classList.remove('toque'); }, { capture: true });
 // o servidor da IA vem junto com o app: a publicação grava o endereço em data/servidor-ia.json (sem ele, a partitura
 // é gerada no aparelho e as telas que precisam do servidor não aparecem). Quem usa não configura nada.
 // O servidor no computador de quem usa (servidor-ia/docker-compose.yml) vem primeiro, quando responde: o QR code da
@@ -108,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-288';
+export const APP_VERSAO = '2026.10.29-289';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
