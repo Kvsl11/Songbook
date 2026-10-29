@@ -450,7 +450,8 @@ export function sincroniaDoLrc(lrc, duracao = 0) {
 // A letra com o tempo de cada linha, do LRCLIB (aberto, com CORS: sem servidor). Só vale a da mesma música (título e,
 // quando se sabe, artista). O tempo do LRC é o da gravação: com a duração do vídeo parecida (até 4 s de diferença),
 // vale como está; com a duração bem diferente (um clipe com uma cena antes da música, como o de "Speed Demon", ou uma
-// versão editada), vem com ajustar: true: a letra está certa, mas falta acertar onde a música começa no vídeo
+// versão editada), vem com ajustar: true: a letra está certa, mas falta acertar onde a música começa no vídeo.
+// duracao: a da gravação (para achar o áudio oficial dela no YouTube)
 export async function letraSincronizada({ titulo = '', artista = '', duracao = 0 } = {}, fetchImpl, { espera = 1500 } = {}) {
   const t = String(titulo || '').trim();
   const a = String(artista || '').trim();
@@ -483,13 +484,13 @@ export async function letraSincronizada({ titulo = '', artista = '', duracao = 0
     const achada = mesmas.find(bate);
     if (achada) {
       const sinc = sincroniaDoLrc(achada.syncedLyrics, achada.duration || duracao);
-      if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: achada.id };
+      if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: achada.id, duracao: achada.duration || 0 };
     }
     fora = fora || mesmas[0] || null;
   }
   if (fora) {
     const sinc = sincroniaDoLrc(fora.syncedLyrics, fora.duration);
-    if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: fora.id, ajustar: true };
+    if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: fora.id, duracao: fora.duration || 0, ajustar: true };
   }
   if (!respondeu) throw new Error('O LRCLIB não respondeu agora');
   return null;
