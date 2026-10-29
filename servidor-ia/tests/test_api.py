@@ -41,7 +41,7 @@ def test_youtube_manda_a_porcentagem_do_download_e_avisa_a_fila(monkeypatch, tmp
         return {"caminho": os.path.join(pasta, "audio.wav"), "titulo": "t", "duracao": 1}
     monkeypatch.setattr(youtube, "baixar_audio", baixar_falso)
     monkeypatch.setattr(transcricao, "CACHE", str(tmp_path))
-    monkeypatch.setattr(transcricao, "carregar", lambda caminho: (np.zeros(100, dtype=np.float32), False))
+    monkeypatch.setattr(transcricao, "carregar", lambda caminho, maximo=None: (np.zeros(100, dtype=np.float32), False))
     monkeypatch.setattr(transcricao, "transcrever", lambda caminho, separar_voz, etapa, **kw: {"notas": [1]})
     import threading
     app.vagas.acquire()  # outra música ocupando o servidor: esta espera na fila
@@ -61,7 +61,7 @@ def test_letra_de_novo_nao_devolve_a_guardada_e_ouve_com_o_whisper_preciso(monke
     import youtube
 
     monkeypatch.setattr(transcricao, "CACHE", str(tmp_path))
-    monkeypatch.setattr(transcricao, "carregar", lambda caminho: (np.zeros(100, dtype=np.float32), False))
+    monkeypatch.setattr(transcricao, "carregar", lambda caminho, maximo=None: (np.zeros(100, dtype=np.float32), False))
     monkeypatch.setattr(youtube, "baixar_audio", lambda video, pasta, progresso=lambda p: None: {"caminho": "x", "titulo": "t"})
     monkeypatch.setattr(letra, "tem_whisper", lambda: True)
     pedidos = []

@@ -12,7 +12,7 @@ def test_a_letra_e_a_partitura_usam_o_mesmo_audio_e_a_mesma_separacao(monkeypatc
     monkeypatch.setattr(transcricao, "CACHE", str(tmp_path))
     y = np.linspace(-0.5, 0.5, 1000).astype(np.float32)
     baixados, separados = [], []
-    monkeypatch.setattr(transcricao, "carregar", lambda caminho: (y, False))
+    monkeypatch.setattr(transcricao, "carregar", lambda caminho, maximo=None: (y, False))
     monkeypatch.setattr(transcricao, "separar", lambda a: separados.append(1) or (a * 0.5, a * 0.25))
 
     def baixar():
@@ -37,3 +37,13 @@ def test_guarda_so_os_ultimos(monkeypatch, tmp_path):
     transcricao.guardar("ccccccccccc", voz=np.zeros(10, dtype=np.float32))
     assert sorted(os.listdir(tmp_path)) == ["bbbbbbbbbbb.npz", "ccccccccccc.npz"]
     assert transcricao.guardado(None) == {}
+
+
+def test_audio_do_video_vem_com_ate_15_minutos_e_o_cortado_em_6_baixa_de_novo(monkeypatch, tmp_path):
+    monkeypatch.setattr(transcricao, "CACHE", str(tmp_path))
+    pedidos = []
+    monkeypatch.setattr(transcricao, "carregar", lambda caminho, maximo=None: pedidos.append(maximo) or (np.zeros(10, dtype=np.float32), False))
+    # guardado de antes: cortado nos 6 minutos (curto demais para a letra de um vídeo longo)
+    transcricao.guardar("vid00000001", y=np.zeros(transcricao.MAX_SEGUNDOS * 10, dtype=np.float32), cortado=np.array(True))
+    transcricao.audio_do_video("vid00000001", lambda: {"caminho": "x.wav", "titulo": "t"})
+    assert pedidos == [transcricao.MAX_SEGUNDOS_VIDEO]

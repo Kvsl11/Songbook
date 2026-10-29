@@ -323,6 +323,9 @@ def do_youtube(pedido: PedidoYoutube, etapas: bool = Query(False), tarefa: bool 
 
     def trabalho(etapa):
         y, cortado, titulo = audio_do_video(video, pasta, etapa)
+        # a partitura: só os 6 primeiros minutos (o áudio do vídeo vem com até 15, por causa da letra)
+        limite = transcricao.MAX_SEGUNDOS * transcricao.SR
+        y, cortado = (y[:limite], True) if len(y) > limite else (y, cortado)
         return {**ouvir(None, pedido.separar, etapa, audio=(y, cortado), video=video), "video": video, "titulo": titulo}
 
     return com_etapas(trabalho, etapas, pasta, tarefa)
