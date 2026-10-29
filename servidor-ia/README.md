@@ -47,6 +47,10 @@ hora ligada); parado 30 minutos, ele desliga sozinho.
    Pública; o Codespace já tenta mudar sozinho). Clique no globo do endereço: abre a página com o QR code.
 3. Leia o QR code com o celular. Pronto.
 
+Deu **404** ou não abre? O servidor ainda está ligando (ou instalando). No **Terminal** do Codespace, veja o que ele
+está fazendo com `tail -f servidor-ia/dados/servidor.log` (pronto quando aparece `Uvicorn running`). Se não houver
+nada rodando, ligue à mão: `bash .devcontainer/ligar.sh`.
+
 Das outras vezes: o endereço não muda, então não precisa ler o QR code de novo. Só ligue o Codespace: em
 <https://github.com/codespaces> (dá até pelo celular), toque nele e espere uns 2 minutos; o servidor liga junto. Na
 tela Importar o áudio, com ele desligado, aparecem os botões **Ligar no GitHub** e **Já liguei**. Para ele demorar mais
