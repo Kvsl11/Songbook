@@ -36,6 +36,12 @@ def endereco() -> str | None:
         return None
 
 
+def do_tunel_vscode(host: str | None) -> str | None:
+    """A página aberta pelo endereço que o VS Code dá (Portas → Encaminhar uma porta): é ele que o celular usa."""
+    host = (host or "").strip().lower()
+    return f"https://{host}" if host.endswith(".devtunnels.ms") else None
+
+
 def link_do_app(url: str) -> str:
     return APP + "?ia=" + urllib.parse.quote(url, safe="")
 
@@ -51,12 +57,16 @@ def anunciar() -> None:
         time.sleep(5)
 
 
-def pagina() -> str:
-    url = endereco()
+VSCODE = ("<p class=nota>Demorando ou a rede da empresa bloqueia o túnel? No VS Code: aba <b>Portas</b> → "
+          "<b>Encaminhar uma porta</b> → <code>7860</code>, entre com a conta do GitHub, mude a visibilidade para "
+          "<b>Pública</b> e abra o endereço que aparece: esta mesma página, com o QR code certo.</p>")
+
+
+def pagina(url: str | None = None) -> str:
+    url = url or endereco()
     if not url:
         corpo = ("<h1>Ligando o túnel…</h1><p>Em alguns segundos o endereço aparece aqui (a página se atualiza sozinha)."
-                 "</p>" if TUNEL else "<h1>Servidor da IA no ar</h1><p>Sem o túnel (rode com <code>docker compose up"
-                 "</code> nesta pasta para o celular alcançar este PC).</p>")
+                 "</p>" + VSCODE if TUNEL else "<h1>Servidor da IA no ar</h1><p>Sem o túnel da Cloudflare.</p>" + VSCODE)
         atualizar = '<meta http-equiv="refresh" content="5">' if TUNEL else ""
         script = ""
     else:

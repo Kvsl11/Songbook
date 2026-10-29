@@ -19,7 +19,7 @@ import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib
 import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } from './lib/alinhamento.js';
 import { partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { NOVIDADES, novidadesNaoVistas } from './lib/novidades.js';
-import { baseDoServidor, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
+import { baseDoServidor, cabecalhos, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, dataDaPergunta, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { audioDbDoArtista, buscarYoutube, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
@@ -67,7 +67,7 @@ document.addEventListener('keydown', (e) => { if (!e.metaKey && !e.ctrlKey) docu
 // o servidor da IA vem junto com o app: a publicação grava o endereço em data/servidor-ia.json (sem ele, a partitura
 // é gerada no aparelho e as telas que precisam do servidor não aparecem). Quem usa não configura nada.
 // O servidor no computador de quem usa (servidor-ia/docker-compose.yml) vem primeiro, quando responde: o QR code da
-// página dele abre o app com ?ia=<endereço> e o endereço fica guardado (Ajustes → Servidor no seu computador)
+// página dele abre o app com ?ia=<endereço> e o endereço fica guardado (Ajustes → Servidor no computador)
 let SERVIDOR_IA = { url: '', chave: '' };
 const servidorIA = () => SERVIDOR_IA;
 const doLink = new URLSearchParams(location.search).get('ia');
@@ -75,7 +75,7 @@ if (doLink !== null) {
   db.setPref('servidorPc', baseDoServidor(doLink));
   history.replaceState(null, '', location.pathname + location.hash);
 }
-const responde = (url) => fetch(url + '/saude', { signal: AbortSignal.timeout(8000) }).then((r) => r.ok).catch(() => false);
+const responde = (url) => fetch(url + '/saude', { headers: cabecalhos(url), signal: AbortSignal.timeout(8000) }).then((r) => r.ok).catch(() => false);
 const servidorCarregado = (async () => {
   const pc = baseDoServidor(db.prefs().servidorPc);
   if (pc && await responde(pc)) {
@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-297';
+export const APP_VERSAO = '2026.10.29-298';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -6220,6 +6220,12 @@ self.onmessage = async (e) => {
 let workerIA = null;
 let pedidoIA = 0;
 const esperandoIA = new Map();
+// desliga a IA do aparelho (travou carregando): a próxima vez abre um Worker novo
+function pararIA() {
+  workerIA?.terminate();
+  workerIA = null;
+  esperandoIA.clear();
+}
 // o meio e o lado do estéreo (lado null: áudio mono) → { notas, tipo, separado }; aoEtapa(nome, progresso 0–1)
 function notasNoAparelho({ meio, lado }, aoEtapa = () => {}) {
   if (!workerIA) {
@@ -6280,9 +6286,13 @@ async function gerarComIA(song, titulo) {
   const id = song.id;
   setHeader(titulo, { back: '#/partituras', eyebrow: 'Gerar partitura com IA' });
   const modoIA = 'mistura'; // a música inteira (voz e instrumentos), do arquivo de áudio
+  // o servidor no computador de quem usa (Ajustes → Servidor no computador): de graça, sem crédito do Modal. Com
+  // ele ligado, o áudio vai para o PC (a voz separada pelo Demucs, mais fiel) e dá para usar o link do YouTube; o
+  // servidor da nuvem (Modal) fica de fora, porque cada partitura gastava o crédito
+  const noPc = Boolean(servidorIA().pc && servidorIA().url);
   view.innerHTML = `<div class="ia">
     <section class="ia-topo">${capa(song)}<div><div class="kind ia-selo">${icon('upload', 14)} Importar o áudio</div><h2>${esc(titulo)}</h2>
-      <p class="muted">Escolha o arquivo de áudio da música: o app ouve aqui mesmo, no aparelho (sem servidor), e escreve a <b>melodia</b> — ou as <b>4 vozes do coral</b> — no tom e no andamento. No fim, ouça ali mesmo e salve se ficou bom.</p></div></section>
+      <p class="muted">${noPc ? 'Escolha o arquivo de áudio da música ou cole o link do YouTube: o <b>servidor do seu computador</b> separa a voz dos instrumentos' : 'Escolha o arquivo de áudio da música: o app ouve aqui mesmo, no aparelho (sem servidor),'} e escreve a <b>melodia</b> — ou as <b>4 vozes do coral</b> — no tom e no andamento. No fim, ouça ali mesmo e salve se ficou bom.</p></div></section>
     <div id="ia-passo"></div></div>`;
   const passo = $('#ia-passo');
 
@@ -6294,7 +6304,12 @@ async function gerarComIA(song, titulo) {
       <button class="ia-solte" id="ia-arquivo"><span class="ia-solte-ic">${icon('upload', 28)}</span>
         <b>Escolher o áudio da música</b><small>MP3, M4A, WAV, OGG… até 6 minutos. Fica melhor com voz e violão do que com banda completa.</small>
         <span class="btn primary">${icon('upload', 16)} Escolher arquivo</span></button>
+      ${noPc ? `<form class="ia-yt" id="ia-yt"><span class="ia-yt-ic">${icon('youtube', 22)}</span>
+        <div class="ia-yt-txt"><b>Ou cole o link do YouTube</b><small>O seu computador baixa só o áudio, gera a partitura e apaga o áudio.</small></div>
+        <div class="ia-yt-campo"><input class="input" name="url" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${song.youtube ? `https://youtu.be/${esc(song.youtube)}` : ''}" required>
+          <button class="btn primary" type="submit">${icon('sparkles', 16)} Gerar</button></div></form>` : `<p class="ia-dica-compartilhar">${icon('info', 16)}<span>Travou ou ficou fraco no celular? Ligue o <b>servidor no seu computador</b> (de graça, sem crédito): veja em Ajustes → Servidor no computador.</span></p>`}
       <p class="ia-dica-compartilhar">${icon('info', 16)}<span>No Android, dá para baixar o áudio em outro app e tocar em <b>Compartilhar → Songbook</b>: ele já chega aqui.</span></p>`;
+    $('#ia-yt')?.addEventListener('submit', (e) => { e.preventDefault(); lerNoServidor({ url: e.target.url.value }); });
     const solte = $('#ia-arquivo');
     solte.onclick = () => {
       const inp = document.createElement('input');
@@ -6312,8 +6327,18 @@ async function gerarComIA(song, titulo) {
 
   // com o servidor da IA, o áudio vai inteiro para ele (a voz separada da banda, mais fiel) e as notas voltam prontas;
   // se ele não responde, o arquivo é lido aqui mesmo, no aparelho
-  // (sem servidor nenhum: o áudio importado é lido aqui mesmo, no aparelho)
-  const lerArquivo = (arquivo) => lerNoAparelho(arquivo);
+  // (sem o servidor do computador: o áudio importado é lido aqui mesmo, no aparelho)
+  const lerArquivo = (arquivo) => (noPc ? lerNoServidor({ arquivo }) : lerNoAparelho(arquivo));
+  // com o servidor: uma tela por etapas, com o andamento que o servidor manda (baixar, separar a voz, ouvir as
+  // notas, conferir a afinação, escrever), cada uma marcada quando termina
+  const ETAPAS_IA = [
+    ['baixando', 'Baixando o áudio do vídeo', 'youtube'],
+    ['enviando', 'Enviando o áudio', 'upload'],
+    ['separando', 'Separando a voz dos instrumentos', 'mic'],
+    ['notas', 'Ouvindo as notas', 'music'],
+    ['afinacao', 'Conferindo a afinação da voz', 'chord'],
+    ['escrevendo', 'Escrevendo a partitura', 'score'],
+  ];
   // no aparelho: as mesmas etapas, sem baixar nem enviar (o lado do estéreo só existe no áudio estéreo)
   const ETAPAS_APARELHO = [
     ['abrindo', 'Abrindo o áudio', 'music'],
@@ -6400,6 +6425,42 @@ async function gerarComIA(song, titulo) {
       },
     };
   }
+  async function lerNoServidor({ arquivo, url }) {
+    // a etapa de afinação só existe com a voz separada; ela aparece se o servidor avisar
+    telaEtapas(ETAPAS_IA.filter(([k]) => k !== (arquivo ? 'baixando' : 'enviando')));
+    const etapas = etapasEmSequencia();
+    etapas.avisar(arquivo ? 'enviando' : 'baixando', 0);
+    const ctrl = new AbortController();
+    $('#ia-cancelar').onclick = () => { ctrl.abort(); telaFontes(); };
+    const t0 = Date.now();
+    const relogio = setInterval(() => { const t = $('#ia-etapa-tempo'); if (t) t.textContent = `${fmtSeg((Date.now() - t0) / 1000)} · no servidor do seu computador`; }, 1000);
+    try {
+      const form = arquivo ? new FormData() : null;
+      if (form) { form.append('arquivo', arquivo, arquivo.name || 'audio'); form.append('separar', 'true'); }
+      const r = await chamarComEtapas(servidorIA(), arquivo ? '/transcrever' : '/youtube', arquivo ? { form, sinal: ctrl.signal } : { json: { url }, sinal: ctrl.signal }, etapas.avisar);
+      clearInterval(relogio);
+      if (!view.contains(passo)) return;
+      await etapas.concluir();
+      if (!view.contains(passo) || ctrl.signal.aborted) return;
+      if (r.cortado) toast('Usei só os primeiros 6 minutos');
+      notas = r.notas || [];
+      if (!notas.length) { telaFontes('A IA não encontrou notas neste áudio. Tente de novo ou use outro arquivo de áudio da música.'); return; }
+      resultado();
+    } catch (e) {
+      clearInterval(relogio);
+      if (ctrl.signal.aborted || !view.contains(passo)) return;
+      console.error(e);
+      // não conseguiu nem falar com o computador (desligado, endereço mudou): o arquivo ainda dá para ler no aparelho,
+      // e a tela diz por quê. Se o servidor caiu no meio, mostra o erro e o "tente de novo"
+      if (arquivo && e.conexao) { lerNoAparelho(arquivo, 'O servidor do seu computador não respondeu (desligado, ou o endereço mudou: leia o QR code de novo), então a partitura está sendo feita aqui no próprio aparelho.'); return; }
+      telaFontes(erroExplicado(e));
+      if (e.status === 403) passo.querySelector('.aviso')?.insertAdjacentHTML('beforeend', `<a class="btn small primary" href="#/youtube">${icon('youtube', 15)} Conectar o YouTube</a>`);
+    }
+  }
+  // no aparelho, abrir o áudio e carregar a IA (a primeira vez baixa o modelo, uns 20 MB) não pode ficar parado para
+  // sempre: sem nenhuma etapa nova nesse tempo, desiste e diz o que fazer (antes ficava em "Abrindo o áudio")
+  const PARADO_MAX = 3 * 60e3;
+  const SEM_RESPOSTA = 'O aparelho não conseguiu abrir este áudio ou carregar a IA (parou em “Abrindo o áudio”). Tente com a internet melhor, com um arquivo menor em MP3, ou ligue o servidor no seu computador (Ajustes → Servidor no computador).';
   async function lerNoAparelho(arquivo, motivo = '') {
     telaEtapas(ETAPAS_APARELHO);
     if (motivo) passo.querySelector('.ia-etapas').insertAdjacentHTML('afterbegin', `<div class="aviso">${icon('info', 16)}<span>${esc(motivo)}</span></div>`);
@@ -6409,13 +6470,23 @@ async function gerarComIA(song, titulo) {
     $('#ia-cancelar').onclick = () => { cancelado = true; telaFontes(); };
     const t0 = Date.now();
     const relogio = setInterval(() => { const t = $('#ia-etapa-tempo'); if (t) t.textContent = `${fmtSeg((Date.now() - t0) / 1000)} · no próprio aparelho, sem servidor`; }, 1000);
+    let vigia;
+    let parou;
+    const parado = new Promise((_, falha) => { parou = falha; });
+    const vigiar = () => { clearTimeout(vigia); vigia = setTimeout(() => parou(Object.assign(new Error(SEM_RESPOSTA), { parado: true })), PARADO_MAX); };
+    vigiar();
     try {
-      const audio = await audioParaModelo(await arquivo.arrayBuffer());
+      const audio = await Promise.race([arquivo.arrayBuffer().then(audioParaModelo), parado]);
       if (cancelado || !view.contains(passo)) return;
       if (audio.cortado) toast('Usei só os primeiros 6 minutos');
       // áudio mono: não dá para separar a voz pelo estéreo (a etapa fica de fora)
       if (!audio.lado) passo.querySelector('[data-etapa="separando"]')?.remove();
-      const r = await notasNoAparelho(audio, (nome, p) => { if (!cancelado) etapas.avisar(nome, p); });
+      // o áudio abriu: agora é a IA que carrega (na primeira vez, baixa o modelo)
+      const sub = passo.querySelector('[data-etapa="abrindo"] .ia-etapa-sub');
+      if (sub) sub.textContent = 'Carregando a IA no aparelho (a primeira vez baixa uns 20 MB)';
+      vigiar();
+      const r = await Promise.race([notasNoAparelho(audio, (nome, p) => { vigiar(); if (!cancelado) etapas.avisar(nome, p); }), parado]);
+      clearTimeout(vigia);
       clearInterval(relogio);
       if (cancelado || !view.contains(passo)) return;
       await etapas.concluir();
@@ -6425,10 +6496,12 @@ async function gerarComIA(song, titulo) {
       resultado();
     } catch (e) {
       clearInterval(relogio);
+      // a IA travada no Worker não serve para a próxima tentativa: começa do zero
+      if (e.parado) pararIA();
       if (cancelado) return;
       console.error(e);
-      telaFontes(e.name === 'EncodingError' ? 'Este aparelho não conseguiu abrir esse arquivo. Tente em MP3 ou WAV.' : FALHOU_IA);
-    }
+      telaFontes(e.parado ? SEM_RESPOSTA : e.name === 'EncodingError' ? 'Este aparelho não conseguiu abrir esse arquivo. Tente em MP3 ou WAV.' : FALHOU_IA);
+    } finally { clearTimeout(vigia); }
   }
   let notas = null;
 

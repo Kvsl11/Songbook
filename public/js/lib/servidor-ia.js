@@ -13,6 +13,16 @@ export function baseDoServidor(texto) {
   } catch { return ''; }
 }
 
+// o túnel do VS Code (Portas → Encaminhar uma porta, no notebook sem administrador) mostra uma página de aviso antes
+// de quem chega pelo navegador; com este cabeçalho, as chamadas do app passam direto por ela
+export const TUNEL_VSCODE = 'X-Tunnel-Skip-AntiPhishing-Page';
+export function cabecalhos(url, chave) {
+  const h = {};
+  if (chave) h['X-Chave'] = chave;
+  if (/\.devtunnels\.ms(\/|$)/i.test(String(url || ''))) h[TUNEL_VSCODE] = 'true';
+  return h;
+}
+
 // a linha da letra como se canta: sem os acordes ([G]Santo) e sem espaços sobrando
 export const linhaSemCifra = (l) => String(l || '').replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
 
@@ -35,8 +45,7 @@ export async function chamar(cfg, rota, { json, form, metodo, sinal, tempo = 15 
   const ctrl = new AbortController();
   const fim = setTimeout(() => ctrl.abort(), tempo);
   sinal?.addEventListener('abort', () => ctrl.abort());
-  const headers = {};
-  if (cfg.chave) headers['X-Chave'] = cfg.chave;
+  const headers = cabecalhos(base, cfg.chave);
   if (json) headers['Content-Type'] = 'application/json';
   try {
     const r = await fetch(base + rota, { method: metodo || (json || form ? 'POST' : 'GET'), headers, body: json ? JSON.stringify(json) : form, signal: ctrl.signal });
@@ -60,8 +69,7 @@ export async function chamarComEtapas(cfg, rota, { json, form, sinal, tempo = 20
   const ctrl = new AbortController();
   const fim = setTimeout(() => ctrl.abort(), tempo);
   sinal?.addEventListener('abort', () => ctrl.abort());
-  const headers = {};
-  if (cfg.chave) headers['X-Chave'] = cfg.chave;
+  const headers = cabecalhos(base, cfg.chave);
   if (json) headers['Content-Type'] = 'application/json';
   try {
     const r = await fetch(`${base}${rota}${rota.includes('?') ? '&' : '?'}etapas=1`, { method: 'POST', headers, body: json ? JSON.stringify(json) : form, signal: ctrl.signal });
@@ -118,7 +126,7 @@ function enviarComEtapas(cfg, url, form, sinal, tempo, aoEtapa) {
       lido = k + 1;
     };
     xhr.open('POST', url);
-    if (cfg.chave) xhr.setRequestHeader('X-Chave', cfg.chave);
+    for (const [k, v] of Object.entries(cabecalhos(url, cfg.chave))) xhr.setRequestHeader(k, v);
     xhr.upload.onprogress = (e) => { if (e.lengthComputable && e.total) aoEtapa('enviando', Math.min(1, e.loaded / e.total)); };
     xhr.onprogress = () => { if (xhr.status === 200) linhas(); };
     xhr.onload = () => {

@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 298, data: '2026-10-29', titulo: 'Partitura pelo servidor do seu computador',
+    itens: [
+      { tipo: 'correcao', texto: 'Gerar a partitura no celular não fica mais parado em “Abrindo o áudio”: se o aparelho não conseguir abrir o arquivo ou carregar a IA em alguns minutos, a tela avisa e diz o que fazer.' },
+      { tipo: 'novo', texto: 'Com o servidor no seu computador ligado (Ajustes → Servidor no computador), a partitura volta a ser feita nele, de graça e sem crédito: a voz é separada dos instrumentos e dá para colar o link do YouTube. Se o computador não responder, o celular faz sozinho.' },
+      { tipo: 'melhoria', texto: 'No notebook da empresa, sem administrador: o servidor liga por uma tarefa do VS Code e, se a rede bloquear o túnel da Cloudflare, o celular alcança o computador pelas Portas do VS Code.' },
+    ],
+  },
+  {
     versao: 297, data: '2026-10-29', titulo: 'O artista certo no “Sobre o artista”',
     itens: [
       { tipo: 'correcao', texto: 'Quando há mais de um artista com o mesmo nome no YouTube (como o Kemuel), a foto, os números e o canal agora são os do artista certo, o mais conhecido, e não os de outro com o mesmo nome.' },
@@ -63,13 +71,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'melhoria', texto: 'Tocando em qualquer botão do app, não fica mais aquela marca cinza atrás dele mostrando que foi tocado.' },
       { tipo: 'melhoria', texto: 'Na letra do Tocando agora, a Cifra, o olho (só a letra), a rolagem e o expandir ficam só com o ícone, sem fundo: ligados, brancos e em negrito; desligados, um pouco apagados.' },
-    ],
-  },
-  {
-    versao: 288, data: '2026-10-29', titulo: 'Vídeo que não trava ao trocar de capa e foto do artista do YouTube',
-    itens: [
-      { tipo: 'correcao', texto: 'No Tocando agora, mudar para a capa animada e voltar para o vídeo não faz mais o vídeo recarregar: antes o YouTube podia pausar com o aviso de que a conta estava sendo usada em outro lugar e o vídeo não tocava mais.' },
-      { tipo: 'melhoria', texto: 'A foto do artista vem do canal dele no YouTube (a mais atual), só quando o canal é com certeza dele: verificado ou o canal de artista que o próprio YouTube cria. Sem um assim, continua a foto de antes (Cifra Club, Deezer ou Wikipédia).' },
     ],
   },
 ];
