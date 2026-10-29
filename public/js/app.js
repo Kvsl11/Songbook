@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-315';
+export const APP_VERSAO = '2026.10.29-316';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -939,6 +939,8 @@ const player = (() => {
   let pendente = null;
   let arrasto = null; // a barra do tempo sendo arrastada: { prog, id, fracao } // ida para um ponto do vídeo pedida antes de ele estar pronto
   let tentativasIda = 0;
+  // o estado do player do YouTube (1 = tocando), pelo que ele avisa; volta a -1 a cada vídeo novo
+  let estadoYt = -1;
   let duracao = 0;
   // na página da própria música o vídeo toca lá (na telinha das Referências); fora dela, no mini player
   let palco = null;
@@ -1681,6 +1683,7 @@ const semLinhasDeAcordes = (sinc) => {
       return;
     }
     pararLocal();
+    estadoYt = -1;
     tela.innerHTML = `<iframe src="${esc(ytEmbed(atual.youtube, { autoplay }))}" title="${esc(atual.titulo || 'Vídeo')}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
     const f = $('iframe', tela);
     f.addEventListener('load', () => f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'));
@@ -1788,7 +1791,10 @@ const semLinhasDeAcordes = (sinc) => {
     tentativasIda = 0;
     const tocando = estado === 'tocando';
     const l = localDe(id);
-    pendente = tocando && !l ? tempo : null; // (pausada, o vídeo novo fica parado já no ponto: o play começa dali)
+    // o ponto pedido vale até o vídeo novo estar tocando nele (pausada, ele fica parado já no ponto e é conferido no
+    // play): enquanto carrega, o YouTube avisa o tempo 0, e esse 0 levava a música de volta ao começo
+    pendente = l ? null : tempo;
+    estadoYt = -1;
     if (l) { comandoYt('pauseVideo'); tocarLocal(l, tempo, tocando); }
     else {
       pararLocal();
@@ -2090,15 +2096,19 @@ const semLinhasDeAcordes = (sinc) => {
       }
       const info = msg?.info;
       if (!info) return;
-      if (pendente !== null && typeof info.currentTime === 'number') {
-        // o vídeo começou: aplica a ida pedida (e não deixa o tempo antigo voltar). Só a mensagem que traz o tempo
-        // decide: a primeira depois de trocar de versão (da música para o clipe, ou ao contrário) costuma vir só com o
-        // estado do player, e antes a ida era dada por feita ali e o vídeo novo começava do zero
-        if (Math.abs(info.currentTime - pendente) > 2 && ++tentativasIda < 12) { comando('seekTo', [pendente, true]); return; }
-        pendente = null;
-        tentativasIda = 0;
+      if (typeof info.playerState === 'number') estadoYt = info.playerState;
+      // aviso que ainda é do vídeo de antes (logo depois de trocar da música para o clipe, ou ao contrário)
+      const outroVideo = info.videoData?.video_id && info.videoData.video_id !== atual.youtube;
+      let usarTempo = typeof info.currentTime === 'number' && !outroVideo;
+      if (pendente !== null && usarTempo) {
+        // a ida pedida (trocar de versão, pular para uma frase): só conta com o vídeo já tocando. Carregando, o YouTube
+        // avisa o tempo 0 antes do ponto pedido: esse 0 não vale (o tempo fica no pedido) e não gasta as tentativas
+        const longe = Math.abs(info.currentTime - pendente) > 2;
+        if (estadoYt !== 1) usarTempo = false;
+        else if (longe && ++tentativasIda < 8) { comando('seekTo', [pendente, true]); return; }
+        else { pendente = null; tentativasIda = 0; }
       }
-      if (typeof info.currentTime === 'number') { tempo = info.currentTime; marcaTempo = performance.now(); }
+      if (usarTempo) { tempo = info.currentTime; marcaTempo = performance.now(); }
       if (typeof info.duration === 'number' && info.duration > 0 && Math.round(info.duration) !== Math.round(duracao)) {
         duracao = info.duration;
         guardarDuracao(atual?.youtube, duracao);
