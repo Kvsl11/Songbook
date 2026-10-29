@@ -3968,3 +3968,7 @@ html.toque .date-field:focus-visible, html.toque .cal-dias button:focus-visible,
   .setor { min-height: 112px; padding: 14px; }
   .setor b { font-size: 16.5px; }
 }
+/* celular e computador, na barra embaixo, no modo música: a capa (quadrada) no lugar do vídeo, que continua tocando
+   escondido, como no tablet */
+html:not(.pp) #player.capa-na-barra:not(.grande) .pl-video { aspect-ratio: 1 / 1; width: 48px; background: #000 center / cover no-repeat; }
+html:not(.pp) #player.capa-na-barra .pl-video.capa-yt { background-size: auto 134%; }

@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-290';
+export const APP_VERSAO = '2026.10.29-291';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -840,6 +840,9 @@ const player = (() => {
   // tablet, como o "Mudar para vídeo" do Spotify: a capa no lugar do vídeo (o vídeo continua tocando, só não aparece)
   let comCapa = Boolean(db.prefs().playerCapa);
   const modoCapa = () => comCapa && document.documentElement.classList.contains('pp');
+  // celular e computador, na barra embaixo (fora da tela toda): no modo música, a capa no lugar do vídeo, como no tablet
+  // (antes a barra mostrava sempre o vídeo, mesmo com "Mudar para música")
+  const capaNaBarra = () => comCapa && !document.documentElement.classList.contains('pp') && !atual?.semVideo && !el.classList.contains('grande');
   // a música tocando é esta?
   const desta = (id) => Boolean(atual && id && atual.youtube === id);
   const noPalco = () => Boolean(atual && palco?.isConnected && desta(palcoDe)) && !document.body.classList.contains('painel-cheio');
@@ -885,7 +888,7 @@ const player = (() => {
     quadro = requestAnimationFrame(seguir);
     const a = alvo();
     if (!tela.isConnected) { casa.append(tela); tela.classList.remove('na-telinha'); montar(); return; } // saiu junto com uma página (não deveria): refaz
-    const escondida = (modoCapa() || atual?.semVideo || el.classList.contains('letra-cheia')) && !noPalco();
+    const escondida = (modoCapa() || capaNaBarra() || atual?.semVideo || el.classList.contains('letra-cheia')) && !noPalco();
     // no painel do tablet (e no mini player dele) o vídeo também entra de verdade no lugar dele: rola junto e fica
     // cortado pela borda do painel. Antes, seguido por cima, ele passava do topo do painel ao rolar e, no mini
     // player, ficava deslocado (uma parte cortada, outra sobrando)
@@ -995,7 +998,9 @@ const player = (() => {
     const semCapa = capa && !url;
     // (só com "Capa animada" ligada nos Ajustes; desligada, fica a capa parada e não baixa os quadros)
     const q = capa && !atual?.semVideo && atual?.youtube && db.prefs().videoFundo !== false ? atual.youtube : '';
-    mini.style.backgroundImage = capa && url ? `url("${url}")` : ''; // (com os quadros no fundo, o CSS a esconde)
+    const barra = capaNaBarra();
+    el.classList.toggle('capa-na-barra', barra);
+    mini.style.backgroundImage = (capa || barra) && url ? `url("${url}")` : ''; // (com os quadros no fundo, o CSS a esconde)
     mini.classList.toggle('com-fundo', Boolean(q));
     fundo.hidden = !q;
     fundoCasa.classList.toggle('ativo', Boolean(q) && fundoCasa.isConnected);
@@ -1014,7 +1019,7 @@ const player = (() => {
       // todos os quadros já carregados (com "lazy", o quadro que chegava no meio da rolagem aparecia de repente)
       fundo.querySelectorAll('img[loading]').forEach((img) => { img.loading = 'eager'; });
     }
-    mini.classList.toggle('capa-yt', capa && capaYt);
+    mini.classList.toggle('capa-yt', (capa || barra) && capaYt);
     // no modo vídeo, a capa pequena ao lado do nome (como no Spotify)
     const capinha = $('.pl-capinha', el);
     capinha.style.backgroundImage = !capa && url ? `url("${url}")` : '';

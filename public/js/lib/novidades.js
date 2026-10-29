@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 291, data: '2026-10-29', titulo: 'Capa na barra do celular',
+    itens: [
+      { tipo: 'correcao', texto: 'No celular, com o Tocando agora em “Mudar para música”, a barra da música embaixo mostra a capa (como no tablet) em vez do vídeo; em “Mudar para vídeo”, volta a mostrar o vídeo. A música continua tocando normalmente.' },
+    ],
+  },
+  {
     versao: 290, data: '2026-10-29', titulo: 'Busca de cara nova',
     itens: [
       { tipo: 'melhoria', texto: 'A abertura da Busca ficou mais limpa: no lugar do aviso corrido, um cartão “Qualquer música, pronta para tocar”, com o que vem junto (cifra, letra e vídeo) e o “Cole aqui” para cifras de outros sites.' },
@@ -66,12 +72,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'Abrir a letra na tela toda não pisca mais: o vídeo some na hora (antes aparecia por um instante por cima da letra) e a capa animada para de rodar por baixo dela.' },
       { tipo: 'melhoria', texto: 'A opção "Duas colunas" saiu dos Ajustes e da barra da música: a letra fica sempre numa coluna só (no PDF, a opção de colunas continua).' },
-    ],
-  },
-  {
-    versao: 281, data: '2026-10-28', titulo: 'Música abre certinho com o painel recolhido',
-    itens: [
-      { tipo: 'correcao', texto: 'No tablet com o Tocando agora recolhido (a barrinha embaixo), tocar numa música da Início abria uma tela preta: agora abre o Tocando agora inteiro, e ao sair o painel volta a ficar recolhido.' },
     ],
   },
 ];
