@@ -47,8 +47,10 @@ hora ligada); parado 30 minutos, ele desliga sozinho.
    Pública; o Codespace já tenta mudar sozinho). Clique no globo do endereço: abre a página com o QR code.
 3. Leia o QR code com o celular. Pronto.
 
-Das outras vezes: em <https://github.com/codespaces>, abra o mesmo Codespace (o servidor liga junto) e leia o QR code
-de novo. O que o servidor está fazendo: `servidor-ia/dados/servidor.log`.
+Das outras vezes: o endereço não muda, então não precisa ler o QR code de novo. Só ligue o Codespace: em
+<https://github.com/codespaces> (dá até pelo celular), toque nele e espere uns 2 minutos; o servidor liga junto. Na
+tela Importar o áudio, com ele desligado, aparecem os botões **Ligar no GitHub** e **Já liguei**. Para ele demorar mais
+a dormir: <https://github.com/settings/codespaces> → **Default idle timeout** (até 240 minutos; gasta mais da cota). O que o servidor está fazendo: `servidor-ia/dados/servidor.log`.
 
 ### No notebook da empresa, pelo VS Code (sem administrador)
 
