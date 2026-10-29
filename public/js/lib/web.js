@@ -585,6 +585,37 @@ export async function duracaoDoVideo(id, { fetchImpl, instancias = PIPED } = {})
   return 0;
 }
 
+// a foto do artista pelo canal dele no YouTube (a mais atual). Só um canal que é com certeza do artista: o "Tópico"
+// que o próprio YouTube cria para ele ("Nome - Topic", sem outro com o mesmo nome) ou um canal verificado com o nome
+// dele (aceita "Oficial"/"VEVO" no fim). Nunca o canal de quem postou o vídeo, que pode ser de outra pessoa, nem um
+// "Fulano Oficial" sem o selo (costuma ser de fã). '' quando não acha um assim
+const nomeDoCanal = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  .replace(/[^a-z0-9 ]+/g, ' ').replace(/\b(oficial|official|vevo)\b/g, ' ').replace(/\s+/g, '').trim();
+export function fotoDosCanais(json, nome) {
+  const quem = nomeDoCanal(nome);
+  if (!quem) return '';
+  const canais = (json?.items || []).filter((c) => c.type === 'channel' && c.thumbnail);
+  const topicos = canais.filter((c) => / - Topic$/.test(c.name || '') && nomeDoCanal(c.name.replace(/ - Topic$/, '')) === quem);
+  const verificado = canais.find((c) => c.verified && !/ - Topic$/.test(c.name || '') && nomeDoCanal(c.name) === quem);
+  const c = verificado || (topicos.length === 1 ? topicos[0] : null);
+  if (!c) return '';
+  // a foto vem pelo proxy da instância (…?host=yt3.ggpht.com): direto do YouTube, maior
+  let url = c.thumbnail;
+  try { const u = new URL(url); const host = u.searchParams.get('host'); if (host && /(^|\.)(ggpht|googleusercontent)\.com$/.test(host)) url = `https://${host}${u.pathname}`; } catch { return ''; }
+  if (url.startsWith('//')) url = 'https:' + url;
+  return /^https:/.test(url) ? url.replace(/=s\d+-/, '=s480-') : '';
+}
+export async function fotoDoCanal(nome, { fetchImpl, instancias = PIPED } = {}) {
+  const q = String(nome || '').trim();
+  if (!q) return '';
+  const uma = async (base) => {
+    const res = await buscar(`${base}/search?filter=channels&q=${encodeURIComponent(q)}`, { fetchImpl, timeout: 8000 });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return fotoDosCanais(await res.json(), q);
+  };
+  return Promise.any(instancias.map(uma)).catch(() => '');
+}
+
 export async function youtubeOEmbed(url, fetchImpl) {
   const res = await buscar(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`, { fetchImpl });
   if (!res.ok) throw new Error('Vídeo não encontrado');

@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 288, data: '2026-10-29', titulo: 'Vídeo que não trava ao trocar de capa e foto do artista do YouTube',
+    itens: [
+      { tipo: 'correcao', texto: 'No Tocando agora, mudar para a capa animada e voltar para o vídeo não faz mais o vídeo recarregar: antes o YouTube podia pausar com o aviso de que a conta estava sendo usada em outro lugar e o vídeo não tocava mais.' },
+      { tipo: 'melhoria', texto: 'A foto do artista vem do canal dele no YouTube (a mais atual), só quando o canal é com certeza dele: verificado ou o canal de artista que o próprio YouTube cria. Sem um assim, continua a foto de antes (Cifra Club, Deezer ou Wikipédia).' },
+    ],
+  },
+  {
     versao: 287, data: '2026-10-29', titulo: 'Letra com respiro no topo',
     itens: [
       { tipo: 'correcao', texto: 'Na letra na tela toda, a primeira linha não fica mais colada no topo e meio apagada: desceu um pouco, e dá para ver bem a linha que está sendo cantada desde o começo da música.' },
@@ -62,14 +69,6 @@ export const NOVIDADES = [
     versao: 279, data: '2026-10-28', titulo: 'Menu do tablet mais limpo',
     itens: [
       { tipo: 'correcao', texto: 'No tablet em pé, a aba ativa do menu de baixo não tem mais o fundo cinza em volta: só o ícone preenchido e o nome em branco, como no tablet deitado.' },
-    ],
-  },
-  {
-    versao: 278, data: '2026-10-28', titulo: 'Tocando agora do tablet como o Spotify',
-    itens: [
-      { tipo: 'melhoria', texto: 'No tablet (em pé e deitado), o Tocando agora fica numa coluna só, no centro, com os cartões um embaixo do outro: letra, artista, participantes, créditos e vídeo (antes eram três colunas desencontradas).' },
-      { tipo: 'novo', texto: 'No tablet, rolando para baixo dos controles, aparece no alto uma barrinha com o nome, o artista e o play.' },
-      { tipo: 'melhoria', texto: 'No tablet, o menu ⋯ do Tocando agora (e o do editor de partitura) sobe do rodapé, numa coluna só, como os outros ⋯.' },
     ],
   },
 ];
