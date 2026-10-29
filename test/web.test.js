@@ -421,6 +421,15 @@ test('canalDosResultados: canal verificado com complemento no nome, com os inscr
   assert.equal(canalDosResultados(json, 'Frei Gilson'), null);
 });
 
+// dois verificados com o mesmo nome (o rapper "Kemuel" vinha antes do Kemuel do gospel): o que tem mais inscritos
+test('canalDosResultados: com vários verificados do mesmo nome, o que tem mais inscritos', async () => {
+  const { canalDosResultados } = await import('../public/js/lib/web.js');
+  const canal = (id, subscribers) => ({ type: 'channel', name: 'Kemuel', verified: true, subscribers, url: `/channel/${id}`, thumbnail: `https://proxy.exemplo/${id}=s176-c-k?host=yt3.ggpht.com` });
+  const json = { items: [canal('UCoutro', 54100), canal('UCgospel', 3190000), { ...canal('UCtop', -1), name: 'Kemuel - Topic', verified: false }] };
+  assert.equal(canalDosResultados(json, 'Kemuel').id, 'UCgospel');
+  assert.equal(canalDosResultados(json, 'Kemuel').inscritos, 3190000);
+});
+
 test('artistaDaAudioDb: os seguidores no Spotify, as fotos e a biografia, só do artista com o mesmo nome', async () => {
   const { artistaDaAudioDb } = await import('../public/js/lib/web.js');
   const json = { artists: [{ strArtist: 'Aline Barros', intFollowers: '5724931', strArtistThumb: 'https://r2.theaudiodb.com/a.jpg', strArtistFanart: 'http://r2.theaudiodb.com/b.jpg', strArtistFanart2: null, strArtistLogo: 'https://r2.theaudiodb.com/logo.png', strBiographyPT: 'Cantora.' }] };
