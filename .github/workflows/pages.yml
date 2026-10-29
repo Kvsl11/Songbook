@@ -19,9 +19,12 @@ permissions:
   pages: write
   id-token: write
 
+# uma publicação por vez, na fila: a de depois espera a que está rodando terminar. Antes a nova cancelava a que
+# estava rodando, e cada merge mostrava um "cancelled" (o push e, logo depois, o fim da publicação do servidor da IA
+# disparavam duas publicações do mesmo commit)
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   testes:
