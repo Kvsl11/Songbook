@@ -187,7 +187,10 @@ def _preencher(saida: list, pesos: list[int], duracao: float) -> list[dict]:
 def ouvir_palavras(y16: np.ndarray, dica: str, preciso: bool = False) -> list[tuple[str, float, float]]:
     segmentos, _ = modelo_whisper(preciso).transcribe(
         y16, language=os.environ.get("IA_IDIOMA", "pt"), word_timestamps=True, vad_filter=True,
-        initial_prompt=dica[:800] or None, condition_on_previous_text=False, beam_size=5)
+        initial_prompt=dica[:800] or None, condition_on_previous_text=False,
+        # a busca gulosa (1) na sincronia de sempre: umas 3 vezes mais rápida, e com a letra na dica quase não erra
+        # mais; no "sincronizar de novo" (preciso), a busca larga (5), que acerta mais as palavras difíceis
+        beam_size=5 if preciso else int(os.environ.get("IA_WHISPER_FEIXE") or 1))
     return [(w.word.strip(), float(w.start), float(w.end)) for s in segmentos for w in (s.words or [])]
 
 
