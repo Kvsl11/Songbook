@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 309, data: '2026-10-29', titulo: 'Música e vídeo, como no Spotify',
+    itens: [
+      { tipo: 'novo', texto: 'Música com videoclipe (com cenas antes ou no meio da música) ganha duas versões: no modo música toca o áudio oficial da gravação, com a letra sincronizada certinha; no modo vídeo, o clipe, sem a letra acompanhando.' },
+      { tipo: 'novo', texto: 'Trocar entre música e vídeo continua no mesmo ponto da música, nos dois sentidos. Com a IA do servidor ligada, ela ouve o clipe e acerta esse ponto trecho por trecho.' },
+    ],
+  },
+  {
     versao: 308, data: '2026-10-29', titulo: 'Sincronia mais firme no canto',
     itens: [
       { tipo: 'correcao', texto: 'O alinhador da letra no servidor não pula mais as frases cantadas com a nota esticada ou com a banda alta (antes elas ficavam sem tempo e a letra se perdia nesses trechos).' },
@@ -62,12 +69,6 @@ export const NOVIDADES = [
     versao: 300, data: '2026-10-29', titulo: 'Ligar o servidor do GitHub pelo celular',
     itens: [
       { tipo: 'melhoria', texto: 'Com o servidor da partitura no GitHub desligado (ele dorme quando ninguém usa), a tela Importar o áudio mostra “Ligar no GitHub” e “Já liguei”: liga pelo próprio celular, sem o computador e sem ler o QR code de novo.' },
-    ],
-  },
-  {
-    versao: 299, data: '2026-10-29', titulo: 'Servidor da partitura na nuvem do GitHub',
-    itens: [
-      { tipo: 'novo', texto: 'O servidor da partitura também roda no GitHub Codespaces: um computador na nuvem, aberto pelo navegador, sem instalar nada no notebook (bom quando o antivírus da empresa bloqueia). A página dele mostra o QR code para ligar o celular.' },
     ],
   },
 ];
