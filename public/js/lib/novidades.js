@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 306, data: '2026-10-29', titulo: 'A letra acompanha assim que sincroniza',
+    itens: [
+      { tipo: 'correcao', texto: 'Quando a sincronia da letra termina com a música já tocando, a letra passa a acompanhar na hora, na frase que está sendo cantada. Antes era preciso sair da música (ou fechar o app) para ela começar a acompanhar.' },
+      { tipo: 'correcao', texto: 'Em videoclipes longos, com um trecho de filme antes da música (como Speed Demon), o servidor agora ouve o vídeo inteiro, até 15 minutos, para sincronizar a letra.' },
+    ],
+  },
+  {
     versao: 305, data: '2026-10-29', titulo: 'Só a letra na letra sincronizada',
     itens: [
       { tipo: 'correcao', texto: 'As linhas que são só acordes, como “( Am7(4) )”, não aparecem mais no meio da letra sincronizada como se fossem cantadas (nem nas sincronias já guardadas).' },
@@ -61,14 +68,6 @@ export const NOVIDADES = [
     versao: 297, data: '2026-10-29', titulo: 'O artista certo no “Sobre o artista”',
     itens: [
       { tipo: 'correcao', texto: 'Quando há mais de um artista com o mesmo nome no YouTube (como o Kemuel), a foto, os números e o canal agora são os do artista certo, o mais conhecido, e não os de outro com o mesmo nome.' },
-    ],
-  },
-  {
-    versao: 296, data: '2026-10-29', titulo: 'Mais fotos e os seguidores do Spotify',
-    itens: [
-      { tipo: 'melhoria', texto: 'Na tela “Sobre o artista”, muito mais fotos (até 10): as fotos de divulgação dele e quadros dos vídeos do canal oficial no YouTube.' },
-      { tipo: 'melhoria', texto: 'Os números grandes agora mostram os seguidores no Spotify e os inscritos no canal do YouTube, além dos fãs no Deezer (os que houver para o artista).' },
-      { tipo: 'correcao', texto: 'O canal oficial de artistas com um complemento no nome (como “Frei Gilson / Som do Monte - OFICIAL”) agora é reconhecido, para a foto e os números.' },
     ],
   },
 ];

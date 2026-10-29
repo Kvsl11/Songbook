@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-305';
+export const APP_VERSAO = '2026.10.29-306';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -2205,6 +2205,12 @@ const semLinhasDeAcordes = (sinc) => {
       else if (atual.href && location.hash !== atual.href) location.hash = atual.href;
       else if (!atual.href && atual.abrir) atual.abrir();
     }
+  });
+  // a sincronia que acabou de chegar (de qualquer lugar do app): a letra desenha de novo com ela
+  window.addEventListener('songbook:sincronia', (e) => {
+    if (!atual || e.detail?.video !== atual.youtube) return;
+    letraDe = '';
+    desenharLetra();
   });
   return api;
 })();
@@ -7352,7 +7358,16 @@ function viewSong(id, ctx = {}) {
     // a letra vai junto, a não ser que a pessoa tenha rolado com o dedo há pouco
     if (player.estado === 'tocando' && Date.now() - rolouEm > 4000) linha.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, 80); // conferido várias vezes por segundo: a linha acende junto com a voz, não até 0,2 s depois
-  aoSair(() => { clearInterval(seguir); view.removeEventListener('wheel', marcarRolagem); view.removeEventListener('touchmove', marcarRolagem); });
+  // a sincronia desta música chegou (pedida aqui, pelo Tocando agora ou ao abrir): a letra já acompanha, sem sair
+  const sincChegou = (e) => {
+    if (!song.youtube || e.detail?.video !== song.youtube || !e.detail.sinc) return;
+    song.sincronia = e.detail.sinc;
+    mapa = null;
+    acesa?.classList.remove('agora');
+    acesa = null;
+  };
+  window.addEventListener('songbook:sincronia', sincChegou);
+  aoSair(() => { clearInterval(seguir); view.removeEventListener('wheel', marcarRolagem); view.removeEventListener('touchmove', marcarRolagem); window.removeEventListener('songbook:sincronia', sincChegou); });
   songEl.addEventListener('click', (e) => {
     const sinc = sincronia();
     if (!sinc || e.target.closest('.chord')) return;
@@ -9473,6 +9488,9 @@ function guardarSincronia(song, sinc) {
   song.sincronia = sinc;
   if (song.id === 'previa') { if (preview) preview.sincronia = sinc; } else if (db.song(song.id)) db.updateSong(song.id, { sincronia: sinc });
   player.atualizar({});
+  // quem está mostrando esta música (a página dela, o Tocando agora) passa a usar a sincronia na hora, mesmo com a
+  // música já tocando: antes só pegava ao sair e voltar para a música
+  window.dispatchEvent(new CustomEvent('songbook:sincronia', { detail: { video: sinc?.video, sinc } }));
 }
 
 
