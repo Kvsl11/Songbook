@@ -26,6 +26,10 @@ APP = os.environ.get("IA_APP", "https://kvsl11.github.io/Songbook/")
 
 def endereco() -> str | None:
     """O endereço https do túnel (None enquanto ele não liga, ou sem túnel)."""
+    # no GitHub Codespaces (.devcontainer/), o endereço da porta encaminhada
+    codespace, dominio = os.environ.get("CODESPACE_NAME"), os.environ.get("GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN")
+    if codespace and dominio:
+        return f"https://{codespace}-{os.environ.get('PORT', '7860')}.{dominio}"
     if not TUNEL:
         return None
     try:
@@ -39,7 +43,7 @@ def endereco() -> str | None:
 def do_tunel_vscode(host: str | None) -> str | None:
     """A página aberta pelo endereço que o VS Code dá (Portas → Encaminhar uma porta): é ele que o celular usa."""
     host = (host or "").strip().lower()
-    return f"https://{host}" if host.endswith(".devtunnels.ms") else None
+    return f"https://{host}" if host.endswith((".devtunnels.ms", ".app.github.dev")) else None
 
 
 def link_do_app(url: str) -> str:

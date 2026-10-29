@@ -35,6 +35,21 @@ python.org) para `servidor-ia\python311`, sem instalar nada e sem administrador 
 5 GB); depois abre a mesma página com o QR code. Deixe a janela preta aberta enquanto usa (fechar desliga o servidor).
 No Mac/Linux, o mesmo com `python3.11 iniciar_pc.py` depois da instalação de "Rodar no seu computador" (abaixo).
 
+### Na nuvem do GitHub (Codespaces): sem instalar nada no computador
+
+Bom para o notebook da empresa, onde o antivírus bloqueia: o servidor roda num computador do GitHub, aberto pelo
+navegador. A conta pessoal do GitHub tem horas grátis todo mês (a máquina de 4 núcleos gasta 2 horas da cota a cada
+hora ligada); parado 30 minutos, ele desliga sozinho.
+
+1. No GitHub do projeto: **Code → Codespaces → Create codespace on …** (o ramo principal). Abre um VS Code no
+   navegador; a primeira vez instala tudo sozinha (uns 10 minutos, aparece "Servidor da IA instalado").
+2. Embaixo, na aba **Portas**: a porta **7860** tem de estar **Pública** (botão direito → Visibilidade da porta →
+   Pública; o Codespace já tenta mudar sozinho). Clique no globo do endereço: abre a página com o QR code.
+3. Leia o QR code com o celular. Pronto.
+
+Das outras vezes: em <https://github.com/codespaces>, abra o mesmo Codespace (o servidor liga junto) e leia o QR code
+de novo. O que o servidor está fazendo: `servidor-ia/dados/servidor.log`.
+
 ### No notebook da empresa, pelo VS Code (sem administrador)
 
 1. Abra a pasta do projeto no VS Code. Precisa de algum Python instalado (o da loja da empresa ou o do python.org
