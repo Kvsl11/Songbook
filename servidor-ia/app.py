@@ -217,8 +217,10 @@ def aquecer():
     """Carrega os modelos (e baixa, na primeira vez) logo que o servidor liga, em vez de no primeiro pedido: antes a
     primeira partitura ou letra esperava minutos (o Whisper vinha da internet, o Demucs e o Basic Pitch abriam do
     disco) e a tela parecia travada em "Ouvindo"."""
+    import alinhador
+
     for nome, carregar in (("Demucs", transcricao.modelo_demucs), ("Basic Pitch", transcricao.modelo_basic_pitch),
-                           ("Whisper", letra.modelo_whisper)):
+                           ("Whisper", letra.modelo_whisper), ("Alinhador da letra", alinhador.modelo)):
         try:
             carregar()
             log.warning("Modelo pronto: %s", nome)
@@ -336,6 +338,9 @@ class PedidoLetra(BaseModel):
     linhas: list[str]
     separar: bool = True
     refazer: bool = False  # "sincronizar de novo": não usa a resposta guardada e ouve com o Whisper maior
+    # a letra sincronizada da internet (LRCLIB) destas mesmas linhas: o servidor só acha o quanto o vídeo está
+    # adiantado (o videoclipe com uma parte antes da música) e devolve ela deslocada
+    referencia: list[dict] | None = None
 
 
 _letras: dict[str, dict] = {}  # a mesma letra no mesmo vídeo: a resposta guardada (não baixa nem ouve de novo)
@@ -351,7 +356,7 @@ def letra_sincronizada(pedido: PedidoLetra, etapas: bool = Query(False), tarefa:
         raise HTTPException(400, "link do YouTube inválido")
     if not any(l.strip() for l in pedido.linhas):
         raise HTTPException(400, "a música não tem letra")
-    chave = hashlib.sha1(json.dumps([video, pedido.linhas, pedido.separar]).encode()).hexdigest()
+    chave = hashlib.sha1(json.dumps([video, pedido.linhas, pedido.separar, bool(pedido.referencia)]).encode()).hexdigest()
     if chave in _letras and not pedido.refazer:
         return com_etapas(lambda etapa: _letras[chave], etapas, tarefa=tarefa)
     pasta = tempfile.mkdtemp(prefix="songbook-letra-")
@@ -361,7 +366,7 @@ def letra_sincronizada(pedido: PedidoLetra, etapas: bool = Query(False), tarefa:
         esperar_vaga(etapa)
         try:
             r = letra.sincronizar(None, pedido.linhas, separar_voz=pedido.separar, etapa=etapa, audio=(y, cortado), video=video,
-                                 preciso=pedido.refazer)
+                                 preciso=pedido.refazer, referencia=pedido.referencia)
         except ValueError as e:
             raise HTTPException(422, str(e))
         finally:

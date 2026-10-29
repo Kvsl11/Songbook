@@ -64,3 +64,21 @@ def test_idioma_pela_letra():
     assert idioma_da_letra(["I can't stop you thinking of me", "you know that I love it so"]) == "en"
     assert idioma_da_letra(["Eu vos amo, ó Senhor", "sois minha força e o meu Deus"]) == "pt"
     assert idioma_da_letra(["la la la"]) is None
+
+
+def test_pela_referencia_desloca_a_letra_da_internet_pelo_comeco_do_video():
+    from letra import pela_referencia
+    # o vídeo tem 200 s de filme antes: a IA achou 4 linhas 200 s depois da letra da internet (uma meio fora)
+    ref = [{"inicio": 10.0 + 5 * k, "fim": 14.0 + 5 * k} for k in range(6)]
+    ia = [{"inicio": 210.2 + 5 * k, "fim": 214.0 + 5 * k, "confianca": 0.8 if k < 4 else 0.0} for k in range(6)]
+    ia[3]["inicio"] += 0.6
+    tempos, achadas = pela_referencia(ia, ref, 600.0)
+    assert achadas == 6
+    assert abs(tempos[0]["inicio"] - 210.2) < 0.5 and abs(tempos[5]["inicio"] - 235.2) < 0.5
+
+
+def test_pela_referencia_sem_linhas_seguras_nao_desloca():
+    from letra import pela_referencia
+    ref = [{"inicio": 10.0, "fim": 12.0}] * 3
+    ia = [{"inicio": 50.0, "fim": 52.0, "confianca": 0.1}] * 3
+    assert pela_referencia(ia, ref, 100.0) is None

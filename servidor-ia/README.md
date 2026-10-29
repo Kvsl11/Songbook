@@ -9,8 +9,10 @@ Transforma áudio em notas para a partitura do Songbook, com mais fidelidade que
   cantada de novo (outra sílaba) e tira os estalos;
 - **YouTube**: cole o link; o **yt-dlp** baixa só o áudio (WAV temporário, apagado assim que a partitura sai). Vídeo
   com restrição de idade: ponha um `cookies.txt` (formato Netscape, exportado do navegador logado) nesta pasta;
-- **Letra sincronizada** (`/letra`): o **Whisper** ouve a voz separada e cada linha da letra ganha o instante em
-  que é cantada no vídeo.
+- **Letra sincronizada** (`/letra`): o **MMS_FA** (alinhador da Meta, aberto, roda no próprio servidor) encaixa a letra
+  na voz separada, letra por letra, e cada linha ganha o instante em que é cantada no vídeo (introdução, solos e
+  trechos falados ficam de fora). Sem ele, o **Whisper** ouve e as palavras são casadas com a letra. Com a letra da
+  internet (LRCLIB) e um vídeo mais longo, o servidor só acha onde a música começa e a devolve no lugar certo.
 
 Medido em 11 trechos de músicas reais (MUSDB18, voz isolada como gabarito): a melodia certa passou de **34%** do
 tempo (a música inteira junta, como no celular) para **70%** (voz separada + limpeza).
