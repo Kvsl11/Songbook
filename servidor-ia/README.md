@@ -47,6 +47,9 @@ hora ligada); parado 30 minutos, ele desliga sozinho.
    Pública; o Codespace já tenta mudar sozinho). Clique no globo do endereço: abre a página com o QR code.
 3. Leia o QR code com o celular. Pronto.
 
+Até 3 músicas são ouvidas ao mesmo tempo no Codespaces (`IA_TAREFAS`): abrir várias em seguida põe todas para
+sincronizar juntas, e cada uma fica pronta quando termina.
+
 Deu **404** ou não abre? O servidor ainda está ligando (ou instalando). No **Terminal** do Codespace, veja o que ele
 está fazendo com `tail -f servidor-ia/dados/servidor.log` (pronto quando aparece `Uvicorn running`). Se não houver
 nada rodando, ligue à mão: `bash .devcontainer/ligar.sh`.
