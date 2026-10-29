@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 290, data: '2026-10-29', titulo: 'Busca de cara nova',
+    itens: [
+      { tipo: 'melhoria', texto: 'A abertura da Busca ficou mais limpa: no lugar do aviso corrido, um cartão “Qualquer música, pronta para tocar”, com o que vem junto (cifra, letra e vídeo) e o “Cole aqui” para cifras de outros sites.' },
+      { tipo: 'melhoria', texto: 'Os cartões dos setores ficaram maiores e mais bonitos, com o desenho grande no canto; no tablet, os quatro numa fileira só (o último não fica mais sozinho embaixo).' },
+      { tipo: 'melhoria', texto: 'No tablet, as Católicas em alta e as músicas da busca aparecem em duas colunas, e as em alta mostram a posição de cada uma na capa.' },
+    ],
+  },
+  {
     versao: 289, data: '2026-10-29', titulo: 'Botões sem a sombra atrás',
     itens: [
       { tipo: 'melhoria', texto: 'Tocando em qualquer botão do app, não fica mais aquela marca cinza atrás dele mostrando que foi tocado.' },
@@ -64,12 +72,6 @@ export const NOVIDADES = [
     versao: 281, data: '2026-10-28', titulo: 'Música abre certinho com o painel recolhido',
     itens: [
       { tipo: 'correcao', texto: 'No tablet com o Tocando agora recolhido (a barrinha embaixo), tocar numa música da Início abria uma tela preta: agora abre o Tocando agora inteiro, e ao sair o painel volta a ficar recolhido.' },
-    ],
-  },
-  {
-    versao: 280, data: '2026-10-28', titulo: 'Capa animada sem piscar no tablet',
-    itens: [
-      { tipo: 'correcao', texto: 'No tablet (em pé e deitado), a capa animada do Tocando agora não pisca mais ao rolar: ela fica parada atrás, o conteúdo rola por cima e ela vai sumindo aos poucos, como no Spotify.' },
     ],
   },
 ];

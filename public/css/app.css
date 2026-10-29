@@ -1137,6 +1137,32 @@ body.performance .convite-instalar { display: none; }
 /* ============================================================ busca e importação */
 .busca-dica { display: flex; gap: 10px; align-items: flex-start; margin: 16px 0 0; padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); font-size: 14px; }
 .busca-dica .ic { color: var(--accent-ink); flex: none; margin-top: 2px; }
+/* a abertura da Busca (sem nada digitado): o que a busca traz, em vez de um aviso corrido */
+.busca-hero { position: relative; display: flex; gap: 14px; align-items: flex-start; margin: 18px 0 4px; padding: 18px; border-radius: 16px; overflow: hidden;
+  background: radial-gradient(90% 140% at 100% 0%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 60%), linear-gradient(135deg, var(--surface-2), color-mix(in srgb, var(--accent) 10%, var(--surface-2)));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06); }
+.busca-hero-ic { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--accent); color: var(--on-accent, #001318); }
+.busca-hero-txt { min-width: 0; }
+.busca-hero h3 { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+.busca-hero p { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
+.busca-hero-fontes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.busca-hero-fontes span { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; background: rgb(255 255 255 / 0.08); font-size: 13px; }
+.busca-hero-fontes .ic, .busca-hero-fontes svg { color: var(--accent-ink); }
+.busca-hero-fontes small { color: var(--muted); font-size: 12px; }
+.busca-hero-colar { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; color: var(--muted); font-size: 13px; }
+.busca-hero-colar b { color: var(--accent-ink); font-weight: 800; }
+:root[data-theme="light"] .busca-hero { box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06); }
+:root[data-theme="light"] .busca-hero-fontes span { background: rgb(0 0 0 / 0.05); }
+@media (min-width: 700px) { .busca-hero { padding: 22px 24px; gap: 18px; } .busca-hero h3 { font-size: 21px; } .busca-hero-ic { width: 52px; height: 52px; } }
+/* músicas da busca e as em alta: em duas colunas na tela larga (numa só, sobrava um vazio enorme entre o nome e os
+   botões); as em alta com o número da posição em cima da capa */
+@media (min-width: 900px) { .tracks-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; } .tracks-grade .track { margin: 0; } }
+.tracks-grade .track { border-radius: 10px; }
+.em-alta { counter-reset: alta; }
+.em-alta .track { counter-increment: alta; }
+.em-alta .track > .cover::after { content: counter(alta); position: absolute; left: 3px; top: 3px; z-index: 1; min-width: 19px; height: 19px; padding: 0 5px; box-sizing: border-box; border-radius: 999px;
+  display: grid; place-items: center; background: rgb(0 0 0 / 0.72); color: #fff; font-size: 11px; font-weight: 800; }
+.em-alta .track:nth-child(-n+3) > .cover::after { background: var(--accent); color: var(--on-accent, #001318); }
 .link-btn { all: unset; cursor: pointer; color: var(--accent-ink); font-weight: 800; }
 .link-btn:hover { text-decoration: underline; }
 .campo-livre { display: grid; gap: 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
@@ -1534,16 +1560,19 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 @media (min-width: 900px) { .song.lyrics-mode { padding-top: 110px; padding-bottom: 190px; } }
 
 /* setores da missa (Busca): cartões coloridos como os de "Navegar" do Spotify */
-.setores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 8px; }
-@media (min-width: 700px) { .setores { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 1200px) { .setores { grid-template-columns: repeat(5, 1fr); } }
-.setor { position: relative; display: flex; flex-direction: column; gap: 4px; min-height: 104px; padding: 14px 14px 14px 14px; overflow: hidden; border-radius: 10px;
-  text-decoration: none; color: #fff; background: linear-gradient(135deg, hsl(var(--h) 55% 40%), hsl(calc(var(--h) + 30) 50% 26%)); transition: transform 0.15s, filter 0.15s; }
+/* (os 4 numa fileira na tela larga: com 3 colunas, o quarto ficava sozinho embaixo) */
+.setores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 8px; }
+@media (min-width: 700px) { .setores { grid-template-columns: repeat(4, 1fr); } }
+.setor { position: relative; display: flex; flex-direction: column; gap: 6px; min-height: 120px; padding: 16px; overflow: hidden; border-radius: 14px; isolation: isolate;
+  text-decoration: none; color: #fff; background: radial-gradient(120% 90% at 0% 0%, rgb(255 255 255 / 0.16), transparent 55%), linear-gradient(140deg, hsl(var(--h) 60% 44%), hsl(calc(var(--h) + 35) 55% 24%));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08), 0 6px 18px rgb(0 0 0 / 0.25); transition: transform 0.15s, filter 0.15s; }
 .setor:hover { filter: brightness(1.08); }
 .setor:active { transform: scale(0.98); }
-.setor b { font-size: 17px; line-height: 1.15; }
-.setor small { padding-right: 30px; font-size: 12px; line-height: 1.3; opacity: 0.85; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.setor-ic { position: absolute; right: -6px; bottom: -6px; transform: rotate(18deg); opacity: 0.9; }
+.setor b { font-size: 18px; font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; }
+.setor small { padding-right: 34px; font-size: 12.5px; line-height: 1.35; opacity: 0.88; hyphens: manual; -webkit-hyphens: manual; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+/* o desenho grande e inclinado no canto, meio para fora, de propósito (como no Spotify), atrás do texto */
+.setor-ic { position: absolute; right: -14px; bottom: -14px; z-index: -1; transform: rotate(20deg); opacity: 0.3; line-height: 0; }
+.setor-ic svg { width: 76px; height: 76px; stroke-width: 1.6; }
 .grade-partes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .parte-card { display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; min-height: 84px; padding: 12px; border-radius: 10px; text-decoration: none; color: #fff;
   background: linear-gradient(135deg, hsl(var(--h) 50% 38%), hsl(calc(var(--h) + 25) 45% 24%)); transition: filter 0.15s, transform 0.15s; }
@@ -3928,3 +3957,14 @@ html.pp #player .pl-letra-cab .icon-btn { color: #fff !important; }
 /* tocando num botão, nada fica marcado atrás dele depois (o contorno de foco só aparece usando o teclado) */
 html.toque :focus-visible { outline: none !important; }
 html.toque .date-field:focus-visible, html.toque .cal-dias button:focus-visible, html.toque .pptx-parte:focus-visible, html.toque .part-acao:focus-visible { box-shadow: none; }
+/* celular: a abertura da Busca mais baixa (sem o quadradinho do ícone, o texto usa a largura toda) */
+@media (max-width: 599px) {
+  .busca-hero { padding: 16px; }
+  .busca-hero-ic { display: none; }
+  .busca-hero h3 { font-size: 17px; }
+  .busca-hero-fontes { gap: 6px; }
+  .busca-hero-fontes span { height: 28px; padding: 0 10px; }
+  .busca-hero-fontes small { display: none; }
+  .setor { min-height: 112px; padding: 14px; }
+  .setor b { font-size: 16.5px; }
+}
