@@ -28,6 +28,9 @@ import numpy as np
 log = logging.getLogger("songbook-ia")
 SR = 22050  # o Basic Pitch ouve em 22050 Hz, mono
 MAX_SEGUNDOS = 360  # no máximo 6 minutos (como no app)
+# o áudio do vídeo, para a letra sincronizada: até 15 minutos (IA_MAX_AUDIO_VIDEO). Videoclipes como Speed Demon
+# têm minutos de filme antes de a música começar, e com o corte em 6 minutos a IA nem ouvia a maior parte do canto
+MAX_SEGUNDOS_VIDEO = int(os.environ.get("IA_MAX_AUDIO_VIDEO") or 900)
 
 # harmônicos de uma nota (em semitons acima dela): oitava, 12ª, 2 oitavas, 17ª, 19ª
 HARMONICOS = (12, 19, 24, 28, 31)
@@ -298,10 +301,11 @@ def guardar(video: str | None, **dados) -> None:
 def audio_do_video(video: str, baixar) -> tuple[np.ndarray, bool, str]:
     """(y, cortado, título) do vídeo: o guardado ou, se não houver, baixar() → {"caminho", "titulo"} e carrega."""
     g = guardado(video)
-    if "y" in g:
+    # o guardado cortado num limite menor (os 6 minutos de antes) não serve: baixa de novo, inteiro
+    if "y" in g and (not bool(g.get("cortado", False)) or len(g["y"]) >= (MAX_SEGUNDOS_VIDEO - 1) * SR):
         return g["y"], bool(g.get("cortado", False)), str(g.get("titulo", ""))
     baixado = baixar()
-    y, cortado = carregar(baixado["caminho"])
+    y, cortado = carregar(baixado["caminho"], MAX_SEGUNDOS_VIDEO)
     guardar(video, y=y, cortado=np.array(cortado), titulo=np.array(baixado.get("titulo") or ""))
     return y, cortado, baixado.get("titulo") or ""
 
@@ -309,8 +313,9 @@ def audio_do_video(video: str, baixar) -> tuple[np.ndarray, bool, str]:
 def separar_guardado(y: np.ndarray, video: str | None = None) -> tuple[np.ndarray, np.ndarray]:
     """A voz e a banda: as já separadas deste vídeo ou, se não houver, separa (e guarda)."""
     g = guardado(video)
-    if "voz" in g and "banda" in g and len(g["voz"]) == len(y):
-        return g["voz"], g["banda"]
+    # a voz guardada do vídeo inteiro serve também para um pedaço do começo (a partitura usa só os 6 primeiros minutos)
+    if "voz" in g and "banda" in g and (len(g["voz"]) == len(y) or (len(y) == MAX_SEGUNDOS * SR and len(g["voz"]) > len(y))):
+        return g["voz"][:len(y)], g["banda"][:len(y)]
     voz, banda = separar(y)
     guardar(video, voz=voz, banda=banda)
     return voz, banda
@@ -376,15 +381,15 @@ def modelo_demucs():
 
 # ------------------------------------------------------------------ etapas
 
-def carregar(caminho: str) -> tuple[np.ndarray, bool]:
-    """Mono, 22050 Hz, no máximo 6 minutos (e se foi cortado)."""
+def carregar(caminho: str, maximo: float = MAX_SEGUNDOS) -> tuple[np.ndarray, bool]:
+    """Mono, 22050 Hz, no máximo `maximo` segundos (6 minutos) (e se foi cortado)."""
     import librosa
 
     try:
-        cortado = librosa.get_duration(path=caminho) > MAX_SEGUNDOS + 0.5
+        cortado = librosa.get_duration(path=caminho) > maximo + 0.5
     except Exception:  # alguns formatos só abrem pelo ffmpeg (no load)
         cortado = False
-    y, _ = librosa.load(caminho, sr=SR, mono=True, duration=MAX_SEGUNDOS)
+    y, _ = librosa.load(caminho, sr=SR, mono=True, duration=maximo)
     pico = float(np.max(np.abs(y))) if len(y) else 0.0
     if 0.002 < pico < 0.9:  # áudio baixo chega fraco e a IA quase não ouve
         y = y * min(0.9 / pico, 40.0)
