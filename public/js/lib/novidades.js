@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 301, data: '2026-10-29', titulo: 'As etapas da partitura andando no servidor do GitHub',
+    itens: [
+      { tipo: 'correcao', texto: 'Com o servidor no GitHub, a tela da partitura ficava parada em “Enviando o áudio 0%” até o fim: agora cada etapa (enviando, separando a voz, ouvindo as notas…) aparece na hora em que o servidor passa por ela.' },
+      { tipo: 'melhoria', texto: 'O servidor no GitHub usa todos os núcleos da máquina para separar a voz e ouvir as notas: a partitura sai mais rápido.' },
+    ],
+  },
+  {
     versao: 300, data: '2026-10-29', titulo: 'Ligar o servidor do GitHub pelo celular',
     itens: [
       { tipo: 'melhoria', texto: 'Com o servidor da partitura no GitHub desligado (ele dorme quando ninguém usa), a tela Importar o áudio mostra “Ligar no GitHub” e “Já liguei”: liga pelo próprio celular, sem o computador e sem ler o QR code de novo.' },
@@ -62,12 +69,6 @@ export const NOVIDADES = [
     versao: 292, data: '2026-10-29', titulo: 'Notinhas nos solos do meio da música',
     itens: [
       { tipo: 'melhoria', texto: 'Na letra sincronizada, as notinhas ♪ das partes só de instrumentos aparecem também nos solos do meio da música (antes, quase sempre, só na introdução). Só nas partes mais longas, de uns 12 segundos ou mais: um respiro curto entre as estrofes não ganha as notinhas.' },
-    ],
-  },
-  {
-    versao: 291, data: '2026-10-29', titulo: 'Capa na barra do celular',
-    itens: [
-      { tipo: 'correcao', texto: 'No celular, com o Tocando agora em “Mudar para música”, a barra da música embaixo mostra a capa (como no tablet) em vez do vídeo; em “Mudar para vídeo”, volta a mostrar o vídeo. A música continua tocando normalmente.' },
     ],
   },
 ];

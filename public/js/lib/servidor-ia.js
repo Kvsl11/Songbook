@@ -128,6 +128,8 @@ function enviarComEtapas(cfg, url, form, sinal, tempo, aoEtapa) {
     xhr.open('POST', url);
     for (const [k, v] of Object.entries(cabecalhos(url, cfg.chave))) xhr.setRequestHeader(k, v);
     xhr.upload.onprogress = (e) => { if (e.lengthComputable && e.total) aoEtapa('enviando', Math.min(1, e.loaded / e.total)); };
+    // o envio terminou (mesmo sem nenhum aviso de andamento no caminho): a tela já passa para a etapa seguinte
+    xhr.upload.onload = () => aoEtapa('enviando', 1);
     xhr.onprogress = () => { if (xhr.status === 200) linhas(); };
     xhr.onload = () => {
       if (xhr.status !== 200) {

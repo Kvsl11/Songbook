@@ -82,6 +82,10 @@ def ouvir(caminho: str | None, separar: bool, etapa=lambda nome, progresso=None:
         vagas.release()
 
 
+# o tamanho de cada linha das etapas, completada com espaços (IA_PREENCHER; no Codespaces, 16 KB): 0 não completa
+PREENCHER = int(os.environ.get("IA_PREENCHER") or (16384 if os.environ.get("CODESPACE_NAME") else 0))
+
+
 def com_etapas(trabalho, etapas: bool, pasta: str | None = None):
     """Roda trabalho(etapa). Com etapas=True, a resposta vai saindo aos poucos, uma linha JSON por vez
     ({"etapa": "baixando"}… e no fim {"resultado": …} ou {"erro": …, "status": …}): o app mostra em que parte está.
@@ -115,16 +119,22 @@ def com_etapas(trabalho, etapas: bool, pasta: str | None = None):
 
     threading.Thread(target=rodar, daemon=True).start()
 
+    def linha(texto: str) -> bytes:
+        # no Codespaces (e no túnel do VS Code) quem encaminha a porta junta a resposta em blocos e só entrega quando
+        # o bloco enche: com a linha completada de espaços até o tamanho do bloco, cada etapa chega na hora no app
+        # (o JSON aceita os espaços no fim)
+        return (texto.ljust(PREENCHER - 1) + "\n").encode() if PREENCHER else (texto + "\n").encode()
+
     def linhas():
         while True:
             try:
                 item = fila.get(timeout=15)
             except queue.Empty:  # trabalho comprido: uma linha de vez em quando mantém a conexão aberta
-                yield b'{"vivo":1}\n'
+                yield linha('{"vivo":1}')
                 continue
             if item is None:
                 return
-            yield (json.dumps(item, ensure_ascii=False) + "\n").encode()
+            yield linha(json.dumps(item, ensure_ascii=False))
 
     # sem compressão: o Modal comprimia esta resposta em zstd para o navegador (que sempre aceita), e o compressor
     # segurava as linhas até o fim: no app a etapa ficava em 0% e a partitura pronta aparecia de repente (o curl,
