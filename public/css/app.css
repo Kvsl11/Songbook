@@ -3153,8 +3153,10 @@ html.pp #player .pl-letra-topo .icon-btn { width: 48px; height: 48px; color: #ff
 html.pp #player.letra-cheia .pl-letra-topo { grid-template-columns: 48px minmax(0, 1fr) auto; }
 html.pp #player .pl-letra-dir { justify-self: end; display: flex; align-items: center; gap: 4px; }
 html.pp #player .pl-letra-dir .pl-ver-cifra { margin-right: 8px; }
-html.pp #player .pl-leitura { width: 40px; height: 40px; }
-html.pp #player .pl-leitura[aria-pressed="true"] { background: rgb(255 255 255 / 0.24); color: #fff; }
+/* o olho (só a letra) do mesmo tamanho e jeito da pílula Cifra ao lado: uma bolinha de 32px na mesma cor; ligado,
+   branca como a Cifra ligada (antes era maior que a pílula, com a sombra passando dela) */
+html.pp #player .pl-leitura { width: 32px; height: 32px; min-width: 32px; padding: 0; border-radius: 50%; background: rgb(255 255 255 / 0.16); color: #fff; box-shadow: none; }
+html.pp #player .pl-leitura[aria-pressed="true"] { background: #fff; color: #111; }
 /* só a letra (para ler): sem o nome, o aviso da sincronia e a barra de baixo; sem a cifra, nem as ferramentas */
 html.pp #player.letra-cheia.so-letra .pl-letra-nome { visibility: hidden; }
 html.pp #player.letra-cheia.so-letra .pl-letra-pe, html.pp #player.letra-cheia.so-letra .pl-sinc,
