@@ -450,7 +450,8 @@ export function sincroniaDoLrc(lrc, duracao = 0) {
 // A letra com o tempo de cada linha, do LRCLIB (aberto, com CORS: sem servidor). Só vale a da mesma música (título e,
 // quando se sabe, artista). O tempo do LRC é o da gravação: com a duração do vídeo parecida (até 4 s de diferença),
 // vale como está; com a duração bem diferente (um clipe com uma cena antes da música, como o de "Speed Demon", ou uma
-// versão editada), vem com ajustar: true: a letra está certa, mas falta acertar onde a música começa no vídeo.
+// versão editada), vem com ajustar: true: a letra está certa, mas falta acertar onde a música começa no vídeo (ou, como
+// no app, tocar o áudio oficial no modo música).
 // duracao: a da gravação (para achar o áudio oficial dela no YouTube)
 export async function letraSincronizada({ titulo = '', artista = '', duracao = 0 } = {}, fetchImpl, { espera = 1500 } = {}) {
   const t = String(titulo || '').trim();
@@ -476,24 +477,35 @@ export async function letraSincronizada({ titulo = '', artista = '', duracao = 0
     a && `track_name=${encodeURIComponent(t)}&artist_name=${encodeURIComponent(a)}`,
     `q=${encodeURIComponent(`${t} ${a}`.trim())}`,
   ].filter(Boolean);
-  const bate = (r) => !(duracao > 0) || !(r.duration > 0) || Math.abs(r.duration - duracao) <= 4;
-  let fora = null; // a mesma música, mas com outra duração
   for (const params of tentativas) {
     const lista = await pedir(params).catch(() => []);
     const mesmas = (Array.isArray(lista) ? lista : []).filter((r) => r.syncedLyrics && !r.instrumental && mesmoTitulo(r.trackName, t) && (!a || mesmoArtista(r.artistName, a)));
-    const achada = mesmas.find(bate);
-    if (achada) {
-      const sinc = sincroniaDoLrc(achada.syncedLyrics, achada.duration || duracao);
-      if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: achada.id, duracao: achada.duration || 0 };
-    }
-    fora = fora || mesmas[0] || null;
-  }
-  if (fora) {
-    const sinc = sincroniaDoLrc(fora.syncedLyrics, fora.duration);
-    if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: fora.id, duracao: fora.duration || 0, ajustar: true };
+    if (!mesmas.length) continue;
+    // a letra da gravação oficial; o vídeo com outra duração é um clipe (ou outra edição): vem com ajustar
+    const oficial = gravacaoOficial(mesmas, duracao);
+    const bate = !(duracao > 0) || !(oficial.duration > 0) || Math.abs(oficial.duration - duracao) <= 4;
+    const sinc = sincroniaDoLrc(oficial.syncedLyrics, oficial.duration || duracao);
+    if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: oficial.id, duracao: oficial.duration || 0, ...(bate ? {} : { ajustar: true }) };
   }
   if (!respondeu) throw new Error('O LRCLIB não respondeu agora');
   return null;
+}
+
+// A gravação oficial entre as letras da mesma música no LRCLIB: a duração que mais aparece (até 2 s de diferença; as
+// coletâneas repetem a do álbum), de preferência não ao vivo; no empate, a da duração do vídeo. Antes valia a letra
+// com a duração do vídeo, e uma feita para o videoclipe (como a de "Tears", de 304 s, contra 160 s da gravação) fazia
+// o clipe passar por gravação: a música não ganhava o áudio oficial e a letra saía fora do tempo
+const aoVivo = (r) => /\b(ao vivo|live|ac[uú]stico|acoustic)\b/i.test(`${r.trackName || ''} ${r.albumName || ''}`);
+export function gravacaoOficial(mesmas, duracao = 0) {
+  const grupos = [];
+  for (const r of mesmas) {
+    const d = r.duration || 0;
+    const g = grupos.find((x) => Math.abs(x.d - d) <= 2);
+    if (g) g.itens.push(r); else grupos.push({ d, itens: [r] });
+  }
+  const nota = (g) => g.itens.length * 10 + (g.itens.some((r) => !aoVivo(r)) ? 5 : 0) + (duracao > 0 && Math.abs(g.d - duracao) <= 4 ? 1 : 0);
+  const melhor = grupos.reduce((x, y) => (nota(y) > nota(x) ? y : x));
+  return melhor.itens.find((r) => !aoVivo(r)) || melhor.itens[0];
 }
 
 // Letra simples -> ChordPro: estrofes separadas por linha em branco; as partes saem sozinhas (partesDosBlocos):

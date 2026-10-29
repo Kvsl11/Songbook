@@ -436,3 +436,22 @@ test('artistaDaAudioDb: os seguidores no Spotify, as fotos e a biografia, só do
   assert.deepEqual(artistaDaAudioDb(json, 'Aline Barros'), { seguidores: 5724931, fotos: ['https://r2.theaudiodb.com/a.jpg', 'https://r2.theaudiodb.com/b.jpg'], bio: 'Cantora.', genero: '' });
   assert.equal(artistaDaAudioDb(json, 'Aline'), null);
 });
+
+// "Tears" (Sabrina Carpenter): a gravação tem 160 s (a maioria das letras do LRCLIB), o clipe 304 s, e uma das letras
+// foi feita para o clipe. O clipe não passa por gravação: a letra é a de 160 s, com ajustar
+test('letra sincronizada: a gravação oficial é a duração que mais aparece, não a do clipe', async () => {
+  const { gravacaoOficial } = await import('../public/js/lib/web.js');
+  const lrc = '[00:04.91] I need the tears\n[00:08.18] to fall';
+  const r = (id, duration, extra = {}) => ({ id, trackName: 'Tears', artistName: 'Sabrina Carpenter', duration, syncedLyrics: lrc, ...extra });
+  const lista = [r(1, 160), r(2, 160), r(3, 304), r(4, 232), r(5, 160.4), r(6, 192, { trackName: 'Tears (Live From The 2025 MTV VMAs)' })];
+  assert.equal(gravacaoOficial(lista, 304).id, 1);
+  const resp = async () => ({ ok: true, status: 200, json: async () => lista });
+  const clipe = await letraSincronizada({ titulo: 'Tears', artista: 'Sabrina Carpenter', duracao: 304 }, resp);
+  assert.equal(clipe.id, 1);
+  assert.equal(clipe.ajustar, true);
+  assert.equal(clipe.duracao, 160);
+  const audio = await letraSincronizada({ titulo: 'Tears', artista: 'Sabrina Carpenter', duracao: 159 }, resp);
+  assert.equal(audio.ajustar, undefined);
+  // empate: a de estúdio (e a da duração do vídeo) ganha da ao vivo
+  assert.equal(gravacaoOficial([r(7, 300, { trackName: 'Tears (Ao Vivo)' }), r(8, 241)], 243).id, 8);
+});

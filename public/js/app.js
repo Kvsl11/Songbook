@@ -131,7 +131,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-312';
+export const APP_VERSAO = '2026.10.29-313';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -679,16 +679,17 @@ function arquivosParaBaixar(song) {
   if (song.youtube && (comVideo || (!audio && !song.audioProprio))) lista.push({ yt: song.youtube, video: comVideo });
   return lista;
 }
-async function baixarMusica(song) {
+// sem Wi-Fi (no Android o navegador diz): pergunta antes, como no Spotify (uma vez, ao baixar várias)
+const podeBaixarAgora = async () => navigator.connection?.type !== 'cellular' || db.prefs().baixarDadosMoveis
+  || ask({ title: 'Baixar com os dados móveis?', text: 'Você está sem Wi-Fi e o download pode gastar bastante do seu plano. Dá para liberar sempre em Ajustes → Economia de dados e offline.', ok: 'Baixar assim mesmo' });
+async function baixarMusica(song, { perguntou = false } = {}) {
   const s = song?.id && db.song(song.id);
   if (!s || s.baixado || baixando.has(s.id)) return;
   if (arquivosParaBaixar(s).length && !servidorIA().url) {
     toast('Para baixar o áudio e o vídeo, ligue o servidor no seu computador (Ajustes → Avançado)');
     return;
   }
-  // sem Wi-Fi (no Android o navegador diz): pergunta antes, como no Spotify
-  if (navigator.connection?.type === 'cellular' && !db.prefs().baixarDadosMoveis
-    && !(await ask({ title: 'Baixar com os dados móveis?', text: 'Você está sem Wi-Fi e o download pode gastar bastante do seu plano. Dá para liberar sempre em Ajustes → Economia de dados e offline.', ok: 'Baixar assim mesmo' }))) return;
+  if (!perguntou && !(await podeBaixarAgora())) return;
   baixando.set(s.id, { pct: 0 });
   filaBaixar.push(s.id);
   avisarDownloads();
@@ -762,6 +763,40 @@ function botaoBaixar(song, cls = '') {
   const titulo = estado === 'baixada' ? 'Baixada: toca sem internet (tocar para remover)' : estado === 'baixando' ? `Baixando… ${b.pct}%` : 'Baixar para ouvir sem internet';
   return `<button class="icon-btn btn-baixar ${estado} ${cls}" data-baixar="${esc(song.id)}" aria-label="${titulo}" title="${titulo}" style="--pct:${b?.pct || 0}">${icon(estado === 'baixada' ? 'baixada' : 'baixar', 22)}</button>`;
 }
+// o botão de baixar o repertório ou a playlist inteira (como no Spotify): verde com todas baixadas; baixando, o anel
+// com o andamento do conjunto
+const musicasDoSet = (set) => [...new Set(set.items.map((it) => it.songId))].map((id) => db.song(id)).filter((s) => s && midiaDe(s));
+function botaoBaixarSet(set) {
+  const ss = musicasDoSet(set);
+  if (!ss.length) return '';
+  const feitas = ss.filter((s) => s.baixado).length;
+  const naFila = ss.filter((s) => baixando.has(s.id));
+  const estado = feitas === ss.length ? 'baixada' : naFila.length ? 'baixando' : '';
+  const pct = naFila.length ? Math.round(((feitas + naFila.reduce((a, s) => a + baixando.get(s.id).pct / 100, 0)) / ss.length) * 100) : 0;
+  const titulo = estado === 'baixada' ? 'Todas baixadas: tocam sem internet (tocar para remover)' : estado === 'baixando' ? `Baixando… ${feitas} de ${ss.length}` : `Baixar as ${ss.length} músicas para ouvir sem internet`;
+  return `<button class="icon-btn btn-baixar ${estado}" data-baixar-set="${esc(set.id)}" aria-label="${titulo}" title="${titulo}" style="--pct:${pct}">${icon(estado === 'baixada' ? 'baixada' : 'baixar', 24)}</button>`;
+}
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-baixar-set]');
+  if (!b) return;
+  e.preventDefault();
+  const set = db.set(b.dataset.baixarSet);
+  if (!set) return;
+  const ss = musicasDoSet(set);
+  const faltam = ss.filter((s) => !s.baixado && !baixando.has(s.id));
+  if (!faltam.length && ss.some((s) => baixando.has(s.id))) { toast('Baixando as músicas…'); return; }
+  if (!faltam.length) {
+    if (await ask({ title: 'Remover os downloads?', text: `As ${ss.length} músicas de “${set.name}” continuam na biblioteca, mas só tocam com internet.`, ok: 'Remover', danger: true })) {
+      for (const s of ss) await removerDownload(s);
+      toast('Downloads removidos');
+    }
+    return;
+  }
+  if (faltam.some((s) => arquivosParaBaixar(s).length) && !servidorIA().url) { toast('Para baixar o áudio e o vídeo, ligue o servidor no seu computador (Ajustes → Avançado)'); return; }
+  if (!(await podeBaixarAgora())) return;
+  for (const s of faltam) await baixarMusica(s, { perguntou: true });
+  toast(`${faltam.length} música${faltam.length > 1 ? 's' : ''} na fila para baixar`);
+});
 // tocar no botão de baixar, onde ele estiver: baixa, ou pergunta se tira o download
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-baixar]');
@@ -782,6 +817,13 @@ window.addEventListener('online', () => player.reavaliarFonte());
 window.addEventListener('offline', () => player.reavaliarFonte());
 window.addEventListener('songbook:downloads', () => {
   player.reavaliarFonte();
+  document.querySelectorAll('[data-baixar-set]').forEach((b) => { const set = db.set(b.dataset.baixarSet); if (set) b.outerHTML = botaoBaixarSet(set); });
+  // (as setinhas verdes das listas)
+  document.querySelectorAll('.track[data-id], .track[data-musica]').forEach((li) => {
+    const s = db.song(li.dataset.id || li.dataset.musica);
+    const ind = li.querySelector('.ind-baixada');
+    if (s && Boolean(s.baixado) !== Boolean(ind)) { const sub = li.querySelector('.info .s'); const velho = sub?.querySelector('.ind'); if (velho) velho.outerHTML = indicadores(s); else sub?.insertAdjacentHTML('afterbegin', indicadores(s)); }
+  });
   document.querySelectorAll('[data-baixar]').forEach((b) => { const s = db.song(b.dataset.baixar); if (s) b.outerHTML = botaoBaixar(s, [...b.classList].filter((c) => !['icon-btn', 'btn-baixar', 'baixada', 'baixando'].includes(c)).join(' ')); });
 });
 
@@ -1316,7 +1358,8 @@ const semLinhasDeAcordes = (sinc) => {
     linhaAcesa = -2;
     acesaChave = '';
     $('.pl-frase', el).hidden = !tempos;
-    $('.pl-letra', el).hidden = !linhas.length && !letraDaPagina;
+    // no clipe (a música com as duas versões, no modo vídeo) não há letra, como no Spotify: ela fica no modo música
+    $('.pl-letra', el).hidden = noClipe() || (!linhas.length && !letraDaPagina);
     $('.pl-letra', el).classList.toggle('sincronizada', Boolean(tempos) || Boolean(marcando));
     $('.pl-letra', el).classList.toggle('marcando', Boolean(marcando));
     // na letra sincronizada, as partes só de música (a introdução, os solos e o final, de 10 s ou mais)
@@ -1329,6 +1372,9 @@ const semLinhasDeAcordes = (sinc) => {
     desenharCifra();
     // sem sincronia: procura sozinha a letra sincronizada no LRCLIB (grátis, sem servidor), uma vez por vídeo
     // (o aviso em cima da letra diz que está sincronizando, se deu certo ou, se não achou, como sincronizar à mão)
+    // a música sincronizada antes das duas versões (a letra do LRCLIB posta no clipe): confere uma vez se ela tem o
+    // áudio oficial
+    if (sinc && !marcando && song && !atual.semVideo && precisaConferirVersoes(song)) conferirVersoes(alvoDaMusica(song));
     if (!sinc && !marcando && song && atual?.youtube && !atual.semVideo && !noClipe() && !lrclibTentado.has(atual.youtube)) {
       const yt = atual.youtube;
       lrclibTentado.add(yt);
@@ -1370,9 +1416,6 @@ const semLinhasDeAcordes = (sinc) => {
       const n = marcando.tempos.length;
       html = `<span class="pl-sinc-txt">${n ? `Frase ${n} de ${marcando.linhas.length}. ` : ''}Toque em <b>Agora</b> quando cada frase começar</span>
         ${n ? botaoSinc('sinc-desfazer', 'Desfazer') : ''}${botaoSinc('sinc-cancelar', 'Cancelar')}${botaoSinc('sinc-agora', 'Agora', true)}`;
-    } else if (noClipe()) {
-      // no clipe a letra não acompanha (como no Spotify): ela anda junto no modo música, com o áudio oficial
-      html = `<span class="pl-sinc-ic">${icon('info', 15)}</span><span class="pl-sinc-txt">No vídeo a letra não acompanha. No modo música, sim</span>${botaoSinc('troca', 'Mudar para música', true)}`;
     } else if (ajustando || e?.tipo === 'ajustar') {
       html = `<span class="pl-sinc-ic">${icon('info', 15)}</span><span class="pl-sinc-txt">${ajustando ? 'Toque na frase no momento em que ela for cantada' : 'O vídeo tem uma parte antes da música: acerte o começo da letra'}</span>
         ${ajustando ? botaoSinc('sinc-pronto', 'Pronto') : botaoSinc('sinc-ajustar', 'Acertar', true)}`;
@@ -1768,6 +1811,8 @@ const semLinhasDeAcordes = (sinc) => {
       else if (!comCapa && atual.youtube === atual.audio) trocarVersao(atual.video, tempoNoVideo(atual.pares, api.tempoAgora));
     }
     if (atual && !atual.semVideo && (localDe(atual.youtube)?.chave || '') !== (local?.chave || '')) trocarVersao(atual.youtube, api.tempoAgora, true);
+    // foi para o clipe com a letra na tela toda aberta: ela fecha (no clipe não há letra) e o vídeo aparece
+    if (noClipe() && el.classList.contains('letra-cheia') && !letraDaPagina) letraCheia(false);
     desenharCapa();
   };
   // tocando o clipe de uma música que tem as duas versões (a letra não acompanha: ela é do áudio)
@@ -2160,7 +2205,7 @@ const semLinhasDeAcordes = (sinc) => {
       !naLetra && (atual.href || atual.abrir) && !telaDeCelular() && { valor: 'abrir', rotulo: 'Abrir a música', ic: 'music' },
       salva ? { valor: 'add-repertorio', rotulo: 'Adicionar a um repertório', ic: 'plus' } : { valor: 'salva', rotulo: 'Salvar na biblioteca', ic: 'download' },
       { valor: 'fila', rotulo: 'Ver a fila', ic: 'queue' },
-      !(song?.content && !temCifra(song.content)) && { valor: 'ver-cifra', rotulo: naLetra && modoCifra ? 'Ver só a letra' : 'Ver a cifra', ic: naLetra && modoCifra ? 'text' : 'chord' },
+      !(song?.content && !temCifra(song.content)) && !noClipe() && { valor: 'ver-cifra', rotulo: naLetra && modoCifra ? 'Ver só a letra' : 'Ver a cifra', ic: naLetra && modoCifra ? 'text' : 'chord' },
       naLetra && atual.youtube && !atual.semVideo && { valor: 'ver-video', rotulo: 'Ver o vídeo', ic: 'video' },
       naLetra && atual.songId && db.song(atual.songId) && { valor: 'editar', rotulo: 'Editar a cifra', ic: 'edit' },
       naLetra && atual.songId && { valor: 'partitura', rotulo: 'Partitura', ic: 'score' },
@@ -3094,7 +3139,7 @@ const botaoMais = (nome) => `<button class="icon-btn mais-linha" data-menu aria-
 
 function linhaItemRepertorio(set, it, i, { atual = -1, fila = false } = {}) {
   const s = db.song(it.songId);
-  return `<li class="track set-item ${i === atual ? 'atual' : ''}" data-i="${i}">
+  return `<li class="track set-item ${i === atual ? 'atual' : ''}" data-i="${i}" data-musica="${esc(it.songId)}">
     <span class="lead"><span class="marca-sel" aria-hidden="true">${icon('check', 14)}</span>${capa(s || {})}</span>
     <a class="info" href="#/repertorio/${set.id}/${i}" ${fila ? 'data-ir' : ''}><div class="t ${i === atual ? 'playing' : ''}">${i === atual ? icon('music', 13, 'style="display:inline;vertical-align:-1px;margin-right:4px"') : ''}${esc(s?.title || '(música removida)')}</div>
       <div class="s">${it.label ? `<b class="parte-tag">${esc(it.label)}</b> ` : ''}${indicadores(s)}${esc(s?.artist || '')}<span class="dur-faixa">${s?.duracao ? ` · ${fmtTempo(s.duracao)}` : ''}</span></div></a>
@@ -7668,6 +7713,7 @@ function viewSong(id, ctx = {}) {
   // aberto e grátis, sem o servidor da IA), sem precisar ir ao ⋯; uma vez por vídeo enquanto o app está aberto.
   // No tablet quem faz isso é o Tocando agora, que abre junto
   const sincronizarAoTocar = () => {
+    if (!ehTablet() && precisaConferirVersoes(song)) { conferirVersoes(song, statusSinc).then(() => { mapa = null; }); return; }
     if (ehTablet() || !midiaDe(song) || sincronia() || tentouSincronizar.has(midiaDe(song))) return;
     tentouSincronizar.add(midiaDe(song));
     sincronizarMusica(song, { soLrclib: true, sozinho: true, status: statusSinc }).then((r) => {
@@ -7808,10 +7854,15 @@ function viewSong(id, ctx = {}) {
   // está pronta (ou quase). Uma vez por vídeo enquanto o app está aberto; o resultado fica guardado na música.
   // No servidor da nuvem (Modal) não: cada abertura gastava o crédito grátis; lá sincroniza pelo play ou pelo ⋯
   servidorCarregado.then(() => {
+    if (sincPelaIA() && precisaConferirVersoes(song) && view.contains(songEl)) { conferirVersoes(song, statusSinc).then(() => { mapa = null; }); return; }
     if (!sincPelaIA() || !midiaDe(song) || sincronia() || tentouSincronizar.has(midiaDe(song)) || !view.contains(songEl)) return;
     tentouSincronizar.add(midiaDe(song));
     sincronizarMusica(song, { sozinho: true, status: statusSinc }).then(() => { mapa = null; });
   });
+  // ao abrir (sem esperar o play), a letra sincronizada do LRCLIB (grátis, sem servidor): a música do videoclipe já
+  // ganha as duas versões, o áudio oficial no modo música e o clipe no modo vídeo (com o servidor no computador, quem
+  // faz isso é o bloco de cima, pelo servidor)
+  if (midiaDe(song) && !sincPelaIA()) sincronizarAoTocar();
   // música vinda da busca sem vídeo: procura no YouTube sozinho e já vincula (se não achar, o aviso diz)
   if (isPreview && !song.youtube && !String(song.source || '').startsWith('cnbb:') && !preview.semVideo && !preview.videoProcurado) {
     const esta = preview;
@@ -8540,6 +8591,7 @@ function viewSet(id, { selecionando = false, marcados = new Set() } = {}) {
     <div class="actions-row">
       ${set.items.length ? (pl ? `<button class="play-big" data-tocar-set="${id}" aria-label="Ouvir a playlist" title="Ouvir">${icon('play', 24)}</button>`
     : `<a class="play-big" href="#/repertorio/${id}/0" aria-label="Tocar repertório" title="Tocar">${icon('play', 24)}</a>`) : ''}
+      ${set.items.length ? botaoBaixarSet(set) : ''}
       <button class="icon-btn" id="add" aria-label="Adicionar música da biblioteca" title="Adicionar música da biblioteca">${icon('plus', 24)}</button>
       <a class="btn small" href="#/editar/novo/${id}" title="Escrever uma música nova (letra, cifra, estrutura) e já colocar neste repertório">${icon('edit', 15)} Criar música</a>
       <button class="icon-btn" id="ren" aria-label="Editar detalhes" title="Editar capa, nome e tipo">${icon('edit', 22)}</button>
@@ -9931,13 +9983,28 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
     return 'erro';
   } finally { sincronizando.delete(song.id); }
 }
+// A música sincronizada pelo LRCLIB direto no vídeo, antes das duas versões existirem (ou com a letra feita para o
+// clipe, como a de "Tears"): confere uma vez se o vídeo é um clipe e, se for, procura o áudio oficial e passa a letra
+// para ele
+function precisaConferirVersoes(song) {
+  return Boolean(song?.youtube && !song.versoesConferidas && !versoesDe(song) && song.sincronia?.video === song.youtube && song.sincronia.fonte === 'lrclib');
+}
+const conferidasAgora = new Set(); // (uma vez por música enquanto o app está aberto, mesmo se o LRCLIB não responder)
+async function conferirVersoes(song, status = () => {}) {
+  if (conferidasAgora.has(song.id)) return;
+  conferidasAgora.add(song.id);
+  const r = await sincronizarMusica(song, { soLrclib: true, sozinho: true, status });
+  if (r === 'erro' || r === undefined) return; // tenta de novo da próxima vez que o app abrir
+  if (song.id === 'previa') { if (preview) preview.versoesConferidas = true; } else if (db.song(song.id)) db.updateSong(song.id, { versoesConferidas: true });
+}
 // o áudio oficial da gravação no YouTube: o mesmo título, a duração da gravação do LRCLIB e, de preferência, do canal do
 // artista (os "- Topic", do YouTube Music); null se não achar
 async function procurarAudio(song, duracao) {
   const titulo = tituloLimpo(song.title);
   const termo = `${titulo} ${song.artist || ''}`.trim();
-  for (const q of [`${termo} audio`, termo]) {
-    const achado = escolherAudio(await buscarYoutube(q).catch(() => []), { titulo, artista: song.artist || '', duracao, evitar: song.youtube });
+  // primeiro no YouTube Music (as faixas dos álbuns, o áudio puro do canal do artista); depois nos vídeos
+  for (const [q, filtro] of [[termo, 'music_songs'], [`${termo} audio`, 'videos'], [termo, 'videos']]) {
+    const achado = escolherAudio(await buscarYoutube(q, { filtro }).catch(() => []), { titulo, artista: song.artist || '', duracao, evitar: song.youtube });
     if (achado) return achado;
   }
   return null;
@@ -10936,7 +11003,8 @@ function viewOffline() {
       const faltam = db.songs().filter((x) => !x.baixado && !baixando.has(x.id) && midiaDe(x));
       if (!faltam.length) return;
       if (faltam.some((x) => arquivosParaBaixar(x).length) && !servidorIA().url) { toast('Para baixar o áudio e o vídeo, ligue o servidor no seu computador (Ajustes → Avançado)'); return; }
-      for (const s of faltam) await baixarMusica(s);
+      if (!(await podeBaixarAgora())) return;
+      for (const s of faltam) await baixarMusica(s, { perguntou: true });
       toast(`${faltam.length} música${faltam.length > 1 ? 's' : ''} na fila para baixar`);
     }
     if (b.id === 'of-remover' && await ask({ title: 'Remover todos os downloads?', text: 'As músicas continuam na biblioteca, mas só tocam com internet.', ok: 'Remover', danger: true })) {
