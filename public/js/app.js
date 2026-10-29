@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-294';
+export const APP_VERSAO = '2026.10.29-295';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1057,7 +1057,7 @@ const player = (() => {
       cartoes.push(`<section class="pl-cartao pl-artista"><div class="pl-artista-foto" data-foto><span>${esc(principal.split(/\s+/).slice(0, 2).map((x) => x[0] || '').join('').toUpperCase())}</span><h4>Sobre o artista</h4></div>
         <div class="pl-artista-pe"><span class="grow"><b>${esc(principal)}</b><small>${esc(pessoas[0]?.papeis.join(' • ') || 'Artista')}</small></span>
         ${slug ? `<a class="ref-pilula" href="#/artista/${encodeURIComponent(slug)}/${encodeURIComponent(principal)}">Ver artista</a>` : ''}</div>
-        <p class="pl-artista-bio" hidden></p></section>`);
+        <div class="pl-artista-bio" hidden><p></p><button class="pl-artista-mais">ver mais</button></div></section>`);
     }
     // créditos como o SongDNA do Spotify: as pessoas com a foto e o "Explorar"; embaixo, a lista (com a foto pequena)
     // (a capa: a da música ou, sem ela, a miniatura do vídeo; aberta a página de um artista, o Tocando agora fecha)
@@ -1088,12 +1088,13 @@ const player = (() => {
       img.src = url;
     }).catch(() => {});
     // a breve apresentação do artista embaixo do nome (3 linhas; tocando, abre o texto inteiro)
-    if (principal) descricaoDoArtista(principal).then((texto) => {
+    // (em 3 linhas, com o "ver mais" no fim, como no Spotify: abre a tela "Sobre o artista", com o texto inteiro)
+    if (principal) descricaoDoArtista(principal).then((info) => {
       const bio = $('.pl-extra .pl-artista-bio', el);
-      if (!texto || !bio || extraDe !== chave) return;
-      bio.textContent = texto;
+      if (!info?.texto || !bio || extraDe !== chave) return;
+      $('p', bio).textContent = info.texto.replace(/\n/g, ' ');
       bio.hidden = false;
-      bio.onclick = () => bio.classList.toggle('aberta');
+      bio.onclick = (e) => { e.stopPropagation(); abrirSobreArtista({ nome: principal, slug }); };
     }).catch(() => {});
     if (atual?.youtube) infoDoVideo(atual.youtube).then((v) => {
       if (!v || extraDe !== chave) return;
@@ -1958,6 +1959,8 @@ const player = (() => {
   el.addEventListener('pointercancel', soltarArrasto);
   window.addEventListener('popstate', () => {
     if (voltaDaLetra) { voltaDaLetra = false; return; }
+    // o voltar com a tela "Sobre o artista" aberta fecha só ela (ela mesma cuida disso)
+    if (document.querySelector('.sobre-artista:not(.saindo)')) return;
     // o voltar com a letra na tela toda fecha só ela (volta para o Tocando agora)
     if (el.classList.contains('letra-cheia') && letraDaPagina) {
       // o voltar na tela da música: sai dela (no tablet o próprio voltar já saiu da página)
@@ -3611,24 +3614,86 @@ async function fotoDeezer(nome) {
   // sem foto, o Deezer devolve uma imagem genérica (o endereço fica com "/artist//")
   return a?.picture_medium && !/\/artist\/\//.test(a.picture_medium) ? a.picture_big || a.picture_medium : '';
 }
-// uma breve apresentação do artista (o estilo, de onde é, os prêmios), para o cartão "Sobre o artista": o começo da
-// página dele na Wikipédia em português. Só vale a página que é mesmo de um músico com esse nome (pela descrição dela:
-// cantor, banda, ministério de música…): "Justice" é a banda, não a atriz Victoria Justice. Sem uma assim, fica sem
+// a apresentação do artista (o estilo, de onde é, os prêmios), para o "Sobre o artista": a introdução da página dele
+// na Wikipédia em português, com a foto e o endereço da página. Só vale a página que é mesmo de um músico com esse
+// nome (pela descrição dela: cantor, banda, ministério de música…): "Justice" é a banda, não a atriz Victoria Justice.
+// Sem uma assim, null. { texto (parágrafos separados por \n), foto, url }
 const descricoesArtistas = new Map();
 const MUSICO = /cantor|cantora|banda|m[uú]sic|grupo|dupla|compositor|compositora|rapper|instrumentista|\bdj\b|minist[eé]rio|cantautor|vocalista|coral|coro|orquestra|trio|duo\b|quarteto|sacerdote|padre|frei/i;
 function descricaoDoArtista(nome) {
   const k = normalizar(nome);
   if (!descricoesArtistas.has(k)) {
-    const url = `https://pt.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&generator=search&gsrlimit=5&gsrsearch=${encodeURIComponent(nome)}&prop=extracts|description&exintro=1&explaintext=1&exsentences=4`;
+    const url = `https://pt.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&generator=search&gsrlimit=5&gsrsearch=${encodeURIComponent(nome)}&prop=extracts|description|pageimages|info&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=900&inprop=url`;
     descricoesArtistas.set(k, fetch(url).then((r) => r.json()).then((j) => {
       const paginas = Object.values(j?.query?.pages || {}).sort((x, y) => (x.index || 0) - (y.index || 0));
       const certa = paginas.find((pg) => mesmoNome(pg.title.replace(/\s*\([^)]*\)\s*$/, ''), nome) && MUSICO.test(pg.description || '')
         && !/desambigua/i.test(pg.description || ''));
       // (sem as datas e a pronúncia entre parênteses do começo, que só atrapalham numa leitura rápida)
-      return String(certa?.extract || '').replace(/\s*\([^()]*\d{4}[^()]*\)/, '').replace(/\s+/g, ' ').trim();
-    }).catch(() => { descricoesArtistas.delete(k); return ''; }));
+      const texto = String(certa?.extract || '').replace(/\s*\([^()]*\d{4}[^()]*\)/, '').split(/\n+/).map((x) => x.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+      return texto ? { texto, foto: certa.thumbnail?.source || '', url: certa.fullurl || '' } : null;
+    }).catch(() => { descricoesArtistas.delete(k); return null; }));
   }
   return descricoesArtistas.get(k);
+}
+// o artista no Deezer (o que tem mais fãs, com o mesmo nome): os fãs, os álbuns e a foto grande, para a tela "Sobre o
+// artista" (como os ouvintes mensais do Spotify)
+const deezerArtistas = new Map();
+function deezerDoArtista(nome) {
+  const k = normalizar(nome);
+  if (!deezerArtistas.has(k)) {
+    deezerArtistas.set(k, jsonp(`https://api.deezer.com/search/artist?q=${encodeURIComponent(nome)}&limit=5`).then((r) => {
+      const a = (r?.data || []).filter((x) => mesmoNome(x.name, nome)).sort((x, y) => (y.nb_fan || 0) - (x.nb_fan || 0))[0];
+      if (!a) return null;
+      const foto = a.picture_xl && !/\/artist\/\//.test(a.picture_xl) ? a.picture_xl : '';
+      return { fas: a.nb_fan || 0, albuns: a.nb_album || 0, foto };
+    }).catch(() => null));
+  }
+  return deezerArtistas.get(k);
+}
+// a tela "Sobre o artista" (o "ver mais" do cartão, como no Spotify): as fotos dele passando para o lado, os fãs, a
+// apresentação inteira e os atalhos (as músicas e os álbuns dele no app, a página na Wikipédia). Abre por cima de
+// tudo; o voltar (o do celular também) fecha
+async function abrirSobreArtista({ nome, slug = '' }) {
+  document.querySelector('.sobre-artista')?.remove();
+  const tela = document.createElement('section');
+  tela.className = 'sobre-artista';
+  tela.setAttribute('role', 'dialog');
+  tela.setAttribute('aria-label', `Sobre ${nome}`);
+  tela.innerHTML = `<header class="sa-topo"><button class="icon-btn" data-sa="voltar" aria-label="Voltar">${icon('back', 24)}</button><b>${esc(nome)}</b><span></span></header>
+    <div class="sa-fotos"></div><div class="sa-numeros" hidden></div><div class="sa-texto"><div class="loading-note"><span class="spin"></span>Carregando…</div></div><div class="sa-links"></div>`;
+  document.body.append(tela);
+  history.pushState({ ...history.state, sobreArtista: true }, '');
+  const fechar = () => { tela.classList.add('saindo'); setTimeout(() => tela.remove(), 180); };
+  window.addEventListener('popstate', fechar, { once: true });
+  tela.querySelector('[data-sa="voltar"]').onclick = () => history.back();
+  const [info, dz, foto, canal] = await Promise.all([descricaoDoArtista(nome), deezerDoArtista(nome), fotoDoArtista(nome, slug).catch(() => ''), fotoDoCanal(nome).catch(() => '')]);
+  if (!tela.isConnected) return;
+  // as fotos (sem repetir): a do cartão, a do canal do YouTube, a do Deezer e a da Wikipédia
+  const fotos = [...new Set([foto, canal, dz?.foto, info?.foto].filter(Boolean))];
+  tela.querySelector('.sa-fotos').innerHTML = fotos.length ? fotos.map((u) => `<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()">`).join('')
+    : `<div class="sa-sem-foto">${esc(iniciaisDe(nome))}</div>`;
+  const numeros = tela.querySelector('.sa-numeros');
+  if (dz?.fas) {
+    numeros.hidden = false;
+    numeros.innerHTML = `<div><b>${dz.fas.toLocaleString('pt-BR')}</b><small>fãs no Deezer</small></div>${dz.albuns ? `<div><b>${dz.albuns.toLocaleString('pt-BR')}</b><small>${dz.albuns === 1 ? 'álbum' : 'álbuns e singles'}</small></div>` : ''}`;
+  }
+  tela.querySelector('.sa-texto').innerHTML = info?.texto ? info.texto.split('\n').map((p) => `<p>${esc(p)}</p>`).join('')
+    : '<p class="muted">Ainda não há uma apresentação deste artista.</p>';
+  const links = [
+    slug && `<a href="#/artista/${encodeURIComponent(slug)}/${encodeURIComponent(nome)}">${icon('music', 20)}<span>Músicas e álbuns</span>${icon('next', 18)}</a>`,
+    info?.url && `<a href="${esc(info.url)}" target="_blank" rel="noopener">${icon('book', 20)}<span>Wikipédia</span>${icon('next', 18)}</a>`,
+    `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(nome)}" target="_blank" rel="noopener">${icon('youtube', 20)}<span>YouTube</span>${icon('next', 18)}</a>`,
+  ].filter(Boolean);
+  tela.querySelector('.sa-links').innerHTML = links.join('');
+  // a página do artista no app: fecha esta tela (e o Tocando agora) antes de ir
+  tela.querySelector('.sa-links a[href^="#/"]')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const destino = e.currentTarget.getAttribute('href');
+    window.removeEventListener('popstate', fechar);
+    tela.remove();
+    history.replaceState({ ...history.state, sobreArtista: false }, '');
+    location.hash = destino;
+  });
 }
 async function fotoWikipedia(nome) {
   for (const lingua of ['pt', 'en']) {

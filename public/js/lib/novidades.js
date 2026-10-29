@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 295, data: '2026-10-29', titulo: 'Sobre o artista, como no Spotify',
+    itens: [
+      { tipo: 'novo', texto: 'No cartão “Sobre o artista” do Tocando agora, o “ver mais” no fim do texto abre a tela do artista: as fotos dele passando para o lado, os fãs e os álbuns, a apresentação inteira e atalhos para as músicas e os álbuns dele, a Wikipédia e o YouTube.' },
+    ],
+  },
+  {
     versao: 294, data: '2026-10-29', titulo: 'Ver o álbum e conhecer o artista',
     itens: [
       { tipo: 'novo', texto: 'Nos ⋯ da música e do Tocando agora, “Ver álbum” abre o álbum em que a música saiu (o lançamento original, não as coletâneas), com a faixa dela destacada na lista.' },
@@ -65,13 +71,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'A letra sincroniza sozinha ao tocar a música (pelo banco de letras sincronizadas, sem servidor), também no celular e no computador. Se o banco de letras estava ocupado, tenta de novo sozinho em vez de desistir.' },
       { tipo: 'melhoria', texto: 'Sua biblioteca, repertórios e playlists ficam guardados com mais segurança: o navegador é avisado para não apagar os dados do app e fica uma segunda cópia, que volta sozinha se os dados sumirem.' },
       { tipo: 'melhoria', texto: 'Partitura sem depender de servidor: "Gerar com IA" virou "Importar o áudio". Escolha o arquivo de áudio da música e o app escreve a partitura aqui mesmo, no aparelho (antes tentava baixar o áudio do vídeo num servidor, que travava em 0% e dava erro). Para começar do zero, continua a "Nova partitura", nota por nota.' },
-    ],
-  },
-  {
-    versao: 285, data: '2026-10-29', titulo: 'Trocar o vídeo pelos ⋯',
-    itens: [
-      { tipo: 'novo', texto: 'Trocar o vídeo de uma música também pelos ⋯ do topo da música e do Tocando agora (inclusive com a letra na tela toda): busca outras versões aqui dentro ou abre a busca no YouTube para copiar e colar o link.' },
-      { tipo: 'melhoria', texto: 'Na letra na tela toda, o botão do olho (só a letra) ficou do mesmo tamanho e jeito da pílula Cifra ao lado.' },
     ],
   },
 ];
