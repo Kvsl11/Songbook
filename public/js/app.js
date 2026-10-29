@@ -2090,9 +2090,11 @@ const semLinhasDeAcordes = (sinc) => {
       }
       const info = msg?.info;
       if (!info) return;
-      if (pendente !== null) {
-        // o vídeo começou: aplica a ida pedida (e não deixa o tempo antigo voltar)
-        if (typeof info.currentTime === 'number' && Math.abs(info.currentTime - pendente) > 2 && ++tentativasIda < 12) { comando('seekTo', [pendente, true]); return; }
+      if (pendente !== null && typeof info.currentTime === 'number') {
+        // o vídeo começou: aplica a ida pedida (e não deixa o tempo antigo voltar). Só a mensagem que traz o tempo
+        // decide: a primeira depois de trocar de versão (da música para o clipe, ou ao contrário) costuma vir só com o
+        // estado do player, e antes a ida era dada por feita ali e o vídeo novo começava do zero
+        if (Math.abs(info.currentTime - pendente) > 2 && ++tentativasIda < 12) { comando('seekTo', [pendente, true]); return; }
         pendente = null;
         tentativasIda = 0;
       }
