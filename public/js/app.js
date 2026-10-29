@@ -92,8 +92,6 @@ const servidorCarregado = (async () => {
     // "lumen": a máquina pequena só das perguntas do Lumen (a principal é a das partituras)
     SERVIDOR_IA = { url: baseDoServidor(d.url), chave: d.chave || '', lumen: baseDoServidor(d.lumen || '') };
   }
-  // a tela que já abriu sem saber do servidor é desenhada de novo
-  if (/^#\/musica\/[^/]+\/compor\/(ia|auto)/.test(location.hash)) route();
 })().catch(() => {});
 const view = $('#view');
 const titleEl = $('#title');
@@ -131,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-313';
+export const APP_VERSAO = '2026.10.29-314';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -2208,7 +2206,8 @@ const semLinhasDeAcordes = (sinc) => {
       !(song?.content && !temCifra(song.content)) && !noClipe() && { valor: 'ver-cifra', rotulo: naLetra && modoCifra ? 'Ver só a letra' : 'Ver a cifra', ic: naLetra && modoCifra ? 'text' : 'chord' },
       naLetra && atual.youtube && !atual.semVideo && { valor: 'ver-video', rotulo: 'Ver o vídeo', ic: 'video' },
       naLetra && atual.songId && db.song(atual.songId) && { valor: 'editar', rotulo: 'Editar a cifra', ic: 'edit' },
-      naLetra && atual.songId && { valor: 'partitura', rotulo: 'Partitura', ic: 'score' },
+      // a partitura no ⋯ do Tocando agora (não no da letra): ver a que a música tem, ou a IA criar sozinha
+      !naLetra && atual.songId && { valor: 'partitura', rotulo: temPartituraMusica(song) ? 'Ver partitura' : 'Criar partitura', ic: temPartituraMusica(song) ? 'score' : 'sparkles' },
       naLetra && song && atual.youtube && !atual.semVideo && !noClipe() && { valor: 'sincronizar', rotulo: sincronizada ? 'Sincronizar a letra de novo' : 'Sincronizar a letra', ic: 'sparkles' },
       (salva || (preview && (atual.songId === 'previa' || atual.href === '#/musica/previa'))) && { valor: 'trocar', rotulo: atual.semVideo ? 'Escolher um vídeo' : 'Trocar o vídeo', ic: atual.semVideo ? 'youtube' : 'refresh' },
       !naLetra && !atual.semVideo && !(ehArquivo(atual.youtube) && !atual.video) && { valor: 'troca', rotulo: modoCapa() ? 'Mudar para vídeo' : 'Mudar para música', ic: modoCapa() ? 'video' : 'music' },
@@ -2475,7 +2474,12 @@ const semLinhasDeAcordes = (sinc) => {
     if (b.dataset.pl === 'artista' && dadosCreditos?.pessoas[b.dataset.i]) { painelCheio(false, { semVoltar: true }); irParaArtista(dadosCreditos.pessoas[b.dataset.i].nome); return; }
     if (b.dataset.pl === 'leitura') { definirLeitura(!el.classList.contains('so-letra')); return; }
     if (b.dataset.pl === 'editar' && atual?.songId && db.song(atual.songId)) { location.hash = '#/editar/' + atual.songId; return; }
-    if (b.dataset.pl === 'partitura' && atual?.songId) { location.hash = `#/musica/${atual.songId}/partitura`; return; }
+    if (b.dataset.pl === 'partitura' && atual?.songId) {
+      // a página abre no lugar do Tocando agora na tela toda (no tablet, o painel continua ao lado)
+      if (document.body.classList.contains('painel-cheio')) painelCheio(false, { semVoltar: true });
+      location.hash = `#/musica/${atual.songId}/${temPartituraMusica(musicaTocando()) ? 'partitura' : 'compor/auto'}`;
+      return;
+    }
     if (b.dataset.pl === 'sinc-ajustar') { ajustando = true; ajustandoVideo = atual?.youtube || ''; mostrarSinc(); letraCheia(true); return; }
     if (b.dataset.pl === 'sinc-pronto') {
       ajustando = false;
@@ -6661,18 +6665,35 @@ async function gerarComIA(song, titulo, { salvarSozinho = false } = {}) {
   const id = song.id;
   setHeader(titulo, { back: salvarSozinho ? `#/musica/${id}` : '#/partituras', eyebrow: 'Gerar partitura com IA' });
   const modoIA = 'mistura'; // a música inteira (voz e instrumentos), do arquivo de áudio
-  // o servidor no computador de quem usa (Ajustes → Servidor no computador): de graça, sem crédito do Modal. Com
-  // ele ligado, o áudio vai para o PC (a voz separada pelo Demucs, mais fiel) e dá para usar o link do YouTube; o
-  // servidor da nuvem (Modal) fica de fora, porque cada partitura gastava o crédito
+  // espera o app saber do servidor (ao abrir, ele ainda confere se o do computador responde): antes, a tela que abria
+  // nesse meio-tempo ia direto para "escolher o arquivo", sem tentar gerar
+  view.innerHTML = `<div class="loading-note"><span class="spin"></span>Preparando a IA…</div>`;
+  await servidorCarregado;
+  const aqui = location.hash;
+  if (!aqui.startsWith(`#/musica/${id}/compor/`)) return;
+  // o servidor no computador de quem usa (Ajustes → Servidor no computador): de graça, sem crédito do Modal. O arquivo
+  // escolhido vai para ele; sem ele, é lido no aparelho. A partitura pelo áudio da própria música vai para o servidor
+  // que houver (o do computador ou o da nuvem)
   const noPc = Boolean(servidorIA().pc && servidorIA().url);
+  const temServidor = Boolean(servidorIA().url);
   // o servidor no GitHub Codespaces (.devcontainer/) dorme quando ninguém usa: o endereço não muda, então basta
   // ligar o Codespace (github.com/codespaces, até pelo celular) e tocar em "Já liguei"
   const pcGuardado = baseDoServidor(db.prefs().servidorPc);
   const noGithub = !noPc && /\.app\.github\.dev$/i.test(pcGuardado ? new URL(pcGuardado).host : '');
   // o áudio da própria música, para a IA do servidor ouvir sozinha: o áudio da pessoa, o áudio oficial (sem as cenas do
   // clipe) ou o vídeo. Só se ele não der certo é que a tela pede um arquivo
-  const fonte = fonteDaPartitura(song);
-  const sozinha = noPc && Boolean(fonte);
+  let fonte = fonteDaPartitura(song);
+  // a música ainda sem vídeo: procura no YouTube (e já vincula) antes de pedir um arquivo
+  if (!fonte && temServidor) {
+    view.innerHTML = `<div class="loading-note"><span class="spin"></span>Procurando o áudio da música…</div>`;
+    const v = await videoDaMusica(song.title, song.artist, song.source).catch(() => null);
+    if (location.hash !== aqui) return;
+    if (v && db.song(id) && !db.song(id).youtube) {
+      song = db.saveSong({ ...db.song(id), content: definirMeta(db.song(id).content, 'youtube', v.url) });
+      fonte = fonteDaPartitura(song);
+    }
+  }
+  const sozinha = temServidor && Boolean(fonte);
   view.innerHTML = `<div class="ia">
     <section class="ia-topo">${capa(song)}<div><div class="kind ia-selo">${icon(sozinha ? 'sparkles' : 'upload', 14)} ${sozinha ? 'Gerar com IA' : 'Importar o áudio'}</div><h2>${esc(titulo)}</h2>
       <p class="muted">${sozinha ? `A <b>IA do servidor</b> ouve ${fonte.arquivo ? 'o seu áudio' : 'o áudio do vídeo'} da música, separa a voz dos instrumentos` : noPc ? 'Escolha o arquivo de áudio da música: o <b>servidor do seu computador</b> separa a voz dos instrumentos' : 'Escolha o arquivo de áudio da música: o app ouve aqui mesmo, no aparelho (sem servidor),'} e escreve a <b>melodia</b> — ou as <b>4 vozes do coral</b> — no tom e no andamento. ${salvarSozinho ? 'Quando ficar pronta, ela já abre para você ver.' : 'No fim, ouça ali mesmo e salve se ficou bom.'}</p></div></section>
@@ -6827,7 +6848,7 @@ async function gerarComIA(song, titulo, { salvarSozinho = false } = {}) {
     const ctrl = new AbortController();
     $('#ia-cancelar').onclick = () => { ctrl.abort(); telaFontes(); };
     const t0 = Date.now();
-    const relogio = setInterval(() => { const t = $('#ia-etapa-tempo'); if (t) t.textContent = `${fmtSeg((Date.now() - t0) / 1000)} · no servidor do seu computador`; }, 1000);
+    const relogio = setInterval(() => { const t = $('#ia-etapa-tempo'); if (t) t.textContent = `${fmtSeg((Date.now() - t0) / 1000)} · ${noPc ? 'no servidor do seu computador' : 'no servidor da IA'}`; }, 1000);
     try {
       const form = arquivo ? new FormData() : null;
       if (form) { form.append('arquivo', arquivo, arquivo.name || 'audio'); form.append('separar', 'true'); }
@@ -7075,7 +7096,14 @@ async function gerarComIA(song, titulo, { salvarSozinho = false } = {}) {
   }
   if (audioCompartilhado) { const a = audioCompartilhado; audioCompartilhado = null; lerArquivo(a); }
   else if (sozinha) gerarSozinha();
-  else telaFontes(salvarSozinho ? (fonte ? 'Para a IA gerar a partitura sozinha pelo áudio da música, ligue o servidor no seu computador (Ajustes → Servidor no computador). Ou escolha o arquivo de áudio:' : 'Esta música ainda não tem vídeo nem áudio: escolha o arquivo de áudio dela.') : '');
+  // não dá para gerar sozinha: diz por quê, e a opção de escolher o arquivo fica embaixo
+  else telaFontes(!temServidor ? 'Para a IA gerar a partitura sozinha pelo áudio da música, ligue o servidor no seu computador (Ajustes → Avançado → Servidor no computador). Sem ele, escolha o arquivo de áudio: o app escreve a partitura aqui no aparelho.'
+    : 'Não achei o vídeo desta música no YouTube: escolha o arquivo de áudio dela.');
+}
+// a música já tem partitura (a feita no app ou pela IA, ou a que veio com ela)
+function temPartituraMusica(song) {
+  if (!song) return false;
+  return Boolean((song.id !== 'previa' && db.song(song.id)?.partitura?.pautas?.some((p) => p.ev?.length)) || mxlDaPartitura(song.content) || paginasDaPartitura(song.content).length);
 }
 // o áudio que a IA ouve para a partitura: o da pessoa (arquivo) ou o do YouTube (o oficial, sem as cenas do clipe, ou
 // o vídeo); null se a música não tem nenhum
@@ -7359,7 +7387,7 @@ function viewSong(id, ctx = {}) {
           ${!isPreview && song.audioProprio ? `<button role="menuitem" id="btn-audio-tirar">${icon('x', 18)}<span>Tirar o seu áudio</span></button>` : ''}
           ${(() => {
             // com partitura (a feita no app, a pela IA ou a da música): ver; sem: a IA cria sozinha e abre para ver
-            const tem = (!isPreview && db.song(song.id)?.partitura?.pautas?.some((p) => p.ev?.length)) || mxlDaPartitura(song.content) || paginasDaPartitura(song.content).length;
+            const tem = temPartituraMusica(song);
             const de = isPreview ? 'previa' : song.id;
             return tem ? `<a role="menuitem" href="#/musica/${de}/partitura">${icon('score', 18)}<span>Ver partitura</span></a>`
               : `<a role="menuitem" href="#/musica/${de}/compor/auto">${icon('sparkles', 18)}<span>Criar partitura</span></a>`;
