@@ -1358,7 +1358,8 @@ const semLinhasDeAcordes = (sinc) => {
     linhaAcesa = -2;
     acesaChave = '';
     $('.pl-frase', el).hidden = !tempos;
-    $('.pl-letra', el).hidden = !linhas.length && !letraDaPagina;
+    // no clipe (a música com as duas versões, no modo vídeo) não há letra, como no Spotify: ela fica no modo música
+    $('.pl-letra', el).hidden = noClipe() || (!linhas.length && !letraDaPagina);
     $('.pl-letra', el).classList.toggle('sincronizada', Boolean(tempos) || Boolean(marcando));
     $('.pl-letra', el).classList.toggle('marcando', Boolean(marcando));
     // na letra sincronizada, as partes só de música (a introdução, os solos e o final, de 10 s ou mais)
@@ -1415,9 +1416,6 @@ const semLinhasDeAcordes = (sinc) => {
       const n = marcando.tempos.length;
       html = `<span class="pl-sinc-txt">${n ? `Frase ${n} de ${marcando.linhas.length}. ` : ''}Toque em <b>Agora</b> quando cada frase começar</span>
         ${n ? botaoSinc('sinc-desfazer', 'Desfazer') : ''}${botaoSinc('sinc-cancelar', 'Cancelar')}${botaoSinc('sinc-agora', 'Agora', true)}`;
-    } else if (noClipe()) {
-      // no clipe a letra não acompanha (como no Spotify): ela anda junto no modo música, com o áudio oficial
-      html = `<span class="pl-sinc-ic">${icon('info', 15)}</span><span class="pl-sinc-txt">No vídeo a letra não acompanha. No modo música, sim</span>${botaoSinc('troca', 'Mudar para música', true)}`;
     } else if (ajustando || e?.tipo === 'ajustar') {
       html = `<span class="pl-sinc-ic">${icon('info', 15)}</span><span class="pl-sinc-txt">${ajustando ? 'Toque na frase no momento em que ela for cantada' : 'O vídeo tem uma parte antes da música: acerte o começo da letra'}</span>
         ${ajustando ? botaoSinc('sinc-pronto', 'Pronto') : botaoSinc('sinc-ajustar', 'Acertar', true)}`;
@@ -1813,6 +1811,8 @@ const semLinhasDeAcordes = (sinc) => {
       else if (!comCapa && atual.youtube === atual.audio) trocarVersao(atual.video, tempoNoVideo(atual.pares, api.tempoAgora));
     }
     if (atual && !atual.semVideo && (localDe(atual.youtube)?.chave || '') !== (local?.chave || '')) trocarVersao(atual.youtube, api.tempoAgora, true);
+    // foi para o clipe com a letra na tela toda aberta: ela fecha (no clipe não há letra) e o vídeo aparece
+    if (noClipe() && el.classList.contains('letra-cheia') && !letraDaPagina) letraCheia(false);
     desenharCapa();
   };
   // tocando o clipe de uma música que tem as duas versões (a letra não acompanha: ela é do áudio)
@@ -2205,7 +2205,7 @@ const semLinhasDeAcordes = (sinc) => {
       !naLetra && (atual.href || atual.abrir) && !telaDeCelular() && { valor: 'abrir', rotulo: 'Abrir a música', ic: 'music' },
       salva ? { valor: 'add-repertorio', rotulo: 'Adicionar a um repertório', ic: 'plus' } : { valor: 'salva', rotulo: 'Salvar na biblioteca', ic: 'download' },
       { valor: 'fila', rotulo: 'Ver a fila', ic: 'queue' },
-      !(song?.content && !temCifra(song.content)) && { valor: 'ver-cifra', rotulo: naLetra && modoCifra ? 'Ver só a letra' : 'Ver a cifra', ic: naLetra && modoCifra ? 'text' : 'chord' },
+      !(song?.content && !temCifra(song.content)) && !noClipe() && { valor: 'ver-cifra', rotulo: naLetra && modoCifra ? 'Ver só a letra' : 'Ver a cifra', ic: naLetra && modoCifra ? 'text' : 'chord' },
       naLetra && atual.youtube && !atual.semVideo && { valor: 'ver-video', rotulo: 'Ver o vídeo', ic: 'video' },
       naLetra && atual.songId && db.song(atual.songId) && { valor: 'editar', rotulo: 'Editar a cifra', ic: 'edit' },
       naLetra && atual.songId && { valor: 'partitura', rotulo: 'Partitura', ic: 'score' },

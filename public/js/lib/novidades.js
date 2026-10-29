@@ -9,6 +9,7 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'Música com videoclipe (como “Tears”, da Sabrina Carpenter) não fica mais só com o clipe e a letra fora do tempo: o app reconhece a gravação oficial pelo banco de letras e toca o áudio oficial no modo música, com a letra certinha, e o clipe no modo vídeo. As músicas já sincronizadas assim são conferidas sozinhas.' },
       { tipo: 'melhoria', texto: 'O áudio oficial vem primeiro do YouTube Music (o canal do artista), e a música da busca já ganha as duas versões ao abrir, sem precisar dar play.' },
       { tipo: 'novo', texto: 'No repertório e na playlist, o botão de baixar todas as músicas de uma vez, ao lado do play; nas listas, a setinha verde mostra as baixadas.' },
+      { tipo: 'melhoria', texto: 'Como no Spotify, no modo vídeo de uma música com videoclipe não aparece a letra (nem a cifra): ela fica no modo música, sincronizada com o áudio oficial.' },
     ],
   },
   {
