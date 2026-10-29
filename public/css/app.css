@@ -4023,3 +4023,27 @@ html.pp #player .pl-artista-mais { all: unset; position: absolute; right: 0; bot
 /* artista sem apresentação: só o "ver mais", embaixo do nome */
 html.pp #player .pl-artista-bio.so-mais p { display: none; }
 html.pp #player .pl-artista-bio.so-mais .pl-artista-mais { position: static; padding: 0; background: none; }
+
+/* ============================================================ downloads (como no Spotify) */
+.btn-baixar { position: relative; color: var(--muted); }
+.btn-baixar.baixada { color: #1ed760; }
+/* baixando: um anel que se completa com a porcentagem */
+.btn-baixar.baixando { color: var(--text); }
+.btn-baixar.baixando::after { content: ''; position: absolute; inset: 7px; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(#1ed760 calc(var(--pct, 0) * 1%), transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%); mask: radial-gradient(circle, transparent 62%, #000 64%); }
+.btn-baixar.baixando .ic { opacity: 0.45; }
+.ind-baixada { color: #1ed760; }
+#pl-tela video.pl-local { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; }
+.of-armazenamento { padding: 14px 12px 4px; }
+.of-barra { display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: var(--surface-3, rgb(255 255 255 / 0.12)); margin: 2px 0 14px; }
+.of-barra i { display: block; height: 100%; width: 0; transition: width 0.4s ease; }
+.of-legenda { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 8px; font-size: 14px; }
+.of-legenda li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
+.of-legenda li > i { width: 10px; height: 10px; border-radius: 50%; }
+.of-dl { background: #1ed760; }
+.of-meus { background: var(--accent); }
+.of-cache { background: #f0a020; }
+.of-livre { background: var(--surface-3, rgb(255 255 255 / 0.25)); }
+.of-armazenamento .setting { padding-left: 0; padding-right: 0; }
+.ind-i.ind-baixada { background: none; }

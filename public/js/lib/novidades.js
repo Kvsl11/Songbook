@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 312, data: '2026-10-29', titulo: 'Baixe as músicas, como no Spotify',
+    itens: [
+      { tipo: 'novo', texto: 'Toque na seta ao lado do “salvar” da música para baixá-la: o áudio e o vídeo ficam no aparelho, com a letra, a cifra, a capa e a partitura, e ela toca sem internet. A música baixada ganha a setinha verde.' },
+      { tipo: 'novo', texto: 'Ajustes → Economia de dados e offline: o que baixar (áudio e vídeo ou só o áudio), baixar com os dados móveis, baixar todas as músicas salvas, o armazenamento usado, remover os downloads e limpar o cache.' },
+      { tipo: 'novo', texto: 'Na Biblioteca, o filtro “Baixadas” mostra as músicas que tocam sem internet.' },
+    ],
+  },
+  {
     versao: 311, data: '2026-10-29', titulo: 'Partitura pela IA, sozinha',
     itens: [
       { tipo: 'novo', texto: 'No ⋯ da música, “Criar partitura”: a IA do servidor ouve o áudio da música, escreve a partitura e ela já abre para você ver. Depois de criada, a opção vira “Ver partitura”.' },
@@ -64,13 +72,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'Com o servidor no seu computador ou no GitHub ligado, a letra sincroniza sozinha pela IA dele, que ouve o próprio vídeo. O banco de letras da internet fica só de reserva.' },
       { tipo: 'correcao', texto: 'No vídeo que começa só com instrumentos, a letra não anda mais durante a introdução: aparecem as notinhas ♪ e a primeira frase acende quando começam a cantar.' },
       { tipo: 'correcao', texto: 'Músicas em inglês e espanhol são ouvidas na língua certa (antes a IA ouvia tudo como português e achava poucas frases).' },
-    ],
-  },
-  {
-    versao: 302, data: '2026-10-29', titulo: 'Partitura pelo servidor sem cair no meio',
-    itens: [
-      { tipo: 'correcao', texto: 'Pelo servidor no GitHub, a partitura do arquivo importado ficava parada em “Enviando o áudio” e às vezes falhava no fim. Agora o app envia o áudio e vai perguntando ao servidor em que etapa ele está: as etapas andam na tela e a partitura chega mesmo depois de vários minutos.' },
-      { tipo: 'melhoria', texto: 'O servidor no seu computador ou no GitHub já deixa a IA pronta assim que liga (antes a primeira partitura ou letra esperava minutos baixando e abrindo os modelos), e a letra sincronizada sai umas 3 vezes mais rápido.' },
     ],
   },
 ];

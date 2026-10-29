@@ -143,6 +143,39 @@ def guardar_cookies_renovados(caminho: str, antes: str | None) -> None:
 def baixar_audio(video: str, pasta: str, progresso=lambda p: None) -> dict:
     """Baixa só o áudio do vídeo para pasta/audio.wav. Devolve o caminho, o título e a duração. progresso(p), de 0
     a 1, a cada 1% baixado (o app mostra a porcentagem e passa para a etapa seguinte quando chega a 100%)"""
+    info = _baixar(video, pasta, progresso, "bestaudio/best", [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}])
+    caminho = os.path.join(pasta, "audio.wav")
+    if not os.path.isfile(caminho):
+        raise ValueError("vídeo longo demais (mais de %d min) ou sem áudio" % (MAX_VIDEO // 60))
+    return {"caminho": caminho, "titulo": info.get("title") or "", "duracao": info.get("duration")}
+
+
+# o que o celular toca sem converter: o áudio em M4A (AAC) e o vídeo em MP4 com o som junto, até 720p (o WebM/Opus é a
+# reserva: o Safari do iPhone não toca)
+FORMATO_AUDIO = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best"
+FORMATO_VIDEO = "best[ext=mp4][height<=720][vcodec!=none][acodec!=none]/18/best[ext=mp4]/best"
+TIPOS = {".m4a": "audio/mp4", ".mp4": "video/mp4", ".webm": "video/webm", ".mp3": "audio/mpeg", ".opus": "audio/ogg",
+         ".ogg": "audio/ogg", ".aac": "audio/aac"}
+
+
+def baixar_midia(video: str, pasta: str, progresso=lambda p: None, com_video: bool = False) -> dict:
+    """O áudio (ou o vídeo com o som) do jeito que vem do YouTube, para o app guardar no aparelho e tocar sem internet
+    (os downloads, como no Spotify). Devolve o caminho, o tipo (MIME), o título e a duração."""
+    info = _baixar(video, pasta, progresso, FORMATO_VIDEO if com_video else FORMATO_AUDIO, [])
+    arquivos = [f for f in os.listdir(pasta) if f.startswith("audio.") and not f.endswith((".part", ".ytdl"))]
+    if not arquivos:
+        raise ValueError("vídeo longo demais (mais de %d min) ou sem áudio" % (MAX_VIDEO // 60))
+    caminho = os.path.join(pasta, arquivos[0])
+    ext = os.path.splitext(caminho)[1].lower()
+    tipo = TIPOS.get(ext, "video/mp4" if com_video else "audio/mp4")
+    if ext == ".webm" and not com_video:
+        tipo = "audio/webm"
+    return {"caminho": caminho, "tipo": tipo, "titulo": info.get("title") or "", "duracao": info.get("duration")}
+
+
+def _baixar(video: str, pasta: str, progresso, formato: str, pos: list) -> dict:
+    """Baixa o vídeo do YouTube para pasta/audio.<ext> no formato pedido (com os pós-processamentos do yt-dlp) e
+    devolve as informações dele"""
     import yt_dlp
     from yt_dlp.utils import match_filter_func
 
@@ -169,14 +202,14 @@ def baixar_audio(video: str, pasta: str, progresso=lambda p: None) -> dict:
         "socket_timeout": 20,
         "retries": 3,
         "fragment_retries": 3,
-        "format": "bestaudio/best",
+        "format": formato,
         "outtmpl": os.path.join(pasta, "audio.%(ext)s"),
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
         "noprogress": True,
         "match_filter": match_filter_func(f"duration <= {MAX_VIDEO}"),
-        "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
+        "postprocessors": pos,
     }
     cookies = arquivo_de_cookies()
     antes = None
@@ -209,7 +242,4 @@ def baixar_audio(video: str, pasta: str, progresso=lambda p: None) -> dict:
         raise next((e for e in erros if not pede_login(e)), erros[0])
     if not info:
         raise ValueError("vídeo longo demais (mais de %d min)" % (MAX_VIDEO // 60))
-    caminho = os.path.join(pasta, "audio.wav")
-    if not os.path.isfile(caminho):
-        raise ValueError("vídeo longo demais (mais de %d min) ou sem áudio" % (MAX_VIDEO // 60))
-    return {"caminho": caminho, "titulo": info.get("title") or "", "duracao": info.get("duration")}
+    return info

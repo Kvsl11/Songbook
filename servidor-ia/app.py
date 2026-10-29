@@ -31,7 +31,8 @@ import uuid
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from starlette.background import BackgroundTask
 from pydantic import BaseModel
 
 import duvidas
@@ -286,10 +287,12 @@ class PedidoYoutube(BaseModel):
     separar: bool = True
 
 
-def baixar(video: str, pasta: str, etapa=lambda nome, progresso=None: None) -> dict:
+def baixar(video: str, pasta: str, etapa=lambda nome, progresso=None: None, midia: str | None = None) -> dict:
     """O áudio do vídeo na pasta (temporária, de quem chama), ou o erro em português. O andamento do download vai
     para a tela (etapa "baixando" com o progresso de 0 a 1)"""
     try:
+        if midia:  # o arquivo como vem (o áudio em M4A ou o vídeo em MP4), para o app guardar no aparelho
+            return youtube.baixar_midia(video, pasta, progresso=lambda p: etapa("baixando", p), com_video=midia == "video")
         return youtube.baixar_audio(video, pasta, progresso=lambda p: etapa("baixando", p))
     except ValueError as e:
         raise HTTPException(422, str(e))
@@ -438,6 +441,61 @@ def letra_do_arquivo(arquivo: UploadFile = File(...), linhas: str = Form(...), r
             vagas.release()
 
     return com_etapas(trabalho, etapas, pasta, tarefa)
+
+
+class PedidoBaixar(BaseModel):
+    url: str
+    video: bool = False  # o vídeo (MP4, com o som); sem ele, só o áudio (M4A)
+
+
+# os arquivos baixados à espera do app (o número → o arquivo): ele busca em GET /baixar/{número} e o arquivo sai do
+# servidor; o que ninguém buscou em 30 minutos é apagado
+_prontos: dict[str, dict] = {}
+_prontos_trava = threading.Lock()
+
+
+def _apagar_prontos_velhos():
+    with _prontos_trava:
+        velhos = [k for k, v in _prontos.items() if time.time() - v["criado"] > GUARDAR_TAREFA]
+        for k in velhos:
+            shutil.rmtree(_prontos.pop(k)["pasta"], ignore_errors=True)
+
+
+@app.post("/baixar", dependencies=[Depends(conferir_chave)])
+def baixar_para_o_app(pedido: PedidoBaixar, etapas: bool = Query(False), tarefa: bool = Query(False)):
+    """Os downloads do app, como no Spotify: o áudio (ou o vídeo) da música, para ele guardar no aparelho e tocar sem
+    internet. Primeiro baixa (com a porcentagem, como na partitura); a resposta diz o número para buscar o arquivo."""
+    video = youtube.id_do_video(pedido.url)
+    if not video:
+        raise HTTPException(400, "link do YouTube inválido")
+    _apagar_prontos_velhos()
+    pasta = tempfile.mkdtemp(prefix="songbook-baixar-")
+
+    def trabalho(etapa):
+        etapa("baixando", 0)
+        try:
+            r = baixar(video, pasta, etapa, midia="video" if pedido.video else "audio")
+        except Exception:
+            shutil.rmtree(pasta, ignore_errors=True)
+            raise
+        numero = uuid.uuid4().hex
+        with _prontos_trava:
+            _prontos[numero] = {"caminho": r["caminho"], "pasta": pasta, "tipo": r["tipo"], "criado": time.time()}
+        return {"arquivo": numero, "tipo": r["tipo"], "tamanho": os.path.getsize(r["caminho"]), "video": video,
+                "titulo": r.get("titulo") or "", "duracao": r.get("duracao")}
+
+    # (a pasta fica até o app buscar o arquivo)
+    return com_etapas(trabalho, etapas, None, tarefa)
+
+
+@app.get("/baixar/{numero}", dependencies=[Depends(conferir_chave)])
+def entregar_baixado(numero: str):
+    with _prontos_trava:
+        pronto = _prontos.pop(numero, None)
+    if not pronto or not os.path.isfile(pronto["caminho"]):
+        raise HTTPException(404, "o arquivo não está mais no servidor: baixe de novo")
+    return FileResponse(pronto["caminho"], media_type=pronto["tipo"],
+                        background=BackgroundTask(shutil.rmtree, pronto["pasta"], ignore_errors=True))
 
 
 class PedidoDuvida(BaseModel):
