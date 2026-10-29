@@ -13,13 +13,13 @@ export function baseDoServidor(texto) {
   } catch { return ''; }
 }
 
-// o túnel do VS Code (Portas → Encaminhar uma porta, no notebook sem administrador) mostra uma página de aviso antes
-// de quem chega pelo navegador; com este cabeçalho, as chamadas do app passam direto por ela
+// o túnel do VS Code (Portas → Encaminhar uma porta, no notebook sem administrador) e o do GitHub Codespaces mostram
+// uma página de aviso antes de quem chega pelo navegador; com este cabeçalho, as chamadas do app passam direto por ela
 export const TUNEL_VSCODE = 'X-Tunnel-Skip-AntiPhishing-Page';
 export function cabecalhos(url, chave) {
   const h = {};
   if (chave) h['X-Chave'] = chave;
-  if (/\.devtunnels\.ms(\/|$)/i.test(String(url || ''))) h[TUNEL_VSCODE] = 'true';
+  if (/\.(devtunnels\.ms|app\.github\.dev)(\/|$)/i.test(String(url || ''))) h[TUNEL_VSCODE] = 'true';
   return h;
 }
 

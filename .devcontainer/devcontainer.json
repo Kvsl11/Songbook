@@ -1,0 +1,19 @@
+{
+  // O servidor da IA (servidor-ia/) no GitHub Codespaces: um computador na nuvem do GitHub, aberto pelo navegador,
+  // sem instalar nada no notebook. Na conta pessoal, as horas grátis do mês dão para muitas partituras; parado
+  // 30 minutos, ele desliga sozinho (e não gasta mais). Passo a passo: servidor-ia/README.md → "Na nuvem do GitHub".
+  "name": "Servidor da IA do Songbook",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11-bookworm",
+  // o Demucs (separar a voz) precisa de memória: a máquina de 4 núcleos e 16 GB
+  "hostRequirements": { "cpus": 4, "memory": "16gb" },
+  // a primeira vez instala tudo (uns 10 minutos); depois, cada vez que o Codespace liga, o servidor liga junto
+  "postCreateCommand": "bash .devcontainer/instalar.sh",
+  "postStartCommand": "bash .devcontainer/ligar.sh",
+  "forwardPorts": [7860],
+  "portsAttributes": {
+    "7860": { "label": "Servidor da IA (abra para o QR code)", "onAutoForward": "openBrowser" }
+  },
+  "customizations": {
+    "codespaces": { "openFiles": ["servidor-ia/README.md"] }
+  }
+}

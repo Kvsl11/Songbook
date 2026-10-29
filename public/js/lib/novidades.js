@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 299, data: '2026-10-29', titulo: 'Servidor da partitura na nuvem do GitHub',
+    itens: [
+      { tipo: 'novo', texto: 'O servidor da partitura também roda no GitHub Codespaces: um computador na nuvem, aberto pelo navegador, sem instalar nada no notebook (bom quando o antivírus da empresa bloqueia). A página dele mostra o QR code para ligar o celular.' },
+    ],
+  },
+  {
     versao: 298, data: '2026-10-29', titulo: 'Partitura pelo servidor do seu computador',
     itens: [
       { tipo: 'correcao', texto: 'Gerar a partitura no celular não fica mais parado em “Abrindo o áudio”: se o aparelho não conseguir abrir o arquivo ou carregar a IA em alguns minutos, a tela avisa e diz o que fazer.' },
@@ -64,13 +70,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'A abertura da Busca ficou mais limpa: no lugar do aviso corrido, um cartão “Qualquer música, pronta para tocar”, com o que vem junto (cifra, letra e vídeo) e o “Cole aqui” para cifras de outros sites.' },
       { tipo: 'melhoria', texto: 'Os cartões dos setores ficaram maiores e mais bonitos, com o desenho grande no canto; no tablet, os quatro numa fileira só (o último não fica mais sozinho embaixo).' },
       { tipo: 'melhoria', texto: 'No tablet, as Católicas em alta e as músicas da busca aparecem em duas colunas, e as em alta mostram a posição de cada uma na capa.' },
-    ],
-  },
-  {
-    versao: 289, data: '2026-10-29', titulo: 'Botões sem a sombra atrás',
-    itens: [
-      { tipo: 'melhoria', texto: 'Tocando em qualquer botão do app, não fica mais aquela marca cinza atrás dele mostrando que foi tocado.' },
-      { tipo: 'melhoria', texto: 'Na letra do Tocando agora, a Cifra, o olho (só a letra), a rolagem e o expandir ficam só com o ícone, sem fundo: ligados, brancos e em negrito; desligados, um pouco apagados.' },
     ],
   },
 ];
