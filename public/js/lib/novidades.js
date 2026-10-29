@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 289, data: '2026-10-29', titulo: 'Botões sem a sombra atrás',
+    itens: [
+      { tipo: 'melhoria', texto: 'Tocando em qualquer botão do app, não fica mais aquela marca cinza atrás dele mostrando que foi tocado.' },
+      { tipo: 'melhoria', texto: 'Na letra do Tocando agora, a Cifra, o olho (só a letra), a rolagem e o expandir ficam só com o ícone, sem fundo: ligados, brancos e em negrito; desligados, um pouco apagados.' },
+    ],
+  },
+  {
     versao: 288, data: '2026-10-29', titulo: 'Vídeo que não trava ao trocar de capa e foto do artista do YouTube',
     itens: [
       { tipo: 'correcao', texto: 'No Tocando agora, mudar para a capa animada e voltar para o vídeo não faz mais o vídeo recarregar: antes o YouTube podia pausar com o aviso de que a conta estava sendo usada em outro lugar e o vídeo não tocava mais.' },
@@ -63,12 +70,6 @@ export const NOVIDADES = [
     versao: 280, data: '2026-10-28', titulo: 'Capa animada sem piscar no tablet',
     itens: [
       { tipo: 'correcao', texto: 'No tablet (em pé e deitado), a capa animada do Tocando agora não pisca mais ao rolar: ela fica parada atrás, o conteúdo rola por cima e ela vai sumindo aos poucos, como no Spotify.' },
-    ],
-  },
-  {
-    versao: 279, data: '2026-10-28', titulo: 'Menu do tablet mais limpo',
-    itens: [
-      { tipo: 'correcao', texto: 'No tablet em pé, a aba ativa do menu de baixo não tem mais o fundo cinza em volta: só o ícone preenchido e o nome em branco, como no tablet deitado.' },
     ],
   },
 ];
