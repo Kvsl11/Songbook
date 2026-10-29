@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  chordsOverLyricsToChordPro, isChord, isChordOnlyLine, parteEmIngles, parseChordPro, transposeChord, transposeChordPro, transposeKey,
+  chordsOverLyricsToChordPro, isChord, linhasCantadas, isChordOnlyLine, parteEmIngles, parseChordPro, transposeChord, transposeChordPro, transposeKey,
 } from '../public/js/chordpro.js';
 
 test('reconhece acordes e rejeita palavras', () => {
@@ -92,4 +92,9 @@ test('acordes com extensão depois da barra e linhas com marcas de repetição',
 test('nomes das partes em inglês', () => {
   const casos = { Refrão: 'Chorus', 'Pré-Refrão': 'Pre-Chorus', 'Pre-chorus': 'Pre-Chorus', 'Primeira Parte': 'Verse 1', 'Segunda Parte': 'Verse 2', 'Estrofe 3': 'Verse 3', Ponte: 'Bridge', Final: 'Outro', 'Repetir refrão': 'Repeat Chorus', Introdução: 'Intro', '(só vozes)': '(só vozes)' };
   for (const [pt, en] of Object.entries(casos)) assert.equal(parteEmIngles(pt), en, pt);
+});
+
+test('linhasCantadas: linha só de acordes entre parênteses não é letra', () => {
+  const src = '(He say) Pull over boy\n( Am7(4) )\n( [Am7(4)] )\n[G] (2x)\n( E a vida )';
+  assert.deepEqual(linhasCantadas(src), ['(He say) Pull over boy', '( E a vida )']);
 });

@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 305, data: '2026-10-29', titulo: 'Só a letra na letra sincronizada',
+    itens: [
+      { tipo: 'correcao', texto: 'As linhas que são só acordes, como “( Am7(4) )”, não aparecem mais no meio da letra sincronizada como se fossem cantadas (nem nas sincronias já guardadas).' },
+    ],
+  },
+  {
     versao: 304, data: '2026-10-29', titulo: 'A letra sincroniza assim que a música abre',
     itens: [
       { tipo: 'melhoria', texto: 'Com o servidor no seu computador ou no GitHub ligado, a letra começa a sincronizar assim que você abre a música, sem precisar dar play: o servidor baixa o áudio do vídeo e ouve sozinho. Quando você tocar, ela já está pronta (ou quase).' },
@@ -63,12 +69,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'Na tela “Sobre o artista”, muito mais fotos (até 10): as fotos de divulgação dele e quadros dos vídeos do canal oficial no YouTube.' },
       { tipo: 'melhoria', texto: 'Os números grandes agora mostram os seguidores no Spotify e os inscritos no canal do YouTube, além dos fãs no Deezer (os que houver para o artista).' },
       { tipo: 'correcao', texto: 'O canal oficial de artistas com um complemento no nome (como “Frei Gilson / Som do Monte - OFICIAL”) agora é reconhecido, para a foto e os números.' },
-    ],
-  },
-  {
-    versao: 295, data: '2026-10-29', titulo: 'Sobre o artista, como no Spotify',
-    itens: [
-      { tipo: 'novo', texto: 'No cartão “Sobre o artista” do Tocando agora, o “ver mais” no fim do texto abre a tela do artista: as fotos dele passando para o lado, os fãs e os álbuns, a apresentação inteira e atalhos para as músicas e os álbuns dele, a Wikipédia e o YouTube.' },
     ],
   },
 ];

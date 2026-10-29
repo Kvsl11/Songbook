@@ -1,6 +1,6 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
-import { definirMeta, semInvisiveis, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasCantadas, partesCantadas, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
+import { definirMeta, semInvisiveis, soAcordes, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasCantadas, partesCantadas, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
 import { icon, iconeMenu, logo, logoLumen } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-304';
+export const APP_VERSAO = '2026.10.29-305';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1105,7 +1105,13 @@ const player = (() => {
       if (v.canal) $('.pl-extra-vcanal', el).textContent = v.canal;
     }).catch(() => {});
   };
-  // a letra da música tocando, no painel do tablet: na ordem em que se canta; com a letra sincronizada, a linha
+  // a sincronia sem as linhas que são só acordes (as guardadas antes de elas ficarem de fora da letra cantada)
+const semLinhasDeAcordes = (sinc) => {
+  if (!sinc?.linhas?.length || !sinc.tempos?.length) return sinc;
+  const ficam = sinc.linhas.map((_, i) => i).filter((i) => !soAcordes(sinc.linhas[i]) && sinc.tempos[i]);
+  return ficam.length === sinc.linhas.length ? sinc : { ...sinc, linhas: ficam.map((i) => sinc.linhas[i]), tempos: ficam.map((i) => sinc.tempos[i]) };
+};
+// a letra da música tocando, no painel do tablet: na ordem em que se canta; com a letra sincronizada, a linha
   // cantada acende e o painel rola junto (tocar numa linha leva o vídeo para ela)
   let letraDe = '';
   let tempos = null;
@@ -1120,7 +1126,8 @@ const player = (() => {
     const chave = `${atual?.youtube}|${song?.sincronia?.tempos?.length || 0}|${song?.sincronia?.tempos?.[0]?.inicio}|${song?.content?.length || 0}|${marcando ? 'm' : ''}`;
     if (chave === letraDe) return;
     letraDe = chave;
-    const sinc = !marcando && song?.sincronia?.video === atual?.youtube ? song.sincronia : null;
+    // a sincronia guardada antes de a linha só de acordes ("( Am7(4) )") ficar de fora da letra: ela sai daqui também
+    const sinc = semLinhasDeAcordes(!marcando && song?.sincronia?.video === atual?.youtube ? song.sincronia : null);
     if (sinc?.ajustar && !sincEstado.has(atual.youtube)) { sincEstado.set(atual.youtube, { tipo: 'ajustar' }); mostrarSinc(); }
     // as marcações das partes (Chorus, Bridge, Verse 2…) em cima da linha em que cada uma começa; na letra sincronizada
     // (que pode ter linhas a mais ou a menos que a cifra, e o refrão repetido), cada frase cantada casa com a linha da
