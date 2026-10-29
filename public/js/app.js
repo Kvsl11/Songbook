@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-317';
+export const APP_VERSAO = '2026.10.29-318';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -941,6 +941,7 @@ const player = (() => {
   let tentativasIda = 0;
   // o estado do player do YouTube (1 = tocando), pelo que ele avisa; volta a -1 a cada vídeo novo
   let estadoYt = -1;
+  const duracoes = new Map(); // a duração de cada vídeo já tocado (o áudio oficial e o clipe), para a troca entre eles
   let duracao = 0;
   // na página da própria música o vídeo toca lá (na telinha das Referências); fora dela, no mini player
   let palco = null;
@@ -1787,7 +1788,11 @@ const semLinhasDeAcordes = (sinc) => {
     atual = { ...atual, youtube: id };
     tempo = Math.max(0, t);
     marcaTempo = performance.now();
-    duracao = 0;
+    // a barra já vai direto para o ponto certo da outra versão: a duração dela, se já se sabe (a desta vez, a das
+    // versões ou a da música); sem saber, fica a de antes até o vídeo dizer. Antes ela zerava, e a barra voltava ao
+    // começo e depois pulava para o ponto (parecia travada)
+    const vs = atual.songId && versoesDe(atual.songId === 'previa' ? preview : db.song(atual.songId));
+    duracao = duracoes.get(id) || (vs && id === vs.audio && vs.duracao) || (id !== atual.audio && db.song(atual.songId || '')?.duracao) || duracao;
     tentativasIda = 0;
     const tocando = estado === 'tocando';
     const l = localDe(id);
@@ -2109,9 +2114,12 @@ const semLinhasDeAcordes = (sinc) => {
         else { pendente = null; tentativasIda = 0; }
       }
       if (usarTempo) { tempo = info.currentTime; marcaTempo = performance.now(); }
-      if (typeof info.duration === 'number' && info.duration > 0 && Math.round(info.duration) !== Math.round(duracao)) {
-        duracao = info.duration;
-        guardarDuracao(atual?.youtube, duracao);
+      if (typeof info.duration === 'number' && info.duration > 0 && !outroVideo) {
+        duracoes.set(atual.youtube, info.duration);
+        if (Math.round(info.duration) !== Math.round(duracao)) {
+          duracao = info.duration;
+          guardarDuracao(atual?.youtube, duracao);
+        }
       }
       const antes = estado;
       if (info.playerState === 1) estado = 'tocando';
@@ -7899,6 +7907,8 @@ function viewSong(id, ctx = {}) {
   // está pronta (ou quase). Uma vez por vídeo enquanto o app está aberto; o resultado fica guardado na música.
   // No servidor da nuvem (Modal) não: cada abertura gastava o crédito grátis; lá sincroniza pelo play ou pelo ⋯
   servidorCarregado.then(() => {
+    // a música com o áudio oficial e o clipe ainda não casados pelo som: o servidor casa, para a troca cair no ponto certo
+    if (sincPelaIA() && view.contains(songEl)) acertarVersoes(song);
     if (sincPelaIA() && precisaConferirVersoes(song) && view.contains(songEl)) { conferirVersoes(song, statusSinc).then(() => { mapa = null; }); return; }
     if (!sincPelaIA() || !midiaDe(song) || sincronia() || tentouSincronizar.has(midiaDe(song)) || !view.contains(songEl)) return;
     tentouSincronizar.add(midiaDe(song));
@@ -9958,7 +9968,7 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
     const durClipe = (player.atual?.youtube === song.youtube && player.duracao) || await duracaoDaMusica(song).catch(() => 0);
     guardarVersoes(song, { video: song.youtube, audio: achado.id, duracao: achado.segundos, pares: doClipe || paresPelaDuracao(durClipe, achado.segundos) });
     yt = achado.id;
-    if (!doClipe && pelaIA) acertarClipe(song, lrc);
+    if (pelaIA) acertarVersoes(song, doClipe ? null : lrc);
     return { ...lrc, ajustar: false };
   };
   const peloLrclib = async () => { const lrc = await comAudio(await buscarLrc()); return lrc ? usarLrc(lrc) : null; };
@@ -10059,6 +10069,22 @@ function guardarVersoes(song, versoes) {
   song.versoes = versoes;
   if (song.id === 'previa') { if (preview) preview.versoes = versoes; } else if (db.song(song.id)) db.updateSong(song.id, { versoes });
   player.versoes(song);
+}
+// com a IA do servidor, em segundo plano: ela ouve o áudio oficial e o clipe e casa os dois pelo próprio som (como o
+// YouTube Music), ponto a ponto: a troca entre a música e o vídeo cai no mesmo ponto, com cena antes, no meio ou no fim
+// do clipe. Sem dar certo (não parecem a mesma gravação), fica a estimativa pela letra (lrc) ou pela duração
+const casandoVersoes = new Set();
+async function acertarVersoes(song, lrc = null) {
+  const vs = versoesDe(song);
+  if (!vs?.audio || !vs.video || vs.casadas || ehArquivo(vs.audio) || casandoVersoes.has(vs.video) || !sincPelaIA()) return;
+  casandoVersoes.add(vs.video);
+  try {
+    const r = await chamarComEtapas(servidorIA(), '/versoes', { json: { audio: vs.audio, video: vs.video } }, () => {});
+    const agora = song.id === 'previa' ? preview : db.song(song.id);
+    if (r?.pares?.length && agora && versoesDe(agora)?.video === vs.video) guardarVersoes(agora, { ...versoesDe(agora), pares: r.pares, casadas: true });
+  } catch {
+    if (lrc) acertarClipe(song, lrc);
+  } finally { casandoVersoes.delete(vs.video); }
 }
 // com a IA do servidor, em segundo plano: ela ouve o clipe e diz onde cada linha da letra está nele; a troca entre o
 // áudio e o clipe passa a cair no mesmo ponto cantado, trecho por trecho (mesmo com uma cena no meio do clipe)
