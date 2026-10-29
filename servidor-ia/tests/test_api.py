@@ -73,3 +73,49 @@ def test_letra_de_novo_nao_devolve_a_guardada_e_ouve_com_o_whisper_preciso(monke
     c.post("/letra", json=corpo)  # a mesma: a guardada
     c.post("/letra", json={**corpo, "refazer": True})
     assert pedidos == [False, True]
+
+
+def test_tarefa_devolve_o_numero_na_hora_e_o_app_acompanha(monkeypatch):
+    import threading
+    import time
+
+    solta = threading.Event()
+
+    def falso(caminho, separar_voz, etapa):
+        etapa("separando")
+        solta.wait(5)
+        etapa("notas")
+        return {"notas": [1]}
+    monkeypatch.setattr(transcricao, "transcrever", falso)
+    c = TestClient(app.app)
+    r = c.post("/transcrever?tarefa=1", files={"arquivo": ("a.wav", b"RIFF", "audio/wav")}).json()
+    tid = r["tarefa"]
+    for _ in range(50):
+        if c.get(f"/tarefa/{tid}").json()["etapa"] == "separando":
+            break
+        time.sleep(0.02)
+    assert c.get(f"/tarefa/{tid}").json() == {"etapa": "separando"}
+    solta.set()
+    for _ in range(100):
+        estado = c.get(f"/tarefa/{tid}").json()
+        if "resultado" in estado:
+            break
+        time.sleep(0.02)
+    assert estado == {"etapa": "notas", "resultado": {"notas": [1]}}
+    assert c.get("/tarefa/nao-existe").status_code == 404
+
+
+def test_tarefa_com_erro_devolve_a_mensagem_e_o_status(monkeypatch):
+    import time
+
+    def falso(caminho, separar_voz, etapa):
+        raise ValueError("sem notas")
+    monkeypatch.setattr(transcricao, "transcrever", falso)
+    c = TestClient(app.app)
+    tid = c.post("/transcrever?tarefa=1", files={"arquivo": ("a.wav", b"RIFF", "audio/wav")}).json()["tarefa"]
+    for _ in range(100):
+        estado = c.get(f"/tarefa/{tid}").json()
+        if "erro" in estado:
+            break
+        time.sleep(0.02)
+    assert estado["erro"] == "sem notas" and estado["status"] == 422
