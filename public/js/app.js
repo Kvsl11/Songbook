@@ -789,6 +789,10 @@ const player = (() => {
   // html.pp: o player com o jeito do "Tocando agora" (o painel do tablet; no celular e no computador, só na tela toda)
   document.documentElement.classList.toggle('pp', ehTablet());
   casa.append(el);
+  // na letra na tela toda, numa música de repertório ou playlist: setas dos lados (no computador) para ir à música
+  // anterior ou à próxima, com a letra dela; no celular e no tablet, é só passar o dedo para o lado
+  $('.pl-letra', el).insertAdjacentHTML('beforeend', `<button class="pl-letra-seta ant" data-pl="anterior-letra" aria-label="Música anterior" title="Música anterior (←)">${icon('back', 26)}</button>
+    <button class="pl-letra-seta prox" data-pl="proxima" aria-label="Próxima música" title="Próxima música (→)">${icon('next', 26)}</button>`);
   // O vídeo é UM só e nunca é recriado (recriar pausa e repete o anúncio): ele fica numa "tela"
   // solta e só muda de lugar, acompanhando a telinha da página da música ou o espaço do mini player.
   const tela = document.createElement('div');
@@ -945,7 +949,8 @@ const player = (() => {
     $('[data-pl="aleatorio"]', el).disabled = !f;
     desenharCapa();
     $('[data-pl="anterior"]', el).disabled = !f || (anteriorIndice() < 0 && tempo < 3);
-    $('[data-pl="proxima"]', el).disabled = !f || proximoIndice() < 0;
+    el.querySelectorAll('[data-pl="proxima"]').forEach((x) => { x.disabled = !f || proximoIndice() < 0; });
+    $('[data-pl="anterior-letra"]', el).disabled = !f || anteriorIndice() < 0;
     desenharModos();
     el.querySelectorAll('.pl-t0').forEach((t) => { t.textContent = duracao ? fmt(arrasto ? arrasto.fracao * duracao : tempo) : ''; });
     el.querySelectorAll('.pl-t1').forEach((t) => { t.textContent = duracao ? fmt(duracao) : ''; });
@@ -1909,6 +1914,34 @@ const player = (() => {
     painelCheio(false);
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('painel-cheio') && !document.querySelector('dialog[open]')) painelCheio(false); });
+  // a letra na tela toda numa música de repertório ou playlist: passar o dedo para o lado (ou as setas do teclado)
+  // leva à próxima música (para a esquerda) ou à anterior (para a direita), já com a letra dela, como num songbook
+  const letraDoRepertorio = () => el.classList.contains('letra-cheia') && Boolean(fila()) && !marcando;
+  const pularNaLetra = (lado) => {
+    if (!letraDoRepertorio() || !pular(lado)) return;
+    $('.pl-linhas', el).scrollTop = 0;
+    $('.pl-cifra', el)?.scrollTo?.(0, 0);
+  };
+  let toque = null;
+  $('.pl-letra', el).addEventListener('touchstart', (e) => {
+    toque = letraDoRepertorio() && e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() } : null;
+  }, { passive: true });
+  $('.pl-letra', el).addEventListener('touchend', (e) => {
+    if (!toque) return;
+    const dx = e.changedTouches[0].clientX - toque.x;
+    const dy = e.changedTouches[0].clientY - toque.y;
+    const rapido = Date.now() - toque.t < 800;
+    toque = null;
+    // um gesto de lado de verdade (não a rolagem da letra, nem um toque)
+    if (rapido && Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 2) pularNaLetra(dx < 0 ? 1 : -1);
+  }, { passive: true });
+  document.addEventListener('keydown', (e) => {
+    if (!/^Arrow(Left|Right)$/.test(e.key) || e.altKey || e.ctrlKey || e.metaKey || document.querySelector('dialog[open]')) return;
+    if (e.target.closest?.('input, textarea, select, [contenteditable="true"], .pl-prog')) return;
+    if (!letraDoRepertorio()) return;
+    e.preventDefault();
+    pularNaLetra(e.key === 'ArrowRight' ? 1 : -1);
+  });
   el.addEventListener('click', (e) => {
     if (e.target.closest('.pl-prog')) return; // a barra do tempo é tratada no toque (abaixo): tocar ou arrastar
     const b = e.target.closest('[data-pl]');
@@ -1982,6 +2015,7 @@ const player = (() => {
     }
     if (b.dataset.pl === 'add-repertorio' && atual?.songId && db.song(atual.songId)) addToSetDialog(atual.songId, atual.parte || '');
     if (b.dataset.pl === 'proxima') pular(1);
+    if (b.dataset.pl === 'anterior-letra') pular(-1); // (na letra, a seta sempre vai à música anterior, sem voltar ao início)
     if (b.dataset.pl === 'troca') { comCapa = !comCapa; db.setPref('playerCapa', comCapa); desenharCapa(); }
     if (b.dataset.pl === 'compartilhar' && atual) compartilhar({ title: atual.titulo || 'Vídeo', text: [atual.titulo, atual.artista].filter(Boolean).join(' — '), ...(atual.youtube ? { url: `https://www.youtube.com/watch?v=${atual.youtube}` } : {}) });
     if (b.dataset.pl === 'compartilhar-letra' && atual) compartilhar({ title: atual.titulo || 'Letra', text: `${[atual.titulo, atual.artista].filter(Boolean).join(' — ')}\n\n${linhasDaLetra.join('\n')}` });
@@ -7244,7 +7278,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'PageDown') { view.scrollBy({ top: view.clientHeight * 0.8, behavior: 'smooth' }); e.preventDefault(); }
   if (e.key === 'PageUp') { view.scrollBy({ top: -view.clientHeight * 0.8, behavior: 'smooth' }); e.preventDefault(); }
   if (e.key === 'Escape') sairPalco();
-  keyHandler?.(e);
+  if (!e.defaultPrevented) keyHandler?.(e); // (as setas já usadas pela letra na tela toda do player)
 });
 
 // navegando: saiu da página (não volta para o Tocando agora); sem isso, a pessoa fechou a letra na tela toda

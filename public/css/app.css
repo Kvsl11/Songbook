@@ -3143,6 +3143,17 @@ html.pp #player.letra-cheia .pl-letra { position: fixed; inset: 0; z-index: 60; 
   padding: calc(8px + env(safe-area-inset-top)) max(20px, calc((100% - 760px) / 2)) calc(18px + env(safe-area-inset-bottom));
   background: linear-gradient(180deg, color-mix(in srgb, var(--cor-musica, var(--tint)) 80%, #000) 0%, color-mix(in srgb, var(--cor-musica, var(--tint)) 70%, #000) 100%);
   animation: subir-tela 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+/* letra na tela toda numa música de repertório ou playlist: setas dos lados para a anterior e a próxima (no computador;
+   no celular e no tablet, passar o dedo para o lado) */
+#player .pl-letra-seta { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  html.pp #player.letra-cheia.com-fila .pl-letra-seta { display: grid; place-items: center; position: absolute; z-index: 3; top: 50%; width: 52px; height: 52px;
+    margin-top: -26px; padding: 0; border: 0; border-radius: 50%; color: #fff; background: rgb(0 0 0 / 0.28); cursor: pointer; transition: background 0.15s, opacity 0.15s; }
+  html.pp #player.letra-cheia.com-fila .pl-letra-seta:hover { background: rgb(0 0 0 / 0.45); }
+  html.pp #player.letra-cheia.com-fila .pl-letra-seta:disabled { opacity: 0; pointer-events: none; }
+  html.pp #player.letra-cheia.com-fila .pl-letra-seta.ant { left: 16px; }
+  html.pp #player.letra-cheia.com-fila .pl-letra-seta.prox { right: 16px; }
+}
 body.com-letra-cheia .nav { display: none; }
 html.pp #player.letra-cheia .pl-letra-cab { display: none; }
 html.pp #player.letra-cheia .pl-letra-topo { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; align-items: center; min-height: 56px; margin: 0 -8px 4px; }
