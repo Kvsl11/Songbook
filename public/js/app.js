@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-292';
+export const APP_VERSAO = '2026.10.29-293';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -940,8 +940,9 @@ const player = (() => {
     $('.pl-txt b', el).textContent = atual.titulo || 'Vídeo';
     $('.pl-fixo b', el).textContent = atual.titulo || 'Vídeo';
     $('.pl-fixo small', el).textContent = atual.artista || '';
-    // o tempo vai junto do artista no celular; no computador ele fica na barra de tempo, no centro
-    $('.pl-txt small', el).innerHTML = esc([atual.parte, atual.artista].filter(Boolean).join(' · ')) + (duracao ? `<span class="pl-tmini">${atual.parte || atual.artista ? ' · ' : ''}${fmt(tempo)} / ${fmt(duracao)}</span>` : '');
+    // só o artista (e a parte da missa): o tempo fica na barra de tempo (no celular ele ia junto do artista e cortava o
+    // nome, "3:17 / 3:…"; a barrinha de progresso embaixo já mostra quanto falta)
+    $('.pl-txt small', el).textContent = [atual.parte, atual.artista].filter(Boolean).join(' · ');
     // música sem vídeo: o play é o de sempre; tocando nele (ou na pílula "Escolher um vídeo"), escolhe um vídeo do YouTube
     el.querySelectorAll('.pl-play').forEach((b) => { b.innerHTML = icon(estado === 'tocando' && !atual.semVideo ? 'pause' : 'play', 20); b.title = atual.semVideo ? 'Escolher um vídeo para tocar' : ''; });
     // a bolinha de salva (na barrinha recolhida do tablet): ✓ se a música está na biblioteca, + se não
