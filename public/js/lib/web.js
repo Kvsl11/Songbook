@@ -585,35 +585,73 @@ export async function duracaoDoVideo(id, { fetchImpl, instancias = PIPED } = {})
   return 0;
 }
 
-// a foto do artista pelo canal dele no YouTube (a mais atual). Só um canal que é com certeza do artista: o "Tópico"
-// que o próprio YouTube cria para ele ("Nome - Topic", sem outro com o mesmo nome) ou um canal verificado com o nome
-// dele (aceita "Oficial"/"VEVO" no fim). Nunca o canal de quem postou o vídeo, que pode ser de outra pessoa, nem um
-// "Fulano Oficial" sem o selo (costuma ser de fã). '' quando não acha um assim
-const nomeDoCanal = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+// o canal do artista no YouTube: a foto (a mais atual), o código do canal e os inscritos. Só um canal que é com certeza
+// do artista: o "Tópico" que o próprio YouTube cria para ele ("Nome - Topic", sem outro com o mesmo nome) ou um canal
+// verificado com o nome dele (aceita "Oficial"/"VEVO" no fim, e um complemento depois de " / ", " - " ou " | ", como
+// "Frei Gilson / Som do Monte - OFICIAL"). Nunca o canal de quem postou o vídeo, que pode ser de outra pessoa, nem um
+// "Fulano Oficial" sem o selo (costuma ser de fã). null quando não acha um assim
+const nomeDoCanal = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   .replace(/[^a-z0-9 ]+/g, ' ').replace(/\b(oficial|official|vevo)\b/g, ' ').replace(/\s+/g, '').trim();
-export function fotoDosCanais(json, nome) {
+export function canalDosResultados(json, nome) {
   const quem = nomeDoCanal(nome);
-  if (!quem) return '';
+  if (!quem) return null;
   const canais = (json?.items || []).filter((c) => c.type === 'channel' && c.thumbnail);
   const topicos = canais.filter((c) => / - Topic$/.test(c.name || '') && nomeDoCanal(c.name.replace(/ - Topic$/, '')) === quem);
-  const verificado = canais.find((c) => c.verified && !/ - Topic$/.test(c.name || '') && nomeDoCanal(c.name) === quem);
+  const verificados = canais.filter((c) => c.verified && !/ - Topic$/.test(c.name || ''));
+  const verificado = verificados.find((c) => nomeDoCanal(c.name) === quem)
+    || verificados.find((c) => nomeDoCanal(String(c.name).split(/\s+[/|–—-]\s+/)[0]) === quem);
   const c = verificado || (topicos.length === 1 ? topicos[0] : null);
-  if (!c) return '';
+  if (!c) return null;
   // a foto vem pelo proxy da instância (…?host=yt3.ggpht.com): direto do YouTube, maior
   let url = c.thumbnail;
-  try { const u = new URL(url); const host = u.searchParams.get('host'); if (host && /(^|\.)(ggpht|googleusercontent)\.com$/.test(host)) url = `https://${host}${u.pathname}`; } catch { return ''; }
+  try { const u = new URL(url); const host = u.searchParams.get('host'); if (host && /(^|\.)(ggpht|googleusercontent)\.com$/.test(host)) url = `https://${host}${u.pathname}`; } catch { return null; }
   if (url.startsWith('//')) url = 'https:' + url;
-  return /^https:/.test(url) ? url.replace(/=s\d+-/, '=s480-') : '';
+  const id = /\/channel\/([\w-]+)/.exec(c.url || '')?.[1] || '';
+  return { foto: /^https:/.test(url) ? url.replace(/=s\d+-/, '=s480-') : '', id, nome: c.name, inscritos: c.subscribers > 0 && c === verificado ? c.subscribers : 0 };
 }
-export async function fotoDoCanal(nome, { fetchImpl, instancias = PIPED } = {}) {
+export const fotoDosCanais = (json, nome) => canalDosResultados(json, nome)?.foto || '';
+export async function canalDoArtista(nome, { fetchImpl, instancias = PIPED } = {}) {
   const q = String(nome || '').trim();
-  if (!q) return '';
+  if (!q) return null;
   const uma = async (base) => {
     const res = await buscar(`${base}/search?filter=channels&q=${encodeURIComponent(q)}`, { fetchImpl, timeout: 8000 });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return fotoDosCanais(await res.json(), q);
+    return canalDosResultados(await res.json(), q);
   };
-  return Promise.any(instancias.map(uma)).catch(() => '');
+  return Promise.any(instancias.map(uma)).catch(() => null);
+}
+export const fotoDoCanal = (nome, opcoes) => canalDoArtista(nome, opcoes).then((c) => c?.foto || '');
+// quadros dos vídeos do próprio canal do artista (só os postados por ele): mais fotos dele cantando, para a tela
+// "Sobre o artista". hq720 = 1280x720 sem as faixas pretas
+export async function fotosDosVideos(nome, canal, { fetchImpl, instancias = PIPED, quantas = 6 } = {}) {
+  if (!canal) return [];
+  const uma = async (base) => {
+    const res = await buscar(`${base}/search?filter=videos&q=${encodeURIComponent(nome)}`, { fetchImpl, timeout: 10000 });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const ids = ((await res.json())?.items || []).filter((v) => v.type === 'stream' && (v.uploaderUrl || '').endsWith(`/channel/${canal}`))
+      .map((v) => /[?&]v=([\w-]{11})/.exec(v.url || '')?.[1]).filter(Boolean);
+    if (!ids.length) throw new Error('nenhum vídeo do canal');
+    return [...new Set(ids)].slice(0, quantas).map((id) => `https://i.ytimg.com/vi/${id}/hq720.jpg`);
+  };
+  return Promise.any(instancias.map(uma)).catch(() => []);
+}
+// o artista na TheAudioDB (chave pública de teste "123"): os seguidores e a popularidade dele no Spotify, várias fotos
+// (a principal e as de fundo) e a biografia em português. Só vale o artista com o mesmo nome. null quando não acha
+export function artistaDaAudioDb(json, nome) {
+  const quem = nomeDoCanal(nome);
+  const a = (json?.artists || []).find((x) => nomeDoCanal(x.strArtist) === quem);
+  if (!a) return null;
+  const fotos = ['strArtistThumb', 'strArtistFanart', 'strArtistFanart2', 'strArtistFanart3', 'strArtistFanart4', 'strArtistWideThumb']
+    .map((k) => a[k]).filter((u) => /^https?:\/\//.test(u || '')).map((u) => u.replace(/^http:/, 'https:'));
+  return { seguidores: Number(a.intFollowers) || 0, fotos, bio: String(a.strBiographyPT || '').trim(), genero: a.strGenre || a.strStyle || '' };
+}
+export async function audioDbDoArtista(nome, fetchImpl) {
+  const q = String(nome || '').trim();
+  if (!q) return null;
+  try {
+    const res = await buscar(`https://www.theaudiodb.com/api/v1/json/123/search.php?s=${encodeURIComponent(q)}`, { fetchImpl, timeout: 10000 });
+    return res.ok ? artistaDaAudioDb(await res.json(), q) : null;
+  } catch { return null; }
 }
 
 export async function youtubeOEmbed(url, fetchImpl) {

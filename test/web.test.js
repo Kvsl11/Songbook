@@ -406,3 +406,24 @@ test('fotoDosCanais: canal verificado ou Tópico do artista, nunca o de fã', as
   assert.equal(fotoDosCanais({ items: [canal('Padre Marcelo Rossi Oficial', false, 'fa'), canal('Músicas do Padre Marcelo Rossi', true, 'm')] }, 'Padre Marcelo Rossi'), '');
   assert.equal(fotoDosCanais({ items: [canal('Justice - Topic', false, 'a'), canal('Justice - Topic', false, 'b')] }, 'Justice'), '');
 });
+
+// o canal oficial com um complemento no nome ("Frei Gilson / Som do Monte - OFICIAL") vale, se for verificado
+test('canalDosResultados: canal verificado com complemento no nome, com os inscritos', async () => {
+  const { canalDosResultados } = await import('../public/js/lib/web.js');
+  const foto = 'https://proxy.exemplo/fg=s176-c-k?host=yt3.ggpht.com';
+  const json = { items: [
+    { type: 'channel', name: 'Frei Gilson / Som do Monte - OFICIAL', verified: true, subscribers: 10200000, url: '/channel/UCbh6', thumbnail: foto },
+    { type: 'channel', name: 'Frei Gilson Frede', verified: false, subscribers: 115, url: '/channel/UCx', thumbnail: foto },
+  ] };
+  assert.deepEqual(canalDosResultados(json, 'Frei Gilson'), { foto: 'https://yt3.ggpht.com/fg=s480-c-k', id: 'UCbh6', nome: 'Frei Gilson / Som do Monte - OFICIAL', inscritos: 10200000 });
+  // sem o selo, o mesmo nome com complemento não vale (pode ser de fã)
+  json.items[0].verified = false;
+  assert.equal(canalDosResultados(json, 'Frei Gilson'), null);
+});
+
+test('artistaDaAudioDb: os seguidores no Spotify, as fotos e a biografia, só do artista com o mesmo nome', async () => {
+  const { artistaDaAudioDb } = await import('../public/js/lib/web.js');
+  const json = { artists: [{ strArtist: 'Aline Barros', intFollowers: '5724931', strArtistThumb: 'https://r2.theaudiodb.com/a.jpg', strArtistFanart: 'http://r2.theaudiodb.com/b.jpg', strArtistFanart2: null, strArtistLogo: 'https://r2.theaudiodb.com/logo.png', strBiographyPT: 'Cantora.' }] };
+  assert.deepEqual(artistaDaAudioDb(json, 'Aline Barros'), { seguidores: 5724931, fotos: ['https://r2.theaudiodb.com/a.jpg', 'https://r2.theaudiodb.com/b.jpg'], bio: 'Cantora.', genero: '' });
+  assert.equal(artistaDaAudioDb(json, 'Aline'), null);
+});

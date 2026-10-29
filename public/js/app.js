@@ -21,7 +21,7 @@ import { partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { NOVIDADES, novidadesNaoVistas } from './lib/novidades.js';
 import { baseDoServidor, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, dataDaPergunta, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
-import { buscarYoutube, duracaoDoVideo, fotoDoCanal, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { audioDbDoArtista, buscarYoutube, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-295';
+export const APP_VERSAO = '2026.10.29-296';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1089,10 +1089,13 @@ const player = (() => {
     }).catch(() => {});
     // a breve apresentação do artista embaixo do nome (3 linhas; tocando, abre o texto inteiro)
     // (em 3 linhas, com o "ver mais" no fim, como no Spotify: abre a tela "Sobre o artista", com o texto inteiro)
-    if (principal) descricaoDoArtista(principal).then((info) => {
+    // (sem a da Wikipédia, a biografia da TheAudioDB; sem nenhuma, só o "ver mais", que abre as fotos e os números)
+    if (principal) Promise.all([descricaoDoArtista(principal), audioDbDoArtista(principal).catch(() => null)]).then(([info, adb]) => {
       const bio = $('.pl-extra .pl-artista-bio', el);
-      if (!info?.texto || !bio || extraDe !== chave) return;
-      $('p', bio).textContent = info.texto.replace(/\n/g, ' ');
+      if (!bio || extraDe !== chave) return;
+      const texto = (info?.texto || adb?.bio || '').replace(/\s*\n+\s*/g, ' ');
+      $('p', bio).textContent = texto;
+      bio.classList.toggle('so-mais', !texto);
       bio.hidden = false;
       bio.onclick = (e) => { e.stopPropagation(); abrirSobreArtista({ nome: principal, slug }); };
     }).catch(() => {});
@@ -3666,23 +3669,37 @@ async function abrirSobreArtista({ nome, slug = '' }) {
   const fechar = () => { tela.classList.add('saindo'); setTimeout(() => tela.remove(), 180); };
   window.addEventListener('popstate', fechar, { once: true });
   tela.querySelector('[data-sa="voltar"]').onclick = () => history.back();
-  const [info, dz, foto, canal] = await Promise.all([descricaoDoArtista(nome), deezerDoArtista(nome), fotoDoArtista(nome, slug).catch(() => ''), fotoDoCanal(nome).catch(() => '')]);
+  const [info, dz, foto, canal, adb] = await Promise.all([descricaoDoArtista(nome), deezerDoArtista(nome), fotoDoArtista(nome, slug).catch(() => ''),
+    canalDoArtista(nome).catch(() => null), audioDbDoArtista(nome).catch(() => null)]);
   if (!tela.isConnected) return;
-  // as fotos (sem repetir): a do cartão, a do canal do YouTube, a do Deezer e a da Wikipédia
-  const fotos = [...new Set([foto, canal, dz?.foto, info?.foto].filter(Boolean))];
-  tela.querySelector('.sa-fotos').innerHTML = fotos.length ? fotos.map((u) => `<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()">`).join('')
-    : `<div class="sa-sem-foto">${esc(iniciaisDe(nome))}</div>`;
-  const numeros = tela.querySelector('.sa-numeros');
-  if (dz?.fas) {
-    numeros.hidden = false;
-    numeros.innerHTML = `<div><b>${dz.fas.toLocaleString('pt-BR')}</b><small>fãs no Deezer</small></div>${dz.albuns ? `<div><b>${dz.albuns.toLocaleString('pt-BR')}</b><small>${dz.albuns === 1 ? 'álbum' : 'álbuns e singles'}</small></div>` : ''}`;
-  }
-  tela.querySelector('.sa-texto').innerHTML = info?.texto ? info.texto.split('\n').map((p) => `<p>${esc(p)}</p>`).join('')
+  // as fotos (sem repetir): a do cartão, a do canal do YouTube, as da TheAudioDB (a principal e as de fundo), a do
+  // Deezer e a da Wikipédia; depois chegam os quadros dos vídeos do próprio canal dele (até 10 ao todo)
+  const vistas = new Set();
+  const caixaFotos = tela.querySelector('.sa-fotos');
+  const porFotos = (lista) => {
+    const novas = [];
+    for (const u of lista) if (u && !vistas.has(u) && vistas.size < 10) { vistas.add(u); novas.push(u); }
+    caixaFotos.querySelector('.sa-sem-foto')?.remove();
+    // (a que não abrir ou vier minúscula, a imagem cinza de "sem foto" do YouTube, sai)
+    caixaFotos.insertAdjacentHTML('beforeend', novas.map((u) => `<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()" onload="if (this.naturalWidth < 200) this.remove()">`).join(''));
+  };
+  porFotos([foto, canal?.foto, ...(adb?.fotos || []), dz?.foto, info?.foto]);
+  if (!vistas.size) caixaFotos.innerHTML = `<div class="sa-sem-foto">${esc(iniciaisDe(nome))}</div>`;
+  if (canal?.id) fotosDosVideos(nome, canal.id).then((l) => { if (tela.isConnected) porFotos(l); });
+  // os números grandes (como os ouvintes do Spotify): os seguidores no Spotify (pela TheAudioDB), os inscritos no
+  // canal do YouTube e os fãs no Deezer, os que houver
+  const num = (n, rotulo) => `<div><b>${n.toLocaleString('pt-BR')}</b><small>${rotulo}</small></div>`;
+  const numeros = [adb?.seguidores && num(adb.seguidores, 'seguidores no Spotify'), canal?.inscritos && num(canal.inscritos, 'inscritos no YouTube'),
+    dz?.fas && num(dz.fas, 'fãs no Deezer')].filter(Boolean);
+  if (numeros.length) { const caixa = tela.querySelector('.sa-numeros'); caixa.hidden = false; caixa.innerHTML = numeros.join(''); }
+  // a apresentação: a da Wikipédia ou, sem ela, a biografia em português da TheAudioDB
+  const texto = info?.texto || adb?.bio || '';
+  tela.querySelector('.sa-texto').innerHTML = texto ? texto.split(/\n+/).map((p) => p.trim()).filter(Boolean).map((p) => `<p>${esc(p)}</p>`).join('')
     : '<p class="muted">Ainda não há uma apresentação deste artista.</p>';
   const links = [
     slug && `<a href="#/artista/${encodeURIComponent(slug)}/${encodeURIComponent(nome)}">${icon('music', 20)}<span>Músicas e álbuns</span>${icon('next', 18)}</a>`,
     info?.url && `<a href="${esc(info.url)}" target="_blank" rel="noopener">${icon('book', 20)}<span>Wikipédia</span>${icon('next', 18)}</a>`,
-    `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(nome)}" target="_blank" rel="noopener">${icon('youtube', 20)}<span>YouTube</span>${icon('next', 18)}</a>`,
+    `<a href="${canal?.id ? `https://www.youtube.com/channel/${esc(canal.id)}` : `https://www.youtube.com/results?search_query=${encodeURIComponent(nome)}`}" target="_blank" rel="noopener">${icon('youtube', 20)}<span>YouTube</span>${icon('next', 18)}</a>`,
   ].filter(Boolean);
   tela.querySelector('.sa-links').innerHTML = links.join('');
   // a página do artista no app: fecha esta tela (e o Tocando agora) antes de ir
