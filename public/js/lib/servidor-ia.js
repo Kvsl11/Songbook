@@ -160,17 +160,57 @@ export function linhaNoTempo(tempos, t) {
 }
 
 // liga as linhas cantadas (com repetições do refrão) às linhas da letra na tela: para cada linha cantada, a linha da
-// tela com o mesmo texto, a próxima depois da anterior (o refrão repetido volta para o refrão escrito)
+// tela com o mesmo texto, a próxima depois da anterior (o refrão repetido volta para o refrão escrito).
+// A letra sincronizada (LRCLIB) e a cifra (Cifra Club) vêm de lugares diferentes e quase nunca são iguais letra por
+// letra: "pra"/"para", um "oh" a mais, "(2x)", uma linha da cifra quebrada em duas na letra sincronizada (ou duas da
+// cifra numa só). Antes só valia o texto idêntico, e muitas linhas não acendiam. Agora vale a linha mais parecida
+// (pelas palavras em comum), perto de onde a música está; sem nenhuma parecida o bastante, a linha fica sem par
+const INTERJEICOES = new Set(['oh', 'o', 'ooh', 'oo', 'uh', 'uoh', 'woh', 'wo', 'ah', 'aah', 'eh', 'ei', 'hey', 'ie', 'yeah', 'ye', 'la', 'lala', 'na', 'nana', 'hum', 'hmm', 'u', 'a']);
+const TROCAS = { pra: 'para', pro: 'para', pros: 'para', pras: 'para', ta: 'esta', to: 'estou', ce: 'voce', vc: 'voce', q: 'que' };
+export function palavrasDaLinha(s) {
+  return linhaSemCifra(s).replace(/\(\s*\d+\s*x\s*\)|\b\d+\s*x\b|\bbis\b/gi, ' ')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+    .split(' ').filter(Boolean).map((w) => TROCAS[w] || w).filter((w) => !INTERJEICOES.has(w));
+}
+// o quanto duas linhas se parecem (0 a 1): as palavras em comum, e também quando uma está inteira dentro da outra (a
+// linha quebrada em duas ou duas juntadas numa)
+export function parecenca(a, b) {
+  if (!a.length || !b.length) return 0;
+  const resto = new Map();
+  for (const w of b) resto.set(w, (resto.get(w) || 0) + 1);
+  let comuns = 0;
+  for (const w of a) { const n = resto.get(w); if (n) { comuns++; resto.set(w, n - 1); } }
+  const dice = (2 * comuns) / (a.length + b.length);
+  // (uma dentro da outra só vale com pelo menos 3 palavras, quase todas em comum: "Senhor" sozinho está dentro de
+  // muita linha, e "O máximo que você consegue" não é "Que seja você")
+  const cobre = comuns / Math.min(a.length, b.length);
+  const dentro = Math.min(a.length, b.length) >= 3 && cobre >= 0.8 ? cobre * 0.9 : 0;
+  return Math.max(dice, dentro);
+}
 export function casarLinhas(cantadas, naTela) {
-  const norm = (s) => linhaSemCifra(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  const tela = naTela.map(norm);
-  let pos = 0;
+  const tela = naTela.map(palavrasDaLinha);
+  let ultima = -1; // a linha da tela da frase anterior
   return cantadas.map((l) => {
-    const n = norm(l);
-    if (!n) return -1;
-    let k = tela.indexOf(n, pos);
-    if (k < 0) k = tela.indexOf(n);
-    if (k >= 0) pos = k + 1;
-    return k;
+    const p = palavrasDaLinha(l);
+    if (!p.length) return -1;
+    // 1º: perto de onde a música está (a próxima linha, ou poucas adiante; a mesma, quando a frase é a 2ª metade de
+    // uma linha da cifra), um pouco menos a cada linha pulada
+    let melhor = -1;
+    let nota = 0;
+    for (let k = Math.max(0, ultima); k < Math.min(tela.length, ultima + 10); k++) {
+      const s = parecenca(p, tela[k]);
+      if (s < 0.6) continue;
+      const efetiva = s - (k === ultima ? 0.12 : 0.025 * (k - ultima - 1));
+      if (efetiva > nota) { nota = efetiva; melhor = k; }
+    }
+    // 2º: em qualquer lugar (o refrão que volta lá do começo), a mais parecida (empate: a primeira)
+    if (melhor < 0) {
+      for (let k = 0; k < tela.length; k++) {
+        const s = parecenca(p, tela[k]);
+        if (s >= 0.7 && s > nota) { nota = s; melhor = k; }
+      }
+    }
+    if (melhor >= 0) ultima = melhor;
+    return melhor;
   });
 }

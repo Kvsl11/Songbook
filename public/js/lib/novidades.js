@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 293, data: '2026-10-29', titulo: 'Cifra que acompanha a música',
+    itens: [
+      { tipo: 'correcao', texto: 'Na cifra com a letra sincronizada, muito mais linhas acendem na hora certa: antes só acendia a linha escrita igualzinho nas duas fontes, e qualquer diferença ("pra"/"para", um "oh" a mais, uma linha quebrada em duas) deixava a linha apagada. As falas das gravações ao vivo, que não estão na cifra, continuam sem acender.' },
+      { tipo: 'melhoria', texto: 'No celular, a barra da música embaixo mostra só o nome e o artista, sem o tempo (que cortava o nome do artista).' },
+    ],
+  },
+  {
     versao: 292, data: '2026-10-29', titulo: 'Notinhas nos solos do meio da música',
     itens: [
       { tipo: 'melhoria', texto: 'Na letra sincronizada, as notinhas ♪ das partes só de instrumentos aparecem também nos solos do meio da música (antes, quase sempre, só na introdução). Só nas partes mais longas, de uns 12 segundos ou mais: um respiro curto entre as estrofes não ganha as notinhas.' },
@@ -65,12 +72,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'A foto do artista no Tocando agora e nos créditos é a mesma do Cifra Club (a da página do artista). Antes, quando a busca do Cifra Club não trazia a foto, vinha a de outro artista com o mesmo nome (como no Justice).' },
       { tipo: 'correcao', texto: 'No tablet, rolando o Tocando agora, a parte de cima (a capa, o nome e os controles) não some mais deixando só a cor do fundo.' },
       { tipo: 'correcao', texto: 'O vídeo do Tocando agora fica dentro do painel ao rolar (antes passava do topo) e, no mini player de baixo, encaixa certinho no quadro (antes ficava cortado ou sobrando), deitado e em pé.' },
-    ],
-  },
-  {
-    versao: 283, data: '2026-10-28', titulo: 'Barrinha da música ao rolar, no tablet',
-    itens: [
-      { tipo: 'novo', texto: 'No tablet, rolando o Tocando agora (no painel do lado e na tela toda), aparece no alto uma barrinha com o nome, o artista, o ✓/+ da biblioteca, o play e a linha do andamento da música, como no Spotify.' },
     ],
   },
 ];

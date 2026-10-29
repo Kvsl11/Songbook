@@ -35,3 +35,18 @@ test('servidor: conta do Modal desativada vira um aviso claro', async () => {
   assert.equal(erroDaResposta(403, '{"detail":"pediu login"}').message, 'pediu login');
   assert.equal(erroDaResposta(500, '').message, 'o servidor respondeu 500');
 });
+
+// a letra sincronizada (LRCLIB) e a cifra (Cifra Club) quase nunca são iguais letra por letra: vale a mais parecida
+test('letra sincronizada: casa com a cifra mesmo com a letra um pouco diferente', () => {
+  const tela = ['[C]Senhor, hoje eu me [G]rendo', 'Eu reconheço que nada eu posso', 'Pra que quando eu falar que seja Você', 'Que seja você', 'Dá-me um coração semelhante ao teu'];
+  const cantadas = [
+    'Senhor, hoje eu me rendo', // igual
+    'Eu reconheço que nada eu posso fazer sem ti', // a cifra quebrou a linha: a 1ª metade
+    'Para que quando eu falar, oh, que seja você', // "para" e um "oh" a mais
+    'Que seja você',
+    'Dai-me um coração semelhante ao teu', // uma palavra diferente
+    'O máximo que você consegue', // fala do ao vivo: não está na cifra
+    'Senhor, hoje eu me rendo (2x)', // a repetição volta para a linha de cima
+  ];
+  assert.deepEqual(casarLinhas(cantadas, tela), [0, 1, 2, 3, 4, -1, 0]);
+});
