@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-306';
+export const APP_VERSAO = '2026.10.29-307';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -9431,11 +9431,14 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
   // vídeo. O "Refazer" (sincronia errada) e as músicas que não estão lá vão para o servidor, que ouve o áudio
   // (sem servidor, o "de novo" também tenta o LRCLIB: senão daria erro na certa)
   let lrclibFalhou = false;
-  const peloLrclib = async () => {
+  let buscouLrc = false;
+  const buscarLrc = async () => {
+    buscouLrc = true;
     status('carregando', 'Procurando a letra sincronizada…');
     const duracao = (player.desta(song.youtube) && player.duracao) || await duracaoDaMusica(song).catch(() => 0);
-    const lrc = await letraSincronizada({ titulo: tituloLimpo(song.title), artista: song.artist || '', duracao }).catch(() => { lrclibFalhou = true; return null; });
-    if (!lrc) return null;
+    return letraSincronizada({ titulo: tituloLimpo(song.title), artista: song.artist || '', duracao }).catch(() => { lrclibFalhou = true; return null; });
+  };
+  const usarLrc = (lrc) => {
     guardar({ video: song.youtube, linhas: lrc.linhas, tempos: lrc.tempos, fonte: 'lrclib', ...(lrc.ajustar ? { ajustar: true } : {}) });
     sincronizando.delete(song.id);
     if (lrc.ajustar) status('ok', 'A letra veio, mas o vídeo tem uma parte antes da música: no Tocando agora, toque na frase quando ela for cantada.');
@@ -9444,9 +9447,20 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
     if (!sozinho) notificar('Dê play: a letra acompanha, e tocar numa linha vai até ela.', { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
     return lrc.ajustar ? 'ajustar' : 'ok';
   };
+  const peloLrclib = async () => { const lrc = await buscarLrc(); return lrc ? usarLrc(lrc) : null; };
   if (!pelaIA && (!refazer || soLrclib || !servidorIA().url)) {
     const r = await peloLrclib();
     if (r) return r;
+  }
+  // com a IA do servidor: a letra sincronizada da internet (LRCLIB, feita por gente, como a do Musixmatch) vale
+  // quando ela tem a duração do vídeo (a mesma gravação); se o vídeo é mais longo (o videoclipe com uma parte antes
+  // da música), o servidor ouve o vídeo só para achar onde ela começa e devolve a da internet no lugar certo.
+  // Sem ela (ou no "Refazer"), o servidor encaixa a letra da cifra na voz
+  let referencia = null;
+  if (pelaIA && !refazer) {
+    const lrc = await buscarLrc();
+    if (lrc && !lrc.ajustar) return usarLrc(lrc);
+    if (lrc?.ajustar) referencia = lrc;
   }
   if (soLrclib) { sincronizando.delete(song.id); return lrclibFalhou ? 'erro' : 'nada'; }
   if (!servidorIA().url) {
@@ -9457,9 +9471,10 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
   }
   status('carregando', refazer ? 'Sincronizando de novo, com mais precisão…' : 'Sincronizando a letra com o vídeo…');
   try {
-    const r = await chamarComEtapas(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: cantadas, refazer } },
+    const linhasPedidas = referencia ? referencia.linhas : cantadas;
+    const r = await chamarComEtapas(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: linhasPedidas, refazer, ...(referencia ? { referencia: referencia.tempos } : {}) } },
       (etapa, p) => status('carregando', etapa === 'baixando' && p !== null && p < 1 ? `Baixando o áudio do vídeo… ${Math.round(p * 100)}%` : etapa === 'baixando' && p >= 1 ? 'Áudio baixado. Preparando…' : ETAPAS_SINC[etapa] || 'Sincronizando a letra…'));
-    guardar({ video: song.youtube, linhas: cantadas, tempos: r.linhas.map((x) => ({ inicio: x.inicio, fim: x.fim })) });
+    guardar({ video: song.youtube, linhas: linhasPedidas, tempos: r.linhas.map((x) => ({ inicio: x.inicio, fim: x.fim })), ...(referencia ? { fonte: 'lrclib' } : {}) });
     status('ok', `Letra sincronizada: ${r.achadas} de ${r.total} linhas. Dê play e ela acompanha.`,
       refazer ? '' : `<button class="btn small" data-sinc="de-novo" data-refazer="1">${icon('refresh', 14)} Ficou errada? Refazer</button>`);
     notificar(`${r.achadas} de ${r.total} linhas ouvidas no vídeo. Dê play: a letra acompanha, e tocar numa linha vai até ela.`, { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
@@ -9467,8 +9482,8 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
   } catch (e) {
     // a IA do servidor não conseguiu (o YouTube bloqueou, o servidor caiu): a reserva é a letra do LRCLIB
     if (pelaIA && !refazer) {
-      const r = await peloLrclib();
-      if (r) return r;
+      const lrc = referencia || (buscouLrc ? null : await buscarLrc());
+      if (lrc) return usarLrc(lrc);
     }
     const motivo = erroExplicado(e);
     status('erro', `Não sincronizou: ${motivo}`, e.status === 403

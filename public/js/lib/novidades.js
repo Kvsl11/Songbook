@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 307, data: '2026-10-29', titulo: 'Letra sincronizada mais firme',
+    itens: [
+      { tipo: 'melhoria', texto: 'Com o servidor ligado, a letra sincronizada da internet (feita por gente, como a do Spotify) é usada quando o vídeo é a mesma gravação. No videoclipe com uma parte antes da música, o servidor ouve o vídeo só para achar onde ela começa e põe essa letra no lugar certo.' },
+      { tipo: 'melhoria', texto: 'Quando a letra não está na internet, o servidor encaixa a letra da cifra na voz, letra por letra (um alinhador de IA gratuito, que roda nele mesmo): ela não se perde mais em introduções, solos e trechos falados do vídeo.' },
+    ],
+  },
+  {
     versao: 306, data: '2026-10-29', titulo: 'A letra acompanha assim que sincroniza',
     itens: [
       { tipo: 'correcao', texto: 'Quando a sincronia da letra termina com a música já tocando, a letra passa a acompanhar na hora, na frase que está sendo cantada. Antes era preciso sair da música (ou fechar o app) para ela começar a acompanhar.' },
@@ -62,12 +69,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'Gerar a partitura no celular não fica mais parado em “Abrindo o áudio”: se o aparelho não conseguir abrir o arquivo ou carregar a IA em alguns minutos, a tela avisa e diz o que fazer.' },
       { tipo: 'novo', texto: 'Com o servidor no seu computador ligado (Ajustes → Servidor no computador), a partitura volta a ser feita nele, de graça e sem crédito: a voz é separada dos instrumentos e dá para colar o link do YouTube. Se o computador não responder, o celular faz sozinho.' },
       { tipo: 'melhoria', texto: 'No notebook da empresa, sem administrador: o servidor liga por uma tarefa do VS Code e, se a rede bloquear o túnel da Cloudflare, o celular alcança o computador pelas Portas do VS Code.' },
-    ],
-  },
-  {
-    versao: 297, data: '2026-10-29', titulo: 'O artista certo no “Sobre o artista”',
-    itens: [
-      { tipo: 'correcao', texto: 'Quando há mais de um artista com o mesmo nome no YouTube (como o Kemuel), a foto, os números e o canal agora são os do artista certo, o mais conhecido, e não os de outro com o mesmo nome.' },
     ],
   },
 ];

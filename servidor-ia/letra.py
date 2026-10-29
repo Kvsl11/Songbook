@@ -12,6 +12,7 @@ As linhas vão na ordem em que se cantam (o refrão repetido entra de novo).
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import threading
@@ -20,6 +21,9 @@ from difflib import SequenceMatcher
 
 import numpy as np
 
+import alinhador
+
+log = logging.getLogger("songbook-ia")
 SR_WHISPER = 16000
 _trava = threading.Lock()
 _whisper: dict = {}  # um modelo por tamanho (o "small" de sempre e o "medium" do refazer)
@@ -196,6 +200,26 @@ def _preencher(saida: list, pesos: list[int], duracao: float, comeco: float = 0.
     return saida
 
 
+def pela_referencia(tempos: list[dict], referencia: list[dict], duracao: float):
+    """A letra sincronizada da internet (LRCLIB, feita por gente, como no Musixmatch) é a mesma música, mas o vídeo
+    tem uma parte antes (o videoclipe com filme): o quanto ela está adiantada sai das linhas que a IA achou com
+    segurança, e a da internet vem inteira, deslocada. (tempos, achadas) ou None se não deu para saber o quanto."""
+    difs = sorted(t["inicio"] - float(r["inicio"]) for t, r in zip(tempos, referencia) if t["confianca"] >= 0.4)
+    if len(difs) < 3:
+        return None
+    meio = difs[len(difs) // 2]
+    perto = [d for d in difs if abs(d - meio) <= 1.5]
+    if len(perto) < max(3, len(difs) // 2):  # as linhas achadas não concordam: o vídeo não é a mesma gravação
+        return None
+    desloca = float(np.median(perto))
+    saida = []
+    for t, r in zip(tempos, referencia):
+        ini = min(duracao, max(0.0, float(r["inicio"]) + desloca))
+        fim = min(duracao, max(ini, float(r.get("fim", r["inicio"])) + desloca))
+        saida.append({"inicio": round(ini, 3), "fim": round(fim, 3), "confianca": max(t["confianca"], 0.5)})
+    return saida, len(saida)
+
+
 # ------------------------------------------------------------------ a música
 
 # palavras curtas e comuns de cada língua: pela letra, o Whisper já sabe em que língua ouvir (com o português fixo,
@@ -232,7 +256,7 @@ def ouvir_palavras(y16: np.ndarray, dica: str, preciso: bool = False, idioma: st
 
 
 def sincronizar(caminho: str | None, linhas: list[str], separar_voz: bool = True, etapa=lambda nome: None,
-                audio=None, video: str | None = None, preciso: bool = False) -> dict:
+                audio=None, video: str | None = None, preciso: bool = False, referencia: list | None = None) -> dict:
     """audio = (y, cortado) já carregado (o do vídeo guardado); video: o id, para usar e guardar a voz já separada
     (a partitura da mesma música aproveita, e vice-versa)."""
     import librosa
@@ -251,11 +275,27 @@ def sincronizar(caminho: str | None, linhas: list[str], separar_voz: bool = True
         etapa("separando")
     voz = transcricao.separar_guardado(y, video)[0] if separado else y
     y16 = librosa.resample(voz, orig_sr=transcricao.SR, target_sr=SR_WHISPER).astype(np.float32)
-    dica = " ".join(re.sub(r"\[[^\]]*\]", "", l) for l in linhas)
     etapa("ouvindo")
-    palavras = ouvir_palavras(y16, dica, preciso, idioma_da_letra(linhas))
-    etapa("alinhando")
-    tempos = tempos_das_linhas(linhas, palavras, duracao)
+    tempos = None
+    if alinhador.disponivel():
+        # o alinhamento forçado (a letra conhecida encaixada na voz, letra por letra): mais firme que casar as
+        # palavras que o Whisper ouviu, sobretudo com introdução longa, solos e trechos falados no vídeo
+        try:
+            achadas_mms = alinhador.tempos(y16, [re.sub(r"\[[^\]]*\]", "", l) for l in linhas])
+            etapa("alinhando")
+            if sum(1 for t in achadas_mms if t) >= max(1, len(linhas) // 3):
+                pesos = [max(1, len(palavras_da_linha(l))) for l in linhas]
+                comeco = next((t["inicio"] for t in achadas_mms if t), 0.0)
+                tempos = _preencher(list(achadas_mms), pesos, duracao, comeco=comeco)
+        except Exception:  # sem o modelo, sem memória: fica com o Whisper
+            log.warning("alinhamento forçado falhou; usando o Whisper", exc_info=True)
+    if tempos is None:
+        dica = " ".join(re.sub(r"\[[^\]]*\]", "", l) for l in linhas)
+        palavras = ouvir_palavras(y16, dica, preciso, idioma_da_letra(linhas))
+        etapa("alinhando")
+        tempos = tempos_das_linhas(linhas, palavras, duracao)
     achadas = sum(1 for t in tempos if t["confianca"] > 0)
+    if referencia and len(referencia) == len(tempos):
+        tempos, achadas = pela_referencia(tempos, referencia, duracao) or (tempos, achadas)
     return {"linhas": tempos, "achadas": achadas, "total": len(linhas), "duracao": round(duracao, 3),
             "separado": separado}
