@@ -27,7 +27,7 @@ import shutil
 import tempfile
 import threading
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
@@ -47,7 +47,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in os.environ.get("IA_ORIGENS", "*").split(",") if o.strip()],
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "X-Chave"],
+    allow_headers=["Content-Type", "X-Chave", "X-Tunnel-Skip-AntiPhishing-Page"],
 )
 
 
@@ -135,9 +135,9 @@ def com_etapas(trabalho, etapas: bool, pasta: str | None = None):
 
 
 @app.get("/", response_class=HTMLResponse)
-def inicio():
+def inicio(request: Request):
     """No PC (docker compose): o QR code que liga o celular a este servidor."""
-    return pc.pagina()
+    return pc.pagina(pc.do_tunel_vscode(request.headers.get("x-forwarded-host") or request.headers.get("host")))
 
 
 if pc.TUNEL:

@@ -35,6 +35,22 @@ python.org) para `servidor-ia\python311`, sem instalar nada e sem administrador 
 5 GB); depois abre a mesma página com o QR code. Deixe a janela preta aberta enquanto usa (fechar desliga o servidor).
 No Mac/Linux, o mesmo com `python3.11 iniciar_pc.py` depois da instalação de "Rodar no seu computador" (abaixo).
 
+### No notebook da empresa, pelo VS Code (sem administrador)
+
+1. Abra a pasta do projeto no VS Code. Precisa de algum Python instalado (o da loja da empresa ou o do python.org
+   "só para mim" serve; o 3.11 portátil é baixado sozinho).
+2. **Terminal → Executar tarefa → Ligar o servidor da IA (partitura e letra)** (a tarefa está em `.vscode/tasks.json`
+   e chama o `iniciar-windows-sem-docker.bat`). A primeira vez instala tudo em `servidor-ia\.venv` (uns 15 minutos).
+3. Se o QR code aparecer em <http://localhost:7860>, leia com o celular e pronto.
+4. Se não aparecer (a rede da empresa bloqueia o túnel da Cloudflare): na aba **Portas** do VS Code (ao lado do
+   Terminal), **Encaminhar uma porta** → `7860`, entre com a conta do GitHub, clique com o botão direito na porta →
+   **Visibilidade da porta → Pública** e abra o endereço `https://…devtunnels.ms` que aparece: é a mesma página, com
+   o QR code apontando para ele. Há também a tarefa "… só com as Portas do VS Code (sem Cloudflare)", que nem tenta
+   o túnel da Cloudflare.
+
+Com o servidor do computador ligado, a tela **Importar o áudio** manda o arquivo (ou o link do YouTube) para ele, sem
+gastar crédito de ninguém; se ele não responder, o celular faz a partitura sozinho.
+
 Deixe o PC ligado enquanto usa. O servidor volta sozinho quando o Docker Desktop abre, mas o endereço do túnel muda a
 cada vez: abra <http://localhost:7860> e leia o QR code de novo. Com o PC desligado, o app volta para o servidor da
 nuvem (abaixo), se houver. Parar: `docker compose down` nesta pasta. Ver o que está fazendo: `docker compose logs -f ia`.

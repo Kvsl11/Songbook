@@ -67,15 +67,24 @@ def main() -> None:
             print(f"Aviso: não consegui o ffmpeg ({type(e).__name__}); os vídeos do YouTube não vão funcionar.", flush=True)
     dados = os.path.join(PASTA, "dados")
     os.makedirs(dados, exist_ok=True)
-    # antes de importar o app: o pc.py lê o IA_TUNEL ao carregar
-    os.environ.setdefault("IA_TUNEL", f"http://{METRICAS}")
     os.environ.setdefault("IA_TAREFAS", "1")
     os.environ.setdefault("IA_CACHE", os.path.join(dados, "cache"))
     os.environ.setdefault("IA_COOKIES", os.path.join(dados, "cookies.txt"))
-    tunel = subprocess.Popen([cloudflared(), "tunnel", "--no-autoupdate", "--metrics", METRICAS,
-                              "--url", f"http://127.0.0.1:{PORTA}"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # a rede da empresa pode bloquear o download ou o próprio túnel da Cloudflare: o servidor liga mesmo assim, e o
+    # endereço vem das Portas do VS Code (IA_SEM_TUNEL=1 nem tenta a Cloudflare)
+    tunel = None
+    if not os.environ.get("IA_SEM_TUNEL"):
+        try:
+            tunel = subprocess.Popen([cloudflared(), "tunnel", "--no-autoupdate", "--metrics", METRICAS,
+                                      "--url", f"http://127.0.0.1:{PORTA}"],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # antes de importar o app: o pc.py lê o IA_TUNEL ao carregar
+            os.environ.setdefault("IA_TUNEL", f"http://{METRICAS}")
+        except (OSError, SystemExit) as e:
+            print(f"Aviso: não consegui ligar o túnel da Cloudflare ({e}).", flush=True)
     print(f"\nServidor ligando. Abra http://localhost:{PORTA} e leia o QR code com o celular.\n"
+          f"Sem o QR code (rede da empresa)? No VS Code: aba Portas → Encaminhar uma porta → {PORTA}, visibilidade\n"
+          "Pública, e abra o endereço que aparece.\n"
           "Deixe esta janela aberta enquanto usa o app (fechar desliga o servidor).\n", flush=True)
     threading.Timer(8, lambda: webbrowser.open(f"http://localhost:{PORTA}")).start()
     try:
@@ -83,7 +92,8 @@ def main() -> None:
 
         uvicorn.run("app:app", host="127.0.0.1", port=PORTA)
     finally:
-        tunel.terminate()
+        if tunel:
+            tunel.terminate()
 
 
 if __name__ == "__main__":
