@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 316, data: '2026-10-29', titulo: 'Música e vídeo continuam no mesmo ponto (de verdade)',
+    itens: [
+      { tipo: 'correcao', texto: 'Trocar da música para o vídeo (ou o contrário) não volta mais para o começo: enquanto a outra versão carrega, o YouTube avisa o tempo zero, e o app tomava esse zero como o ponto da música. Agora ele espera o vídeo começar a tocar e confere se está na parte que estava sendo cantada.' },
+    ],
+  },
+  {
     versao: 315, data: '2026-10-29', titulo: 'Trocar entre música e vídeo sem voltar ao começo',
     itens: [
       { tipo: 'correcao', texto: 'Ao trocar da música para o vídeo (ou do vídeo para a música) no player, ela continua do ponto em que estava, na parte que estava sendo cantada. Antes, às vezes, voltava para o começo.' },
@@ -67,13 +73,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'melhoria', texto: 'Com o servidor ligado, a letra sincronizada da internet (feita por gente, como a do Spotify) é usada quando o vídeo é a mesma gravação. No videoclipe com uma parte antes da música, o servidor ouve o vídeo só para achar onde ela começa e põe essa letra no lugar certo.' },
       { tipo: 'melhoria', texto: 'Quando a letra não está na internet, o servidor encaixa a letra da cifra na voz, letra por letra (um alinhador de IA gratuito, que roda nele mesmo): ela não se perde mais em introduções, solos e trechos falados do vídeo.' },
-    ],
-  },
-  {
-    versao: 306, data: '2026-10-29', titulo: 'A letra acompanha assim que sincroniza',
-    itens: [
-      { tipo: 'correcao', texto: 'Quando a sincronia da letra termina com a música já tocando, a letra passa a acompanhar na hora, na frase que está sendo cantada. Antes era preciso sair da música (ou fechar o app) para ela começar a acompanhar.' },
-      { tipo: 'correcao', texto: 'Em videoclipes longos, com um trecho de filme antes da música (como Speed Demon), o servidor agora ouve o vídeo inteiro, até 15 minutos, para sincronizar a letra.' },
     ],
   },
 ];
