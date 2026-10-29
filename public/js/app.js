@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-303';
+export const APP_VERSAO = '2026.10.29-304';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -7389,9 +7389,15 @@ function viewSong(id, ctx = {}) {
   const sincronizarLetra = (o = {}) => sincronizarMusica(song, { ...o, status: statusSinc }).then(() => { mapa = null; });
   // pelo menu ⋯: a música já sincronizada sincroniza de novo com mais precisão (a guardada não volta)
   $('#btn-sincronizar')?.addEventListener('click', () => { $('#menu-mais').hidden = true; sincronizarLetra({ refazer: Boolean(sincronia()) }); });
-  // a letra não sincroniza mais sozinha ao abrir a música: só abrir (e navegar entre as músicas) ligava o servidor
-  // várias vezes e acabava com o crédito grátis do Modal. Sincroniza pelo menu ⋯, uma vez;
-  // depois fica guardada na música
+  // com o servidor no computador de quem usa (ou no GitHub, de graça), a letra já começa a sincronizar ao abrir a
+  // música, sem esperar o play: o servidor baixa o áudio do vídeo e ouve sozinho, e quando a pessoa der play ela já
+  // está pronta (ou quase). Uma vez por vídeo enquanto o app está aberto; o resultado fica guardado na música.
+  // No servidor da nuvem (Modal) não: cada abertura gastava o crédito grátis; lá sincroniza pelo play ou pelo ⋯
+  servidorCarregado.then(() => {
+    if (!sincPelaIA() || !song.youtube || sincronia() || tentouSincronizar.has(song.youtube) || !view.contains(songEl)) return;
+    tentouSincronizar.add(song.youtube);
+    sincronizarMusica(song, { sozinho: true, status: statusSinc }).then(() => { mapa = null; });
+  });
   // música vinda da busca sem vídeo: procura no YouTube sozinho e já vincula (se não achar, o aviso diz)
   if (isPreview && !song.youtube && !String(song.source || '').startsWith('cnbb:') && !preview.semVideo && !preview.videoProcurado) {
     const esta = preview;
