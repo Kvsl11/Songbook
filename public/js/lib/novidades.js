@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 297, data: '2026-10-29', titulo: 'O artista certo no “Sobre o artista”',
+    itens: [
+      { tipo: 'correcao', texto: 'Quando há mais de um artista com o mesmo nome no YouTube (como o Kemuel), a foto, os números e o canal agora são os do artista certo, o mais conhecido, e não os de outro com o mesmo nome.' },
+    ],
+  },
+  {
     versao: 296, data: '2026-10-29', titulo: 'Mais fotos e os seguidores do Spotify',
     itens: [
       { tipo: 'melhoria', texto: 'Na tela “Sobre o artista”, muito mais fotos (até 10): as fotos de divulgação dele e quadros dos vídeos do canal oficial no YouTube.' },
@@ -64,12 +70,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'No Tocando agora, mudar para a capa animada e voltar para o vídeo não faz mais o vídeo recarregar: antes o YouTube podia pausar com o aviso de que a conta estava sendo usada em outro lugar e o vídeo não tocava mais.' },
       { tipo: 'melhoria', texto: 'A foto do artista vem do canal dele no YouTube (a mais atual), só quando o canal é com certeza dele: verificado ou o canal de artista que o próprio YouTube cria. Sem um assim, continua a foto de antes (Cifra Club, Deezer ou Wikipédia).' },
-    ],
-  },
-  {
-    versao: 287, data: '2026-10-29', titulo: 'Letra com respiro no topo',
-    itens: [
-      { tipo: 'correcao', texto: 'Na letra na tela toda, a primeira linha não fica mais colada no topo e meio apagada: desceu um pouco, e dá para ver bem a linha que está sendo cantada desde o começo da música.' },
     ],
   },
 ];
