@@ -48,3 +48,19 @@ def test_linha_cujo_comeco_nao_foi_ouvido_comeca_antes_da_primeira_achada():
     t = tempos_das_linhas(linhas, ouvidas, 20.0)
     assert t[0]["inicio"] == 0.0
     assert 9.7 <= t[1]["inicio"] < 10.4
+
+
+def test_linhas_do_comeco_nao_ouvidas_nao_comecam_na_introducao():
+    linhas = ["um dois tres quatro", "cinco seis sete oito", "nove dez onze doze"]
+    # 20 s só de instrumentos: o Whisper só achou a 2ª e a 3ª linha
+    ouvidas = palavras("cinco seis sete oito", 22.0) + palavras("nove dez onze doze", 26.0)
+    t = tempos_das_linhas(linhas, ouvidas, 60.0)
+    assert t[0]["confianca"] == 0.0
+    assert 17.0 <= t[0]["inicio"] < 22.0  # logo antes da 2ª linha, no ritmo do canto (e não no 0)
+
+
+def test_idioma_pela_letra():
+    from letra import idioma_da_letra
+    assert idioma_da_letra(["I can't stop you thinking of me", "you know that I love it so"]) == "en"
+    assert idioma_da_letra(["Eu vos amo, ó Senhor", "sois minha força e o meu Deus"]) == "pt"
+    assert idioma_da_letra(["la la la"]) is None

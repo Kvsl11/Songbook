@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-302';
+export const APP_VERSAO = '2026.10.29-303';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1154,7 +1154,7 @@ const player = (() => {
     // ganham as notinhas ♪, que acendem e pulam enquanto tocam
     const nota = (id) => `<p class="pl-pausa" data-pausa="${id}" aria-label="Só música"><i>♪</i><i>♪</i><i>♪</i></p>`;
     fins = tempos ? tempos.map((x, k) => fimCantado(tempos, linhas, k)) : null;
-    const pausaAntes = (k) => tempos && (k === 0 ? tempos[0].inicio >= PAUSA_MUSICA : tempos[k].inicio - fins[k - 1] >= PAUSA_MEIO);
+    const pausaAntes = (k) => tempos && (k === 0 ? tempos[0].inicio >= PAUSA_INICIO : tempos[k].inicio - fins[k - 1] >= PAUSA_MEIO);
     $('.pl-linhas', el).innerHTML = linhas.map((l, k) => `${marcas.has(k) ? `<h4 class="pl-parte">${esc(marcas.get(k))}</h4>` : ''}${pausaAntes(k) ? nota(k) : ''}<p data-k="${k}">${esc(l)}</p>`).join('')
       + (tempos?.length && duracao > 0 && duracao - tempos[tempos.length - 1].fim >= PAUSA_MUSICA ? nota('fim') : '');
     desenharCifra();
@@ -1169,11 +1169,11 @@ const player = (() => {
         if (r === 'ok') sincEstado.set(yt, { tipo: 'ok', texto: 'Letra sincronizada' });
         else if (r === 'ajustar') sincEstado.set(yt, { tipo: 'ajustar' });
         else if (r === 'nada') sincEstado.set(yt, { tipo: 'falhou', texto: 'Não achei a letra sincronizada desta música' });
-        else if (r === 'erro') sincEstado.set(yt, { tipo: 'falhou', texto: 'O banco de letras não respondeu agora', deNovo: true });
+        else if (r === 'erro') sincEstado.set(yt, { tipo: 'falhou', texto: sincPelaIA() ? 'A IA do servidor não conseguiu sincronizar agora' : 'O banco de letras não respondeu agora', deNovo: true });
         else sincEstado.delete(yt);
         mostrarSinc();
         // o banco de letras estava ocupado: tenta mais uma vez sozinho, daqui a pouco (antes ficava sem sincronizar)
-        if (r === 'erro' && !lrclibDeNovo.has(yt)) {
+        if (r === 'erro' && !sincPelaIA() && !lrclibDeNovo.has(yt)) {
           lrclibDeNovo.add(yt);
           setTimeout(() => {
             if (atual?.youtube !== yt || sincEstado.get(yt)?.tipo !== 'falhou') return;
@@ -1251,6 +1251,8 @@ const player = (() => {
   // só as partes longas só de instrumentos (introdução, solo, final) ganham as notinhas: as pausas curtas entre as
   // estrofes não
   const PAUSA_MUSICA = 10;
+  // a introdução (o toque antes de começarem a cantar) ganha as notinhas já a partir de 4 s
+  const PAUSA_INICIO = 4;
   // no meio da música, só um solo mais longo (12 s ou mais): um respiro entre as estrofes não ganha as notinhas
   const PAUSA_MEIO = 12;
   // A letra sincronizada do LRCLIB só diz quando cada frase começa: o fim dela fica sendo o começo da seguinte, e um solo
@@ -7305,7 +7307,7 @@ function viewSong(id, ctx = {}) {
     sincronizarMusica(song, { soLrclib: true, sozinho: true, status: statusSinc }).then((r) => {
       mapa = null;
       if (r === 'nada') statusSinc('erro', 'Não achei a letra sincronizada desta música no banco de letras.');
-      if (r === 'erro') { statusSinc('erro', 'O banco de letras não respondeu agora. Tente de novo pelo ⋯.'); tentouSincronizar.delete(song.youtube); }
+      if (r === 'erro' && !sincPelaIA()) { statusSinc('erro', 'O banco de letras não respondeu agora. Tente de novo pelo ⋯.'); tentouSincronizar.delete(song.youtube); }
     });
   };
 
@@ -9383,8 +9385,13 @@ const sincronizando = new Set();
 // soLrclib: a busca automática do Tocando agora (só o LRCLIB: sem servidor e sem avisos)
 // Devolve o que aconteceu: 'ok', 'ajustar' (a letra veio, falta acertar onde a música começa no vídeo), 'nada' (não
 // achou, só LRCLIB), 'erro' ou undefined (já sincronizando, sem letra)
+// com o servidor no computador de quem usa (ou no GitHub Codespaces, de graça), a sincronia é sempre pela IA dele, que
+// ouve o próprio vídeo (acerta a introdução e as partes diferentes da gravação); o LRCLIB fica de reserva
+const sincPelaIA = () => Boolean(SERVIDOR_IA.pc && SERVIDOR_IA.url);
 async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrclib = false, status = () => {} } = {}) {
   if (sincronizando.has(song.id)) return undefined;
+  const pelaIA = sincPelaIA();
+  if (pelaIA) soLrclib = false; // a busca automática (ao tocar) também vai para a IA do servidor
   const cantadas = linhasCantadas(song.content).map(linhaSemCifra).filter(Boolean);
   if (!cantadas.length) { if (!sozinho) status('erro', 'Esta música não tem letra para sincronizar'); return undefined; }
   sincronizando.add(song.id);
@@ -9396,19 +9403,22 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
   // vídeo. O "Refazer" (sincronia errada) e as músicas que não estão lá vão para o servidor, que ouve o áudio
   // (sem servidor, o "de novo" também tenta o LRCLIB: senão daria erro na certa)
   let lrclibFalhou = false;
-  if (!refazer || soLrclib || !servidorIA().url) {
+  const peloLrclib = async () => {
     status('carregando', 'Procurando a letra sincronizada…');
     const duracao = (player.desta(song.youtube) && player.duracao) || await duracaoDaMusica(song).catch(() => 0);
     const lrc = await letraSincronizada({ titulo: tituloLimpo(song.title), artista: song.artist || '', duracao }).catch(() => { lrclibFalhou = true; return null; });
-    if (lrc) {
-      guardar({ video: song.youtube, linhas: lrc.linhas, tempos: lrc.tempos, fonte: 'lrclib', ...(lrc.ajustar ? { ajustar: true } : {}) });
-      sincronizando.delete(song.id);
-      if (lrc.ajustar) status('ok', 'A letra veio, mas o vídeo tem uma parte antes da música: no Tocando agora, toque na frase quando ela for cantada.');
-      else status('ok', `Letra sincronizada: ${lrc.linhas.length} linhas (LRCLIB). Dê play e ela acompanha.`,
-        `<button class="btn small" data-sinc="de-novo" data-refazer="1">${icon('refresh', 14)} Ficou fora do tempo? Ouvir o vídeo</button>`);
-      if (!sozinho) notificar('Dê play: a letra acompanha, e tocar numa linha vai até ela.', { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
-      return lrc.ajustar ? 'ajustar' : 'ok';
-    }
+    if (!lrc) return null;
+    guardar({ video: song.youtube, linhas: lrc.linhas, tempos: lrc.tempos, fonte: 'lrclib', ...(lrc.ajustar ? { ajustar: true } : {}) });
+    sincronizando.delete(song.id);
+    if (lrc.ajustar) status('ok', 'A letra veio, mas o vídeo tem uma parte antes da música: no Tocando agora, toque na frase quando ela for cantada.');
+    else status('ok', `Letra sincronizada: ${lrc.linhas.length} linhas (LRCLIB). Dê play e ela acompanha.`,
+      `<button class="btn small" data-sinc="de-novo" data-refazer="1">${icon('refresh', 14)} Ficou fora do tempo? Ouvir o vídeo</button>`);
+    if (!sozinho) notificar('Dê play: a letra acompanha, e tocar numa linha vai até ela.', { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
+    return lrc.ajustar ? 'ajustar' : 'ok';
+  };
+  if (!pelaIA && (!refazer || soLrclib || !servidorIA().url)) {
+    const r = await peloLrclib();
+    if (r) return r;
   }
   if (soLrclib) { sincronizando.delete(song.id); return lrclibFalhou ? 'erro' : 'nada'; }
   if (!servidorIA().url) {
@@ -9427,6 +9437,11 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
     notificar(`${r.achadas} de ${r.total} linhas ouvidas no vídeo. Dê play: a letra acompanha, e tocar numa linha vai até ela.`, { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
     return 'ok';
   } catch (e) {
+    // a IA do servidor não conseguiu (o YouTube bloqueou, o servidor caiu): a reserva é a letra do LRCLIB
+    if (pelaIA && !refazer) {
+      const r = await peloLrclib();
+      if (r) return r;
+    }
     const motivo = erroExplicado(e);
     status('erro', `Não sincronizou: ${motivo}`, e.status === 403
       ? `<button class="btn small" data-sinc="youtube">${icon('youtube', 14)} Conectar o YouTube</button>`

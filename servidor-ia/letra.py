@@ -146,12 +146,21 @@ def tempos_das_linhas(linhas: list[str], palavras: list[tuple[str, float, float]
             saida.append({"inicio": inicio, "fim": fim, "confianca": round(len(js) / max(1, total[k]), 2)})
         else:
             saida.append(None)
-    return _preencher(saida, [max(1, t) for t in total], duracao)
+    return _preencher(saida, [max(1, t) for t in total], duracao, comeco=palavras[0][1] if palavras else 0.0)
 
 
-def _preencher(saida: list, pesos: list[int], duracao: float) -> list[dict]:
+def _segundos_por_palavra(saida: list, pesos: list[int]) -> float:
+    """O ritmo do canto nesta música (a mediana das linhas achadas), entre 0,25 e 0,9 s por palavra."""
+    ritmos = sorted((s["fim"] - s["inicio"]) / pesos[k] for k, s in enumerate(saida) if s and s["fim"] > s["inicio"])
+    return min(0.9, max(0.25, ritmos[len(ritmos) // 2])) if ritmos else 0.45
+
+
+def _preencher(saida: list, pesos: list[int], duracao: float, comeco: float = 0.0) -> list[dict]:
     """As linhas não achadas ficam entre a achada de antes e a de depois, divididas pelo número de palavras; e as
-    achadas nunca voltam no tempo (uma linha não começa antes da anterior)."""
+    achadas nunca voltam no tempo (uma linha não começa antes da anterior). As do começo, antes da 1ª achada, não
+    começam no 0 do vídeo: ficam logo antes dela, no ritmo do canto, e nunca antes da 1ª palavra ouvida (comeco).
+    Antes elas se espalhavam pela introdução só de instrumentos, e a letra já andava antes de cantarem."""
+    por_palavra = _segundos_por_palavra(saida, pesos)
     ult = 0.0
     for k, s in enumerate(saida):
         if s and s["inicio"] < ult:
@@ -168,6 +177,11 @@ def _preencher(saida: list, pesos: list[int], duracao: float) -> list[dict]:
             fim_buraco += 1
         ini = saida[k - 1]["fim"] if k else 0.0
         fim = saida[fim_buraco]["inicio"] if fim_buraco < len(saida) else duracao
+        if not k and fim_buraco < len(saida):
+            ini = fim - sum(pesos[:fim_buraco]) * por_palavra
+            if comeco < fim:
+                ini = max(ini, comeco)
+            ini = max(0.0, ini)
         if fim <= ini:
             fim = ini + 0.5 * (fim_buraco - k)
         soma = sum(pesos[k:fim_buraco])
@@ -184,9 +198,32 @@ def _preencher(saida: list, pesos: list[int], duracao: float) -> list[dict]:
 
 # ------------------------------------------------------------------ a música
 
-def ouvir_palavras(y16: np.ndarray, dica: str, preciso: bool = False) -> list[tuple[str, float, float]]:
+# palavras curtas e comuns de cada língua: pela letra, o Whisper já sabe em que língua ouvir (com o português fixo,
+# a música em inglês, como Espresso, era ouvida como português e quase nenhuma linha era achada)
+_COMUNS = {
+    "pt": {"eu", "voce", "nao", "que", "meu", "minha", "de", "do", "da", "em", "com", "para", "pra", "um", "uma",
+           "teu", "tua", "nos", "sou", "vou", "deus", "senhor", "e", "o", "a", "os", "as", "se", "mais", "te"},
+    "en": {"i", "you", "the", "and", "my", "me", "to", "it", "is", "in", "of", "your", "on", "that", "we", "be",
+           "so", "oh", "but", "what", "can", "all", "love", "know", "just", "its", "im", "dont", "this", "with"},
+    "es": {"yo", "tu", "que", "el", "la", "los", "las", "y", "mi", "en", "de", "por", "con", "es", "no", "te",
+           "un", "una", "del", "como", "mas", "pero", "dios", "senor", "quiero", "eres", "soy", "estoy"},
+}
+
+
+def idioma_da_letra(linhas: list[str]) -> str | None:
+    """A língua da letra ("pt", "en" ou "es"); None se não der para saber (o Whisper descobre sozinho)."""
+    palavras = [normalizar(p) for l in linhas for p in palavras_da_linha(l)]
+    if len(palavras) < 8:
+        return None
+    contas = {lingua: sum(p in comuns for p in palavras) for lingua, comuns in _COMUNS.items()}
+    melhor = max(contas, key=contas.get)
+    segunda = max(v for k, v in contas.items() if k != melhor)
+    return melhor if contas[melhor] >= 4 and contas[melhor] >= 1.3 * segunda else None
+
+
+def ouvir_palavras(y16: np.ndarray, dica: str, preciso: bool = False, idioma: str | None = None) -> list[tuple[str, float, float]]:
     segmentos, _ = modelo_whisper(preciso).transcribe(
-        y16, language=os.environ.get("IA_IDIOMA", "pt"), word_timestamps=True, vad_filter=True,
+        y16, language=os.environ.get("IA_IDIOMA") or idioma, word_timestamps=True, vad_filter=True,
         initial_prompt=dica[:800] or None, condition_on_previous_text=False,
         # a busca gulosa (1) na sincronia de sempre: umas 3 vezes mais rápida, e com a letra na dica quase não erra
         # mais; no "sincronizar de novo" (preciso), a busca larga (5), que acerta mais as palavras difíceis
@@ -216,7 +253,7 @@ def sincronizar(caminho: str | None, linhas: list[str], separar_voz: bool = True
     y16 = librosa.resample(voz, orig_sr=transcricao.SR, target_sr=SR_WHISPER).astype(np.float32)
     dica = " ".join(re.sub(r"\[[^\]]*\]", "", l) for l in linhas)
     etapa("ouvindo")
-    palavras = ouvir_palavras(y16, dica, preciso)
+    palavras = ouvir_palavras(y16, dica, preciso, idioma_da_letra(linhas))
     etapa("alinhando")
     tempos = tempos_das_linhas(linhas, palavras, duracao)
     achadas = sum(1 for t in tempos if t["confianca"] > 0)
