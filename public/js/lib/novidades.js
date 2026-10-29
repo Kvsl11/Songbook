@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 311, data: '2026-10-29', titulo: 'Partitura pela IA, sozinha',
+    itens: [
+      { tipo: 'novo', texto: 'No ⋯ da música, “Criar partitura”: a IA do servidor ouve o áudio da música, escreve a partitura e ela já abre para você ver. Depois de criada, a opção vira “Ver partitura”.' },
+      { tipo: 'melhoria', texto: 'Gerar a partitura com IA começa sozinho pelo áudio da música (o vídeo ou o seu áudio), sem escolher arquivo nem colar link. Só se não der certo é que aparece a opção de importar o áudio.' },
+      { tipo: 'melhoria', texto: 'A tela de criar a partitura ficou mais clara: a automática, com IA, em destaque em cima; a manual, nota por nota, embaixo.' },
+    ],
+  },
+  {
     versao: 310, data: '2026-10-29', titulo: 'Toque o seu próprio áudio',
     itens: [
       { tipo: 'novo', texto: 'Use um áudio seu na música (a gravação do ensaio, um MP3): no ⋯ da música, “Usar um áudio seu”. Ele fica guardado no aparelho e toca no modo música; o clipe continua no modo vídeo.' },
@@ -63,13 +71,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'Pelo servidor no GitHub, a partitura do arquivo importado ficava parada em “Enviando o áudio” e às vezes falhava no fim. Agora o app envia o áudio e vai perguntando ao servidor em que etapa ele está: as etapas andam na tela e a partitura chega mesmo depois de vários minutos.' },
       { tipo: 'melhoria', texto: 'O servidor no seu computador ou no GitHub já deixa a IA pronta assim que liga (antes a primeira partitura ou letra esperava minutos baixando e abrindo os modelos), e a letra sincronizada sai umas 3 vezes mais rápido.' },
-    ],
-  },
-  {
-    versao: 301, data: '2026-10-29', titulo: 'As etapas da partitura andando no servidor do GitHub',
-    itens: [
-      { tipo: 'correcao', texto: 'Com o servidor no GitHub, a tela da partitura ficava parada em “Enviando o áudio 0%” até o fim: agora cada etapa (enviando, separando a voz, ouvindo as notas…) aparece na hora em que o servidor passa por ela.' },
-      { tipo: 'melhoria', texto: 'O servidor no GitHub usa todos os núcleos da máquina para separar a voz e ouvir as notas: a partitura sai mais rápido.' },
     ],
   },
 ];
