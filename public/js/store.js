@@ -17,11 +17,52 @@ let state = load();
 for (const s of state.songs) if ((s.youtube === undefined || s.parte === undefined) && s.content) Object.assign(s, metaFrom(s.content));
 
 function persist() {
+  const json = JSON.stringify(state);
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    localStorage.setItem(KEY, json);
   } catch (e) {
     console.warn('Não foi possível salvar', e);
   }
+  copiaSegura(json);
+}
+
+// ---- a biblioteca e os repertórios não se perdem: o navegador é avisado de que os dados do app são para guardar (não
+// apaga quando falta espaço) e fica uma segunda cópia no IndexedDB. Se um dia o localStorage voltar vazio (limpeza do
+// navegador, falta de espaço), o app volta com a cópia na próxima abertura
+const BANCO = 'songbook-copia';
+const abrirBanco = () => new Promise((ok, erro) => {
+  const r = indexedDB.open(BANCO, 1);
+  r.onupgradeneeded = () => r.result.createObjectStore('dados');
+  r.onsuccess = () => ok(r.result);
+  r.onerror = () => erro(r.error);
+});
+let copiaPendente = 0;
+function copiaSegura(json) {
+  if (typeof indexedDB === 'undefined') return;
+  clearTimeout(copiaPendente);
+  // (junta as gravações seguidas numa só)
+  copiaPendente = setTimeout(() => abrirBanco().then((b) => {
+    const tx = b.transaction('dados', 'readwrite');
+    tx.objectStore('dados').put(json, KEY);
+    tx.oncomplete = tx.onerror = () => b.close();
+  }).catch(() => {}), 400);
+}
+const tinhaDados = (() => { try { return Boolean(localStorage.getItem(KEY)); } catch { return false; } })();
+if (typeof navigator !== 'undefined' && navigator.storage?.persist) navigator.storage.persisted?.().then((ja) => ja || navigator.storage.persist()).catch(() => {});
+if (typeof indexedDB !== 'undefined') {
+  if (!tinhaDados) {
+    // o localStorage voltou vazio: a cópia, se tiver músicas ou repertórios, volta para ele e o app recomeça com ela
+    abrirBanco().then((b) => new Promise((ok) => {
+      const r = b.transaction('dados').objectStore('dados').get(KEY);
+      r.onsuccess = () => { b.close(); ok(r.result); };
+      r.onerror = () => { b.close(); ok(null); };
+    })).then((json) => {
+      const data = json && JSON.parse(json);
+      if (!data || !Array.isArray(data.songs) || !(data.songs.length || data.sets?.length) || state.songs.length || state.sets.length) return;
+      localStorage.setItem(KEY, json);
+      location.reload();
+    }).catch(() => {});
+  } else copiaSegura(localStorage.getItem(KEY));
 }
 
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);

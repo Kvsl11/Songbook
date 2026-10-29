@@ -25,3 +25,13 @@ test('letra sincronizada: o refrão repetido volta para o refrão escrito na tel
   assert.deepEqual(casarLinhas(cantadas, tela), [0, 1, 2, 0, 1]);
   assert.equal(linhaSemCifra('[G]Santo, [D]santo'), 'Santo, santo');
 });
+
+// o Modal com a conta desativada responde 404 com "workspace … is disabled" (não é o servidor): o erro diz isso
+test('servidor: conta do Modal desativada vira um aviso claro', async () => {
+  const { erroDaResposta, SERVIDOR_DESATIVADO } = await import('../public/js/lib/servidor-ia.js');
+  const e = erroDaResposta(404, 'modal-http: workspace ac-xyz is disabled');
+  assert.equal(e.message, SERVIDOR_DESATIVADO);
+  assert.ok(e.desativado && e.conexao);
+  assert.equal(erroDaResposta(403, '{"detail":"pediu login"}').message, 'pediu login');
+  assert.equal(erroDaResposta(500, '').message, 'o servidor respondeu 500');
+});
