@@ -4,14 +4,19 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 314, data: '2026-10-29', titulo: 'A partitura gera sozinha',
+    itens: [
+      { tipo: 'correcao', texto: 'Gerar a partitura com IA começa a gerar de verdade, sem cair na tela de importar o arquivo: o app espera saber do servidor, usa o do computador ou o da nuvem e, se a música não tem vídeo, procura um no YouTube. Importar o arquivo só aparece se não der para gerar.' },
+      { tipo: 'melhoria', texto: 'A partitura saiu do ⋯ da letra e foi para o ⋯ do Tocando agora (no canto de cima): “Criar partitura”, que a IA gera sozinha, ou “Ver partitura”, se a música já tem.' },
+    ],
+  },
+  {
     versao: 313, data: '2026-10-29', titulo: 'Música e clipe certos, e baixar o repertório',
     itens: [
       { tipo: 'correcao', texto: 'Música com videoclipe (como “Tears”, da Sabrina Carpenter) não fica mais só com o clipe e a letra fora do tempo: o app reconhece a gravação oficial pelo banco de letras e toca o áudio oficial no modo música, com a letra certinha, e o clipe no modo vídeo. As músicas já sincronizadas assim são conferidas sozinhas.' },
       { tipo: 'melhoria', texto: 'O áudio oficial vem primeiro do YouTube Music (o canal do artista), e a música da busca já ganha as duas versões ao abrir, sem precisar dar play.' },
       { tipo: 'novo', texto: 'No repertório e na playlist, o botão de baixar todas as músicas de uma vez, ao lado do play; nas listas, a setinha verde mostra as baixadas.' },
       { tipo: 'melhoria', texto: 'Como no Spotify, no modo vídeo de uma música com videoclipe não aparece a letra (nem a cifra): ela fica no modo música, sincronizada com o áudio oficial.' },
-      { tipo: 'correcao', texto: 'Gerar a partitura com IA começa a gerar de verdade, sem cair na tela de importar o arquivo: o app espera saber do servidor, usa o do computador ou o da nuvem e, se a música não tem vídeo, procura um no YouTube. Importar o arquivo só aparece se não der para gerar.' },
-      { tipo: 'melhoria', texto: 'A partitura saiu do ⋯ da letra e foi para o ⋯ do Tocando agora (no canto de cima): “Criar partitura”, que a IA gera sozinha, ou “Ver partitura”, se a música já tem.' },
     ],
   },
   {
@@ -69,12 +74,6 @@ export const NOVIDADES = [
     versao: 305, data: '2026-10-29', titulo: 'Só a letra na letra sincronizada',
     itens: [
       { tipo: 'correcao', texto: 'As linhas que são só acordes, como “( Am7(4) )”, não aparecem mais no meio da letra sincronizada como se fossem cantadas (nem nas sincronias já guardadas).' },
-    ],
-  },
-  {
-    versao: 304, data: '2026-10-29', titulo: 'A letra sincroniza assim que a música abre',
-    itens: [
-      { tipo: 'melhoria', texto: 'Com o servidor no seu computador ou no GitHub ligado, a letra começa a sincronizar assim que você abre a música, sem precisar dar play: o servidor baixa o áudio do vídeo e ouve sozinho. Quando você tocar, ela já está pronta (ou quase).' },
     ],
   },
 ];
