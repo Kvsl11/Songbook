@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 284, data: '2026-10-29', titulo: 'Foto do artista certa e Tocando agora sem sumir',
+    itens: [
+      { tipo: 'correcao', texto: 'A foto do artista no Tocando agora e nos créditos é a mesma do Cifra Club (a da página do artista). Antes, quando a busca do Cifra Club não trazia a foto, vinha a de outro artista com o mesmo nome (como no Justice).' },
+      { tipo: 'correcao', texto: 'No tablet, rolando o Tocando agora, a parte de cima (a capa, o nome e os controles) não some mais deixando só a cor do fundo.' },
+      { tipo: 'correcao', texto: 'O vídeo do Tocando agora fica dentro do painel ao rolar (antes passava do topo) e, no mini player de baixo, encaixa certinho no quadro (antes ficava cortado ou sobrando), deitado e em pé.' },
+    ],
+  },
+  {
     versao: 283, data: '2026-10-28', titulo: 'Barrinha da música ao rolar, no tablet',
     itens: [
       { tipo: 'novo', texto: 'No tablet, rolando o Tocando agora (no painel do lado e na tela toda), aparece no alto uma barrinha com o nome, o artista, o ✓/+ da biblioteca, o play e a linha do andamento da música, como no Spotify.' },
@@ -63,14 +71,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'melhoria', texto: 'Na letra na tela toda, a música sem cifra não mostra mais o botão Cifra/Letra (nem tom e capotraste): fica só a letra.' },
       { tipo: 'melhoria', texto: '"Tocando agora", no alto da tela, um pouco maior e em negrito.' },
-    ],
-  },
-  {
-    versao: 274, data: '2026-10-28', titulo: 'Artistas nos créditos e letra que não se perde',
-    itens: [
-      { tipo: 'novo', texto: 'Nos créditos, tocar num artista abre a página dele, com as músicas e os álbuns (no Explorar e na lista dos créditos).' },
-      { tipo: 'melhoria', texto: 'A tela Explorar dos créditos mostra a capa da música (ou a imagem do vídeo).' },
-      { tipo: 'correcao', texto: 'Voltando ao app depois de minimizar, a letra sincronizada volta a seguir o que está sendo cantado (antes ela podia correr sozinha à frente da música).' },
     ],
   },
 ];

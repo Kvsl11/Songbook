@@ -2972,24 +2972,29 @@ html.pp #player.modo-capa .pl-video.capa-yt { background-size: auto 134%; }
    do Spotify. z-index -1: fica sobre o fundo do painel e embaixo de tudo; some num degradê no fundo do painel (mask) e
    escurece um pouco em cima e embaixo, para os textos e os botões ficarem legíveis. O lugar da capa fica vazio */
 #player .pl-fundo { display: none; }
-html.pp:not(.tablet) #player.modo-capa .pl-fundo:not([hidden]),
-html.pp.tablet body:not(.painel-recolhido) #player.modo-capa .pl-fundo:not([hidden]) { display: block; position: absolute; z-index: -1; top: 0; left: 0; right: 0;
+html.pp:not(.tablet) #player.modo-capa .pl-fundo:not([hidden]) { display: block; position: absolute; z-index: -1; top: 0; left: 0; right: 0;
   width: auto !important; align-self: stretch !important; height: var(--fundo-h, 100%);
   overflow: hidden; pointer-events: none;
   -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%); }
-/* tablet: a capa animada fica parada atrás do painel (presa a ele, não rola junto) e o conteúdo rola por cima; ela
-   só some aos poucos (a opacidade, pela rolagem). Rolando junto, com a máscara e os quadros animados, o tablet tinha
-   de redesenhar a camada inteira a cada passo da rolagem e ela piscava */
-html.pp.tablet body:not(.painel-recolhido) #player.modo-capa .pl-fundo:not([hidden]) { position: fixed; top: 8px; right: 8px; left: auto;
-  width: var(--painel-w) !important; height: min(var(--fundo-h, 100%), calc(100dvh - 16px)); border-radius: var(--radius) var(--radius) 0 0;
-  transform: translateZ(0); backface-visibility: hidden; will-change: opacity; }
-html.pp.tablet body.painel-cheio #player.modo-capa .pl-fundo:not([hidden]) { left: 8px; width: auto !important; }
+/* tablet: a capa animada fica parada atrás do painel e o conteúdo rola por cima; ela só some aos poucos (a opacidade,
+   pela rolagem). Rolando junto, com a máscara e os quadros animados, o tablet redesenhava a camada inteira a cada passo
+   e ela piscava; presa dentro do painel (position: fixed), a parte de cima do painel sumia ao rolar. Agora ela fica numa
+   camada fora do painel (.pl-fundo-casa, no lugar dele e com o fundo dele) e o painel fica transparente por cima */
+.pl-fundo-casa { display: none; }
+html.pp.tablet body.com-player:not(.painel-recolhido):not(.com-letra-cheia) .pl-fundo-casa.ativo { display: block; position: fixed; z-index: 24; top: 8px; right: 8px; bottom: 8px;
+  width: var(--painel-w); overflow: hidden; pointer-events: none; border-radius: var(--radius);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--cor-musica, var(--tint)) 88%, #000) 0%, color-mix(in srgb, var(--cor-musica, var(--tint)) 45%, #121212) 55%, #121212 100%); }
+html.pp.tablet body.painel-cheio .pl-fundo-casa.ativo { z-index: 39; left: 8px; width: auto; }
+html.pp.tablet body.com-player:not(.painel-recolhido):not(.com-letra-cheia) #player.fundo-fora.modo-capa:not(.letra-cheia) { background: transparent; }
+html.pp.tablet .pl-fundo-casa .pl-fundo:not([hidden]) { display: block; position: absolute; top: 0; left: 0; right: 0; height: min(var(--fundo-h, 100%), 100%);
+  overflow: hidden; pointer-events: none; will-change: opacity;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%); }
 /* com a letra na tela toda por cima: a capa animada sai (os quadros não ficam animando embaixo dela) e o vídeo fica
    escondido já na troca de classe (antes só no quadro seguinte: por um instante ele aparecia por cima da letra que subia
    e a tela piscava) */
 #player.letra-cheia .pl-fundo { display: none !important; }
 body.com-letra-cheia #pl-tela:not(.no-palco) { visibility: hidden !important; }
-html.pp #player .pl-fundo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(0 0 0 / 0.35) 0%, transparent 22%, transparent 45%, rgb(0 0 0 / 0.45) 75%, rgb(0 0 0 / 0.45) 100%); }
+html.pp .pl-fundo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(0 0 0 / 0.35) 0%, transparent 22%, transparent 45%, rgb(0 0 0 / 0.45) 75%, rgb(0 0 0 / 0.45) 100%); }
 html.pp:not(.tablet) #player.modo-capa .pl-video.com-fundo,
 html.pp.tablet body:not(.painel-recolhido) #player.modo-capa .pl-video.com-fundo { background-image: none !important; background-color: transparent; box-shadow: none; }
 /* ao trocar entre vídeo e música, a capa (ou o vídeo) aparece com um zoom suave */
