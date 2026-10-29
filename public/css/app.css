@@ -3972,3 +3972,14 @@ html.toque .date-field:focus-visible, html.toque .cal-dias button:focus-visible,
    escondido, como no tablet */
 html:not(.pp) #player.capa-na-barra:not(.grande) .pl-video { aspect-ratio: 1 / 1; width: 48px; background: #000 center / cover no-repeat; }
 html:not(.pp) #player.capa-na-barra .pl-video.capa-yt { background-size: auto 134%; }
+/* página do álbum: o ano, as faixas e quantas têm cifra em pílulas; a faixa da música que abriu o álbum, destacada */
+.album-dados { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.album-dados span { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 999px; background: rgb(255 255 255 / 0.1); font-size: 13px; font-weight: 600; }
+:root[data-theme="light"] .album-dados span { background: rgb(0 0 0 / 0.06); }
+.track.faixa-destaque { background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+.track.faixa-destaque .t { color: var(--accent-ink); }
+/* "Sobre o artista": a breve apresentação (da Wikipédia) embaixo do nome, em 3 linhas; tocando, abre inteira */
+html.pp #player .pl-artista-bio { margin: -4px 18px 18px; color: rgb(255 255 255 / 0.78); font-size: 14.5px; line-height: 1.45; cursor: pointer; hyphens: manual; -webkit-hyphens: manual;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+html.pp #player .pl-artista-bio.aberta { display: block; -webkit-line-clamp: unset; }
+html.pp #player .pl-artista-bio[hidden] { display: none; }

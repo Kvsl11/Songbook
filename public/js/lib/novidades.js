@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 294, data: '2026-10-29', titulo: 'Ver o álbum e conhecer o artista',
+    itens: [
+      { tipo: 'novo', texto: 'Nos ⋯ da música e do Tocando agora, “Ver álbum” abre o álbum em que a música saiu (o lançamento original, não as coletâneas), com a faixa dela destacada na lista.' },
+      { tipo: 'melhoria', texto: 'A página do álbum mostra o tipo (álbum, ao vivo, single, EP ou coletânea), o ano de lançamento, o número de faixas e quantas têm cifra.' },
+      { tipo: 'novo', texto: 'No cartão “Sobre o artista” do Tocando agora, uma breve apresentação do artista (da Wikipédia), embaixo do nome; tocando no texto, ele abre inteiro.' },
+    ],
+  },
+  {
     versao: 293, data: '2026-10-29', titulo: 'Cifra que acompanha a música',
     itens: [
       { tipo: 'correcao', texto: 'Na cifra com a letra sincronizada, muito mais linhas acendem na hora certa: antes só acendia a linha escrita igualzinho nas duas fontes, e qualquer diferença ("pra"/"para", um "oh" a mais, uma linha quebrada em duas) deixava a linha apagada. As falas das gravações ao vivo, que não estão na cifra, continuam sem acender.' },
@@ -64,14 +72,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'novo', texto: 'Trocar o vídeo de uma música também pelos ⋯ do topo da música e do Tocando agora (inclusive com a letra na tela toda): busca outras versões aqui dentro ou abre a busca no YouTube para copiar e colar o link.' },
       { tipo: 'melhoria', texto: 'Na letra na tela toda, o botão do olho (só a letra) ficou do mesmo tamanho e jeito da pílula Cifra ao lado.' },
-    ],
-  },
-  {
-    versao: 284, data: '2026-10-29', titulo: 'Foto do artista certa e Tocando agora sem sumir',
-    itens: [
-      { tipo: 'correcao', texto: 'A foto do artista no Tocando agora e nos créditos é a mesma do Cifra Club (a da página do artista). Antes, quando a busca do Cifra Club não trazia a foto, vinha a de outro artista com o mesmo nome (como no Justice).' },
-      { tipo: 'correcao', texto: 'No tablet, rolando o Tocando agora, a parte de cima (a capa, o nome e os controles) não some mais deixando só a cor do fundo.' },
-      { tipo: 'correcao', texto: 'O vídeo do Tocando agora fica dentro do painel ao rolar (antes passava do topo) e, no mini player de baixo, encaixa certinho no quadro (antes ficava cortado ou sobrando), deitado e em pé.' },
     ],
   },
 ];

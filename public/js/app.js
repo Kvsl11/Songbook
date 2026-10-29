@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-293';
+export const APP_VERSAO = '2026.10.29-294';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1056,7 +1056,8 @@ const player = (() => {
     if (principal) {
       cartoes.push(`<section class="pl-cartao pl-artista"><div class="pl-artista-foto" data-foto><span>${esc(principal.split(/\s+/).slice(0, 2).map((x) => x[0] || '').join('').toUpperCase())}</span><h4>Sobre o artista</h4></div>
         <div class="pl-artista-pe"><span class="grow"><b>${esc(principal)}</b><small>${esc(pessoas[0]?.papeis.join(' • ') || 'Artista')}</small></span>
-        ${slug ? `<a class="ref-pilula" href="#/artista/${encodeURIComponent(slug)}/${encodeURIComponent(principal)}">Ver artista</a>` : ''}</div></section>`);
+        ${slug ? `<a class="ref-pilula" href="#/artista/${encodeURIComponent(slug)}/${encodeURIComponent(principal)}">Ver artista</a>` : ''}</div>
+        <p class="pl-artista-bio" hidden></p></section>`);
     }
     // créditos como o SongDNA do Spotify: as pessoas com a foto e o "Explorar"; embaixo, a lista (com a foto pequena)
     // (a capa: a da música ou, sem ela, a miniatura do vídeo; aberta a página de um artista, o Tocando agora fecha)
@@ -1085,6 +1086,14 @@ const player = (() => {
       const img = new Image();
       img.onload = () => { f.classList.add('com-foto'); f.style.backgroundImage = `url("${url}")`; };
       img.src = url;
+    }).catch(() => {});
+    // a breve apresentação do artista embaixo do nome (3 linhas; tocando, abre o texto inteiro)
+    if (principal) descricaoDoArtista(principal).then((texto) => {
+      const bio = $('.pl-extra .pl-artista-bio', el);
+      if (!texto || !bio || extraDe !== chave) return;
+      bio.textContent = texto;
+      bio.hidden = false;
+      bio.onclick = () => bio.classList.toggle('aberta');
     }).catch(() => {});
     if (atual?.youtube) infoDoVideo(atual.youtube).then((v) => {
       if (!v || extraDe !== chave) return;
@@ -1842,6 +1851,7 @@ const player = (() => {
       naLetra && song && atual.youtube && !atual.semVideo && { valor: 'sincronizar', rotulo: sincronizada ? 'Sincronizar a letra de novo' : 'Sincronizar a letra', ic: 'sparkles' },
       (salva || (preview && (atual.songId === 'previa' || atual.href === '#/musica/previa'))) && { valor: 'trocar', rotulo: atual.semVideo ? 'Escolher um vídeo' : 'Trocar o vídeo', ic: atual.semVideo ? 'youtube' : 'refresh' },
       !naLetra && !atual.semVideo && { valor: 'troca', rotulo: modoCapa() ? 'Mudar para vídeo' : 'Mudar para música', ic: modoCapa() ? 'video' : 'music' },
+      (atual.artista || ehCifraClub(song?.source || '')) && { valor: 'album', rotulo: 'Ver álbum', ic: 'disc' },
       { valor: 'compartilhar', rotulo: 'Compartilhar', ic: 'share' },
       atual.youtube && { valor: 'youtube', rotulo: 'Abrir no YouTube', ic: 'youtube' },
       { valor: 'fechar', rotulo: 'Fechar o player', ic: 'x' },
@@ -1852,6 +1862,8 @@ const player = (() => {
     if (!v || !atual) return;
     if (v === 'youtube') { window.open(`https://www.youtube.com/watch?v=${atual.youtube}&t=${Math.floor(api.tempoAgora)}s`, '_blank', 'noopener'); return; }
     if (v === 'sincronizar') { sincronizarDoPlayer(song, sincronizada); return; }
+    // o álbum abre como página: o Tocando agora na tela toda fecha antes (no tablet, o painel continua ao lado)
+    if (v === 'album') { if (document.body.classList.contains('painel-cheio')) painelCheio(false, { semVoltar: true }); irParaAlbum({ titulo: song?.title || atual.titulo, artista: song?.artist || atual.artista, fonte: song?.source }); return; }
     // as outras opções fazem o mesmo que os botões do painel
     const alvoBt = document.createElement('button');
     alvoBt.dataset.pl = v;
@@ -3599,6 +3611,25 @@ async function fotoDeezer(nome) {
   // sem foto, o Deezer devolve uma imagem genérica (o endereço fica com "/artist//")
   return a?.picture_medium && !/\/artist\/\//.test(a.picture_medium) ? a.picture_big || a.picture_medium : '';
 }
+// uma breve apresentação do artista (o estilo, de onde é, os prêmios), para o cartão "Sobre o artista": o começo da
+// página dele na Wikipédia em português. Só vale a página que é mesmo de um músico com esse nome (pela descrição dela:
+// cantor, banda, ministério de música…): "Justice" é a banda, não a atriz Victoria Justice. Sem uma assim, fica sem
+const descricoesArtistas = new Map();
+const MUSICO = /cantor|cantora|banda|m[uú]sic|grupo|dupla|compositor|compositora|rapper|instrumentista|\bdj\b|minist[eé]rio|cantautor|vocalista|coral|coro|orquestra|trio|duo\b|quarteto|sacerdote|padre|frei/i;
+function descricaoDoArtista(nome) {
+  const k = normalizar(nome);
+  if (!descricoesArtistas.has(k)) {
+    const url = `https://pt.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&generator=search&gsrlimit=5&gsrsearch=${encodeURIComponent(nome)}&prop=extracts|description&exintro=1&explaintext=1&exsentences=4`;
+    descricoesArtistas.set(k, fetch(url).then((r) => r.json()).then((j) => {
+      const paginas = Object.values(j?.query?.pages || {}).sort((x, y) => (x.index || 0) - (y.index || 0));
+      const certa = paginas.find((pg) => mesmoNome(pg.title.replace(/\s*\([^)]*\)\s*$/, ''), nome) && MUSICO.test(pg.description || '')
+        && !/desambigua/i.test(pg.description || ''));
+      // (sem as datas e a pronúncia entre parênteses do começo, que só atrapalham numa leitura rápida)
+      return String(certa?.extract || '').replace(/\s*\([^()]*\d{4}[^()]*\)/, '').replace(/\s+/g, ' ').trim();
+    }).catch(() => { descricoesArtistas.delete(k); return ''; }));
+  }
+  return descricoesArtistas.get(k);
+}
 async function fotoWikipedia(nome) {
   for (const lingua of ['pt', 'en']) {
     try {
@@ -3953,6 +3984,44 @@ async function viewArtista(slug, nome) {
 }
 
 // álbum do artista: capa, ano e as faixas na ordem do disco; cada faixa abre com cifra, letra e vídeo
+// "Ver álbum" (no ⋯ da música e do Tocando agora): o álbum em que a música saiu, pela discografia do artista no Cifra
+// Club. A música que veio de lá já diz o artista (e a faixa, pelo endereço); as outras procuram o artista pelo nome e a
+// faixa pelo título. Saindo em vários (o álbum, o ao vivo, as coletâneas de sucessos), vale o lançamento original: o
+// mais antigo que não é coletânea (no mesmo ano, o álbum antes do single)
+const COLETANEA = /\b(hits|sele[cç][aã]o|essencial|grandes sucessos|colet[aâ]nea|o melhor|the best|greatest|melhores|sucessos|momentos)\b/i;
+async function irParaAlbum({ titulo = '', artista = '', fonte = '' } = {}) {
+  const t = toast('Procurando o álbum…');
+  try {
+    const m = /cifraclub\.com\.br\/([a-z0-9-]+)\/([a-z0-9-]+)/.exec(fonte || '');
+    let slug = m?.[1] || '';
+    let nome = artista;
+    if (!slug) {
+      if (!artista) throw new Error('sem artista');
+      const a = artistaCerto(await buscarArtistasCifraClub(artista).catch(() => []), artista);
+      if (!a?.slug) throw new Error('artista não encontrado');
+      slug = a.slug;
+      nome = a.nome || artista;
+    }
+    const dados = carregarArtista(slug, nome);
+    nome = (await dados.principal.catch(() => null))?.nome || nome;
+    const disc = await dados.disc;
+    const faixa = m?.[2] ? `/${slug}/${m[2]}/` : '';
+    const mesmoTitulo = (f) => normalizar(tituloLimpo(f.titulo)) === normalizar(tituloLimpo(titulo));
+    const tem = (al) => al.faixas.find((f) => (faixa && f.url?.endsWith(faixa)) || mesmoTitulo(f));
+    const candidatos = disc.filter(tem).sort((x, y) => (COLETANEA.test(x.titulo) - COLETANEA.test(y.titulo))
+      || ((Number(x.ano) || 9999) - (Number(y.ano) || 9999)) || ((x.tipo === 'single') - (y.tipo === 'single')));
+    const al = candidatos[0];
+    if (!al) throw new Error('álbum não encontrado');
+    // a faixa da música fica destacada na lista do álbum
+    try { sessionStorage.setItem('albumFaixa', tem(al).titulo); } catch { /* sem armazenamento */ }
+    t?.remove?.();
+    location.hash = `#/artista/${encodeURIComponent(slug)}/${encodeURIComponent(nome)}/album/${encodeURIComponent(al.url)}`;
+  } catch {
+    t?.remove?.();
+    toast('Não achei o álbum desta música no Cifra Club');
+  }
+}
+const TIPO_ALBUM = { album: 'Álbum', single: 'Single', ep: 'EP' };
 async function viewAlbum(slug, nome, albumUrl) {
   setTab('buscar');
   setTint('#2f3a4f');
@@ -3971,11 +4040,23 @@ async function viewAlbum(slug, nome, albumUrl) {
   }
   setHeader(al.titulo.trim(), { back: voltar, eyebrow: nome });
   const comCifra = al.faixas.filter((f) => f.url).length;
+  // o tipo (álbum, single, EP; ao vivo e coletânea pelo nome), o ano e as faixas; vindo do "Ver álbum" de uma música,
+  // a faixa dela fica destacada e a lista rola até ela
+  let destaque = '';
+  try { destaque = sessionStorage.getItem('albumFaixa') || ''; sessionStorage.removeItem('albumFaixa'); } catch { /* sem armazenamento */ }
+  const tipo = [/\b(ao vivo|live)\b/i.test(al.titulo) ? 'Álbum ao vivo' : COLETANEA.test(al.titulo) ? 'Coletânea' : TIPO_ALBUM[al.tipo] || 'Álbum'];
+  const nFaixas = `${al.faixas.length} ${al.faixas.length === 1 ? 'faixa' : 'faixas'}`;
   view.innerHTML = `
-    <section class="page-hero"><div class="cover">${al.capaGrande ? `<img src="${esc(al.capaGrande)}" alt="">` : icon('disc', 48)}</div>
-      <div><div class="kind">Álbum</div><h2>${esc(al.titulo.trim())}</h2>
-      <div class="meta"><a href="${voltar}"><b>${esc(nome)}</b></a>${al.ano ? ` · ${esc(al.ano)}` : ''} · ${al.faixas.length} faixas${comCifra < al.faixas.length ? ` (${comCifra} com cifra)` : ''}</div></div></section>
+    <section class="page-hero album-hero"><div class="cover">${al.capaGrande ? `<img src="${esc(al.capaGrande)}" alt="">` : icon('disc', 48)}</div>
+      <div><div class="kind">${esc(tipo[0])}</div><h2>${esc(al.titulo.trim())}</h2>
+      <div class="meta"><a href="${voltar}"><b>${esc(nome)}</b></a>${al.ano ? ` · ${esc(al.ano)}` : ''} · ${nFaixas}${comCifra < al.faixas.length ? ` (${comCifra} com cifra)` : ''}</div>
+      ${al.ano ? `<div class="album-dados"><span>${icon('calendar', 14)} Lançado em ${esc(al.ano)}</span><span>${icon('list', 14)} ${nFaixas}</span>${comCifra ? `<span>${icon('chord', 14)} ${comCifra} com cifra</span>` : ''}</div>` : ''}</div></section>
     <ul class="tracks" id="faixas">${al.faixas.map((f, i) => linhaFaixa({ ...f, capa: al.capa }, i, i + 1, al.capa, nome)).join('')}</ul>`;
+  if (destaque) {
+    const i = al.faixas.findIndex((f) => normalizar(tituloLimpo(f.titulo)) === normalizar(tituloLimpo(destaque)));
+    const li = i >= 0 && $(`#faixas li[data-i="${i}"]`);
+    if (li) { li.classList.add('faixa-destaque'); requestAnimationFrame(() => li.scrollIntoView({ block: 'center' })); }
+  }
   $('#faixas').addEventListener('click', (e) => {
     const li = e.target.closest('li[data-i]');
     const f = li && al.faixas[Number(li.dataset.i)];
@@ -6692,6 +6773,7 @@ function viewSong(id, ctx = {}) {
           ${isPreview ? `<button role="menuitem" id="btn-edit-prev">${icon('edit', 18)}<span>Editar cifra</span></button>`
             : `<a role="menuitem" href="#/editar/${song.id}">${icon('edit', 18)}<span>Editar cifra</span></a>`}
           <button role="menuitem" id="btn-pdf">${icon('file', 18)}<span>Exportar PDF</span></button>
+          ${song.artist || ehCifraClub(song.source || '') ? `<button role="menuitem" id="btn-album">${icon('disc', 18)}<span>Ver álbum</span></button>` : ''}
           <button role="menuitem" id="btn-trocar-video">${icon(song.youtube ? 'refresh' : 'youtube', 18)}<span>${song.youtube ? 'Trocar o vídeo' : 'Escolher um vídeo'}</span></button>
           ${song.youtube ? `<button role="menuitem" id="btn-sincronizar">${icon('sparkles', 18)}<span>${song.sincronia?.video === song.youtube ? 'Sincronizar a letra de novo' : 'Sincronizar a letra com o vídeo'}</span></button>` : ''}
           ${(() => {
@@ -7022,6 +7104,7 @@ function viewSong(id, ctx = {}) {
   const mudarVideo = async () => { const url = await escolherVideo(song); if (url !== null) salvarVideo(url); };
   // também nos ⋯ do topo: buscar outras versões aqui dentro ou colar o link do YouTube
   $('#btn-trocar-video').onclick = mudarVideo;
+  if ($('#btn-album')) $('#btn-album').onclick = () => irParaAlbum({ titulo: song.title, artista: song.artist, fonte: song.source });
   const tocar = () => player.tocar(itemDoPlayer(song, ctx.set ? db.set(ctx.set.id) : null, ctx.set ? ctx.index : -1));
   $('#refs').addEventListener('click', (e) => {
     if (e.target.closest('[data-video]')) mudarVideo();
