@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-307';
+export const APP_VERSAO = '2026.10.29-308';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -9475,7 +9475,10 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
     const r = await chamarComEtapas(servidorIA(), '/letra', { json: { url: `https://youtu.be/${song.youtube}`, linhas: linhasPedidas, refazer, ...(referencia ? { referencia: referencia.tempos } : {}) } },
       (etapa, p) => status('carregando', etapa === 'baixando' && p !== null && p < 1 ? `Baixando o áudio do vídeo… ${Math.round(p * 100)}%` : etapa === 'baixando' && p >= 1 ? 'Áudio baixado. Preparando…' : ETAPAS_SINC[etapa] || 'Sincronizando a letra…'));
     guardar({ video: song.youtube, linhas: linhasPedidas, tempos: r.linhas.map((x) => ({ inicio: x.inicio, fim: x.fim })), ...(referencia ? { fonte: 'lrclib' } : {}) });
-    status('ok', `Letra sincronizada: ${r.achadas} de ${r.total} linhas. Dê play e ela acompanha.`,
+    // como o servidor sincronizou: o alinhador (a letra encaixada na voz), a letra da internet no lugar certo ou o
+    // Whisper (a reserva); aparece no aviso, para saber o que deu certo ou não
+    const metodo = { alinhador: 'alinhador de IA', 'alinhador+internet': 'letra da internet, no lugar certo', 'whisper+internet': 'letra da internet, no lugar certo', whisper: 'Whisper' }[r.metodo] || '';
+    status('ok', `Letra sincronizada: ${r.achadas} de ${r.total} linhas${metodo ? ` (${metodo})` : ''}. Dê play e ela acompanha.`,
       refazer ? '' : `<button class="btn small" data-sinc="de-novo" data-refazer="1">${icon('refresh', 14)} Ficou errada? Refazer</button>`);
     notificar(`${r.achadas} de ${r.total} linhas ouvidas no vídeo. Dê play: a letra acompanha, e tocar numa linha vai até ela.`, { tipo: 'sucesso', titulo: `Letra sincronizada: ${song.title}`, href: aqui });
     return 'ok';
