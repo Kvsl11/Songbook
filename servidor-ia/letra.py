@@ -204,7 +204,7 @@ def pela_referencia(tempos: list[dict], referencia: list[dict], duracao: float):
     """A letra sincronizada da internet (LRCLIB, feita por gente, como no Musixmatch) é a mesma música, mas o vídeo
     tem uma parte antes (o videoclipe com filme): o quanto ela está adiantada sai das linhas que a IA achou com
     segurança, e a da internet vem inteira, deslocada. (tempos, achadas) ou None se não deu para saber o quanto."""
-    difs = sorted(t["inicio"] - float(r["inicio"]) for t, r in zip(tempos, referencia) if t["confianca"] >= 0.4)
+    difs = sorted(t["inicio"] - float(r["inicio"]) for t, r in zip(tempos, referencia) if t["confianca"] >= 0.1)
     if len(difs) < 3:
         return None
     meio = difs[len(difs) // 2]
@@ -277,6 +277,7 @@ def sincronizar(caminho: str | None, linhas: list[str], separar_voz: bool = True
     y16 = librosa.resample(voz, orig_sr=transcricao.SR, target_sr=SR_WHISPER).astype(np.float32)
     etapa("ouvindo")
     tempos = None
+    metodo = "whisper"
     if alinhador.disponivel():
         # o alinhamento forçado (a letra conhecida encaixada na voz, letra por letra): mais firme que casar as
         # palavras que o Whisper ouviu, sobretudo com introdução longa, solos e trechos falados no vídeo
@@ -287,6 +288,9 @@ def sincronizar(caminho: str | None, linhas: list[str], separar_voz: bool = True
                 pesos = [max(1, len(palavras_da_linha(l))) for l in linhas]
                 comeco = next((t["inicio"] for t in achadas_mms if t), 0.0)
                 tempos = _preencher(list(achadas_mms), pesos, duracao, comeco=comeco)
+                metodo = "alinhador"
+            else:
+                log.warning("alinhador achou só %d de %d linhas; usando o Whisper", sum(1 for t in achadas_mms if t), len(linhas))
         except Exception:  # sem o modelo, sem memória: fica com o Whisper
             log.warning("alinhamento forçado falhou; usando o Whisper", exc_info=True)
     if tempos is None:
@@ -296,6 +300,9 @@ def sincronizar(caminho: str | None, linhas: list[str], separar_voz: bool = True
         tempos = tempos_das_linhas(linhas, palavras, duracao)
     achadas = sum(1 for t in tempos if t["confianca"] > 0)
     if referencia and len(referencia) == len(tempos):
-        tempos, achadas = pela_referencia(tempos, referencia, duracao) or (tempos, achadas)
+        ajustada = pela_referencia(tempos, referencia, duracao)
+        if ajustada:
+            (tempos, achadas), metodo = ajustada, metodo + "+internet"
+    log.warning("letra sincronizada: %d de %d linhas (%s)", achadas, len(linhas), metodo)
     return {"linhas": tempos, "achadas": achadas, "total": len(linhas), "duracao": round(duracao, 3),
-            "separado": separado}
+            "separado": separado, "metodo": metodo}

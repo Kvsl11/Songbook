@@ -6,7 +6,8 @@ que é cantado e depois casar as palavras, a letra já conhecida é "encaixada" 
 2. a letra inteira, na ordem cantada, é encaixada nessas chances pelo caminho mais provável (Viterbi, como no CTC).
    Entre uma linha e outra há um "vão" que pode durar o quanto for: a introdução só de instrumentos, um solo, ou o
    trecho de filme de um videoclipe (a fala de lá é aceita no vão, pagando um pouco por quadro, e não vira a letra);
-3. a linha que não é cantada no vídeo (a cifra tem uma estrofe a mais, por exemplo) pode ser pulada, com um custo:
+3. a linha que não é cantada no vídeo (a cifra tem uma estrofe a mais, por exemplo) pode ser pulada, com um custo
+   por letra dela:
    ela fica sem tempo e a sincronia a põe entre as vizinhas.
 
 O resultado: o começo e o fim de cada linha e a confiança (a chance média das letras dela).
@@ -25,9 +26,11 @@ QUADRO = 0.02  # o MMS_FA dá uma coluna de chances a cada 20 ms
 JANELA = 30  # segundos de áudio por vez no modelo (o áudio inteiro de uma vez não caberia na memória)
 # custos (em log da chance): ficar no vão ouvindo voz que não é da letra, por quadro; pular uma linha inteira
 CUSTO_VAO = float(os.environ.get("IA_ALINHA_VAO") or 1.5)
-CUSTO_PULAR = float(os.environ.get("IA_ALINHA_PULAR") or 40.0)
+# pular uma linha custa por letra dela: uma linha comprida só é pulada quando não há mesmo nada dela na voz (no canto,
+# com a nota esticada e a banda vazando, as letras têm chance baixa, e com um custo fixo as linhas longas eram puladas)
+CUSTO_PULAR = float(os.environ.get("IA_ALINHA_PULAR") or 6.0)
 # linha encaixada à força, com as letras quase sem chance nenhuma ali (ela não é cantada no vídeo): fica sem tempo
-CONFIANCA_MINIMA = 0.15
+CONFIANCA_MINIMA = 0.08
 
 _trava = threading.Lock()
 _modelo = None
@@ -127,7 +130,7 @@ def alinhar(emissao: np.ndarray, linhas: list[str], vazio: int = 0, custo_vao: f
                 pred[s, 1] = fim_linha[k]  # o vazio do fim da linha
                 pred[s, 2] = fim_linha[k] - 1 if fim_linha[k] - 1 > inicio_linha[k] else -1  # a última letra
                 pred[s, 3] = vaos[g - 1]
-                custo[s, 3] = -custo_pular
+                custo[s, 3] = -custo_pular * (10 + len(linhas[k]))
             continue
         k = dona[s]
         if s == inicio_linha[k]:

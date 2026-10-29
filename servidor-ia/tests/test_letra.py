@@ -80,5 +80,5 @@ def test_pela_referencia_desloca_a_letra_da_internet_pelo_comeco_do_video():
 def test_pela_referencia_sem_linhas_seguras_nao_desloca():
     from letra import pela_referencia
     ref = [{"inicio": 10.0, "fim": 12.0}] * 3
-    ia = [{"inicio": 50.0, "fim": 52.0, "confianca": 0.1}] * 3
+    ia = [{"inicio": 50.0, "fim": 52.0, "confianca": 0.0}] * 3  # linhas preenchidas, nenhuma achada
     assert pela_referencia(ia, ref, 100.0) is None

@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 308, data: '2026-10-29', titulo: 'Sincronia mais firme no canto',
+    itens: [
+      { tipo: 'correcao', texto: 'O alinhador da letra no servidor não pula mais as frases cantadas com a nota esticada ou com a banda alta (antes elas ficavam sem tempo e a letra se perdia nesses trechos).' },
+      { tipo: 'melhoria', texto: 'O aviso de “Letra sincronizada” diz como ela foi feita: pelo alinhador de IA, pela letra da internet no lugar certo ou pelo Whisper.' },
+    ],
+  },
+  {
     versao: 307, data: '2026-10-29', titulo: 'Letra sincronizada mais firme',
     itens: [
       { tipo: 'melhoria', texto: 'Com o servidor ligado, a letra sincronizada da internet (feita por gente, como a do Spotify) é usada quando o vídeo é a mesma gravação. No videoclipe com uma parte antes da música, o servidor ouve o vídeo só para achar onde ela começa e põe essa letra no lugar certo.' },
@@ -61,14 +68,6 @@ export const NOVIDADES = [
     versao: 299, data: '2026-10-29', titulo: 'Servidor da partitura na nuvem do GitHub',
     itens: [
       { tipo: 'novo', texto: 'O servidor da partitura também roda no GitHub Codespaces: um computador na nuvem, aberto pelo navegador, sem instalar nada no notebook (bom quando o antivírus da empresa bloqueia). A página dele mostra o QR code para ligar o celular.' },
-    ],
-  },
-  {
-    versao: 298, data: '2026-10-29', titulo: 'Partitura pelo servidor do seu computador',
-    itens: [
-      { tipo: 'correcao', texto: 'Gerar a partitura no celular não fica mais parado em “Abrindo o áudio”: se o aparelho não conseguir abrir o arquivo ou carregar a IA em alguns minutos, a tela avisa e diz o que fazer.' },
-      { tipo: 'novo', texto: 'Com o servidor no seu computador ligado (Ajustes → Servidor no computador), a partitura volta a ser feita nele, de graça e sem crédito: a voz é separada dos instrumentos e dá para colar o link do YouTube. Se o computador não responder, o celular faz sozinho.' },
-      { tipo: 'melhoria', texto: 'No notebook da empresa, sem administrador: o servidor liga por uma tarefa do VS Code e, se a rede bloquear o túnel da Cloudflare, o celular alcança o computador pelas Portas do VS Code.' },
     ],
   },
 ];
