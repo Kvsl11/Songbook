@@ -6219,7 +6219,7 @@ async function gerarComIA(song, titulo) {
       // não conseguiu nem falar com o servidor (sem internet, fora do ar): o arquivo ainda dá para ler no aparelho, e a
       // tela diz por quê (antes trocava de tela calada e parecia que as etapas nem rodavam). Se o servidor caiu no meio,
       // mostra o erro e o "tente de novo", em vez de recomeçar tudo no aparelho
-      if (arquivo && e.conexao) { lerNoAparelho(arquivo, 'O servidor da IA não respondeu, então a partitura está sendo feita aqui no próprio aparelho.'); return; }
+      if (arquivo && e.conexao) { lerNoAparelho(arquivo, e.desativado ? 'O servidor da IA está desligado (a conta do Modal foi desativada), então a partitura está sendo feita aqui no próprio aparelho.' : 'O servidor da IA não respondeu, então a partitura está sendo feita aqui no próprio aparelho.'); return; }
       telaFontes(erroExplicado(e));
       if (e.status === 403) passo.querySelector('.aviso')?.insertAdjacentHTML('beforeend', `<a class="btn small primary" href="#/youtube">${icon('youtube', 15)} Conectar o YouTube</a>`);
     }

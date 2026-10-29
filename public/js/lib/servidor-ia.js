@@ -16,6 +16,18 @@ export function baseDoServidor(texto) {
 // a linha da letra como se canta: sem os acordes ([G]Santo) e sem espaços sobrando
 export const linhaSemCifra = (l) => String(l || '').replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
 
+// a resposta de erro do servidor virou um erro em português. Quando o Modal (onde o servidor está publicado) desliga a
+// conta ("workspace is disabled": o crédito do mês acabou ou falta pagamento) ou o app parou, a resposta nem é do
+// servidor: o erro diz isso (desativado) e conta como sem conexão, para o arquivo ser lido no próprio aparelho
+export const SERVIDOR_DESATIVADO = 'O servidor da IA está desligado no Modal (a conta foi desativada: o crédito grátis do mês acabou ou falta pagamento). Entre em modal.com e reative a conta; enquanto isso, escolha o arquivo de áudio da música (a partitura é feita no próprio aparelho).';
+export function erroDaResposta(status, texto = '') {
+  let dados = {};
+  try { dados = JSON.parse(texto); } catch { /* não é JSON */ }
+  if (typeof dados.detail === 'string') return Object.assign(new Error(dados.detail), { status });
+  if (/workspace .*disabled|app .*(stopped|not found)|modal-http/i.test(texto)) return Object.assign(new Error(SERVIDOR_DESATIVADO), { status, desativado: true, conexao: true });
+  return Object.assign(new Error(`o servidor respondeu ${status}`), { status });
+}
+
 // chamada ao servidor: JSON ou multipart; o erro vem com a mensagem do servidor (em português)
 export async function chamar(cfg, rota, { json, form, metodo, sinal, tempo = 15 * 60e3 } = {}) {
   const base = baseDoServidor(cfg?.url);
@@ -28,9 +40,9 @@ export async function chamar(cfg, rota, { json, form, metodo, sinal, tempo = 15 
   if (json) headers['Content-Type'] = 'application/json';
   try {
     const r = await fetch(base + rota, { method: metodo || (json || form ? 'POST' : 'GET'), headers, body: json ? JSON.stringify(json) : form, signal: ctrl.signal });
-    const dados = await r.json().catch(() => ({}));
-    if (!r.ok) throw Object.assign(new Error(typeof dados.detail === 'string' ? dados.detail : `o servidor respondeu ${r.status}`), { status: r.status });
-    return dados;
+    const texto = await r.text().catch(() => '');
+    if (!r.ok) throw erroDaResposta(r.status, texto);
+    try { return JSON.parse(texto); } catch { return {}; }
   } catch (e) {
     if (e.name === 'AbortError') throw new Error(sinal?.aborted ? 'Cancelado' : 'O servidor demorou demais');
     if (e instanceof TypeError) throw new Error('Não consegui falar com o servidor da IA (endereço certo? ligado?)');
@@ -53,10 +65,7 @@ export async function chamarComEtapas(cfg, rota, { json, form, sinal, tempo = 20
   if (json) headers['Content-Type'] = 'application/json';
   try {
     const r = await fetch(`${base}${rota}${rota.includes('?') ? '&' : '?'}etapas=1`, { method: 'POST', headers, body: json ? JSON.stringify(json) : form, signal: ctrl.signal });
-    if (!r.ok) {
-      const dados = await r.json().catch(() => ({}));
-      throw Object.assign(new Error(typeof dados.detail === 'string' ? dados.detail : `o servidor respondeu ${r.status}`), { status: r.status });
-    }
+    if (!r.ok) throw erroDaResposta(r.status, await r.text().catch(() => ''));
     const leitor = r.body.getReader();
     const texto = new TextDecoder();
     let resto = '';
@@ -114,9 +123,7 @@ function enviarComEtapas(cfg, url, form, sinal, tempo, aoEtapa) {
     xhr.onprogress = () => { if (xhr.status === 200) linhas(); };
     xhr.onload = () => {
       if (xhr.status !== 200) {
-        let dados = {};
-        try { dados = JSON.parse(xhr.responseText); } catch { /* sem corpo */ }
-        terminar(falha, Object.assign(new Error(typeof dados.detail === 'string' ? dados.detail : `o servidor respondeu ${xhr.status}`), { status: xhr.status }));
+        terminar(falha, erroDaResposta(xhr.status, xhr.responseText || ''));
         return;
       }
       linhas();

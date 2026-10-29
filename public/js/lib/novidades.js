@@ -9,6 +9,7 @@ export const NOVIDADES = [
       { tipo: 'novo', texto: 'Trocar o vídeo de uma música também pelos ⋯ do topo da música e do Tocando agora (inclusive com a letra na tela toda): busca outras versões aqui dentro ou abre a busca no YouTube para copiar e colar o link.' },
       { tipo: 'melhoria', texto: 'Na letra na tela toda, o botão do olho (só a letra) ficou do mesmo tamanho e jeito da pílula Cifra ao lado.' },
       { tipo: 'novo', texto: 'Repertório e playlist como songbook: com a letra na tela toda (ou só a letra, no olho), passar o dedo para o lado vai para a próxima música (ou volta para a anterior), já com a letra dela. No computador, setas dos lados da tela e as setas do teclado.' },
+      { tipo: 'correcao', texto: 'Gerar a partitura com IA: quando o servidor da IA está desligado, o app agora diz isso com clareza (em vez de travar em "Baixando o áudio 0%" e dar um erro sem explicação) e, com um arquivo de áudio, faz a partitura no próprio aparelho.' },
       { tipo: 'melhoria', texto: 'Sua biblioteca, repertórios e playlists ficam guardados com mais segurança: o navegador é avisado para não apagar os dados do app e fica uma segunda cópia, que volta sozinha se os dados sumirem.' },
     ],
   },
