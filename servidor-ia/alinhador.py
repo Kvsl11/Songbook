@@ -82,11 +82,15 @@ def chances(voz16: np.ndarray) -> np.ndarray:
             x = torch.from_numpy(np.ascontiguousarray(voz16[a:b], dtype=np.float32))[None]
             e, _ = m(x)
             e = torch.log_softmax(e[0], dim=-1).numpy()
-            # tira as bordas (só servem de contexto) pela proporção de quadros
-            por_amostra = e.shape[0] / max(1, b - a)
-            i0 = int(round((ini - a) * por_amostra))
-            i1 = i0 + int(round((min(ini + passo, len(voz16)) - ini) * por_amostra))
-            partes.append(e[i0:i1])
+            # tira as bordas (só servem de contexto): um quadro a cada 20 ms. Pela proporção de quadros (o modelo dá um
+            # a menos por janela, pelas bordas da convolução) cada janela de 30 s rendia 1499 quadros, e a letra
+            # atrasava 20 ms a cada 30 s
+            i0 = int(round((ini - a) / (SR * QUADRO)))
+            n = int(round((min(ini + passo, len(voz16)) - ini) / (SR * QUADRO)))
+            pedaco = e[i0:i0 + n]
+            if len(pedaco) < n and len(pedaco):  # o fim do áudio: repete o último quadro para não perder o passo
+                pedaco = np.concatenate([pedaco, np.repeat(pedaco[-1:], n - len(pedaco), axis=0)])
+            partes.append(pedaco)
     return np.concatenate(partes) if partes else np.zeros((0, len(_rotulos)), dtype=np.float32)
 
 

@@ -82,3 +82,25 @@ def test_pela_referencia_sem_linhas_seguras_nao_desloca():
     ref = [{"inicio": 10.0, "fim": 12.0}] * 3
     ia = [{"inicio": 50.0, "fim": 52.0, "confianca": 0.0}] * 3  # linhas preenchidas, nenhuma achada
     assert pela_referencia(ia, ref, 100.0) is None
+
+
+def test_pela_referencia_com_uma_cena_no_meio_do_video():
+    from letra import pela_referencia
+    # como no clipe de Espresso: 10 s de filme antes e, depois da 6ª linha, mais 20 s de cena no meio da música
+    ref = [{"inicio": 10.0 + 4 * k, "fim": 13.0 + 4 * k} for k in range(12)]
+    real = [r["inicio"] + (10.0 if k < 6 else 30.0) for k, r in enumerate(ref)]
+    ia = [{"inicio": x + 0.1, "fim": x + 3.0, "confianca": 0.6} for x in real]
+    ia[2]["inicio"] += 15.0  # uma linha achada no lugar errado não muda nada
+    ia[7]["confianca"] = 0.0  # e uma não achada (preenchida) fica no trecho certo
+    tempos, achadas = pela_referencia(ia, ref, 120.0)
+    assert achadas == 12
+    assert all(abs(t["inicio"] - x) < 0.5 for t, x in zip(tempos, real))
+
+
+def test_pela_referencia_acompanha_o_andamento_entre_as_ancoras():
+    from letra import pela_referencia
+    # ao vivo, um pouco mais lento: o deslocamento cresce aos poucos (0,1 s por linha)
+    ref = [{"inicio": 5.0 * k, "fim": 5.0 * k + 4} for k in range(10)]
+    ia = [{"inicio": 5.0 * k + 3.0 + 0.1 * k, "fim": 5.0 * k + 7, "confianca": 0.0 if k % 3 == 1 else 0.7} for k in range(10)]
+    tempos, _ = pela_referencia(ia, ref, 100.0)
+    assert all(abs(t["inicio"] - (5.0 * k + 3.0 + 0.1 * k)) < 0.2 for k, t in enumerate(tempos))

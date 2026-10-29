@@ -26,6 +26,8 @@ import alinhador
 log = logging.getLogger("songbook-ia")
 SR_WHISPER = 16000
 _trava = threading.Lock()
+# dois deslocamentos (vídeo - letra da internet) que diferem até isto são o mesmo trecho do vídeo
+TOLERA_TRECHO = 1.5
 _whisper: dict = {}  # um modelo por tamanho (o "small" de sempre e o "medium" do refazer)
 
 
@@ -202,21 +204,64 @@ def _preencher(saida: list, pesos: list[int], duracao: float, comeco: float = 0.
 
 def pela_referencia(tempos: list[dict], referencia: list[dict], duracao: float):
     """A letra sincronizada da internet (LRCLIB, feita por gente, como no Musixmatch) é a mesma música, mas o vídeo
-    tem uma parte antes (o videoclipe com filme): o quanto ela está adiantada sai das linhas que a IA achou com
-    segurança, e a da internet vem inteira, deslocada. (tempos, achadas) ou None se não deu para saber o quanto."""
-    difs = sorted(t["inicio"] - float(r["inicio"]) for t, r in zip(tempos, referencia) if t["confianca"] >= 0.1)
-    if len(difs) < 3:
+    tem partes que a gravação não tem (o videoclipe com filme antes, ou uma cena no meio da música, como no de
+    Espresso): o quanto ela está adiantada sai das linhas que a IA achou com segurança, trecho por trecho, e a da
+    internet vem inteira, deslocada em cada trecho. Antes era um deslocamento só para a música toda: a primeira parte
+    ficava certa e, depois da cena do meio, a letra se perdia. (tempos, achadas) ou None se não deu para saber."""
+    pares = [(k, t["inicio"] - float(r["inicio"])) for k, (t, r) in enumerate(zip(tempos, referencia))
+             if t["confianca"] >= 0.1]
+    if len(pares) < 3:
         return None
-    meio = difs[len(difs) // 2]
-    perto = [d for d in difs if abs(d - meio) <= 1.5]
-    if len(perto) < max(3, len(difs) // 2):  # as linhas achadas não concordam: o vídeo não é a mesma gravação
+    # os trechos: linhas seguidas que concordam no deslocamento (até 1,5 s); uma linha achada no lugar errado (menos
+    # de 3 seguidas) é deixada de lado e o trecho de antes continua
+    trechos: list[list[tuple[int, float]]] = []
+    perto = lambda tr, d: abs(d - float(np.median([x[1] for x in tr]))) <= TOLERA_TRECHO
+    for k, d in pares:
+        if trechos and perto(trechos[-1], d):
+            trechos[-1].append((k, d))
+        elif len(trechos) >= 2 and len(trechos[-1]) < 3 and perto(trechos[-2], d):
+            trechos.pop()
+            trechos[-1].append((k, d))
+        else:
+            trechos.append([(k, d)])
+    firmes: list[list[tuple[int, float]]] = []
+    for tr in (t for t in trechos if len(t) >= 3):
+        if firmes and perto(firmes[-1], float(np.median([x[1] for x in tr]))):
+            firmes[-1] += tr
+        else:
+            firmes.append(list(tr))
+    if not firmes or sum(map(len, firmes)) < max(3, len(pares) // 2):  # não concordam: não é a mesma gravação
         return None
-    desloca = float(np.median(perto))
-    saida = []
-    for t, r in zip(tempos, referencia):
-        ini = min(duracao, max(0.0, float(r["inicio"]) + desloca))
+    # as âncoras (linha, deslocamento, trecho), com a mediana de 3 vizinhas (o alinhador erra um pouco cada linha)
+    ancoras = []
+    for g, tr in enumerate(firmes):
+        ds = [d for _, d in tr]
+        for i, (k, _) in enumerate(tr):
+            ancoras.append((k, float(np.median(ds[max(0, i - 1):i + 2])), g))
+    ref = [float(r["inicio"]) for r in referencia]
+    saida, ult, depois_do_salto = [], 0.0, None
+    a = 0  # a última âncora até a linha k
+    for k, (t, r) in enumerate(zip(tempos, referencia)):
+        while a + 1 < len(ancoras) and ancoras[a + 1][0] <= k:
+            a += 1
+        ka, da, ga = ancoras[a]
+        if k <= ancoras[0][0] or a + 1 >= len(ancoras):
+            desloca = da
+        else:
+            kb, db, gb = ancoras[a + 1]
+            if ga == gb:  # no mesmo trecho: acompanha a âncora de antes e a de depois (o andamento muda um pouco)
+                f = (ref[k] - ref[ka]) / (ref[kb] - ref[ka]) if ref[kb] > ref[ka] else 0.0
+                desloca = da + (db - da) * min(1.0, max(0.0, f))
+            else:
+                # entre dois trechos (a cena no meio): fica com o deslocamento que põe a linha mais perto de onde a
+                # IA a ouviu; depois de passar para o trecho seguinte, não volta
+                if depois_do_salto != gb and abs(ref[k] + db - t["inicio"]) < abs(ref[k] + da - t["inicio"]):
+                    depois_do_salto = gb
+                desloca = db if depois_do_salto == gb else da
+        ini = min(duracao, max(0.0, ult, ref[k] + desloca))
         fim = min(duracao, max(ini, float(r.get("fim", r["inicio"])) + desloca))
         saida.append({"inicio": round(ini, 3), "fim": round(fim, 3), "confianca": max(t["confianca"], 0.5)})
+        ult = ini
     return saida, len(saida)
 
 
