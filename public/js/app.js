@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-284';
+export const APP_VERSAO = '2026.10.29-285';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -662,7 +662,8 @@ function escolherVideo(song) {
     <ul class="tracks lista-videos" id="yt-lista"><li class="loading-note"><span class="spin"></span>Buscando vídeos…</li></ul>
     <details class="colar-link"><summary>Tenho o link do vídeo</summary>
       <span class="input-btn"><input class="input" id="yt-link" placeholder="https://www.youtube.com/watch?v=…" value="${esc(song.youtube ? 'https://www.youtube.com/watch?v=' + song.youtube : '')}"><button class="btn small" type="button" data-colar>Colar</button><button class="btn small primary" type="button" data-ok>Usar</button></span>
-      <p class="muted" id="yt-info" style="margin:6px 0 0;font-size:13px"></p></details>
+      <p class="muted" id="yt-info" style="margin:6px 0 0;font-size:13px"></p>
+      <a class="link-btn" id="yt-abrir" href="${esc(ytBusca(termo))}" target="_blank" rel="noopener" style="margin-top:8px">${icon('youtube', 15)} Procurar no YouTube e copiar o link</a></details>
     <div class="acts">${song.youtube ? '<button class="btn ghost danger" data-rm>Remover vídeo</button><span class="spacer"></span>' : ''}<button class="btn ghost" data-no>Cancelar</button></div>`,
   (dlg, done) => {
     const link = $('#yt-link', dlg);
@@ -680,7 +681,7 @@ function escolherVideo(song) {
     };
     buscar(termo);
     let tb;
-    $('#yt-q', dlg).oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => buscar(e.target.value), 450); };
+    $('#yt-q', dlg).oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => buscar(e.target.value), 450); $('#yt-abrir', dlg).href = ytBusca(e.target.value || termo); };
     // tocar no vídeo mostra uma prévia; "Escolher" vincula
     ul.onclick = (e) => {
       const li = e.target.closest('li[data-video]');
@@ -1767,7 +1768,7 @@ const player = (() => {
   const abrirMenu = async () => {
     if (!atual) return;
     const salva = Boolean(atual.songId && db.song(atual.songId));
-    // no ⋯ da letra (tela toda): sincronizar a letra; trocar o vídeo e o modo vídeo/música ficam no ⋯ das listas
+    // no ⋯ da letra (tela toda): sincronizar a letra; o modo vídeo/música fica no ⋯ das listas (trocar o vídeo, nos dois)
     const naLetra = el.classList.contains('letra-cheia');
     const song = musicaTocando();
     const sincronizada = song?.sincronia?.video && song.sincronia.video === atual.youtube;
@@ -1780,7 +1781,7 @@ const player = (() => {
       naLetra && atual.songId && db.song(atual.songId) && { valor: 'editar', rotulo: 'Editar a cifra', ic: 'edit' },
       naLetra && atual.songId && { valor: 'partitura', rotulo: 'Partitura', ic: 'score' },
       naLetra && song && atual.youtube && !atual.semVideo && { valor: 'sincronizar', rotulo: sincronizada ? 'Sincronizar a letra de novo' : 'Sincronizar a letra', ic: 'sparkles' },
-      !naLetra && salva && { valor: 'trocar', rotulo: atual.semVideo ? 'Escolher um vídeo' : 'Trocar o vídeo', ic: atual.semVideo ? 'youtube' : 'refresh' },
+      (salva || (preview && (atual.songId === 'previa' || atual.href === '#/musica/previa'))) && { valor: 'trocar', rotulo: atual.semVideo ? 'Escolher um vídeo' : 'Trocar o vídeo', ic: atual.semVideo ? 'youtube' : 'refresh' },
       !naLetra && !atual.semVideo && { valor: 'troca', rotulo: modoCapa() ? 'Mudar para vídeo' : 'Mudar para música', ic: modoCapa() ? 'video' : 'music' },
       { valor: 'compartilhar', rotulo: 'Compartilhar', ic: 'share' },
       atual.youtube && { valor: 'youtube', rotulo: 'Abrir no YouTube', ic: 'youtube' },
@@ -2071,8 +2072,10 @@ const player = (() => {
     // tablet: expandir o "Tocando agora" para a tela toda (o vídeo grande e a letra ao lado) ou voltar ao painel
     if (b.dataset.pl === 'expandir') painelCheio(!document.body.classList.contains('painel-cheio'));
     if (b.dataset.pl === 'trocar') {
-      const s = db.song(atual?.songId);
-      if (s) escolherVideo(s).then((url) => { if (!url) return; db.saveSong({ ...db.song(s.id), content: definirMeta(db.song(s.id).content, 'youtube', url) }); api.tocar({ ...atual, semVideo: false, youtube: youtubeId(url) }); route(); });
+      // (a música da busca, ainda não salva, é salva antes, para guardar o vídeo nela)
+      const s = db.song(atual?.songId) || (daPrevia() ? salvarDaPrevia() : null);
+      if (!s) { toast('Salve a música na biblioteca para trocar o vídeo'); return; }
+      escolherVideo(s).then((url) => { if (!url) return; db.saveSong({ ...db.song(s.id), content: definirMeta(db.song(s.id).content, 'youtube', url) }); api.tocar({ ...atual, semVideo: false, youtube: youtubeId(url) }); route(); });
     }
     if (b.dataset.pl === 'ampliar') { el.classList.toggle('grande'); b.innerHTML = icon(el.classList.contains('grande') ? 'shrink' : 'expand', 18); }
     // abrir a música (o nome no player): a página dela (o expandir da letra abre a letra na tela toda, aqui mesmo)
@@ -6640,6 +6643,7 @@ function viewSong(id, ctx = {}) {
           ${isPreview ? `<button role="menuitem" id="btn-edit-prev">${icon('edit', 18)}<span>Editar cifra</span></button>`
             : `<a role="menuitem" href="#/editar/${song.id}">${icon('edit', 18)}<span>Editar cifra</span></a>`}
           <button role="menuitem" id="btn-pdf">${icon('file', 18)}<span>Exportar PDF</span></button>
+          <button role="menuitem" id="btn-trocar-video">${icon(song.youtube ? 'refresh' : 'youtube', 18)}<span>${song.youtube ? 'Trocar o vídeo' : 'Escolher um vídeo'}</span></button>
           ${song.youtube ? `<button role="menuitem" id="btn-sincronizar">${icon('sparkles', 18)}<span>${song.sincronia?.video === song.youtube ? 'Sincronizar a letra de novo' : 'Sincronizar a letra com o vídeo'}</span></button>` : ''}
           ${(() => {
             const propria = !isPreview && db.song(song.id)?.partitura;
@@ -6967,6 +6971,8 @@ function viewSong(id, ctx = {}) {
     if (url) setTimeout(() => $('#btn-play')?.click(), 50); // já toca o vídeo novo, aqui na página
   };
   const mudarVideo = async () => { const url = await escolherVideo(song); if (url !== null) salvarVideo(url); };
+  // também nos ⋯ do topo: buscar outras versões aqui dentro ou colar o link do YouTube
+  $('#btn-trocar-video').onclick = mudarVideo;
   const tocar = () => player.tocar(itemDoPlayer(song, ctx.set ? db.set(ctx.set.id) : null, ctx.set ? ctx.index : -1));
   $('#refs').addEventListener('click', (e) => {
     if (e.target.closest('[data-video]')) mudarVideo();
