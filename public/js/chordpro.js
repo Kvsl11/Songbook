@@ -372,7 +372,15 @@ export function semIntro(pro) {
 // mesma sílaba. Linhas só de acordes (introdução, passagens) ficam escondidas e são mantidas.
 const ehDiretiva = (l) => /^\s*\{.*\}\s*$/.test(l) || Boolean(ehCabecalho(l)); // diretiva ou "[Refrão]"
 const semAcordes = (l) => l.replace(/\[[^\]]*\]/g, '');
-const soAcordes = (l) => !ehDiretiva(l) && /\[[^\]]*\]/.test(l) && !semAcordes(l).trim();
+// linha só de acordes: os acordes entre colchetes sem letra nenhuma em volta (só parênteses, barras, "x2"…), ou
+// os acordes escritos soltos entre parênteses, como "( Am7(4) )" (a passagem da cifra): não é letra cantada, e
+// aparecia na letra sincronizada como se fosse uma frase
+const MARCAS_DE_REPETIR = /\b(\d+\s*x|x\s*\d+|bis)\b/gi;
+export const soAcordes = (l) => {
+  if (ehDiretiva(l)) return false;
+  if (/\[[^\]]*\]/.test(l)) return !/[\p{L}\d]/u.test(semAcordes(l).replace(MARCAS_DE_REPETIR, ''));
+  return /^\s*\(.*\)\s*$/.test(l) && Boolean(acordesEntreParenteses(l));
+};
 
 export function letraDe(src) {
   return String(src || '').replace(/\r\n?/g, '\n').split('\n').filter((l) => !soAcordes(l)).map((l) => (ehDiretiva(l) ? l : semAcordes(l))).join('\n');
