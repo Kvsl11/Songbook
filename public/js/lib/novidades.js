@@ -4,13 +4,19 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
-    versao: 285, data: '2026-10-29', titulo: 'Repertório como songbook e trocar o vídeo pelos ⋯',
+    versao: 286, data: '2026-10-29', titulo: 'Repertório como songbook e letra que sincroniza sozinha',
+    itens: [
+      { tipo: 'novo', texto: 'Repertório e playlist como songbook: com a letra na tela toda (ou só a letra, no olho), passar o dedo para o lado vai para a próxima música (ou volta para a anterior), já com a letra dela. No computador, setas dos lados da tela e as setas do teclado.' },
+      { tipo: 'melhoria', texto: 'A letra sincroniza sozinha ao tocar a música (pelo banco de letras sincronizadas, sem servidor), também no celular e no computador. Se o banco de letras estava ocupado, tenta de novo sozinho em vez de desistir.' },
+      { tipo: 'melhoria', texto: 'Sua biblioteca, repertórios e playlists ficam guardados com mais segurança: o navegador é avisado para não apagar os dados do app e fica uma segunda cópia, que volta sozinha se os dados sumirem.' },
+      { tipo: 'melhoria', texto: 'Partitura sem depender de servidor: "Gerar com IA" virou "Importar o áudio". Escolha o arquivo de áudio da música e o app escreve a partitura aqui mesmo, no aparelho (antes tentava baixar o áudio do vídeo num servidor, que travava em 0% e dava erro). Para começar do zero, continua a "Nova partitura", nota por nota.' },
+    ],
+  },
+  {
+    versao: 285, data: '2026-10-29', titulo: 'Trocar o vídeo pelos ⋯',
     itens: [
       { tipo: 'novo', texto: 'Trocar o vídeo de uma música também pelos ⋯ do topo da música e do Tocando agora (inclusive com a letra na tela toda): busca outras versões aqui dentro ou abre a busca no YouTube para copiar e colar o link.' },
       { tipo: 'melhoria', texto: 'Na letra na tela toda, o botão do olho (só a letra) ficou do mesmo tamanho e jeito da pílula Cifra ao lado.' },
-      { tipo: 'novo', texto: 'Repertório e playlist como songbook: com a letra na tela toda (ou só a letra, no olho), passar o dedo para o lado vai para a próxima música (ou volta para a anterior), já com a letra dela. No computador, setas dos lados da tela e as setas do teclado.' },
-      { tipo: 'correcao', texto: 'Gerar a partitura com IA: quando o servidor da IA está desligado, o app agora diz isso com clareza (em vez de travar em "Baixando o áudio 0%" e dar um erro sem explicação) e, com um arquivo de áudio, faz a partitura no próprio aparelho.' },
-      { tipo: 'melhoria', texto: 'Sua biblioteca, repertórios e playlists ficam guardados com mais segurança: o navegador é avisado para não apagar os dados do app e fica uma segunda cópia, que volta sozinha se os dados sumirem.' },
     ],
   },
   {
@@ -66,14 +72,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'Gerar a partitura pelo aparelho (sem servidor) ficou bem mais fiel à música: a IA ouve a música inteira de uma vez (antes eram pedaços de 5 segundos, que cortavam e repetiam notas), separa a voz dos instrumentos pelo estéreo, confere a afinação da voz e limpa o eco, o vibrato e os estalos, como o servidor faz.' },
       { tipo: 'melhoria', texto: 'Enquanto gera, a tela mostra as etapas (abrindo o áudio, ouvindo as notas, separando a voz, conferindo a afinação, escrevendo) com a porcentagem.' },
       { tipo: 'correcao', texto: 'No tablet em pé, o ícone e o nome da aba do menu ficam brancos (antes ficavam azuis), como no tablet deitado.' },
-    ],
-  },
-  {
-    versao: 276, data: '2026-10-28', titulo: 'Liturgia com visual novo',
-    itens: [
-      { tipo: 'melhoria', texto: 'O cartão da liturgia de hoje (na Início e na Liturgia) ganhou visual novo: o dia num quadradinho de calendário, o tempo e a semana, a cor do dia, o refrão do salmo e cada leitura com o nome (1ª Leitura, Salmo, Evangelho). Na Início, "Montar a missa" e "Ler a liturgia".' },
-      { tipo: 'novo', texto: 'Na Liturgia, a semana aparece em pílulas para trocar de dia num toque (as setas pulam uma semana), e "Hoje" volta para o dia de hoje.' },
-      { tipo: 'melhoria', texto: 'As partes da missa vêm separadas pelos momentos da celebração (Ritos iniciais, Liturgia da Palavra, Liturgia Eucarística e Ritos finais), em cartões arredondados; Missa litúrgica e Missa popular viraram um seletor só.' },
     ],
   },
 ];
