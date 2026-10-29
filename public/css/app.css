@@ -1978,6 +1978,17 @@ dialog.lista-fila .lista-txt small { font-size: 13.5px; }
 .compor-inicio .cp-ini-ajustes { margin-bottom: 12px; }
 .cp-ini-dica { margin: 18px 0 10px; font-size: 13px; line-height: 1.5; hyphens: none; }
 .cp-ini-arquivo { justify-self: start; }
+/* criar a partitura: a automática (IA) em destaque, em cima; a manual embaixo */
+.cp-auto { display: flex; align-items: center; gap: 14px; margin: 4px 0 6px; padding: 18px 16px; border-radius: 16px; color: var(--text); text-decoration: none;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, var(--surface-2)), var(--surface-2)); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.cp-auto:hover { border-color: var(--accent); }
+.cp-auto-ic { flex: none; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--accent); color: var(--on-accent, #000); }
+.cp-auto-txt { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.cp-auto-txt small { color: var(--accent-ink); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.cp-auto-txt b { font-size: 18px; }
+.cp-auto-txt span { color: var(--muted); font-size: 13px; line-height: 1.45; }
+.cp-auto > .ic { flex: none; color: var(--muted); }
+.compor-inicio .cp-manual-tit { display: flex; align-items: center; gap: 8px; margin-top: 22px; }
 .cp-editar { margin-left: auto; }
 .compor { display: flex; flex-direction: column; min-height: 100%; }
 .compor-topo { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; min-width: 0; }
@@ -2572,13 +2583,7 @@ dialog.creditos-dlg::backdrop { background: #121212; }
 .aj-ia-campos { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; margin-top: 10px; }
 .aj-ia-campos .input { flex: 1 1 220px; min-width: 0; }
 .aj-ia-estado { width: 100%; margin: 8px 0 0; font-size: 13px; }
-.ia-yt { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; margin-top: 14px; padding: 14px 16px;
-  border-radius: 16px; background: var(--surface-2, rgb(255 255 255 / 0.05)); border: 1px solid var(--surface-3, rgb(255 255 255 / 0.08)); }
-.ia-yt-ic { color: #ff4e45; display: flex; }
-.ia-yt-txt { display: flex; flex-direction: column; gap: 2px; }
-.ia-yt-txt small { color: var(--text-2, rgb(255 255 255 / 0.65)); }
-.ia-yt-campo { grid-column: 1 / -1; display: flex; gap: 8px; }
-.ia-yt-campo .input { flex: 1; min-width: 0; }
+.ia-meu { width: 100%; margin-top: 12px; }
 
 /* ---------------------------------------------------------------- letra sincronizada (a linha cantada acende) */
 /* a linha cantada não muda de cor: fica no branco mais forte, com um brilho leve, e dá um pulinho ao acender
@@ -4018,3 +4023,27 @@ html.pp #player .pl-artista-mais { all: unset; position: absolute; right: 0; bot
 /* artista sem apresentação: só o "ver mais", embaixo do nome */
 html.pp #player .pl-artista-bio.so-mais p { display: none; }
 html.pp #player .pl-artista-bio.so-mais .pl-artista-mais { position: static; padding: 0; background: none; }
+
+/* ============================================================ downloads (como no Spotify) */
+.btn-baixar { position: relative; color: var(--muted); }
+.btn-baixar.baixada { color: #1ed760; }
+/* baixando: um anel que se completa com a porcentagem */
+.btn-baixar.baixando { color: var(--text); }
+.btn-baixar.baixando::after { content: ''; position: absolute; inset: 7px; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(#1ed760 calc(var(--pct, 0) * 1%), transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%); mask: radial-gradient(circle, transparent 62%, #000 64%); }
+.btn-baixar.baixando .ic { opacity: 0.45; }
+.ind-baixada { color: #1ed760; }
+#pl-tela video.pl-local { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; }
+.of-armazenamento { padding: 14px 12px 4px; }
+.of-barra { display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: var(--surface-3, rgb(255 255 255 / 0.12)); margin: 2px 0 14px; }
+.of-barra i { display: block; height: 100%; width: 0; transition: width 0.4s ease; }
+.of-legenda { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 8px; font-size: 14px; }
+.of-legenda li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
+.of-legenda li > i { width: 10px; height: 10px; border-radius: 50%; }
+.of-dl { background: #1ed760; }
+.of-meus { background: var(--accent); }
+.of-cache { background: #f0a020; }
+.of-livre { background: var(--surface-3, rgb(255 255 255 / 0.25)); }
+.of-armazenamento .setting { padding-left: 0; padding-right: 0; }
+.ind-i.ind-baixada { background: none; }

@@ -93,7 +93,7 @@ const servidorCarregado = (async () => {
     SERVIDOR_IA = { url: baseDoServidor(d.url), chave: d.chave || '', lumen: baseDoServidor(d.lumen || '') };
   }
   // a tela que já abriu sem saber do servidor é desenhada de novo
-  if (/^#\/musica\/[^/]+\/compor\/ia/.test(location.hash)) route();
+  if (/^#\/musica\/[^/]+\/compor\/(ia|auto)/.test(location.hash)) route();
 })().catch(() => {});
 const view = $('#view');
 const titleEl = $('#title');
@@ -131,7 +131,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-310';
+export const APP_VERSAO = '2026.10.29-312';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -650,8 +650,140 @@ const versoesDe = (song) => {
 };
 // o vídeo em que a letra sincronizada acompanha: o áudio oficial, quando a música tem as duas versões
 const videoDaLetra = (song) => versoesDe(song)?.audio || song?.youtube || '';
-// os áudios das músicas que saíram da biblioteca saem do aparelho (um pouco depois de abrir o app)
-setTimeout(() => limparAudios(new Set(db.songs().filter((s) => s.audioProprio).map((s) => s.id))).catch(() => {}), 30000);
+// os áudios das músicas que saíram da biblioteca (e os downloads delas) saem do aparelho (um pouco depois de abrir o app)
+setTimeout(() => limparAudios(new Set(db.songs().flatMap((s) => [...(s.audioProprio ? [s.id] : []), ...Object.keys(s.baixado?.arquivos || {}).map(chaveBaixada)]))).catch(() => {}), 30000);
+
+// ---------------------------------------------------------------- downloads (como no Spotify)
+// A música baixada fica inteira no aparelho, para tocar sem internet: a letra, a cifra e a partitura (já ficam na
+// biblioteca), as capas e as páginas da partitura (no cache dos downloads, que não se apaga sozinho) e o áudio e o vídeo
+// do YouTube, que o servidor da IA baixa e o app guarda no IndexedDB (junto dos áudios da pessoa). song.baixado:
+// { arquivos: { [vídeo do YouTube]: { tipo, tamanho } }, tamanho, em }
+const CACHE_BAIXADOS = 'songbook-baixados';
+function chaveBaixada(yt) { return `yt:${yt}`; }
+// o download deste vídeo do YouTube, se alguma música o baixou ({ tipo, tamanho }; null se não)
+function baixadoDe(yt) {
+  for (const s of db.songs()) { const a = s.baixado?.arquivos?.[yt]; if (a) return a; }
+  return null;
+}
+const baixando = new Map(); // id da música → { pct } (as que estão na fila ou baixando agora)
+const filaBaixar = [];
+let andandoFila = null;
+const avisarDownloads = () => window.dispatchEvent(new CustomEvent('songbook:downloads'));
+// o que baixar do YouTube: o áudio oficial (das duas versões) e o clipe; com "Só o áudio" nos ajustes, o clipe só se a
+// música não tiver outro áudio (e vem só o som dele)
+function arquivosParaBaixar(song) {
+  const comVideo = db.prefs().baixarVideo !== false;
+  const vs = versoesDe(song);
+  const audio = vs && !ehArquivo(vs.audio) ? vs.audio : '';
+  const lista = audio ? [{ yt: audio, video: false }] : [];
+  if (song.youtube && (comVideo || (!audio && !song.audioProprio))) lista.push({ yt: song.youtube, video: comVideo });
+  return lista;
+}
+async function baixarMusica(song) {
+  const s = song?.id && db.song(song.id);
+  if (!s || s.baixado || baixando.has(s.id)) return;
+  if (arquivosParaBaixar(s).length && !servidorIA().url) {
+    toast('Para baixar o áudio e o vídeo, ligue o servidor no seu computador (Ajustes → Avançado)');
+    return;
+  }
+  // sem Wi-Fi (no Android o navegador diz): pergunta antes, como no Spotify
+  if (navigator.connection?.type === 'cellular' && !db.prefs().baixarDadosMoveis
+    && !(await ask({ title: 'Baixar com os dados móveis?', text: 'Você está sem Wi-Fi e o download pode gastar bastante do seu plano. Dá para liberar sempre em Ajustes → Economia de dados e offline.', ok: 'Baixar assim mesmo' }))) return;
+  baixando.set(s.id, { pct: 0 });
+  filaBaixar.push(s.id);
+  avisarDownloads();
+  andandoFila ||= (async () => {
+    while (filaBaixar.length) {
+      const id = filaBaixar.shift();
+      try { await baixarAgora(id); } catch (e) { toast(`Não baixou “${db.song(id)?.title || 'a música'}”: ${erroExplicado(e)}`, 5000); }
+      baixando.delete(id);
+      avisarDownloads();
+    }
+    andandoFila = null;
+  })();
+}
+async function baixarAgora(id) {
+  const song = db.song(id);
+  if (!song) return;
+  const lista = arquivosParaBaixar(song);
+  const arquivos = {};
+  for (const [n, { yt, video }] of lista.entries()) {
+    const ja = baixadoDe(yt);
+    if (ja && (!video || String(ja.tipo).startsWith('video'))) { arquivos[yt] = ja; continue; }
+    const andou = (p) => { baixando.set(id, { pct: Math.round(((n + p) / lista.length) * 100) }); avisarDownloads(); };
+    const r = await chamarComEtapas(servidorIA(), '/baixar', { json: { url: `https://youtu.be/${yt}`, video } }, (etapa, p) => { if (etapa === 'baixando' && p !== null) andou(p * 0.8); });
+    andou(0.85);
+    const base = baseDoServidor(servidorIA().url);
+    const resp = await fetch(`${base}/baixar/${r.arquivo}`, { headers: cabecalhos(base, servidorIA().chave) });
+    if (!resp.ok) throw new Error('o arquivo não chegou do servidor: tente de novo');
+    const blob = await resp.blob();
+    await guardarAudio(chaveBaixada(yt), blob);
+    arquivos[yt] = { tipo: r.tipo || blob.type, tamanho: blob.size };
+    andou(1);
+  }
+  await guardarImagensDaMusica(song);
+  if (!db.song(id)) return; // saiu da biblioteca enquanto baixava
+  db.updateSong(id, { baixado: { arquivos, tamanho: Object.values(arquivos).reduce((a, x) => a + (x.tamanho || 0), 0), em: Date.now() } });
+  toast(`Baixada: ${song.title}`);
+}
+// as capas e a partitura da música no cache dos downloads (o service worker usa sem internet)
+async function guardarImagensDaMusica(song) {
+  if (!('caches' in window)) return;
+  const yts = [song.youtube, versoesDe(song)?.audio].filter((x) => x && !ehArquivo(x));
+  const urls = [song.cover, ...yts.flatMap((y) => [`https://i.ytimg.com/vi/${y}/hqdefault.jpg`, `https://i.ytimg.com/vi/${y}/mqdefault.jpg`]),
+    ...paginasDaPartitura(song.content), mxlDaPartitura(song.content)].filter((u) => u && !/^data:/.test(u));
+  const c = await caches.open(CACHE_BAIXADOS);
+  await Promise.all(urls.map(async (u) => {
+    try {
+      const url = new URL(u, document.baseURI);
+      const res = await fetch(url, url.origin === location.origin ? {} : { mode: 'no-cors' });
+      if (res.ok || res.type === 'opaque') await c.put(url.href, res);
+    } catch { /* sem essa imagem: só não aparece sem internet */ }
+  }));
+}
+// tira o download da música (os arquivos que outra música baixada também usa ficam)
+async function removerDownload(song) {
+  const s = db.song(song.id);
+  if (!s?.baixado) return;
+  const yts = Object.keys(s.baixado.arquivos || {});
+  db.updateSong(s.id, { baixado: null });
+  await Promise.all(yts.filter((y) => !baixadoDe(y)).map((y) => apagarAudio(chaveBaixada(y)).catch(() => {})));
+  avisarDownloads();
+}
+async function removerTodosDownloads() {
+  for (const s of db.songs().filter((x) => x.baixado)) await removerDownload(s);
+  if ('caches' in window) await caches.delete(CACHE_BAIXADOS).catch(() => {});
+}
+// o botão de baixar (a seta no círculo, como no Spotify): vazio, baixando (com a porcentagem) ou baixada (cheio)
+function botaoBaixar(song, cls = '') {
+  const s = song?.id && db.song(song.id);
+  const b = baixando.get(song?.id);
+  const estado = s?.baixado ? 'baixada' : b ? 'baixando' : '';
+  const titulo = estado === 'baixada' ? 'Baixada: toca sem internet (tocar para remover)' : estado === 'baixando' ? `Baixando… ${b.pct}%` : 'Baixar para ouvir sem internet';
+  return `<button class="icon-btn btn-baixar ${estado} ${cls}" data-baixar="${esc(song.id)}" aria-label="${titulo}" title="${titulo}" style="--pct:${b?.pct || 0}">${icon(estado === 'baixada' ? 'baixada' : 'baixar', 22)}</button>`;
+}
+// tocar no botão de baixar, onde ele estiver: baixa, ou pergunta se tira o download
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-baixar]');
+  if (!b) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const s = db.song(b.dataset.baixar);
+  if (!s) { toast('Salve a música na biblioteca para baixar'); return; }
+  if (baixando.has(s.id)) { toast(`Baixando: ${baixando.get(s.id).pct}%`); return; }
+  if (s.baixado) {
+    if (await ask({ title: 'Remover o download?', text: `“${s.title}” continua na biblioteca, mas só toca com internet.`, ok: 'Remover', danger: true })) { await removerDownload(s); toast('Download removido'); }
+    return;
+  }
+  baixarMusica(s);
+});
+// os botões de baixar na tela acompanham o andamento
+window.addEventListener('online', () => player.reavaliarFonte());
+window.addEventListener('offline', () => player.reavaliarFonte());
+window.addEventListener('songbook:downloads', () => {
+  player.reavaliarFonte();
+  document.querySelectorAll('[data-baixar]').forEach((b) => { const s = db.song(b.dataset.baixar); if (s) b.outerHTML = botaoBaixar(s, [...b.classList].filter((c) => !['icon-btn', 'btn-baixar', 'baixada', 'baixando'].includes(c)).join(' ')); });
+});
 
 // endereço do player do YouTube embutido (enablejsapi permite pausar/tocar pelo botão verde)
 function ytEmbed(id, { inicio = 0, autoplay = true } = {}) {
@@ -760,6 +892,7 @@ function escolherVideo(song) {
 // menu, com o vídeo pequeno, nome, parte da missa, progresso, tocar/pausar e ampliar o vídeo.
 const player = (() => {
   let atual = null;
+  let local = null; // tocando do aparelho (o áudio da pessoa ou um download): veja localDe
   let estado = 'parado'; // tocando | pausado | parado
   let tempo = 0;
   let marcaTempo = 0;
@@ -1013,8 +1146,8 @@ const player = (() => {
   const ytAgora = () => (ehArquivo(atual?.youtube) ? '' : atual?.youtube || '');
   // a capa (no modo capa): a da música ou o quadro do vídeo; o botão de trocar diz para o que vai
   const desenharCapa = () => {
-    // (o áudio da pessoa não tem vídeo: sempre a capa)
-    const capa = modoCapa() || Boolean(atual?.semVideo) || ehArquivo(atual?.youtube);
+    // (tocando só o áudio, do aparelho: sempre a capa)
+    const capa = modoCapa() || Boolean(atual?.semVideo) || Boolean(local && !local.video);
     el.classList.toggle('modo-capa', capa);
     const doYt = ytDaCapa();
     const url = atual?.capa && /^(https?:|data:)/.test(atual.capa) ? atual.capa : doYt ? `https://i.ytimg.com/vi/${doYt}/hqdefault.jpg` : '';
@@ -1497,16 +1630,16 @@ const semLinhasDeAcordes = (sinc) => {
   window.addEventListener('focus', aoVoltar);
   // cria o vídeo (só quando muda de vídeo)
   const montar = ({ autoplay = true } = {}) => {
-    if (ehArquivo(atual.youtube)) {
-      // o áudio da pessoa: sem vídeo (a capa no lugar)
-      tela.innerHTML = '';
-      tela.hidden = true;
-      tocarArquivo(atual.youtube, 0, autoplay);
+    // do aparelho (o áudio da pessoa ou um download): sem o YouTube
+    const l = localDe(atual.youtube);
+    if (l) {
+      comandoYt('pauseVideo');
+      tocarLocal(l, 0, autoplay);
       mostrarBarra();
       if (!quadro) seguir();
       return;
     }
-    if (som && !som.paused) som.pause();
+    pararLocal();
     tela.innerHTML = `<iframe src="${esc(ytEmbed(atual.youtube, { autoplay }))}" title="${esc(atual.titulo || 'Vídeo')}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
     const f = $('iframe', tela);
     f.addEventListener('load', () => f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'));
@@ -1527,57 +1660,97 @@ const semLinhasDeAcordes = (sinc) => {
     else atual = null;
   };
   const comandoYt = (func, args = []) => iframeAtual()?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
-  // o áudio da pessoa toca num <audio> do próprio app; os comandos do YouTube valem para ele também
+  // O que toca do próprio aparelho, sem o YouTube: o áudio da pessoa e os downloads (como no Spotify). { chave, video }
+  // (a chave do arquivo guardado; video: o download é o vídeo, que aparece no lugar do clipe), ou null: o YouTube.
+  // O áudio toca num <audio> do app e o vídeo num <video> na tela do player; os comandos do YouTube valem para os dois
+  let somAudio = null;
+  let somVideo = null;
   let som = null;
+  // tocar do aparelho: o áudio da pessoa, sempre; um download, quando é o vídeo, no modo música ou sem internet (o
+  // download só do áudio, no modo vídeo e com internet, deixa o clipe tocar pelo YouTube)
+  const localDe = (id) => {
+    if (ehArquivo(id)) return { chave: id.slice(ARQ.length), video: false };
+    const b = id && baixadoDe(id);
+    if (!b) return null;
+    const video = String(b.tipo || '').startsWith('video');
+    return video || comCapa || !navigator.onLine || db.prefs().economiaDados ? { chave: chaveBaixada(id), video } : null;
+  };
   const comando = (func, args = []) => {
-    if (!ehArquivo(atual?.youtube)) { comandoYt(func, args); return; }
+    if (!local) { comandoYt(func, args); return; }
     if (!som) return;
     if (func === 'playVideo') som.play().catch(() => { estado = 'pausado'; desenhar(); avisar(); });
     else if (func === 'pauseVideo') som.pause();
     else if (func === 'seekTo') som.currentTime = args[0];
   };
-  const doSom = () => Boolean(som && atual && ehArquivo(atual.youtube) && som.dataset.de === atual.youtube);
-  const criarSom = () => {
-    som = new Audio();
-    som.preload = 'auto';
-    som.addEventListener('timeupdate', () => { if (!doSom()) return; tempo = som.currentTime; marcaTempo = performance.now(); desenhar(); });
-    som.addEventListener('durationchange', () => { if (doSom() && som.duration > 0 && Number.isFinite(som.duration)) { duracao = som.duration; desenhar(); } });
-    som.addEventListener('play', () => { if (doSom()) { estado = 'tocando'; desenhar(); avisar(); } });
-    som.addEventListener('pause', () => { if (doSom() && !som.ended) { estado = 'pausado'; desenhar(); avisar(); } });
-    som.addEventListener('ended', () => { if (!doSom()) return; estado = 'pausado'; if (!fimDaMusica()) { desenhar(); avisar(); } });
-    som.addEventListener('error', () => { if (doSom()) toast('Não consegui tocar o áudio desta música'); });
+  const criarSom = (m) => {
+    const doSom = () => Boolean(local && m === som && m.dataset.de === local.chave);
+    m.preload = 'auto';
+    m.addEventListener('timeupdate', () => { if (!doSom()) return; tempo = m.currentTime; marcaTempo = performance.now(); desenhar(); });
+    m.addEventListener('durationchange', () => { if (doSom() && m.duration > 0 && Number.isFinite(m.duration)) { duracao = m.duration; desenhar(); } });
+    m.addEventListener('play', () => { if (doSom()) { estado = 'tocando'; desenhar(); avisar(); } });
+    m.addEventListener('pause', () => { if (doSom() && !m.ended) { estado = 'pausado'; desenhar(); avisar(); } });
+    m.addEventListener('ended', () => { if (!doSom()) return; estado = 'pausado'; if (!fimDaMusica()) { desenhar(); avisar(); } });
+    m.addEventListener('error', () => { if (doSom()) toast('Não consegui tocar o arquivo desta música'); });
+    return m;
   };
-  // abre o áudio da pessoa (guardado no aparelho) no segundo t
-  const tocarArquivo = async (id, t, tocar) => {
-    if (!som) criarSom();
-    if (som.dataset.de !== id) {
-      const arquivo = await lerAudio(id.slice(ARQ.length)).catch(() => null);
-      if (atual?.youtube !== id) return; // trocou de música enquanto abria
-      if (!arquivo) { estado = 'parado'; desenhar(); avisar(); toast('O áudio desta música não está neste aparelho: importe de novo pelo ⋯ da música'); return; }
-      if (som.src) URL.revokeObjectURL(som.src);
-      som.dataset.de = id;
-      som.src = URL.createObjectURL(arquivo);
+  // abre o arquivo guardado no aparelho no segundo t
+  const tocarLocal = async (l, t, tocar) => {
+    local = l;
+    const m = l.video ? (somVideo ||= criarSom(Object.assign(document.createElement('video'), { playsInline: true, className: 'pl-local' })))
+      : (somAudio ||= criarSom(new Audio()));
+    if (som && som !== m) som.pause();
+    som = m;
+    // o vídeo baixado aparece no lugar do clipe; só o áudio, a tela fica escondida (a capa no lugar)
+    const f = iframeAtual();
+    if (f) f.style.display = l.video ? 'none' : '';
+    if (somVideo) somVideo.style.display = l.video ? '' : 'none';
+    if (l.video && m.parentElement !== tela) tela.append(m);
+    tela.hidden = !l.video;
+    if (m.dataset.de !== l.chave) {
+      const arquivo = await lerAudio(l.chave).catch(() => null);
+      if (local !== l) return; // trocou de música enquanto abria
+      if (!arquivo) {
+        // o download sumiu (o navegador apagou, ou foi removido): toca pelo YouTube
+        if (!l.chave.startsWith('yt:')) { estado = 'parado'; desenhar(); avisar(); toast('O áudio desta música não está neste aparelho: importe de novo pelo ⋯ da música'); return; }
+        local = null;
+        montar({ autoplay: tocar });
+        pendente = t;
+        return;
+      }
+      if (m.src) URL.revokeObjectURL(m.src);
+      m.dataset.de = l.chave;
+      m.src = URL.createObjectURL(arquivo);
     }
-    if (som.duration > 0 && Number.isFinite(som.duration)) duracao = som.duration; // (já aberto: a duração não muda de novo)
-    const ir = () => { try { som.currentTime = t; } catch { /* ainda abrindo */ } };
-    if (som.readyState >= 1) ir(); else som.addEventListener('loadedmetadata', ir, { once: true });
-    if (tocar) som.play().catch(() => { estado = 'pausado'; desenhar(); avisar(); });
-    else som.pause();
+    if (m.duration > 0 && Number.isFinite(m.duration)) duracao = m.duration; // (já aberto: a duração não muda de novo)
+    const ir = () => { try { m.currentTime = t; } catch { /* ainda abrindo */ } };
+    if (m.readyState >= 1) ir(); else m.addEventListener('loadedmetadata', ir, { once: true });
+    if (tocar) m.play().catch(() => { estado = 'pausado'; desenhar(); avisar(); });
+    else m.pause();
+  };
+  // volta ao YouTube: o arquivo do aparelho para e o vídeo embutido aparece de novo
+  const pararLocal = () => {
+    som?.pause();
+    if (somVideo) somVideo.style.display = 'none';
+    local = null;
+    const f = iframeAtual();
+    if (f) { f.style.display = ''; tela.hidden = false; }
   };
   // passa para a outra versão da música (o áudio oficial ou o clipe) no segundo t dela, no mesmo vídeo embutido (sem
-  // recriá-lo: recriar pausava e, no celular, não tocava sozinho)
-  const trocarVersao = (id, t) => {
-    if (!atual || !id || id === atual.youtube) return;
+  // recriá-lo: recriar pausava e, no celular, não tocava sozinho). mesmo: a mesma versão, de outra fonte (o download
+  // ou o YouTube, ao trocar de modo)
+  const trocarVersao = (id, t, mesmo = false) => {
+    if (!atual || !id || (id === atual.youtube && !mesmo)) return;
     atual = { ...atual, youtube: id };
     tempo = Math.max(0, t);
     marcaTempo = performance.now();
     duracao = 0;
     tentativasIda = 0;
     const tocando = estado === 'tocando';
-    pendente = tocando && !ehArquivo(id) ? tempo : null; // (pausada, o vídeo novo fica parado já no ponto: o play começa dali)
-    if (ehArquivo(id)) { comandoYt('pauseVideo'); tocarArquivo(id, tempo, tocando); }
+    const l = localDe(id);
+    pendente = tocando && !l ? tempo : null; // (pausada, o vídeo novo fica parado já no ponto: o play começa dali)
+    if (l) { comandoYt('pauseVideo'); tocarLocal(l, tempo, tocando); }
     else {
-      if (som && !som.paused) som.pause();
+      pararLocal();
       if (iframeAtual()) comandoYt(tocando ? 'loadVideoById' : 'cueVideoById', [{ videoId: id, startSeconds: tempo }]);
       else { montar({ autoplay: tocando }); pendente = tempo; }
     }
@@ -1585,7 +1758,8 @@ const semLinhasDeAcordes = (sinc) => {
     desenhar();
     avisar();
   };
-  // o modo música (a capa) ou vídeo; com as duas versões, troca também o que toca, no mesmo ponto da música
+  // o modo música (a capa) ou vídeo; com as duas versões, troca também o que toca, no mesmo ponto da música (e o
+  // download só do áudio toca no modo música, no lugar do YouTube)
   const mudarModo = () => {
     comCapa = !comCapa;
     db.setPref('playerCapa', comCapa);
@@ -1593,6 +1767,7 @@ const semLinhasDeAcordes = (sinc) => {
       if (comCapa && atual.youtube === atual.video) trocarVersao(atual.audio, tempoNoAudio(atual.pares, api.tempoAgora));
       else if (!comCapa && atual.youtube === atual.audio) trocarVersao(atual.video, tempoNoVideo(atual.pares, api.tempoAgora));
     }
+    if (atual && !atual.semVideo && (localDe(atual.youtube)?.chave || '') !== (local?.chave || '')) trocarVersao(atual.youtube, api.tempoAgora, true);
     desenharCapa();
   };
   // tocando o clipe de uma música que tem as duas versões (a letra não acompanha: ela é do áudio)
@@ -1655,6 +1830,11 @@ const semLinhasDeAcordes = (sinc) => {
     // modo do Tocando agora: o vídeo ou a música (a capa); o ⋯ das listas troca
     get modoMusica() { return comCapa; },
     trocarModo: () => mudarModo(),
+    // a música tocando foi baixada (ou o download saiu), ou a internet caiu ou voltou: passa a tocar do aparelho ou do
+    // YouTube, no mesmo ponto
+    reavaliarFonte() {
+      if (atual && !atual.semVideo && (localDe(atual.youtube)?.chave || '') !== (local?.chave || '')) trocarVersao(atual.youtube, api.tempoAgora, true);
+    },
     // as duas versões da música tocando chegaram (o áudio oficial foi achado): no modo música, já passa para ele
     versoes(song) {
       const vs = versoesDe(song);
@@ -1667,7 +1847,7 @@ const semLinhasDeAcordes = (sinc) => {
       if (!atual) return;
       tempo = Math.max(0, seg);
       marcaTempo = performance.now();
-      pendente = ehArquivo(atual.youtube) ? null : tempo;
+      pendente = local ? null : tempo;
       tentativasIda = 0;
       comando('seekTo', [tempo, true]);
       if (estado !== 'tocando') { comando('playVideo'); estado = 'tocando'; desenhar(); avisar(); }
@@ -1710,6 +1890,7 @@ const semLinhasDeAcordes = (sinc) => {
       sessaoDe = '';
       mudo?.pause();
       som?.pause();
+      local = null;
       tela.innerHTML = '';
       tela.hidden = true;
       cancelAnimationFrame(quadro);
@@ -1852,7 +2033,7 @@ const semLinhasDeAcordes = (sinc) => {
   window.addEventListener('message', (e) => {
     let h = '';
     try { h = new URL(e.origin).hostname; } catch { return; }
-    if (!/(^|\.)youtube(-nocookie)?\.com$/.test(h) || !atual || atual.semVideo || ehArquivo(atual.youtube) || e.source !== iframeAtual()?.contentWindow) return;
+    if (!/(^|\.)youtube(-nocookie)?\.com$/.test(h) || !atual || atual.semVideo || local || e.source !== iframeAtual()?.contentWindow) return;
     try {
       const msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
       // vídeo que o dono não deixa tocar fora do YouTube (erros 101/150) ou que saiu do ar
@@ -2650,7 +2831,9 @@ function indicadores(s) {
   // a tonalidade (o chip ao lado) já diz que tem cifra: o # só aparece numa cifra sem tom
   if (s.key) c = false;
   const tem = (ic, t) => `<span class="ind-i" title="${t}" aria-label="${t}">${icon(ic, 11)}</span>`;
-  return c || s.youtube ? `<span class="ind">${c ? tem('chord', 'Tem cifra') : ''}${s.youtube ? tem('youtube', 'Tem vídeo') : ''}</span>` : '';
+  // baixada (toca sem internet): a setinha verde, como no Spotify
+  const baixada = s.baixado ? `<span class="ind-i ind-baixada" title="Baixada" aria-label="Baixada">${icon('baixada', 12)}</span>` : '';
+  return c || s.youtube || baixada ? `<span class="ind">${baixada}${c ? tem('chord', 'Tem cifra') : ''}${s.youtube ? tem('youtube', 'Tem vídeo') : ''}</span>` : '';
 }
 
 const linhaMusica = (s, extra = '') => `
@@ -4684,7 +4867,8 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
   const ehPropria = (x) => !/^https?:|^cnbb:/.test(x.source || '');
   const temPartitura = (x) => x.partitura?.pautas?.length || mxlDaPartitura(x.content) || paginasDaPartitura(x.content).length;
   const FILTROS = [['musicas', 'Músicas', todas.length], ['repertorios', 'Repertórios', sets.filter((x) => !ehPlaylist(x)).length], ['playlists', 'Playlists', sets.filter(ehPlaylist).length],
-    ['video', 'Com vídeo', todas.filter((x) => x.youtube).length], ['partitura', 'Com partitura', todas.filter(temPartitura).length], ['proprias', 'Cifras próprias', todas.filter(ehPropria).length]];
+    ['video', 'Com vídeo', todas.filter((x) => x.youtube).length], ['partitura', 'Com partitura', todas.filter(temPartitura).length], ['proprias', 'Cifras próprias', todas.filter(ehPropria).length],
+    ['baixadas', 'Baixadas', todas.filter((x) => x.baixado).length]];
   if (!FILTROS.some(([k]) => k === filtro)) filtro = 'musicas';
   const ehRep = filtro === 'repertorios' || filtro === 'playlists';
   const ehPl = filtro === 'playlists';
@@ -4692,6 +4876,7 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
   if (filtro === 'video') songs = songs.filter((s) => s.youtube);
   if (filtro === 'proprias') songs = songs.filter(ehPropria);
   if (filtro === 'partitura') songs = songs.filter(temPartitura);
+  if (filtro === 'baixadas') songs = songs.filter((x) => x.baixado);
   const itens = ehRep ? db.sets().filter((x) => ehPlaylist(x) === ehPl) : songs;
   const marca = (id) => `<span class="marca-sel" aria-hidden="true">${icon('check', 14)}</span>`;
   const lixeira = (id, nome) => `<button class="icon-btn lixo" data-excluir="${id}" aria-label="Excluir ${esc(nome)}" title="Excluir">${icon('trash', 16)}</button>`;
@@ -4710,8 +4895,8 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
     : !todas.length ? `<div class="empty"><div class="bubble">${icon('music', 32)}</div><h3>Sua biblioteca está vazia</h3>
       <p>Busque cantos, monte a missa do dia ou importe arquivos ChordPro.</p>
       <div class="row"><a class="btn primary" href="#/buscar">Buscar músicas</a><a class="btn" href="#/liturgia">Missa de hoje</a><button class="btn" id="imp">Importar</button></div></div>`
-    : `<div class="empty"><div class="bubble">${icon(filtro === 'video' ? 'youtube' : filtro === 'partitura' ? 'score' : 'edit', 30)}</div><h3>${filtro === 'video' ? 'Nenhuma música com vídeo' : filtro === 'partitura' ? 'Nenhuma música com partitura' : 'Nenhuma cifra própria'}</h3>
-      <p>${filtro === 'video' ? 'Abra uma música e escolha um vídeo do YouTube para ela.' : filtro === 'partitura' ? 'Crie uma partitura no app ou salve músicas do acervo litúrgico, que já vêm com partitura.' : 'Cifras que você escreveu ou importou aparecem aqui.'}</p>
+    : `<div class="empty"><div class="bubble">${icon(filtro === 'video' ? 'youtube' : filtro === 'partitura' ? 'score' : filtro === 'baixadas' ? 'baixar' : 'edit', 30)}</div><h3>${filtro === 'video' ? 'Nenhuma música com vídeo' : filtro === 'partitura' ? 'Nenhuma música com partitura' : filtro === 'baixadas' ? 'Nenhuma música baixada' : 'Nenhuma cifra própria'}</h3>
+      <p>${filtro === 'video' ? 'Abra uma música e escolha um vídeo do YouTube para ela.' : filtro === 'baixadas' ? 'Toque na seta da música para baixar: ela fica no aparelho, com o áudio e o vídeo, e toca sem internet.' : filtro === 'partitura' ? 'Crie uma partitura no app ou salve músicas do acervo litúrgico, que já vêm com partitura.' : 'Cifras que você escreveu ou importou aparecem aqui.'}</p>
       <div class="row">${filtro === 'partitura' ? '<a class="btn primary" href="#/partituras">Ir para Partituras</a>' : filtro === 'proprias' ? '<a class="btn primary" href="#/editar/novo">Criar música</a>' : '<a class="btn primary" href="#/biblioteca/musicas">Ver todas as músicas</a>'}</div></div>`;
   const nRep = FILTROS[1][2];
   const nPl = FILTROS[2][2];
@@ -5439,7 +5624,9 @@ async function viewCompor(id, de = '') {
   const titulo = renderSong(song.content).meta.title || song.title || 'Partitura';
   setTab('partituras');
   setTint('#2c3b3d');
-  if (de === 'ia') return gerarComIA(song, titulo);
+  // ia: a tela da IA (pelo áudio da música ou um arquivo); auto (o "Criar partitura" do ⋯ da música): a IA gera e a
+  // partitura já fica salva, e abre para ver
+  if (de === 'ia' || de === 'auto') return gerarComIA(song, titulo, { salvarSozinho: de === 'auto' });
   // "Editar" numa partitura pronta (a desenhada pelo app): copia as notas dela direto para o editor
   const mxl = mxlDaPartitura(song.content);
   if (!song.partitura?.pautas?.length && de === 'desenhada' && mxl) {
@@ -5475,13 +5662,19 @@ async function comecarPartitura(song, titulo) {
     ['satb', 'Coral a 4 vozes', 'Soprano, contralto, tenor e baixo'],
     ['piano', 'Piano ou órgão', 'Mão direita e mão esquerda'],
   ];
+  // automática (a IA ouve o áudio da música: pelo servidor, sozinha; sem ele, um arquivo lido no aparelho) ou à mão
+  const fonte = fonteDaPartitura(song);
+  const pelaIA = Boolean(servidorIA().pc && servidorIA().url && fonte);
   view.innerHTML = `<div class="compor-inicio">
     <h2 class="greet">Criar a partitura</h2>
-    <div class="cp-tipos">
-      <a class="pptx-tipo" href="#/musica/${song.id}/compor/ia"><b>${icon('upload', 16)} Importar o áudio</b><span>Escolha o arquivo de áudio da música: o app escreve a partitura, aqui no aparelho, para você ouvir, conferir e salvar</span></a>
-      ${mxl ? `<button class="pptx-tipo" id="ini-desenhada" hidden><b>${icon('score', 16)} Da partitura pronta</b><span>Copia as notas da partitura que a música já tem, para corrigir e completar</span></button>` : ''}
-    </div>
-    <div class="section-title">Ou escreva nota por nota</div>
+    <a class="cp-auto" href="#/musica/${song.id}/compor/ia">
+      <span class="cp-auto-ic">${icon('sparkles', 26)}</span>
+      <span class="cp-auto-txt"><small>Automática</small><b>Gerar com IA</b>
+        <span>${pelaIA ? `A IA do servidor ouve ${fonte.arquivo ? 'o seu áudio' : 'o áudio do vídeo'} da música e escreve a melodia ou as 4 vozes do coral, com a letra e a cifra. Você ouve, confere e salva.`
+          : 'Escolha o arquivo de áudio da música: a IA escreve a melodia ou as 4 vozes do coral, com a letra e a cifra.'}</span></span>
+      ${icon('next', 20)}</a>
+    ${mxl ? `<div class="cp-tipos"><button class="pptx-tipo" id="ini-desenhada" hidden><b>${icon('score', 16)} Da partitura pronta</b><span>Copia as notas da partitura que a música já tem, para corrigir e completar</span></button></div>` : ''}
+    <div class="section-title cp-manual-tit">${icon('edit', 18)} Ou escreva à mão, nota por nota</div>
     <div class="settings-group cp-ini-ajustes">
       <div class="setting"><span class="ico">${icon('music', 18)}</span><div class="grow"><div class="t">Tom</div><div class="s">${tomC ? 'Pela cifra da música' : 'A armadura de clave'}</div></div>
         <button class="btn small" id="ini-tom">${nomeDoTom(fifths, modo)}</button></div>
@@ -6251,7 +6444,7 @@ function viewPartituras() {
     <header class="pt-topo"><h2>Partituras</h2><p class="muted">Escreva do zero, ensaie ouvindo cada voz ou importe o áudio para o app escrever a melodia.</p></header>
     <div class="pt-atalhos">
       <button class="pt-atalho" id="part-nova"><span class="pt-atalho-ic">${icon('edit', 20)}</span><span class="pt-atalho-txt"><b>Nova partitura</b><small>Nota por nota, com letra, cifras e até 4 vozes</small></span>${icon('next', 16)}</button>
-      <button class="pt-atalho" id="part-ia"><span class="pt-atalho-ic ia">${icon('upload', 20)}</span><span class="pt-atalho-txt"><b>Importar o áudio</b><small>O app ouve o arquivo e escreve a melodia</small></span>${icon('next', 16)}</button>
+      <button class="pt-atalho" id="part-ia"><span class="pt-atalho-ic ia">${icon('sparkles', 20)}</span><span class="pt-atalho-txt"><b>Gerar com IA</b><small>A IA ouve a música e escreve a partitura</small></span>${icon('next', 16)}</button>
     </div>
     <div class="shelf-head"><h2>Suas partituras</h2>${proprias.length ? `<span class="muted part-conta">${proprias.length}</span>` : ''}</div>
     ${proprias.length ? `<ul class="tracks pt-lista">${proprias.map(linha).join('')}</ul>`
@@ -6419,9 +6612,9 @@ async function audioParaModelo(arrayBuffer) {
   return { meio, lado: estereo ? lado : null, cortado: buf.duration > 360 };
 }
 
-async function gerarComIA(song, titulo) {
+async function gerarComIA(song, titulo, { salvarSozinho = false } = {}) {
   const id = song.id;
-  setHeader(titulo, { back: '#/partituras', eyebrow: 'Gerar partitura com IA' });
+  setHeader(titulo, { back: salvarSozinho ? `#/musica/${id}` : '#/partituras', eyebrow: 'Gerar partitura com IA' });
   const modoIA = 'mistura'; // a música inteira (voz e instrumentos), do arquivo de áudio
   // o servidor no computador de quem usa (Ajustes → Servidor no computador): de graça, sem crédito do Modal. Com
   // ele ligado, o áudio vai para o PC (a voz separada pelo Demucs, mais fiel) e dá para usar o link do YouTube; o
@@ -6431,9 +6624,13 @@ async function gerarComIA(song, titulo) {
   // ligar o Codespace (github.com/codespaces, até pelo celular) e tocar em "Já liguei"
   const pcGuardado = baseDoServidor(db.prefs().servidorPc);
   const noGithub = !noPc && /\.app\.github\.dev$/i.test(pcGuardado ? new URL(pcGuardado).host : '');
+  // o áudio da própria música, para a IA do servidor ouvir sozinha: o áudio da pessoa, o áudio oficial (sem as cenas do
+  // clipe) ou o vídeo. Só se ele não der certo é que a tela pede um arquivo
+  const fonte = fonteDaPartitura(song);
+  const sozinha = noPc && Boolean(fonte);
   view.innerHTML = `<div class="ia">
-    <section class="ia-topo">${capa(song)}<div><div class="kind ia-selo">${icon('upload', 14)} Importar o áudio</div><h2>${esc(titulo)}</h2>
-      <p class="muted">${noPc ? 'Escolha o arquivo de áudio da música ou cole o link do YouTube: o <b>servidor do seu computador</b> separa a voz dos instrumentos' : 'Escolha o arquivo de áudio da música: o app ouve aqui mesmo, no aparelho (sem servidor),'} e escreve a <b>melodia</b> — ou as <b>4 vozes do coral</b> — no tom e no andamento. No fim, ouça ali mesmo e salve se ficou bom.</p></div></section>
+    <section class="ia-topo">${capa(song)}<div><div class="kind ia-selo">${icon(sozinha ? 'sparkles' : 'upload', 14)} ${sozinha ? 'Gerar com IA' : 'Importar o áudio'}</div><h2>${esc(titulo)}</h2>
+      <p class="muted">${sozinha ? `A <b>IA do servidor</b> ouve ${fonte.arquivo ? 'o seu áudio' : 'o áudio do vídeo'} da música, separa a voz dos instrumentos` : noPc ? 'Escolha o arquivo de áudio da música: o <b>servidor do seu computador</b> separa a voz dos instrumentos' : 'Escolha o arquivo de áudio da música: o app ouve aqui mesmo, no aparelho (sem servidor),'} e escreve a <b>melodia</b> — ou as <b>4 vozes do coral</b> — no tom e no andamento. ${salvarSozinho ? 'Quando ficar pronta, ela já abre para você ver.' : 'No fim, ouça ali mesmo e salve se ficou bom.'}</p></div></section>
     <div id="ia-passo"></div></div>`;
   const passo = $('#ia-passo');
 
@@ -6441,18 +6638,18 @@ async function gerarComIA(song, titulo) {
   // o começo: escolher o arquivo de áudio da música (ou arrastar para cá, no computador)
   function telaFontes(motivo = '') {
     passo.onclick = null;
-    passo.innerHTML = `${motivo ? `<div class="aviso">${icon('info', 18)}<span>${esc(motivo)}</span></div>` : ''}
+    passo.innerHTML = `${motivo ? `<div class="aviso">${icon('info', 18)}<span>${esc(motivo)}</span>${sozinha ? `<button class="btn small primary" id="ia-auto">${icon('refresh', 15)} Tentar de novo</button>` : ''}</div>` : ''}
+      ${sozinha && !motivo ? `<button class="pptx-tipo ia-meu" id="ia-auto"><b>${icon('sparkles', 16)} Gerar pela IA do servidor</b><span>Ela ouve ${fonte.arquivo ? 'o seu áudio' : 'o áudio do vídeo'} da música de novo</span></button>` : ''}
+      ${!noPc && fonte?.arquivo ? `<button class="pptx-tipo ia-meu" id="ia-meu"><b>${icon('music', 16)} Usar o seu áudio desta música</b><span>O que você importou no ⋯ da música, lido aqui no aparelho</span></button>` : ''}
       <button class="ia-solte" id="ia-arquivo"><span class="ia-solte-ic">${icon('upload', 28)}</span>
         <b>Escolher o áudio da música</b><small>MP3, M4A, WAV, OGG… até 6 minutos. Fica melhor com voz e violão do que com banda completa.</small>
         <span class="btn primary">${icon('upload', 16)} Escolher arquivo</span></button>
-      ${noPc ? `<form class="ia-yt" id="ia-yt"><span class="ia-yt-ic">${icon('youtube', 22)}</span>
-        <div class="ia-yt-txt"><b>Ou cole o link do YouTube</b><small>O seu computador baixa só o áudio, gera a partitura e apaga o áudio.</small></div>
-        <div class="ia-yt-campo"><input class="input" name="url" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${song.youtube ? `https://youtu.be/${esc(song.youtube)}` : ''}" required>
-          <button class="btn primary" type="submit">${icon('sparkles', 16)} Gerar</button></div></form>` : noGithub ? `<div class="aviso">${icon('info', 18)}<span>O <b>servidor no GitHub</b> está desligado (ele dorme quando ninguém usa). Ligue o Codespace e volte aqui: leva uns 2 minutos.</span>
+      ${noPc ? '' : noGithub ? `<div class="aviso">${icon('info', 18)}<span>O <b>servidor no GitHub</b> está desligado (ele dorme quando ninguém usa). Ligue o Codespace e volte aqui: leva uns 2 minutos.</span>
           <a class="btn small primary" href="https://github.com/codespaces" target="_blank" rel="noopener">${icon('next', 15)} Ligar no GitHub</a><button class="btn small" id="ia-religar">${icon('refresh', 15)} Já liguei</button></div>`
         : `<p class="ia-dica-compartilhar">${icon('info', 16)}<span>Travou ou ficou fraco no celular? Ligue o <b>servidor no seu computador</b> (de graça, sem crédito): veja em Ajustes → Servidor no computador.</span></p>`}
       <p class="ia-dica-compartilhar">${icon('info', 16)}<span>No Android, dá para baixar o áudio em outro app e tocar em <b>Compartilhar → Songbook</b>: ele já chega aqui.</span></p>`;
-    $('#ia-yt')?.addEventListener('submit', (e) => { e.preventDefault(); lerNoServidor({ url: e.target.url.value }); });
+    $('#ia-auto')?.addEventListener('click', () => gerarSozinha());
+    $('#ia-meu')?.addEventListener('click', async () => { const a = await arquivoDaMusica(song); if (a) lerNoAparelho(a); else telaFontes('O seu áudio desta música não está neste aparelho: escolha o arquivo.'); });
     $('#ia-religar')?.addEventListener('click', async (e) => {
       const b = e.currentTarget;
       b.disabled = true;
@@ -6715,6 +6912,13 @@ async function gerarComIA(song, titulo) {
       m.cifraAuto = true;
       return m;
     };
+    // pelo "Criar partitura" do ⋯ da música: já salva e abre para ver (os ajustes ficam no Editar da partitura)
+    if (salvarSozinho && !db.song(id)?.partitura?.pautas?.some((p) => p.ev.length)) {
+      db.updateSong(id, { partitura: montar() });
+      toast('Partitura criada pela IA: confira e, se precisar, toque em Editar');
+      location.hash = `#/musica/${id}/partitura`;
+      return;
+    }
     // pronto: a partitura com o player logo abaixo (ouvir ali mesmo), os ajustes recolhidos e salvar ou descartar
     passo.innerHTML = `<div class="ia-pronto">
       <section class="ia-pronto-cab"><span class="ia-pronto-ic">${icon('check', 22)}</span>
@@ -6817,7 +7021,29 @@ async function gerarComIA(song, titulo) {
   // com o servidor da IA e o vídeo da música, a partitura começa sozinha pelo vídeo (sem escolher arquivo nem colar link)
   // a partitura vem do áudio que a pessoa importa (ou que chegou pelo Compartilhar), lido no aparelho: não depende de
   // servidor (antes, com o vídeo, ia sozinha para o servidor baixar o áudio do YouTube)
-  if (audioCompartilhado) { const a = audioCompartilhado; audioCompartilhado = null; lerArquivo(a); } else telaFontes();
+  // pelo servidor, sozinha, com o áudio da própria música (sem escolher arquivo nem colar link)
+  async function gerarSozinha() {
+    if (fonte.arquivo) {
+      const a = await arquivoDaMusica(song);
+      if (a) lerNoServidor({ arquivo: a }); else telaFontes('O seu áudio desta música não está neste aparelho: escolha o arquivo.');
+    } else lerNoServidor({ url: fonte.url });
+  }
+  if (audioCompartilhado) { const a = audioCompartilhado; audioCompartilhado = null; lerArquivo(a); }
+  else if (sozinha) gerarSozinha();
+  else telaFontes(salvarSozinho ? (fonte ? 'Para a IA gerar a partitura sozinha pelo áudio da música, ligue o servidor no seu computador (Ajustes → Servidor no computador). Ou escolha o arquivo de áudio:' : 'Esta música ainda não tem vídeo nem áudio: escolha o arquivo de áudio dela.') : '');
+}
+// o áudio que a IA ouve para a partitura: o da pessoa (arquivo) ou o do YouTube (o oficial, sem as cenas do clipe, ou
+// o vídeo); null se a música não tem nenhum
+function fonteDaPartitura(song) {
+  if (song.audioProprio) return { arquivo: true };
+  const vs = versoesDe(song);
+  const yt = vs && !ehArquivo(vs.audio) ? vs.audio : song.youtube;
+  return yt ? { url: `https://youtu.be/${yt}` } : null;
+}
+// o áudio da pessoa guardado no aparelho, como arquivo (null se não está aqui)
+async function arquivoDaMusica(song) {
+  const blob = await lerAudio(song.id).catch(() => null);
+  return blob ? new File([blob], song.audioProprio?.nome || 'audio', { type: blob.type }) : null;
 }
 
 // "Compartilhar → Songbook" no Android: o service worker guarda o áudio (cache COMPARTILHADO do sw.js) e abre
@@ -6841,7 +7067,7 @@ async function viewCompartilhado() {
   } catch { /* sem cache: o arquivo não chegou */ }
   if (location.hash !== '#/compartilhado') return;
   if (!arquivo) {
-    view.innerHTML = `<div class="ia"><div class="aviso">${icon('info', 18)}<span>O áudio não chegou. Compartilhe de novo pelo app onde ele está (Compartilhar → Songbook) ou escolha o arquivo em Partituras → Importar o áudio.</span></div>
+    view.innerHTML = `<div class="ia"><div class="aviso">${icon('info', 18)}<span>O áudio não chegou. Compartilhe de novo pelo app onde ele está (Compartilhar → Songbook) ou escolha o arquivo em Partituras → Gerar com IA.</span></div>
       <div class="row"><a class="btn primary" href="#/partituras">${icon('score', 16)} Ir para Partituras</a></div></div>`;
     return;
   }
@@ -7069,6 +7295,7 @@ function viewSong(id, ctx = {}) {
     <div class="actions-row acoes-musica">
       <button class="play-big ${midiaDe(song) ? '' : 'off'}" id="btn-play" aria-label="${midiaDe(song) ? 'Tocar' : 'Escolher vídeo'}" title="${midiaDe(song) ? 'Tocar (continua tocando no player enquanto você navega)' : 'Sem vídeo: escolher um no YouTube'}">${icon(midiaDe(song) ? (player.tocandoAgora(midiaDe(song)) ? 'pause' : 'play') : 'youtube', 24)}</button>
       <button class="salvar-btn${isPreview ? '' : ' salva'}" id="btn-biblio" data-salvar aria-pressed="${!isPreview}" aria-label="${isPreview ? 'Salvar na biblioteca' : 'Na biblioteca (tocar para tirar)'}" title="${isPreview ? 'Salvar na biblioteca' : 'Na sua biblioteca — tocar para tirar'}">${icon(isPreview ? 'plus' : 'check', 18)}</button>
+      ${isPreview ? '' : botaoBaixar(song)}
       <button class="icon-btn" id="btn-add" aria-label="Adicionar a repertório" title="Adicionar a um repertório">${icon('list', 22)}</button>
       ${ctx.set ? `<button class="icon-btn" id="btn-fila" aria-label="Fila do repertório" title="Fila: próximas músicas">${icon('queue', 24)}</button>` : ''}
       <span class="spacer"></span>
@@ -7086,9 +7313,11 @@ function viewSong(id, ctx = {}) {
           ${isPreview ? '' : `<button role="menuitem" id="btn-audio-meu">${icon('upload', 18)}<span>${song.audioProprio ? 'Trocar o seu áudio' : 'Usar um áudio seu'}</span></button>`}
           ${!isPreview && song.audioProprio ? `<button role="menuitem" id="btn-audio-tirar">${icon('x', 18)}<span>Tirar o seu áudio</span></button>` : ''}
           ${(() => {
-            const propria = !isPreview && db.song(song.id)?.partitura;
-            const pronta = mxlDaPartitura(song.content);
-            return `<a role="menuitem" href="#/musica/${isPreview ? 'previa' : song.id}/compor${!propria && pronta ? '/desenhada' : ''}">${icon('score', 18)}<span>${propria || pronta ? 'Editar partitura' : 'Criar partitura'}</span></a>`;
+            // com partitura (a feita no app, a pela IA ou a da música): ver; sem: a IA cria sozinha e abre para ver
+            const tem = (!isPreview && db.song(song.id)?.partitura?.pautas?.some((p) => p.ev?.length)) || mxlDaPartitura(song.content) || paginasDaPartitura(song.content).length;
+            const de = isPreview ? 'previa' : song.id;
+            return tem ? `<a role="menuitem" href="#/musica/${de}/partitura">${icon('score', 18)}<span>Ver partitura</span></a>`
+              : `<a role="menuitem" href="#/musica/${de}/compor/auto">${icon('sparkles', 18)}<span>Criar partitura</span></a>`;
           })()}
         </div>
       </div>
@@ -9071,6 +9300,11 @@ function viewSettings() {
       ${chave('video-fundo', 'video', 'Capa animada', 'Cenas do clipe passam atrás da música, sem som. Desligue para economizar dados', p.videoFundo !== false)}
     </div>`)}
 
+    ${secao('Downloads e dados', `
+    <div class="settings-group">
+      <a class="setting" href="#/offline"><span class="ico">${icon('baixar', 18)}</span><div class="grow"><div class="t">Economia de dados e offline</div><div class="s">Músicas baixadas, armazenamento e cache</div></div>${icon('next', 18)}</a>
+    </div>`)}
+
     ${secao('PowerPoint', `
     <div class="settings-group"><div class="aj-pptx" id="pptx"><div class="aj-pptx-vazio muted">Verificando…</div></div></div>`)}
 
@@ -10469,6 +10703,7 @@ function route() {
     case 'oracao': return viewOracao(b);
     case 'fontes': return viewFontes();
     case 'novidades': return viewNovidades(b);
+    case 'offline': return viewOffline();
     case 'arquivo': return viewArquivo(b, c, d);
     case 'setor': return viewSetor(b, c);
     case 'acervo': return viewAcervo(b || '');
@@ -10628,6 +10863,96 @@ sessionStorage.removeItem('atualizado');
 })();
 
 // a tela Novidades: as versões, da mais nova para a mais antiga, cada mudança com o tipo (novo, melhoria, correção)
+// ---- Economia de dados e offline (como no Spotify): o que baixar, a economia de dados, o armazenamento e o cache
+const fmtBytes = (n) => (n >= 1e9 ? `${(n / 1e9).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} GB` : n >= 1e6 ? `${Math.round(n / 1e6)} MB` : `${Math.round((n || 0) / 1e3)} KB`);
+// os caches que dá para limpar (as capas e os dados guardados enquanto se usa o app); o pacote do app e os downloads ficam
+const ehCacheLimpavel = (k) => k === 'songbook-imagens' || k === 'songbook-extras' || /-api$/.test(k);
+function viewOffline() {
+  setTab('');
+  setTint('#1f3a2c');
+  setHeader('Economia de dados e offline', { back: '#/ajustes' });
+  const desenhar = () => {
+    const p = db.prefs();
+    const salvas = db.songs();
+    const baixadas = salvas.filter((x) => x.baixado);
+    const faltam = salvas.filter((x) => !x.baixado && !baixando.has(x.id) && midiaDe(x));
+    const chave = (id, ic, t, sub, ligado) => `<label class="setting"><span class="ico">${icon(ic, 18)}</span><div class="grow"><div class="t">${t}</div><div class="s">${sub}</div></div><input type="checkbox" class="switch" id="${id}"${ligado ? ' checked' : ''}></label>`;
+    view.innerHTML = `<div class="ajustes offline">
+      <section class="aj-sec"><h3 class="aj-titulo">Economia de dados</h3><div class="settings-group">
+        ${chave('of-economia', 'gauge', 'Economia de dados', 'Desliga a capa animada e, nas músicas baixadas, toca sempre o arquivo do aparelho (até no modo vídeo), sem gastar internet', p.economiaDados)}
+      </div></section>
+      <section class="aj-sec"><h3 class="aj-titulo">Downloads</h3><div class="settings-group">
+        <div class="setting wrap"><span class="ico">${icon('baixar', 18)}</span><div class="grow"><div class="t">O que baixar</div><div class="s">O vídeo ocupa bem mais espaço que só o áudio</div></div>
+          <div class="seg" id="of-oque"><button data-v="video" aria-pressed="${p.baixarVideo !== false}">Áudio e vídeo</button><button data-v="audio" aria-pressed="${p.baixarVideo === false}">Só o áudio</button></div></div>
+        ${chave('of-moveis', 'aparelhos', 'Baixar com os dados móveis', 'Sem isso, fora do Wi-Fi o app pergunta antes de baixar', p.baixarDadosMoveis)}
+        <div class="setting"><span class="ico">${icon('library', 18)}</span><div class="grow"><div class="t">Baixar as músicas salvas</div><div class="s">${baixando.size ? `Baixando: ${baixando.size} na fila` : `${baixadas.length} de ${salvas.length} baixadas`}${servidorIA().url ? '' : ' · o áudio e o vídeo vêm pelo servidor do seu computador (Ajustes → Avançado)'}</div></div>
+          <button class="btn small primary" id="of-todas"${faltam.length ? '' : ' disabled'}>${icon('baixar', 15)} ${faltam.length ? `Baixar ${faltam.length}` : 'Todas baixadas'}</button></div>
+        <a class="setting" href="#/biblioteca/baixadas"><span class="ico">${icon('baixada', 18)}</span><div class="grow"><div class="t">Músicas baixadas</div><div class="s">Tocam sem internet, com a letra, a cifra e a partitura</div></div>${icon('next', 18)}</a>
+      </div></section>
+      <section class="aj-sec"><h3 class="aj-titulo">Armazenamento</h3><div class="settings-group of-armazenamento">
+        <div class="of-barra" id="of-barra"><i class="of-dl"></i><i class="of-meus"></i><i class="of-cache"></i></div>
+        <ul class="of-legenda" id="of-legenda"><li class="muted">Calculando…</li></ul>
+        <div class="setting"><div class="grow"><div class="t">Remover todos os downloads</div><div class="s">Tira do aparelho o áudio e o vídeo baixados, para liberar espaço (as músicas continuam na biblioteca)</div></div>
+          <button class="btn small" id="of-remover"${baixadas.length ? '' : ' disabled'}>Remover</button></div>
+        <div class="setting"><div class="grow"><div class="t">Limpar o cache</div><div class="s">Libera o espaço das capas e dos dados guardados enquanto você usa o app (os downloads não saem)</div></div>
+          <button class="btn small" id="of-cache">Limpar</button></div>
+      </div></section></div>`;
+    medir(baixadas);
+  };
+  // a barra do armazenamento: os downloads, os áudios seus, o resto do app (cache e dados) e o espaço livre
+  const medir = async (baixadas) => {
+    const est = await navigator.storage?.estimate?.().catch(() => null) || {};
+    const dl = baixadas.reduce((a, x) => a + (x.baixado.tamanho || 0), 0);
+    let meus = 0;
+    for (const s of db.songs().filter((x) => x.audioProprio)) meus += (await lerAudio(s.id).catch(() => null))?.size || 0;
+    const usado = Math.max(est.usage || 0, dl + meus);
+    const cache = Math.max(0, usado - dl - meus);
+    const livre = Math.max(0, (est.quota || 0) - usado);
+    const total = usado + livre || 1;
+    const barra = $('#of-barra');
+    if (!barra) return;
+    [['.of-dl', dl], ['.of-meus', meus], ['.of-cache', cache]].forEach(([c, n]) => { barra.querySelector(c).style.width = `${Math.max(n ? 0.6 : 0, (n / total) * 100)}%`; });
+    $('#of-legenda').innerHTML = [['of-dl', 'Downloads', dl], ['of-meus', 'Áudios seus', meus], ['of-cache', 'Dados e cache do app', cache], ['of-livre', 'Livre para o app', livre]]
+      .map(([c, n, v]) => `<li><i class="${c}"></i><span>${n}</span><b>${est.quota || c !== 'of-livre' ? fmtBytes(v) : '—'}</b></li>`).join('');
+  };
+  desenhar();
+  const aoMudar = () => { if (location.hash === '#/offline') desenhar(); };
+  window.addEventListener('songbook:downloads', aoMudar);
+  aoSair(() => window.removeEventListener('songbook:downloads', aoMudar));
+  view.addEventListener('change', (e) => {
+    if (e.target.id === 'of-economia') {
+      db.setPref('economiaDados', e.target.checked);
+      if (e.target.checked) db.setPref('videoFundo', false);
+      player.atualizar({});
+      toast(e.target.checked ? 'Economia de dados ligada: a capa animada foi desligada' : 'Economia de dados desligada');
+    }
+    if (e.target.id === 'of-moveis') db.setPref('baixarDadosMoveis', e.target.checked);
+  });
+  view.addEventListener('click', async (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.v) { db.setPref('baixarVideo', b.dataset.v === 'video'); $('#of-oque').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }
+    if (b.id === 'of-todas') {
+      const faltam = db.songs().filter((x) => !x.baixado && !baixando.has(x.id) && midiaDe(x));
+      if (!faltam.length) return;
+      if (faltam.some((x) => arquivosParaBaixar(x).length) && !servidorIA().url) { toast('Para baixar o áudio e o vídeo, ligue o servidor no seu computador (Ajustes → Avançado)'); return; }
+      for (const s of faltam) await baixarMusica(s);
+      toast(`${faltam.length} música${faltam.length > 1 ? 's' : ''} na fila para baixar`);
+    }
+    if (b.id === 'of-remover' && await ask({ title: 'Remover todos os downloads?', text: 'As músicas continuam na biblioteca, mas só tocam com internet.', ok: 'Remover', danger: true })) {
+      await removerTodosDownloads();
+      toast('Downloads removidos');
+      desenhar();
+    }
+    if (b.id === 'of-cache') {
+      const nomes = 'caches' in window ? (await caches.keys()).filter(ehCacheLimpavel) : [];
+      await Promise.all(nomes.map((k) => caches.delete(k)));
+      toast('Cache limpo');
+      desenhar();
+    }
+  });
+}
+
 function viewNovidades(versao) {
   const TIPO_NOVIDADE = { novo: ['Novo', 'sparkles'], melhoria: ['Melhoria', 'up'], correcao: ['Correção', 'check'] };
   setTab('');

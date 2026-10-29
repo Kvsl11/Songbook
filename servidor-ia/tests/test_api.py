@@ -138,3 +138,22 @@ def test_letra_do_arquivo_enviado(monkeypatch):
     assert r.status_code == 200 and r.json()["achadas"] == 1
     assert pedidos == [(["Santo, santo"], None, [{"inicio": 3}], True)]
     assert c.post("/letra/arquivo", files={"arquivo": ("a.wav", b"x", "audio/wav")}, data={"linhas": "[]"}).status_code == 400
+
+
+def test_baixar_para_o_app_e_entregar_o_arquivo(monkeypatch, tmp_path):
+    import youtube
+
+    def baixar_midia(video, pasta, progresso=lambda p: None, com_video=False):
+        progresso(1.0)
+        caminho = os.path.join(pasta, "audio.mp4" if com_video else "audio.m4a")
+        with open(caminho, "wb") as f:
+            f.write(b"0123456789")
+        return {"caminho": caminho, "tipo": "video/mp4" if com_video else "audio/mp4", "titulo": "t", "duracao": 10}
+    monkeypatch.setattr(youtube, "baixar_midia", baixar_midia)
+    c = TestClient(app.app)
+    r = c.post("/baixar", json={"url": "https://youtu.be/abcdefghijk", "video": True}).json()
+    assert r["tipo"] == "video/mp4" and r["tamanho"] == 10 and r["video"] == "abcdefghijk"
+    arq = c.get(f"/baixar/{r['arquivo']}")
+    assert arq.status_code == 200 and arq.content == b"0123456789" and arq.headers["content-type"] == "video/mp4"
+    assert c.get(f"/baixar/{r['arquivo']}").status_code == 404  # entregue uma vez só
+    assert c.post("/baixar", json={"url": "nada"}).status_code == 400

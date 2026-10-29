@@ -5,7 +5,7 @@
 //   (a anterior continua) e tenta de novo depois;
 // - dados (liturgia, músicas, partituras, API): "rede primeiro", com a cópia local como reserva offline;
 // - ao publicar uma versão nova, mude VERSION: o app baixa o pacote novo e recarrega sozinho com ele.
-const VERSION = 'songbook-v310';
+const VERSION = 'songbook-v312';
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/store.js', 'js/render.js', 'js/chordpro.js', 'js/icons.js', 'js/pdf.js', 'js/powerpoint.js', 'js/lib/pptx-missa.js', 'js/lib/pptx-simples.js', 'js/fonte.js', 'js/lib/html.js', 'js/lib/cnbb.js', 'js/lib/cindy.js', 'js/lib/missa.js', 'js/lib/mpm.js', 'js/lib/pocket.js', 'js/lib/web.js', 'js/lib/acervo.js', 'js/lib/hinario.js', 'js/lib/sugestoes-liturgicas.js', 'js/lib/revisor.js', 'js/lib/ensaio.js', 'js/lib/partitura.js', 'js/lib/alinhamento.js', 'js/lib/transcricao.js', 'js/lib/cores.js', 'js/lib/avisos.js', 'js/lib/novidades.js', 'js/lib/versoes.js', 'js/audios.js', 'js/lib/piano.js', 'js/acordes.js', 'icon.svg', 'icon-192-v7.png', 'icon-512-v7.png', 'apple-touch-icon-v7.png', 'manifest.webmanifest'];
 
 // caminhos (absolutos) dos arquivos do pacote, para reconhecer as requisições
@@ -26,10 +26,12 @@ self.addEventListener('install', (e) => {
 const IMAGENS = 'songbook-imagens';
 const EXTRAS = 'songbook-extras';
 const COMPARTILHADO = 'songbook-compartilhado'; // o áudio que chegou pelo "Compartilhar" do celular
+// as capas e as partituras das músicas baixadas (o app guarda ao baixar): ficam até a pessoa remover o download
+const BAIXADOS = 'songbook-baixados';
 const MAX_IMAGENS = 400;
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => !k.startsWith(VERSION) && k !== IMAGENS && k !== EXTRAS && k !== COMPARTILHADO).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => !k.startsWith(VERSION) && k !== IMAGENS && k !== EXTRAS && k !== COMPARTILHADO && k !== BAIXADOS).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
 // rede primeiro; se a rede demorar (sinal fraco) e houver cópia guardada, usa a cópia
@@ -99,7 +101,8 @@ self.addEventListener('fetch', (e) => {
   }
   // capas (Cindy, YouTube…): guardadas na primeira vez que aparecem, para o modo offline
   if (req.destination === 'image') {
-    e.respondWith(caches.open(IMAGENS).then((c) => c.match(req).then((r) => r || fetch(req).then((res) => {
+    // (as das músicas baixadas primeiro: o cache delas não perde imagens)
+    e.respondWith(caches.open(IMAGENS).then((c) => caches.open(BAIXADOS).then((b) => b.match(req)).then((r) => r || c.match(req)).then((r) => r || fetch(req).then((res) => {
       if (res.ok || res.type === 'opaque') { c.put(req, res.clone()); limitar(IMAGENS, MAX_IMAGENS); }
       return res;
     }).catch(() => Response.error()))));

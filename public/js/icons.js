@@ -53,6 +53,9 @@ const P = {
   search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/>',
+  // baixar para ouvir sem internet (como no Spotify): a seta no círculo; baixada, o círculo cheio
+  baixar: '<circle cx="12" cy="12" r="9.5"/><path d="M12 7.5v8.5M8.2 12.4l3.8 3.8 3.8-3.8"/>',
+  baixada: '<circle cx="12" cy="12" r="10.5" fill="currentColor" stroke="none"/><path d="M12 7.5v8.5M8.2 12.4l3.8 3.8 3.8-3.8" style="stroke: var(--on-accent, #000)" stroke-width="2.4"/>',
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
   trash: '<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
