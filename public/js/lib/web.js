@@ -597,7 +597,9 @@ export function canalDosResultados(json, nome) {
   if (!quem) return null;
   const canais = (json?.items || []).filter((c) => c.type === 'channel' && c.thumbnail);
   const topicos = canais.filter((c) => / - Topic$/.test(c.name || '') && nomeDoCanal(c.name.replace(/ - Topic$/, '')) === quem);
-  const verificados = canais.filter((c) => c.verified && !/ - Topic$/.test(c.name || ''));
+  // (com vários verificados do mesmo nome, o que tem mais inscritos: o "Kemuel" do gospel, não um rapper "Kemuel"
+  // que vinha antes na busca)
+  const verificados = canais.filter((c) => c.verified && !/ - Topic$/.test(c.name || '')).sort((x, y) => (y.subscribers || 0) - (x.subscribers || 0));
   const verificado = verificados.find((c) => nomeDoCanal(c.name) === quem)
     || verificados.find((c) => nomeDoCanal(String(c.name).split(/\s+[/|–—-]\s+/)[0]) === quem);
   const c = verificado || (topicos.length === 1 ? topicos[0] : null);
