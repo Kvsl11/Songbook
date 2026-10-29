@@ -67,7 +67,10 @@ def main() -> None:
             print(f"Aviso: não consegui o ffmpeg ({type(e).__name__}); os vídeos do YouTube não vão funcionar.", flush=True)
     dados = os.path.join(PASTA, "dados")
     os.makedirs(dados, exist_ok=True)
-    os.environ.setdefault("IA_TAREFAS", "1")
+    # quantas músicas ao mesmo tempo: no Codespaces (16 GB de memória) 3, para a letra e a partitura de várias músicas
+    # abertas em seguida irem juntas (cada uma termina quando termina); no computador de casa, 1 (cada uma usa
+    # bastante memória)
+    os.environ.setdefault("IA_TAREFAS", "3" if os.environ.get("CODESPACE_NAME") else "1")
     os.environ.setdefault("IA_AQUECER", "1")  # os modelos carregam assim que o servidor liga (app.aquecer)
     os.environ.setdefault("IA_THREADS", str(os.cpu_count() or 0))  # todos os núcleos para os modelos
     os.environ.setdefault("IA_CACHE", os.path.join(dados, "cache"))

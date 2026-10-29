@@ -10,6 +10,6 @@ mkdir -p dados
 # Se a instalação da criação não terminou (ou falhou), instala antes de ligar
 setsid bash -c '
   python -c "import uvicorn, fastapi, demucs" 2>/dev/null || bash ../.devcontainer/instalar.sh
-  IA_SEM_TUNEL=1 IA_THREADS=$(nproc) exec python iniciar_pc.py
+  IA_SEM_TUNEL=1 IA_THREADS=$(nproc) IA_TAREFAS=3 exec python iniciar_pc.py
 ' > dados/servidor.log 2>&1 < /dev/null &
 echo "Servidor da IA ligando (uns segundos; na primeira vez, até 15 minutos): aba Portas → 7860 → globo."
