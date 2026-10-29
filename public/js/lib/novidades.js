@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 304, data: '2026-10-29', titulo: 'A letra sincroniza assim que a música abre',
+    itens: [
+      { tipo: 'melhoria', texto: 'Com o servidor no seu computador ou no GitHub ligado, a letra começa a sincronizar assim que você abre a música, sem precisar dar play: o servidor baixa o áudio do vídeo e ouve sozinho. Quando você tocar, ela já está pronta (ou quase).' },
+    ],
+  },
+  {
     versao: 303, data: '2026-10-29', titulo: 'Letra sincronizada pela IA do servidor',
     itens: [
       { tipo: 'melhoria', texto: 'Com o servidor no seu computador ou no GitHub ligado, a letra sincroniza sozinha pela IA dele, que ouve o próprio vídeo. O banco de letras da internet fica só de reserva.' },
@@ -63,14 +69,6 @@ export const NOVIDADES = [
     versao: 295, data: '2026-10-29', titulo: 'Sobre o artista, como no Spotify',
     itens: [
       { tipo: 'novo', texto: 'No cartão “Sobre o artista” do Tocando agora, o “ver mais” no fim do texto abre a tela do artista: as fotos dele passando para o lado, os fãs e os álbuns, a apresentação inteira e atalhos para as músicas e os álbuns dele, a Wikipédia e o YouTube.' },
-    ],
-  },
-  {
-    versao: 294, data: '2026-10-29', titulo: 'Ver o álbum e conhecer o artista',
-    itens: [
-      { tipo: 'novo', texto: 'Nos ⋯ da música e do Tocando agora, “Ver álbum” abre o álbum em que a música saiu (o lançamento original, não as coletâneas), com a faixa dela destacada na lista.' },
-      { tipo: 'melhoria', texto: 'A página do álbum mostra o tipo (álbum, ao vivo, single, EP ou coletânea), o ano de lançamento, o número de faixas e quantas têm cifra.' },
-      { tipo: 'novo', texto: 'No cartão “Sobre o artista” do Tocando agora, uma breve apresentação do artista (da Wikipédia), embaixo do nome; tocando no texto, ele abre inteiro.' },
     ],
   },
 ];
