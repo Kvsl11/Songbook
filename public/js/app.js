@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-289';
+export const APP_VERSAO = '2026.10.29-290';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -3701,7 +3701,12 @@ function viewSearch() {
     term = term.trim();
     if (!term) {
       res.innerHTML = `
-        <div class="busca-dica">${icon('sparkles', 18)}<span>Busque qualquer música: ao abrir, ela já vem com a cifra (<b>Cifra Club</b>), a letra (<b>Letras</b>) e o vídeo (<b>YouTube</b>). Achou a cifra em outro site? <button class="link-btn" id="btn-importar">Cole aqui</button>.</span></div>`;
+        <section class="busca-hero">
+          <span class="busca-hero-ic">${icon('sparkles', 22)}</span>
+          <div class="busca-hero-txt"><h3>Qualquer música, pronta para tocar</h3><p>Digite o nome, o artista ou um trecho: ela abre com tudo junto.</p>
+            <div class="busca-hero-fontes"><span>${icon('chord', 14)}<b>Cifra</b><small>Cifra Club</small></span><span>${icon('text', 14)}<b>Letra</b><small>Letras</small></span><span>${icon('youtube', 14)}<b>Vídeo</b><small>YouTube</small></span></div>
+            <button class="busca-hero-colar" id="btn-importar">${icon('download', 14)} Achou a cifra em outro site? <b>Cole aqui</b></button></div>
+        </section>`;
       $('#btn-importar').onclick = () => importarDaInternet();
       res.insertAdjacentHTML('beforeend', `<div class="shelf-head"><h2>Navegar por setor</h2></div><div class="setores">${SETORES.map(cartaoSetor).join('')}</div>
         <div class="shelf-head"><h2>Artistas católicos</h2></div><div class="shelf" id="art-cat"></div>
@@ -3714,7 +3719,7 @@ function viewSearch() {
       catolicasEmAlta().then((lista) => {
         if (meu !== seq || !$('#em-alta')) return;
         achados.musica = lista;
-        $('#em-alta').innerHTML = lista.length ? `<ul class="tracks">${lista.map((r, i) => linhaMusicaWeb(r, i)).join('')}</ul>` : '<p class="muted">Não consegui carregar agora. Digite o nome de uma música acima.</p>';
+        $('#em-alta').innerHTML = lista.length ? `<ul class="tracks tracks-grade em-alta">${lista.map((r, i) => linhaMusicaWeb(r, i)).join('')}</ul>` : '<p class="muted">Não consegui carregar agora. Digite o nome de uma música acima.</p>';
       });
       return;
     }
@@ -3764,7 +3769,7 @@ function viewSearch() {
         const mostrar = (lista) => {
           if (!vivo('mu-res')) return;
           achados.musica = lista;
-          $('#mu-res').innerHTML = lista.length ? `<ul class="tracks">${lista.map((r, i) => linhaMusicaWeb(r, i)).join('')}</ul>` : '<p class="muted">Nenhuma música encontrada.</p>';
+          $('#mu-res').innerHTML = lista.length ? `<ul class="tracks tracks-grade">${lista.map((r, i) => linhaMusicaWeb(r, i)).join('')}</ul>` : '<p class="muted">Nenhuma música encontrada.</p>';
         };
         buscarTudo(term, filtro === 'musicas' ? 25 : 8, filtro === 'musicas' ? 15 : 6).then(mostrar)
           .catch((e) => vivo('mu-res') && erro('mu-res', 'Não consegui buscar músicas: ' + e.message));
@@ -3987,7 +3992,7 @@ const SETORES = [
   ['tempos', 'Tempos e solenidades', 'Proclamação da Páscoa, Calenda, Sequências, Semana Santa…', 'calendar', 330],
   ['popular', 'Missa popular', 'Cantos de devoção popular (Cindy Ferrarezi)', 'music', 150],
 ];
-const cartaoSetor = ([k, nome, desc, ic, h]) => `<a class="setor" href="#/setor/${k}" style="--h:${h}"><b>${esc(nome)}</b><small>${esc(desc)}</small><span class="setor-ic">${icon(ic, 40)}</span></a>`;
+const cartaoSetor = ([k, nome, desc, ic, h]) => `<a class="setor" href="#/setor/${k}" style="--h:${h}"><b>${esc(nome)}</b><small>${esc(desc)}</small><span class="setor-ic">${icon(ic, 64)}</span></a>`;
 const HINARIO = 'Hinário Litúrgico da CNBB';
 
 // todas as músicas do acervo: { fonte (source no app), titulo, autor, parte, caminho, tipo: 'cifra'|'letra', chordpro, nome }
