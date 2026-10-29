@@ -282,6 +282,41 @@ def transcrever(arquivo: UploadFile = File(...), separar: str = Form("1"), etapa
     return com_etapas(lambda etapa: ouvir(caminho, separar_voz, etapa), etapas, pasta, tarefa)
 
 
+class PedidoVersoes(BaseModel):
+    audio: str  # o áudio oficial da música (link ou id do YouTube)
+    video: str  # o videoclipe
+
+
+_versoes: dict[tuple[str, str], dict] = {}  # o mesmo par de vídeos: a resposta guardada
+
+
+@app.post("/versoes", dependencies=[Depends(conferir_chave)])
+def casar_versoes(pedido: PedidoVersoes, etapas: bool = Query(False), tarefa: bool = Query(False)):
+    """Onde cada ponto do áudio oficial está no clipe, casando o som dos dois (como o YouTube Music ao trocar entre
+    a música e o vídeo): {"pares": [[segundo no áudio, segundo no clipe], …], "confianca"}."""
+    import versoes
+
+    audio, video = youtube.id_do_video(pedido.audio), youtube.id_do_video(pedido.video)
+    if not audio or not video:
+        raise HTTPException(400, "link do YouTube inválido")
+    if (audio, video) in _versoes:
+        return com_etapas(lambda etapa: _versoes[(audio, video)], etapas, tarefa=tarefa)
+    pasta = tempfile.mkdtemp(prefix="songbook-versoes-")
+
+    def trabalho(etapa):
+        ya, _, _ = audio_do_video(audio, pasta, etapa)
+        yv, _, _ = audio_do_video(video, pasta, etapa)
+        etapa("alinhando")
+        r = versoes.alinhar(ya, yv, transcricao.SR)
+        if not r:
+            raise HTTPException(422, "o áudio e o clipe não parecem a mesma gravação")
+        _versoes[(audio, video)] = r
+        log.warning("versões casadas (%s → %s): %d trechos, parecença %.2f", audio, video, len(r["pares"]), r["confianca"])
+        return r
+
+    return com_etapas(trabalho, etapas, pasta, tarefa)
+
+
 class PedidoYoutube(BaseModel):
     url: str
     separar: bool = True

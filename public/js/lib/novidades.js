@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 318, data: '2026-10-29', titulo: 'Música e vídeo casados pelo som',
+    itens: [
+      { tipo: 'melhoria', texto: 'Com o servidor ligado, o áudio oficial e o videoclipe são casados pelo próprio som, como no YouTube Music: trocar entre a música e o vídeo cai na mesma parte cantada, mesmo com cena antes, no meio ou no fim do clipe.' },
+      { tipo: 'correcao', texto: 'Na troca entre música e vídeo, a barra do tempo vai direto para o ponto certo, sem voltar ao começo e pular de volta.' },
+    ],
+  },
+  {
     versao: 317, data: '2026-10-29', titulo: 'O + do Tocando agora salva de novo',
     itens: [
       { tipo: 'correcao', texto: 'O botão + do Tocando agora (salvar na biblioteca) não fazia nada no modo música das músicas que têm áudio oficial e clipe: agora salva na hora.' },
@@ -65,13 +72,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'novo', texto: 'Música com videoclipe (com cenas antes ou no meio da música) ganha duas versões: no modo música toca o áudio oficial da gravação, com a letra sincronizada certinha; no modo vídeo, o clipe, sem a letra acompanhando.' },
       { tipo: 'novo', texto: 'Trocar entre música e vídeo continua no mesmo ponto da música, nos dois sentidos. Com a IA do servidor ligada, ela ouve o clipe e acerta esse ponto trecho por trecho.' },
-    ],
-  },
-  {
-    versao: 308, data: '2026-10-29', titulo: 'Sincronia mais firme no canto',
-    itens: [
-      { tipo: 'correcao', texto: 'O alinhador da letra no servidor não pula mais as frases cantadas com a nota esticada ou com a banda alta (antes elas ficavam sem tempo e a letra se perdia nesses trechos).' },
-      { tipo: 'melhoria', texto: 'O aviso de “Letra sincronizada” diz como ela foi feita: pelo alinhador de IA, pela letra da internet no lugar certo ou pelo Whisper.' },
     ],
   },
 ];
