@@ -4,7 +4,7 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
-    versao: 309, data: '2026-10-29', titulo: 'Trocar entre música e vídeo sem voltar ao começo',
+    versao: 315, data: '2026-10-29', titulo: 'Trocar entre música e vídeo sem voltar ao começo',
     itens: [
       { tipo: 'correcao', texto: 'Ao trocar da música para o vídeo (ou do vídeo para a música) no player, ela continua do ponto em que estava, na parte que estava sendo cantada. Antes, às vezes, voltava para o começo.' },
     ],
