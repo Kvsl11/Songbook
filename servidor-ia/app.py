@@ -213,6 +213,25 @@ if pc.TUNEL:
     threading.Thread(target=pc.anunciar, daemon=True).start()
 
 
+def aquecer():
+    """Carrega os modelos (e baixa, na primeira vez) logo que o servidor liga, em vez de no primeiro pedido: antes a
+    primeira partitura ou letra esperava minutos (o Whisper vinha da internet, o Demucs e o Basic Pitch abriam do
+    disco) e a tela parecia travada em "Ouvindo"."""
+    for nome, carregar in (("Demucs", transcricao.modelo_demucs), ("Basic Pitch", transcricao.modelo_basic_pitch),
+                           ("Whisper", letra.modelo_whisper)):
+        try:
+            carregar()
+            log.warning("Modelo pronto: %s", nome)
+        except Exception as e:  # sem o pacote (servidor sem separação ou sem letra): fica para quando precisar
+            log.warning("Modelo %s não carregou agora (%s)", nome, type(e).__name__)
+
+
+# no computador de quem usa e no Codespaces (IA_AQUECER=1, o iniciar_pc.py põe): no Modal não, porque cada máquina
+# que liga demoraria mais para responder
+if os.environ.get("IA_AQUECER") == "1" or os.environ.get("CODESPACE_NAME"):
+    threading.Thread(target=aquecer, daemon=True).start()
+
+
 @app.get("/saude")
 def saude():
     return {

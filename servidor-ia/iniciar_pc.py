@@ -68,6 +68,8 @@ def main() -> None:
     dados = os.path.join(PASTA, "dados")
     os.makedirs(dados, exist_ok=True)
     os.environ.setdefault("IA_TAREFAS", "1")
+    os.environ.setdefault("IA_AQUECER", "1")  # os modelos carregam assim que o servidor liga (app.aquecer)
+    os.environ.setdefault("IA_THREADS", str(os.cpu_count() or 0))  # todos os núcleos para os modelos
     os.environ.setdefault("IA_CACHE", os.path.join(dados, "cache"))
     os.environ.setdefault("IA_COOKIES", os.path.join(dados, "cookies.txt"))
     # a rede da empresa pode bloquear o download ou o próprio túnel da Cloudflare: o servidor liga mesmo assim, e o
