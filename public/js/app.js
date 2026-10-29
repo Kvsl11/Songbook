@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.28-283';
+export const APP_VERSAO = '2026.10.29-284';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -797,10 +797,19 @@ const player = (() => {
   const mini = $('.pl-video', el); // espaço reservado no mini player
   // no modo música (Tocando agora), os quadros do clipe passam atrás de toda a parte de cima, até o cartão da letra
   const fundo = $('.pl-fundo', el);
+  // tablet: a capa animada fica numa camada FORA do painel, parada atrás dele (com o fundo do painel), e o painel fica
+  // transparente por cima. Presa dentro do painel que rola (position: fixed), o tablet não dava conta de redesenhar ao
+  // rolar: a parte de cima (a capa, o nome, os controles) sumia e ficava só a cor do fundo
+  const fundoCasa = document.createElement('div');
+  fundoCasa.className = 'pl-fundo-casa';
+  fundoCasa.setAttribute('aria-hidden', 'true');
+  if (ehTablet()) { casa.insertBefore(fundoCasa, el); fundoCasa.append(fundo); }
   const medirFundo = () => {
     if (fundo.hidden || el.classList.contains('letra-cheia')) return;
     const ate = [$('.pl-letra', el), $('.pl-extra', el)].find((x) => !x.hidden);
-    el.style.setProperty('--fundo-h', `${ate ? ate.offsetTop : el.scrollHeight}px`);
+    const h = `${ate ? ate.offsetTop : el.scrollHeight}px`;
+    el.style.setProperty('--fundo-h', h);
+    fundoCasa.style.setProperty('--fundo-h', h);
   };
   // tablet, como o "Mudar para vídeo" do Spotify: a capa no lugar do vídeo (o vídeo continua tocando, só não aparece)
   let comCapa = Boolean(db.prefs().playerCapa);
@@ -850,15 +859,23 @@ const player = (() => {
     quadro = requestAnimationFrame(seguir);
     const a = alvo();
     if (!tela.isConnected) { casa.append(tela); tela.classList.remove('na-telinha'); montar(); return; } // saiu junto com uma página (não deveria): refaz
-    if (a && noPalco() && mover) porNaTelinha(a); else tirarDaTelinha();
-    if (dentro()) { tela.style.visibility = 'visible'; tela.classList.add('no-palco'); return; }
+    const escondida = (modoCapa() || atual?.semVideo || el.classList.contains('letra-cheia')) && !noPalco();
+    // no painel do tablet (e no mini player dele) o vídeo também entra de verdade no lugar dele: rola junto e fica
+    // cortado pela borda do painel. Antes, seguido por cima, ele passava do topo do painel ao rolar e, no mini
+    // player, ficava deslocado (uma parte cortada, outra sobrando)
+    const naMini = a === mini && document.documentElement.classList.contains('pp');
+    if (a && mover && (noPalco() || naMini)) porNaTelinha(a); else tirarDaTelinha();
+    if (dentro()) { tela.style.visibility = escondida ? 'hidden' : 'visible'; tela.style.clipPath = ''; tela.classList.toggle('no-palco', noPalco()); return; }
     const r = a?.isConnected ? a.getBoundingClientRect() : null;
     if (!r || !r.width || !r.height) { tela.style.visibility = 'hidden'; return; }
     const base = tela.parentElement.getBoundingClientRect();
-    tela.style.visibility = (modoCapa() || atual?.semVideo || el.classList.contains('letra-cheia')) && !noPalco() ? 'hidden' : 'visible';
+    tela.style.visibility = escondida ? 'hidden' : 'visible';
     tela.style.transform = `translate(${r.left - base.left}px, ${r.top - base.top}px)`;
     tela.style.width = r.width + 'px';
     tela.style.height = r.height + 'px';
+    // (sem mudar de lugar: só a parte dentro do painel aparece)
+    const p = naMini ? el.getBoundingClientRect() : null;
+    tela.style.clipPath = p ? `inset(${Math.max(0, p.top - r.top)}px ${Math.max(0, r.right - p.right)}px ${Math.max(0, r.bottom - p.bottom)}px ${Math.max(0, p.left - r.left)}px)` : '';
     tela.classList.toggle('no-palco', noPalco());
   };
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -889,6 +906,7 @@ const player = (() => {
     // a barra tem a cor do fundo da letra da música que está tocando (não a da tela em que se está)
     const corDoFundo = atual.cor || corDaMusica(atual.titulo || '');
     el.style.setProperty('--cor-musica', corDoFundo);
+    fundoCasa.style.setProperty('--cor-musica', corDoFundo);
     el.style.setProperty('--tint-cifra', corDaCifra(corDoFundo)); // os acordes na cor do fundo do player, mais clara
     $('.pl-txt b', el).textContent = atual.titulo || 'Vídeo';
     $('.pl-fixo b', el).textContent = atual.titulo || 'Vídeo';
@@ -953,11 +971,14 @@ const player = (() => {
     mini.style.backgroundImage = capa && url ? `url("${url}")` : ''; // (com os quadros no fundo, o CSS a esconde)
     mini.classList.toggle('com-fundo', Boolean(q));
     fundo.hidden = !q;
+    fundoCasa.classList.toggle('ativo', Boolean(q) && fundoCasa.isConnected);
+    el.classList.toggle('fundo-fora', Boolean(q) && fundoCasa.isConnected);
     const conteudo = semCapa ? 'nota' : q ? `q:${q}` : '';
     if (mini.dataset.conteudo !== conteudo) {
       mini.dataset.conteudo = conteudo;
       mini.classList.toggle('sem-capa', semCapa);
       const song = q ? musicaTocando() : null;
+      if (tela.parentElement === mini) tirarDaTelinha(); // (o vídeo está dentro: sai antes, sem recarregar; volta no quadro seguinte)
       mini.innerHTML = semCapa ? icon('music', 72) : '';
       fundo.innerHTML = q ? htmlQuadros(q, (song && renderSong(song.content).meta.x_canvas) || 'sd') : '';
       // todos os quadros já carregados (com "lazy", o quadro que chegava no meio da rolagem aparecia de repente)
@@ -1019,6 +1040,8 @@ const player = (() => {
     }
     box.innerHTML = cartoes.join('');
     box.hidden = !cartoes.length;
+    // (a foto do artista principal pela página dele no Cifra Club, quando a música veio de lá; antes das bolinhas)
+    if (principal) fotoDoArtista(principal, slug);
     porFotos(box, pessoas);
     if (principal) fotoDoArtista(principal).then((url) => {
       const f = $('.pl-extra [data-foto]', el);
@@ -3447,10 +3470,17 @@ function explorarCreditos({ titulo, artista, capa, cor, pessoas, detalhes = [], 
 // a foto de um artista pelo nome (a do Cifra Club); guardada na sessão, para não buscar de novo a cada música
 const fotosArtistas = new Map();
 // (primeiro o Cifra Club; se não tiver, o Deezer, que tem a foto de quase todo artista; por fim a Wikipédia)
-function fotoDoArtista(nome) {
+function fotoDoArtista(nome, slug = '') {
   const k = normalizar(nome);
+  // a música veio do Cifra Club: o artista é o da página dela (sem adivinhar pelo nome)
+  if (slug && !fotosArtistas.has(k)) fotosArtistas.set(k, carregarArtista(slug, nome).principal.then((x) => x?.foto || '').catch(() => '')
+    .then((f) => f || buscarArtistasCifraClub(nome).then((l) => l.find((a) => a.slug === slug)?.capa || '').catch(() => ''))
+    .then((f) => f || fotoDeezer(nome)));
   if (!fotosArtistas.has(k)) {
-    const cifraClub = () => buscarArtistasCifraClub(nome).then((l) => artistaCerto(l, nome)?.capa || '').catch(() => '');
+    // a busca do Cifra Club nem sempre traz a foto (a do Justice vem vazia): aí vale a da página do artista, a mesma
+    // que aparece ao abrir o artista (sem isso, o Deezer trazia a foto de outro artista com o mesmo nome)
+    const cifraClub = () => buscarArtistasCifraClub(nome).then((l) => artistaCerto(l, nome)).then((a) => a?.capa
+      || (a?.slug ? carregarArtista(a.slug, a.nome || nome).principal.then((x) => x?.foto || '') : '')).catch(() => '');
     fotosArtistas.set(k, cifraClub().then((f) => f || fotoDeezer(nome)).then((f) => f || fotoWikipedia(nome)));
   }
   return fotosArtistas.get(k);
@@ -3471,7 +3501,8 @@ function jsonp(url, tempo = 8000) {
 }
 async function fotoDeezer(nome) {
   const r = await jsonp(`https://api.deezer.com/search/artist?q=${encodeURIComponent(nome)}&limit=5`);
-  const a = (r?.data || []).find((x) => mesmoNome(x.name, nome));
+  // com vários do mesmo nome (o "justice" desconhecido vinha antes do Justice), o que tem mais fãs
+  const a = (r?.data || []).filter((x) => mesmoNome(x.name, nome)).sort((x, y) => (y.nb_fan || 0) - (x.nb_fan || 0))[0];
   // sem foto, o Deezer devolve uma imagem genérica (o endereço fica com "/artist//")
   return a?.picture_medium && !/\/artist\/\//.test(a.picture_medium) ? a.picture_big || a.picture_medium : '';
 }
@@ -3811,6 +3842,8 @@ async function viewArtista(slug, nome) {
   });
   d.principal.then((a) => {
     foto = a.foto || '';
+    // a foto da página vale também para o painel e os créditos (a mesma em todo lugar)
+    if (foto && nome) fotosArtistas.set(normalizar(nome), Promise.resolve(foto));
     if (foto && $('#art-foto')) $('#art-foto').innerHTML = `<img src="${esc(foto)}" alt="">`;
   });
   Promise.all([d.disc, d.todas]).then(([disc, todas]) => {
