@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-290';
+export const APP_VERSAO = '2026.10.29-292';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -840,6 +840,9 @@ const player = (() => {
   // tablet, como o "Mudar para vídeo" do Spotify: a capa no lugar do vídeo (o vídeo continua tocando, só não aparece)
   let comCapa = Boolean(db.prefs().playerCapa);
   const modoCapa = () => comCapa && document.documentElement.classList.contains('pp');
+  // celular e computador, na barra embaixo (fora da tela toda): no modo música, a capa no lugar do vídeo, como no tablet
+  // (antes a barra mostrava sempre o vídeo, mesmo com "Mudar para música")
+  const capaNaBarra = () => comCapa && !document.documentElement.classList.contains('pp') && !atual?.semVideo && !el.classList.contains('grande');
   // a música tocando é esta?
   const desta = (id) => Boolean(atual && id && atual.youtube === id);
   const noPalco = () => Boolean(atual && palco?.isConnected && desta(palcoDe)) && !document.body.classList.contains('painel-cheio');
@@ -885,7 +888,7 @@ const player = (() => {
     quadro = requestAnimationFrame(seguir);
     const a = alvo();
     if (!tela.isConnected) { casa.append(tela); tela.classList.remove('na-telinha'); montar(); return; } // saiu junto com uma página (não deveria): refaz
-    const escondida = (modoCapa() || atual?.semVideo || el.classList.contains('letra-cheia')) && !noPalco();
+    const escondida = (modoCapa() || capaNaBarra() || atual?.semVideo || el.classList.contains('letra-cheia')) && !noPalco();
     // no painel do tablet (e no mini player dele) o vídeo também entra de verdade no lugar dele: rola junto e fica
     // cortado pela borda do painel. Antes, seguido por cima, ele passava do topo do painel ao rolar e, no mini
     // player, ficava deslocado (uma parte cortada, outra sobrando)
@@ -995,7 +998,9 @@ const player = (() => {
     const semCapa = capa && !url;
     // (só com "Capa animada" ligada nos Ajustes; desligada, fica a capa parada e não baixa os quadros)
     const q = capa && !atual?.semVideo && atual?.youtube && db.prefs().videoFundo !== false ? atual.youtube : '';
-    mini.style.backgroundImage = capa && url ? `url("${url}")` : ''; // (com os quadros no fundo, o CSS a esconde)
+    const barra = capaNaBarra();
+    el.classList.toggle('capa-na-barra', barra);
+    mini.style.backgroundImage = (capa || barra) && url ? `url("${url}")` : ''; // (com os quadros no fundo, o CSS a esconde)
     mini.classList.toggle('com-fundo', Boolean(q));
     fundo.hidden = !q;
     fundoCasa.classList.toggle('ativo', Boolean(q) && fundoCasa.isConnected);
@@ -1014,7 +1019,7 @@ const player = (() => {
       // todos os quadros já carregados (com "lazy", o quadro que chegava no meio da rolagem aparecia de repente)
       fundo.querySelectorAll('img[loading]').forEach((img) => { img.loading = 'eager'; });
     }
-    mini.classList.toggle('capa-yt', capa && capaYt);
+    mini.classList.toggle('capa-yt', (capa || barra) && capaYt);
     // no modo vídeo, a capa pequena ao lado do nome (como no Spotify)
     const capinha = $('.pl-capinha', el);
     capinha.style.backgroundImage = !capa && url ? `url("${url}")` : '';
@@ -1090,6 +1095,7 @@ const player = (() => {
   // cantada acende e o painel rola junto (tocar numa linha leva o vídeo para ela)
   let letraDe = '';
   let tempos = null;
+  let fins = null; // o fim de cada frase cantada, para achar as partes só de música (fimCantado)
   let linhasDaLetra = [];
   const desenharLetra = () => {
     if (!document.documentElement.classList.contains('pp')) return;
@@ -1133,7 +1139,8 @@ const player = (() => {
     // na letra sincronizada, as partes só de música (a introdução, os solos e o final, de 10 s ou mais)
     // ganham as notinhas ♪, que acendem e pulam enquanto tocam
     const nota = (id) => `<p class="pl-pausa" data-pausa="${id}" aria-label="Só música"><i>♪</i><i>♪</i><i>♪</i></p>`;
-    const pausaAntes = (k) => tempos && (k === 0 ? tempos[0].inicio >= PAUSA_MUSICA : tempos[k].inicio - tempos[k - 1].fim >= PAUSA_MUSICA);
+    fins = tempos ? tempos.map((x, k) => fimCantado(tempos, linhas, k)) : null;
+    const pausaAntes = (k) => tempos && (k === 0 ? tempos[0].inicio >= PAUSA_MUSICA : tempos[k].inicio - fins[k - 1] >= PAUSA_MEIO);
     $('.pl-linhas', el).innerHTML = linhas.map((l, k) => `${marcas.has(k) ? `<h4 class="pl-parte">${esc(marcas.get(k))}</h4>` : ''}${pausaAntes(k) ? nota(k) : ''}<p data-k="${k}">${esc(l)}</p>`).join('')
       + (tempos?.length && duracao > 0 && duracao - tempos[tempos.length - 1].fim >= PAUSA_MUSICA ? nota('fim') : '');
     desenharCifra();
@@ -1230,6 +1237,19 @@ const player = (() => {
   // só as partes longas só de instrumentos (introdução, solo, final) ganham as notinhas: as pausas curtas entre as
   // estrofes não
   const PAUSA_MUSICA = 10;
+  // no meio da música, só um solo mais longo (12 s ou mais): um respiro entre as estrofes não ganha as notinhas
+  const PAUSA_MEIO = 12;
+  // A letra sincronizada do LRCLIB só diz quando cada frase começa: o fim dela fica sendo o começo da seguinte, e um solo
+  // no meio da música ficava "dentro" da frase de antes (as notinhas só apareciam no começo). Quando o fim é esse
+  // (colado na frase seguinte, como no LRCLIB e na sincronia à mão), a frase dura o que se leva para cantá-la (pelo número de
+  // palavras, de 3 a 9 s); o resto é a parte só de música. Um fim marcado de verdade (uma pausa no LRC) vale como está
+  const fimCantado = (ts, ls, k) => {
+    const { inicio, fim } = ts[k];
+    const prox = ts[k + 1];
+    if (!prox || Math.abs(fim - prox.inicio) > 0.05) return fim;
+    const palavras = String(ls[k] || '').split(/\s+/).filter(Boolean).length;
+    return Math.min(fim, inicio + Math.max(3, Math.min(9, 1.5 + 0.55 * palavras)));
+  };
   const lrclibTentado = new Set();
   const lrclibDeNovo = new Set(); // (os vídeos que já tentaram o LRCLIB de novo, depois de ele não responder)
   // a música para sincronizar: a salva, ou a prévia da busca com os dados que a página da música calcula
@@ -1369,7 +1389,7 @@ const player = (() => {
     // numa parte só de música (antes da 1ª frase, numa pausa longa ou depois da última), acendem as notinhas dela
     let pausa = null;
     if (k < 0) pausa = '0';
-    else if (t > tempos[k].fim + 0.6) pausa = k + 1 < tempos.length ? String(k + 1) : 'fim';
+    else if (t > (fins?.[k] ?? tempos[k].fim) + 0.6) pausa = k + 1 < tempos.length ? String(k + 1) : 'fim';
     if (pausa !== null && !caixa.querySelector(`[data-pausa="${pausa}"]`)) pausa = null;
     const chave = pausa !== null ? 'p' + pausa : String(k);
     if (chave === acesaChave) return;
