@@ -41,6 +41,18 @@ import transcricao
 import youtube
 
 log = logging.getLogger("songbook-ia")
+
+
+class _SemPerguntas(logging.Filter):
+    """O app pergunta pela tarefa a cada 1,5 s (e pela saúde do servidor): essas linhas enchiam o terminal e
+    escondiam o que importa (os modelos prontos, a "letra sincronizada: … linhas (alinhador)", os erros)."""
+
+    def filter(self, registro: logging.LogRecord) -> bool:
+        msg = registro.getMessage()
+        return not any(r in msg for r in ('"GET /tarefa/', '"OPTIONS /tarefa/', '"GET /saude', '"OPTIONS /saude', '"GET / HTTP'))
+
+
+logging.getLogger("uvicorn.access").addFilter(_SemPerguntas())
 MAX_MB = int(os.environ.get("IA_MAX_MB", 60))
 vagas = threading.Semaphore(int(os.environ.get("IA_TAREFAS", 1)))
 
