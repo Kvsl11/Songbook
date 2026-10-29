@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 317, data: '2026-10-29', titulo: 'O + do Tocando agora salva de novo',
+    itens: [
+      { tipo: 'correcao', texto: 'O botão + do Tocando agora (salvar na biblioteca) não fazia nada no modo música das músicas que têm áudio oficial e clipe: agora salva na hora.' },
+    ],
+  },
+  {
     versao: 316, data: '2026-10-29', titulo: 'Música e vídeo continuam no mesmo ponto (de verdade)',
     itens: [
       { tipo: 'correcao', texto: 'Trocar da música para o vídeo (ou o contrário) não volta mais para o começo: enquanto a outra versão carrega, o YouTube avisa o tempo zero, e o app tomava esse zero como o ponto da música. Agora ele espera o vídeo começar a tocar e confere se está na parte que estava sendo cantada.' },
@@ -66,13 +72,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'O alinhador da letra no servidor não pula mais as frases cantadas com a nota esticada ou com a banda alta (antes elas ficavam sem tempo e a letra se perdia nesses trechos).' },
       { tipo: 'melhoria', texto: 'O aviso de “Letra sincronizada” diz como ela foi feita: pelo alinhador de IA, pela letra da internet no lugar certo ou pelo Whisper.' },
-    ],
-  },
-  {
-    versao: 307, data: '2026-10-29', titulo: 'Letra sincronizada mais firme',
-    itens: [
-      { tipo: 'melhoria', texto: 'Com o servidor ligado, a letra sincronizada da internet (feita por gente, como a do Spotify) é usada quando o vídeo é a mesma gravação. No videoclipe com uma parte antes da música, o servidor ouve o vídeo só para achar onde ela começa e põe essa letra no lugar certo.' },
-      { tipo: 'melhoria', texto: 'Quando a letra não está na internet, o servidor encaixa a letra da cifra na voz, letra por letra (um alinhador de IA gratuito, que roda nele mesmo): ela não se perde mais em introduções, solos e trechos falados do vídeo.' },
     ],
   },
 ];

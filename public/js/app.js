@@ -129,7 +129,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-316';
+export const APP_VERSAO = '2026.10.29-317';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -2398,8 +2398,13 @@ const semLinhasDeAcordes = (sinc) => {
     }
     if (!b) return;
     // a música aberta da busca (a prévia, ainda não salva) é a que está no player?
-    const daPrevia = () => Boolean(preview && atual && (atual.songId === 'previa' || atual.href === '#/musica/previa')
-      && (!atual.youtube || youtubeId(renderSong(preview.content).meta.youtube) === atual.youtube));
+    // (com as duas versões da música, o que toca no modo música é o áudio oficial, e o vídeo da prévia é o clipe: as
+    // duas contam. Antes, no modo música, o + não fazia nada)
+    const daPrevia = () => {
+      if (!preview || !atual || !(atual.songId === 'previa' || atual.href === '#/musica/previa')) return false;
+      const yt = youtubeId(renderSong(preview.content).meta.youtube);
+      return !atual.youtube || [atual.youtube, atual.video, atual.audio].includes(yt);
+    };
     // salva a prévia na biblioteca e o player passa a ser da música salva
     const salvarDaPrevia = () => {
       const ja = db.songBySource(preview.source);
@@ -2451,7 +2456,7 @@ const semLinhasDeAcordes = (sinc) => {
       else if (!atual.href && atual.abrir) {
         // vídeo tocado direto da busca: abre como música (com a cifra e a letra) e já salva
         Promise.resolve(atual.abrir()).then(() => { if (daPrevia()) salvarDaPrevia(); });
-      }
+      } else toast('Abra a música para salvar na biblioteca'); // (nunca mais um toque sem resposta)
     }
     if (b.dataset.pl === 'add-repertorio' && atual?.songId && db.song(atual.songId)) addToSetDialog(atual.songId, atual.parte || '');
     if (b.dataset.pl === 'proxima') pular(1);
