@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 303, data: '2026-10-29', titulo: 'Letra sincronizada pela IA do servidor',
+    itens: [
+      { tipo: 'melhoria', texto: 'Com o servidor no seu computador ou no GitHub ligado, a letra sincroniza sozinha pela IA dele, que ouve o próprio vídeo. O banco de letras da internet fica só de reserva.' },
+      { tipo: 'correcao', texto: 'No vídeo que começa só com instrumentos, a letra não anda mais durante a introdução: aparecem as notinhas ♪ e a primeira frase acende quando começam a cantar.' },
+      { tipo: 'correcao', texto: 'Músicas em inglês e espanhol são ouvidas na língua certa (antes a IA ouvia tudo como português e achava poucas frases).' },
+    ],
+  },
+  {
     versao: 302, data: '2026-10-29', titulo: 'Partitura pelo servidor sem cair no meio',
     itens: [
       { tipo: 'correcao', texto: 'Pelo servidor no GitHub, a partitura do arquivo importado ficava parada em “Enviando o áudio” e às vezes falhava no fim. Agora o app envia o áudio e vai perguntando ao servidor em que etapa ele está: as etapas andam na tela e a partitura chega mesmo depois de vários minutos.' },
@@ -63,13 +71,6 @@ export const NOVIDADES = [
       { tipo: 'novo', texto: 'Nos ⋯ da música e do Tocando agora, “Ver álbum” abre o álbum em que a música saiu (o lançamento original, não as coletâneas), com a faixa dela destacada na lista.' },
       { tipo: 'melhoria', texto: 'A página do álbum mostra o tipo (álbum, ao vivo, single, EP ou coletânea), o ano de lançamento, o número de faixas e quantas têm cifra.' },
       { tipo: 'novo', texto: 'No cartão “Sobre o artista” do Tocando agora, uma breve apresentação do artista (da Wikipédia), embaixo do nome; tocando no texto, ele abre inteiro.' },
-    ],
-  },
-  {
-    versao: 293, data: '2026-10-29', titulo: 'Cifra que acompanha a música',
-    itens: [
-      { tipo: 'correcao', texto: 'Na cifra com a letra sincronizada, muito mais linhas acendem na hora certa: antes só acendia a linha escrita igualzinho nas duas fontes, e qualquer diferença ("pra"/"para", um "oh" a mais, uma linha quebrada em duas) deixava a linha apagada. As falas das gravações ao vivo, que não estão na cifra, continuam sem acender.' },
-      { tipo: 'melhoria', texto: 'No celular, a barra da música embaixo mostra só o nome e o artista, sem o tempo (que cortava o nome do artista).' },
     ],
   },
 ];
