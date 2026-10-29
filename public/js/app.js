@@ -21,7 +21,7 @@ import { partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { NOVIDADES, novidadesNaoVistas } from './lib/novidades.js';
 import { baseDoServidor, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, dataDaPergunta, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
-import { buscarYoutube, duracaoDoVideo, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { buscarYoutube, duracaoDoVideo, fotoDoCanal, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -108,7 +108,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-287';
+export const APP_VERSAO = '2026.10.29-288';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -984,8 +984,11 @@ const player = (() => {
       mini.dataset.conteudo = conteudo;
       mini.classList.toggle('sem-capa', semCapa);
       const song = q ? musicaTocando() : null;
-      if (tela.parentElement === mini) tirarDaTelinha(); // (o vídeo está dentro: sai antes, sem recarregar; volta no quadro seguinte)
-      mini.innerHTML = semCapa ? icon('music', 72) : '';
+      // o vídeo (se estiver dentro) não sai do lugar: troca só o que está em volta dele. Tirar e pôr de volta a cada
+      // troca de vídeo/capa fazia o vídeo recarregar em alguns aparelhos, e o YouTube pausava com "a conta está sendo
+      // usada em outro lugar" (a sessão velha ainda contava) e não tocava mais
+      [...mini.childNodes].forEach((n) => { if (n !== tela) n.remove(); });
+      if (semCapa) mini.insertAdjacentHTML('afterbegin', icon('music', 72));
       fundo.innerHTML = q ? htmlQuadros(q, (song && renderSong(song.content).meta.x_canvas) || 'sd') : '';
       // todos os quadros já carregados (com "lazy", o quadro que chegava no meio da rolagem aparecia de repente)
       fundo.querySelectorAll('img[loading]').forEach((img) => { img.loading = 'eager'; });
@@ -3513,21 +3516,23 @@ function explorarCreditos({ titulo, artista, capa, cor, pessoas, detalhes = [], 
   dlg.showModal();
   porFotos(dlg, pessoas);
 }
-// a foto de um artista pelo nome (a do Cifra Club); guardada na sessão, para não buscar de novo a cada música
+// a foto de um artista pelo nome; guardada na sessão, para não buscar de novo a cada música
 const fotosArtistas = new Map();
-// (primeiro o Cifra Club; se não tiver, o Deezer, que tem a foto de quase todo artista; por fim a Wikipédia)
+// (primeiro a do canal do artista no YouTube, a mais atual, só quando o canal é com certeza dele: verificado ou o
+// "Tópico" do YouTube; depois o Cifra Club; se não tiver, o Deezer, que tem a foto de quase todo artista; por fim a
+// Wikipédia)
 function fotoDoArtista(nome, slug = '') {
   const k = normalizar(nome);
   // a música veio do Cifra Club: o artista é o da página dela (sem adivinhar pelo nome)
-  if (slug && !fotosArtistas.has(k)) fotosArtistas.set(k, carregarArtista(slug, nome).principal.then((x) => x?.foto || '').catch(() => '')
+  if (slug && !fotosArtistas.has(k)) fotosArtistas.set(k, fotoDoCanal(nome).then((f) => f || carregarArtista(slug, nome).principal.then((x) => x?.foto || '').catch(() => '')
     .then((f) => f || buscarArtistasCifraClub(nome).then((l) => l.find((a) => a.slug === slug)?.capa || '').catch(() => ''))
-    .then((f) => f || fotoDeezer(nome)));
+    .then((f) => f || fotoDeezer(nome))));
   if (!fotosArtistas.has(k)) {
     // a busca do Cifra Club nem sempre traz a foto (a do Justice vem vazia): aí vale a da página do artista, a mesma
     // que aparece ao abrir o artista (sem isso, o Deezer trazia a foto de outro artista com o mesmo nome)
     const cifraClub = () => buscarArtistasCifraClub(nome).then((l) => artistaCerto(l, nome)).then((a) => a?.capa
       || (a?.slug ? carregarArtista(a.slug, a.nome || nome).principal.then((x) => x?.foto || '') : '')).catch(() => '');
-    fotosArtistas.set(k, cifraClub().then((f) => f || fotoDeezer(nome)).then((f) => f || fotoWikipedia(nome)));
+    fotosArtistas.set(k, fotoDoCanal(nome).then((f) => f || cifraClub()).then((f) => f || fotoDeezer(nome)).then((f) => f || fotoWikipedia(nome)));
   }
   return fotosArtistas.get(k);
 }

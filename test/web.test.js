@@ -389,3 +389,20 @@ test('letra sincronizada: o LRCLIB ocupado (503) tenta de novo; sem resposta nen
   assert.equal(n, 3);
   await assert.rejects(letraSincronizada({ titulo: 'Colo de Mãe', artista: 'Frei Gilson' }, async () => ocupado, { espera: 1 }), /não respondeu|ocupado/);
 });
+
+// foto do artista pelo YouTube: só o canal que é com certeza dele (verificado com o nome dele ou o "Tópico" do YouTube)
+test('fotoDosCanais: canal verificado ou Tópico do artista, nunca o de fã', async () => {
+  const { fotoDosCanais } = await import('../public/js/lib/web.js');
+  const foto = (id) => `https://proxy.exemplo/${id}=s176-c-k-c0x00ffffff-no-rw-mo?host=yt3.ggpht.com`;
+  const canal = (name, verified, id) => ({ type: 'channel', name, verified, thumbnail: foto(id) });
+  // o verificado com o nome dele, com a foto direto do YouTube e maior
+  assert.equal(fotoDosCanais({ items: [canal('Justice', false, 'fa'), canal('Justice', true, 'ok'), canal('Just!ce', true, 'x')] }, 'Justice'),
+    'https://yt3.ggpht.com/ok=s480-c-k-c0x00ffffff-no-rw-mo');
+  // sem verificado com o nome: o Tópico; "Fulano Oficial" sem o selo (de fã) não vale
+  assert.equal(fotoDosCanais({ items: [canal('Pe Marcelo Rossi', true, 'a'), canal('Padre Marcelo Rossi - Topic', false, 'top'), canal('Padre Marcelo Rossi Oficial', false, 'fa')] }, 'Padre Marcelo Rossi'),
+    'https://yt3.ggpht.com/top=s480-c-k-c0x00ffffff-no-rw-mo');
+  assert.equal(fotoDosCanais({ items: [canal('Aline Barros Oficial', true, 'ab')] }, 'Aline Barros'), 'https://yt3.ggpht.com/ab=s480-c-k-c0x00ffffff-no-rw-mo');
+  // nada certo: fica a foto de antes
+  assert.equal(fotoDosCanais({ items: [canal('Padre Marcelo Rossi Oficial', false, 'fa'), canal('Músicas do Padre Marcelo Rossi', true, 'm')] }, 'Padre Marcelo Rossi'), '');
+  assert.equal(fotoDosCanais({ items: [canal('Justice - Topic', false, 'a'), canal('Justice - Topic', false, 'b')] }, 'Justice'), '');
+});
