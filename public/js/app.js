@@ -2883,7 +2883,19 @@ const semLinhasDeAcordes = (sinc) => {
     });
     lista.addEventListener('keydown', (e) => {
       const linha = e.target.closest('[data-fila-pos]');
-      if (!linha || !['Enter', ' '].includes(e.key)) return;
+      if (!linha) return;
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const pos = Number(linha.dataset.filaPos);
+        const destino = pos + (e.key === 'ArrowUp' ? -1 : 1);
+        if (destino < 0 || destino >= filaOrdem.length) return;
+        filaOrdem = moverIndice(filaOrdem, pos, destino);
+        historico = [];
+        desenharLista();
+        lista.querySelector(`[data-fila-pos="${destino}"]`)?.focus();
+        return;
+      }
+      if (!['Enter', ' '].includes(e.key)) return;
       e.preventDefault();
       linha.click();
     });
