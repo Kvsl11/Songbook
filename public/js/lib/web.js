@@ -559,6 +559,38 @@ export function videosDoPiped(json) {
     });
 }
 
+// A busca do próprio YouTube, pela página dela lida pelo Jina Reader (em texto): a reserva quando nenhuma instância do
+// Piped responde (elas caem com frequência). Cada vídeo vem em três linhas: a miniatura com a duração e o endereço,
+// o título ("### [título](endereço)") e o canal ("[canal](…/channel/… ou /@…)")
+export function videosDaPaginaDoYoutube(texto) {
+  const linhas = String(texto || '').split(/\n/);
+  const vistos = new Set();
+  const lista = [];
+  for (let i = 0; i < linhas.length; i++) {
+    const m = /^\[!\[Image[^\]]*\]\([^)]*\)\s+(\d{1,2}(?::\d{2}){1,2})\b[^\]]*\]\(https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})/.exec(linhas[i]);
+    if (!m || vistos.has(m[2])) continue;
+    const id = m[2];
+    let titulo = '';
+    let canal = '';
+    for (let j = i + 1; j < Math.min(linhas.length, i + 12); j++) {
+      const t = !titulo && new RegExp(`^###\\s+\\[(.+?)\\]\\(https:\\/\\/www\\.youtube\\.com\\/watch\\?v=${id}`).exec(linhas[j]);
+      if (t) { titulo = t[1]; continue; }
+      const c = titulo && /^\[([^\]]+)\]\(https:\/\/www\.youtube\.com\/(?:channel\/|@)/.exec(linhas[j]);
+      if (c) { canal = c[1]; break; }
+    }
+    if (!titulo) continue;
+    vistos.add(id);
+    const segundos = m[1].split(':').reduce((a, x) => a * 60 + Number(x), 0);
+    lista.push({ id, titulo, canal: canal.replace(/\s*-\s*Topic$/, ''), duracao: m[1], segundos, capa: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`, url: `https://www.youtube.com/watch?v=${id}`, fonte: 'youtube' });
+  }
+  return lista;
+}
+async function buscarNaPaginaDoYoutube(q, { fetchImpl } = {}) {
+  const res = await buscar(`https://r.jina.ai/https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`, { fetchImpl, timeout: 25000 });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return videosDaPaginaDoYoutube(await res.text()).slice(0, 15);
+}
+
 export async function buscarYoutube(termo, { fetchImpl, instancias = PIPED, filtro = 'videos' } = {}) {
   const q = String(termo || '').trim();
   if (!q) return [];
@@ -576,6 +608,9 @@ export async function buscarYoutube(termo, { fetchImpl, instancias = PIPED, filt
     return await Promise.any(instancias.map(uma));
   } catch {
     if (respondeu) return [];
+    // nenhuma instância do Piped respondeu: a página de busca do YouTube
+    const daPagina = await buscarNaPaginaDoYoutube(q, { fetchImpl }).catch(() => null);
+    if (daPagina?.length) return daPagina;
     throw new Error('Busca de vídeos indisponível agora');
   }
 }

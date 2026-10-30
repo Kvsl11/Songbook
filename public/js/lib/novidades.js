@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 323, data: '2026-10-30', titulo: 'Música e letra certas no tablet, sem piscar',
+    itens: [
+      { tipo: 'correcao', texto: 'Quando a busca do áudio oficial não respondia, a música ficava só com o clipe e a letra fora do tempo, para sempre. Agora o app tenta de novo (daqui a um minuto e na próxima vez que ela tocar) e, com a busca de vídeos fora do ar, procura direto na página do YouTube.' },
+      { tipo: 'correcao', texto: 'O Tocando agora não pisca mais: o botão de trocar, o nome, os controles e o aviso da letra eram reescritos 4 vezes por segundo, mesmo sem mudar nada.' },
+    ],
+  },
+  {
     versao: 322, data: '2026-10-30', titulo: 'Troca sem engasgo também nas baixadas',
     itens: [
       { tipo: 'correcao', texto: 'Nas músicas baixadas, trocar entre a música e o vídeo não engasga mais: o arquivo de agora continua tocando até o outro começar no mesmo ponto, e os dois se cruzam suavemente (antes o som sumia por um instante).' },
@@ -76,15 +83,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'Gerar a partitura com IA começa a gerar de verdade, sem cair na tela de importar o arquivo: o app espera saber do servidor, usa o do computador ou o da nuvem e, se a música não tem vídeo, procura um no YouTube. Importar o arquivo só aparece se não der para gerar.' },
       { tipo: 'melhoria', texto: 'A partitura saiu do ⋯ da letra e foi para o ⋯ do Tocando agora (no canto de cima): “Criar partitura”, que a IA gera sozinha, ou “Ver partitura”, se a música já tem.' },
-    ],
-  },
-  {
-    versao: 313, data: '2026-10-29', titulo: 'Música e clipe certos, e baixar o repertório',
-    itens: [
-      { tipo: 'correcao', texto: 'Música com videoclipe (como “Tears”, da Sabrina Carpenter) não fica mais só com o clipe e a letra fora do tempo: o app reconhece a gravação oficial pelo banco de letras e toca o áudio oficial no modo música, com a letra certinha, e o clipe no modo vídeo. As músicas já sincronizadas assim são conferidas sozinhas.' },
-      { tipo: 'melhoria', texto: 'O áudio oficial vem primeiro do YouTube Music (o canal do artista), e a música da busca já ganha as duas versões ao abrir, sem precisar dar play.' },
-      { tipo: 'novo', texto: 'No repertório e na playlist, o botão de baixar todas as músicas de uma vez, ao lado do play; nas listas, a setinha verde mostra as baixadas.' },
-      { tipo: 'melhoria', texto: 'Como no Spotify, no modo vídeo de uma música com videoclipe não aparece a letra (nem a cifra): ela fica no modo música, sincronizada com o áudio oficial.' },
     ],
   },
 ];

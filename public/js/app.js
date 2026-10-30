@@ -131,7 +131,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-322';
+export const APP_VERSAO = '2026.10.30-323';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1282,6 +1282,10 @@ const player = (() => {
     document.body.classList.toggle('com-player', ver);
     if (ver) medirPlayer();
   };
+  // (só escreve o que mudou: o player é desenhado a cada aviso do tempo, 4 vezes por segundo, e reescrever os botões e os
+  // textos iguais fazia os ícones e os nomes piscarem no tablet)
+  const porTexto = (x, v) => { if (x && x.textContent !== String(v)) x.textContent = v; };
+  const porHtml = (x, v) => { if (x && x.__html !== v) { x.innerHTML = v; x.__html = v; } };
   const desenhar = () => {
     if (!atual) return;
     // a barra tem a cor do fundo da letra da música que está tocando (não a da tela em que se está)
@@ -1289,27 +1293,27 @@ const player = (() => {
     el.style.setProperty('--cor-musica', corDoFundo);
     fundoCasa.style.setProperty('--cor-musica', corDoFundo);
     el.style.setProperty('--tint-cifra', corDaCifra(corDoFundo)); // os acordes na cor do fundo do player, mais clara
-    $('.pl-txt b', el).textContent = atual.titulo || 'Vídeo';
-    $('.pl-fixo b', el).textContent = atual.titulo || 'Vídeo';
-    $('.pl-fixo small', el).textContent = atual.artista || '';
+    porTexto($('.pl-txt b', el), atual.titulo || 'Vídeo');
+    porTexto($('.pl-fixo b', el), atual.titulo || 'Vídeo');
+    porTexto($('.pl-fixo small', el), atual.artista || '');
     // só o artista (e a parte da missa): o tempo fica na barra de tempo (no celular ele ia junto do artista e cortava o
     // nome, "3:17 / 3:…"; a barrinha de progresso embaixo já mostra quanto falta)
-    $('.pl-txt small', el).textContent = [atual.parte, atual.artista].filter(Boolean).join(' · ');
+    porTexto($('.pl-txt small', el), [atual.parte, atual.artista].filter(Boolean).join(' · '));
     // música sem vídeo: o play é o de sempre; tocando nele (ou na pílula "Escolher um vídeo"), escolhe um vídeo do YouTube
-    el.querySelectorAll('.pl-play').forEach((b) => { b.innerHTML = icon(estado === 'tocando' && !atual.semVideo ? 'pause' : 'play', 20); b.title = atual.semVideo ? 'Escolher um vídeo para tocar' : ''; });
+    el.querySelectorAll('.pl-play').forEach((b) => { porHtml(b, icon(estado === 'tocando' && !atual.semVideo ? 'pause' : 'play', 20)); b.title = atual.semVideo ? 'Escolher um vídeo para tocar' : ''; });
     // a bolinha de salva (na barrinha recolhida do tablet): ✓ se a música está na biblioteca, + se não
     const salva = Boolean(atual.songId && db.song(atual.songId));
     const bs = $('.pl-salva', el);
     if (bs.hidden || bs.classList.contains('salva') !== salva) {
       bs.hidden = false;
       bs.classList.toggle('salva', salva);
-      bs.innerHTML = icon(salva ? 'check' : 'plus', 16);
+      porHtml(bs, icon(salva ? 'check' : 'plus', 16));
       bs.title = salva ? 'Na sua biblioteca (tocar para tirar)' : 'Salvar na biblioteca';
       bs.setAttribute('aria-label', bs.title);
       // o mesmo ✓/+ na barrinha de cima (rolando)
       const fs = $('.pl-fixo-salva', el);
       fs.classList.toggle('salva', salva);
-      fs.innerHTML = icon(salva ? 'check' : 'plus', 16);
+      porHtml(fs, icon(salva ? 'check' : 'plus', 16));
       fs.title = bs.title;
       fs.setAttribute('aria-label', bs.title);
     }
@@ -1329,11 +1333,11 @@ const player = (() => {
     el.querySelectorAll('[data-pl="proxima"]').forEach((x) => { x.disabled = !f || proximoIndice() < 0; });
     $('[data-pl="anterior-letra"]', el).disabled = !f || anteriorIndice() < 0;
     desenharModos();
-    el.querySelectorAll('.pl-t0').forEach((t) => { t.textContent = duracao ? fmt(arrasto ? arrasto.fracao * duracao : tempo) : ''; });
-    el.querySelectorAll('.pl-t1').forEach((t) => { t.textContent = duracao ? fmt(duracao) : ''; });
-    $('.pl-letra-nome b', el).textContent = atual.titulo || '';
-    $('.pl-letra-nome small', el).textContent = atual.artista || '';
-    $('.pl-cab-meio b', el).textContent = atual.setId ? db.set(atual.setId)?.name || '' : atual.parte || '';
+    el.querySelectorAll('.pl-t0').forEach((t) => { porTexto(t, duracao ? fmt(arrasto ? arrasto.fracao * duracao : tempo) : ''); });
+    el.querySelectorAll('.pl-t1').forEach((t) => { porTexto(t, duracao ? fmt(duracao) : ''); });
+    porTexto($('.pl-letra-nome b', el), atual.titulo || '');
+    porTexto($('.pl-letra-nome small', el), atual.artista || '');
+    porTexto($('.pl-cab-meio b', el), atual.setId ? db.set(atual.setId)?.name || '' : atual.parte || '');
     desenharLetra();
     desenharExtra();
     medirFundo();
@@ -1477,8 +1481,8 @@ const player = (() => {
     capinha.hidden = !url;
     const b = $('.pl-troca', el);
     b.hidden = ehArquivo(atual?.youtube) && !atual?.video; // (só o áudio da pessoa, sem clipe: não há para onde trocar)
-    b.innerHTML = atual?.semVideo ? `${icon('youtube', 18)}<span>Escolher um vídeo</span>`
-      : `${icon(capa ? 'video' : 'music', 18)}<span>${capa ? 'Mudar para vídeo' : 'Mudar para música'}</span>`;
+    porHtml(b, atual?.semVideo ? `${icon('youtube', 18)}<span>Escolher um vídeo</span>`
+      : `${icon(capa ? 'video' : 'music', 18)}<span>${capa ? 'Mudar para vídeo' : 'Mudar para música'}</span>`);
   };
   // embaixo da letra, no painel do tablet (como os cartões do "Tocando agora" do Spotify): o artista com a foto,
   // os créditos (quem canta, compôs, o tom, de onde veio a cifra) e o vídeo, com o que dá para fazer em cada um
@@ -1678,8 +1682,8 @@ const semLinhasDeAcordes = (sinc) => {
       html = `<span class="pl-sinc-ic erro">${icon('alerta', 15)}</span><span class="pl-sinc-txt">${esc(e.texto || 'Não sincronizou')}</span>
         ${e.deNovo ? botaoSinc('sinc-tentar', 'Tentar de novo', true) : ''}${botaoSinc('sinc-marcar', 'Sincronizar à mão', !e.deNovo)}${servidorIA().url ? botaoSinc('sinc-servidor', 'Ouvir o vídeo') : ''}`;
     }
-    box.innerHTML = html;
-    box.hidden = !html;
+    porHtml(box, html); // (só quando muda: reescrito a cada desenho, ele piscava em cima da letra)
+    if (box.hidden !== !html) box.hidden = !html;
   };
   // acerta o tempo da letra inteira pela frase tocada agora (o vídeo com uma parte antes da música, ou fora do tempo)
   const ajustarPelaFrase = (k) => {
@@ -2531,7 +2535,7 @@ const semLinhasDeAcordes = (sinc) => {
       if (msg?.event === 'onError') {
         estado = 'parado';
         $('.pl-txt small', el).innerHTML = `Este vídeo não toca fora do YouTube · <a href="https://www.youtube.com/watch?v=${esc(atual.youtube)}" target="_blank" rel="noopener">abrir</a>${atual.songId ? ' · <button class="link-btn" data-pl="trocar">escolher outro</button>' : ''}`;
-        el.querySelectorAll('.pl-play').forEach((b) => { b.innerHTML = icon('play', 20); });
+        el.querySelectorAll('.pl-play').forEach((b) => { porHtml(b, icon('play', 20)); });
         if (noPalco()) toast('Este vídeo não toca fora do YouTube: escolha outro em “Trocar vídeo”');
         avisar();
         return;
@@ -10720,19 +10724,37 @@ async function conferirVersoes(song, status = () => {}) {
   if (conferidasAgora.has(song.id)) return;
   conferidasAgora.add(song.id);
   const r = await sincronizarMusica(song, { soLrclib: true, sozinho: true, status });
+  // (a busca do áudio oficial não respondeu: tenta de novo daqui a um minuto, se ela ainda estiver tocando, e na
+  // próxima vez que ela tocar)
+  if (buscaDeAudioFalhou.has(song.id)) {
+    setTimeout(() => {
+      conferidasAgora.delete(song.id);
+      const agora = song.id === 'previa' ? preview : db.song(song.id);
+      if (agora && player.atual?.songId === song.id && precisaConferirVersoes(agora)) conferirVersoes(agora, status);
+    }, 60000);
+    return;
+  }
   if (r === 'erro' || r === undefined) return; // tenta de novo da próxima vez que o app abrir
   if (song.id === 'previa') { if (preview) preview.versoesConferidas = true; } else if (db.song(song.id)) db.updateSong(song.id, { versoesConferidas: true });
 }
 // o áudio oficial da gravação no YouTube: o mesmo título, a duração da gravação do LRCLIB e, de preferência, do canal do
 // artista (os "- Topic", do YouTube Music); null se não achar
+// (buscaDeAudioFalhou: nenhuma busca respondeu, nem o Piped nem a página do YouTube: não quer dizer que a música não
+// tem o áudio oficial, e a conferência fica para depois, em vez de marcar a música como conferida para sempre — antes
+// ela ficava só com o clipe, e a letra fora do tempo)
+const buscaDeAudioFalhou = new Set();
 async function procurarAudio(song, duracao) {
   const titulo = tituloLimpo(song.title);
   const termo = `${titulo} ${song.artist || ''}`.trim();
+  let respondeu = false;
   // primeiro no YouTube Music (as faixas dos álbuns, o áudio puro do canal do artista); depois nos vídeos
   for (const [q, filtro] of [[termo, 'music_songs'], [`${termo} audio`, 'videos'], [termo, 'videos']]) {
-    const achado = escolherAudio(await buscarYoutube(q, { filtro }).catch(() => []), { titulo, artista: song.artist || '', duracao, evitar: song.youtube });
-    if (achado) return achado;
+    const lista = await buscarYoutube(q, { filtro }).catch(() => null);
+    if (lista) respondeu = true;
+    const achado = escolherAudio(lista || [], { titulo, artista: song.artist || '', duracao, evitar: song.youtube });
+    if (achado) { buscaDeAudioFalhou.delete(song.id); return achado; }
   }
+  if (!respondeu) buscaDeAudioFalhou.add(song.id);
   return null;
 }
 // as duas versões da música (o clipe e o áudio oficial) ficam guardadas nela; o player passa a usá-las na hora
