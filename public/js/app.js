@@ -133,7 +133,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-338';
+export const APP_VERSAO = '2026.10.30-339';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -8432,8 +8432,8 @@ function viewSong(id, ctx = {}) {
     });
   };
 
-  // letra sincronizada (como no Spotify): o servidor da IA ouve o vídeo e diz quando cada linha é cantada. Tocando o
-  // vídeo desta música, a linha cantada acende e a letra rola até ela; tocar numa linha leva o vídeo para ali
+  // letra sincronizada (como no Spotify): os tempos vêm do LRCLIB. Tocando o
+  // áudio desta música, a linha cantada acende e a letra rola até ela; tocar numa linha leva o áudio para ali
   // (com as duas versões, a letra acompanha o áudio oficial: no clipe ela fica parada)
   const sincronia = () => (midiaDe(song) && song.sincronia?.fonte === 'lrclib' && song.sincronia.video === videoDaLetra(song) && song.sincronia.tempos?.length ? song.sincronia : null);
   // Consulta o LRCLIB automaticamente ao abrir a música, em qualquer tamanho de tela.
