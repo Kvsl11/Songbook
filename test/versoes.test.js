@@ -176,6 +176,6 @@ test('a busca não entra na música sem videoclipe e letra sincronizada confirma
   const navegar = app.indexOf("location.hash = '#/musica/previa'", bloquear);
   assert.ok(preparar > abrir && bloquear > preparar && navegar > bloquear);
   assert.match(app.slice(bloquear, navegar), /openDialog/);
-  assert.match(app.slice(bloquear, navegar), /novo\.sincronia\?\.fonte === 'lrclib'/);
+  assert.match(app.slice(preparar, bloquear), /novo\.sincronia\?\.fonte === 'lrclib'/);
   assert.match(app, /if \(r !== 'ok'\) tentouSincronizar\.delete\(chaveSync\)/);
 });
