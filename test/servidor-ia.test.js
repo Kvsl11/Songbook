@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { baseDoServidor, casarLinhas, linhaNoTempo, linhaSemCifra } from '../public/js/lib/servidor-ia.js';
 
@@ -74,4 +75,12 @@ test('servidor: não repete entrega quando o identificador expirou (404)', async
     aguardar: async () => {},
   }), /arquivo expirado/);
   assert.equal(chamadas, 1);
+});
+
+test('servidor: a descoberta de conexão não fica presa ao primeiro resultado', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  assert.match(app, /let servidorVerificadoEm = 0/);
+  assert.match(app, /Date\.now\(\) - servidorVerificadoEm < 15000/);
+  assert.match(app, /carregamentoServidor = null/);
+  assert.match(app, /cache: 'no-store'/);
 });
