@@ -57,5 +57,5 @@ test('download: o ícone entra em andamento imediatamente, antes da verificaçã
   assert.ok(rotina.indexOf('baixando.set(s.id, { pct: 0, preparando: true })') < rotina.indexOf('avisarDownloads()'));
   assert.match(rotina, /texto: 'Download iniciado · preparando áudio e videoclipe'/);
   assert.match(rotina, /Não deu para baixar/);
-  assert.match(rotina, /finally[\\s\\S]*baixando\\.delete\\(id\\)/);
+  assert.match(rotina, /finally[\s\S]*baixando\.delete\(id\)/);
 });
