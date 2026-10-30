@@ -65,18 +65,8 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'Se o áudio baixar, mas o videoclipe falhar, o Songbook não considera o download completo. Agora é possível tentar novamente e baixar só o arquivo que faltou; mudar de “Só o áudio” para “Áudio e vídeo” também completa o download sem repetir o áudio.' },
     ],
   },
-  {
-    versao: 341, data: '2026-10-30', titulo: 'Música preparada antes de abrir e notificações de download restauradas',
-    itens: [
-      { tipo: 'melhoria', texto: 'Ao entrar numa música, a busca da faixa de áudio e a consulta ao LRCLIB começam em paralelo. A tela espera no máximo 1,1 segundo; se a rede demorar, abre sem travar e termina o preparo em segundo plano. As duas buscas do LRCLIB também são feitas em paralelo, com limite curto de tempo. As notificações de progresso, conclusão e falha dos downloads voltaram à barra do celular; notificações de sincronização continuam desativadas.' },
-    ],
-  },
-  {
-    versao: 340, data: '2026-10-30', titulo: 'Sincronia LRCLIB sem procurar o servidor',
-    itens: [
-      { tipo: 'correcao', texto: 'Abrir ou tocar uma música não consulta mais o servidor de IA. A sincronização automática continua usando somente o LRCLIB; se não houver letra sincronizada correspondente, a música permanece sem sincronia. Avisos e notificações foram removidos.' },
-    ],
-  },
+
+
 
 
 ];
