@@ -23,9 +23,12 @@ export function escolherAudio(videos, { titulo = '', artista = '', duracao = 0, 
   let melhor = null;
   let nota = -Infinity;
   for (const v of videos || []) {
-    if (!v?.id || v.id === evitar || !(v.segundos > 0) || Math.abs(v.segundos - duracao) > 2) continue;
+    // LRCLIB e YouTube podem arredondar/cortar silêncios de formas diferentes.
+    // A tolerância proporcional evita descartar faixas longas como Thriller por poucos segundos.
+    const tolerancia = Math.max(8, duracao * 0.025);
+    if (!v?.id || v.id === evitar || !(v.segundos > 0) || Math.abs(v.segundos - duracao) > tolerancia) continue;
     const nome = normal(v.titulo);
-    if (!` ${nome} `.includes(` ${t} `) || (OUTRA_GRAVACAO.test(nome) && !OUTRA_GRAVACAO.test(t))) continue;
+    if (!` ${nome} `.includes(` ${t} `) || CLIPE.test(nome) || (OUTRA_GRAVACAO.test(nome) && !OUTRA_GRAVACAO.test(t))) continue;
     // (a instrumental tem a mesma duração da gravação: só o nome diz que ela não tem a voz)
     if (SEM_VOZ.test(nome) && !SEM_VOZ.test(t)) continue;
     const canal = normal(v.canal);
