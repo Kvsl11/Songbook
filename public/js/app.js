@@ -131,7 +131,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-321';
+export const APP_VERSAO = '2026.10.30-322';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1959,12 +1959,13 @@ const semLinhasDeAcordes = (sinc) => {
   let som = null;
   // tocar do aparelho: o áudio da pessoa, sempre; um download, quando é o vídeo, no modo música ou sem internet (o
   // download só do áudio, no modo vídeo e com internet, deixa o clipe tocar pelo YouTube)
-  const localDe = (id) => {
+  // (noModoMusica: como fica depois de trocar para o modo música, para deixar o arquivo da outra versão já aberto)
+  const localDe = (id, noModoMusica = comCapa) => {
     if (ehArquivo(id)) return { chave: id.slice(ARQ.length), video: false };
     const b = id && baixadoDe(id);
     if (!b) return null;
     const video = String(b.tipo || '').startsWith('video');
-    return video || comCapa || !navigator.onLine || db.prefs().economiaDados ? { chave: chaveBaixada(id), video } : null;
+    return video || noModoMusica || !navigator.onLine || db.prefs().economiaDados ? { chave: chaveBaixada(id), video } : null;
   };
   const comando = (func, args = []) => {
     if (!local) { comandoYt(func, args); return; }
@@ -2007,12 +2008,74 @@ const semLinhasDeAcordes = (sinc) => {
     else v.webkitEnterFullscreen?.(); // (iPhone: só o próprio vídeo vai para a tela cheia)
     v.addEventListener('webkitendfullscreen', () => { v.controls = false; }, { once: true });
   });
+  const elementoDe = (l) => (l.video ? (somVideo ||= criarSom(Object.assign(document.createElement('video'), { playsInline: true, className: 'pl-local' })))
+    : (somAudio ||= criarSom(new Audio())));
+  // o arquivo no elemento (uma vez só: trocar de versão de novo não abre outra vez); false se ele não está no aparelho
+  const abrindo = new Map();
+  const carregarLocal = (m, chave) => {
+    if (m.dataset.de === chave) return Promise.resolve(true);
+    if (!abrindo.has(m)) {
+      abrindo.set(m, lerAudio(chave).catch(() => null).then((arquivo) => {
+        abrindo.delete(m);
+        if (!arquivo) return false;
+        if (m.src) URL.revokeObjectURL(m.src);
+        m.dataset.de = chave;
+        m.src = URL.createObjectURL(arquivo);
+        return true;
+      }));
+    }
+    return abrindo.get(m).then((ok) => ok && m.dataset.de === chave);
+  };
+  // A troca entre as duas versões baixadas sem engasgo: a de agora continua tocando enquanto a outra vai ao ponto e
+  // começa sem volume; quando ela já toca (e no ponto), as duas se cruzam em 0,2 s e a de antes para. Antes a de agora
+  // parava primeiro, e o som sumia enquanto a outra ia ao ponto e começava (0,1 a 0,4 s de silêncio)
+  const cruzarLocal = (velho, novo, alvoAgora) => {
+    novo.volume = 0;
+    let feito = false;
+    const subir = () => {
+      let k = 0;
+      const passo = setInterval(() => {
+        k++;
+        novo.volume = Math.min(1, k / 8);
+        velho.volume = Math.max(0, 1 - k / 8);
+        if (k < 8) return;
+        clearInterval(passo);
+        if (som !== velho) velho.pause();
+        velho.volume = 1;
+      }, 25);
+    };
+    const comecou = () => {
+      if (feito) return;
+      feito = true;
+      // (o tempo que ela levou para começar: volta ao ponto, ainda sem volume, e só então sobe)
+      if (Math.abs(novo.currentTime - alvoAgora()) > 0.12) {
+        let foi = false;
+        const depois = () => { if (!foi) { foi = true; subir(); } };
+        novo.addEventListener('seeked', depois, { once: true });
+        setTimeout(depois, 500);
+        try { novo.currentTime = alvoAgora() + 0.03; } catch { depois(); }
+      } else subir();
+    };
+    novo.addEventListener('playing', comecou, { once: true });
+    setTimeout(comecou, 1500);
+  };
+  // o arquivo da outra versão já aberto, para a troca não esperar (o vídeo baixado tem centenas de MB)
+  const prepararLocalOutra = () => {
+    const outra = outraVersao();
+    if (!outra || !local) return;
+    const l2 = localDe(outra, outra === atual.audio);
+    if (!l2) return;
+    const m2 = elementoDe(l2);
+    if (m2 !== som) carregarLocal(m2, l2.chave);
+  };
   // abre o arquivo guardado no aparelho no segundo t
   const tocarLocal = async (l, t, tocar) => {
     local = l;
-    const m = l.video ? (somVideo ||= criarSom(Object.assign(document.createElement('video'), { playsInline: true, className: 'pl-local' })))
-      : (somAudio ||= criarSom(new Audio()));
-    if (som && som !== m) som.pause();
+    const desde = performance.now();
+    const m = elementoDe(l);
+    // (a de agora, tocando, só para depois que esta começar: a troca sem engasgo)
+    const velho = som && som !== m && tocar && !som.paused && !som.ended ? som : null;
+    if (som && som !== m && !velho) som.pause();
     som = m;
     // o vídeo baixado aparece no lugar do clipe; só o áudio, a tela fica escondida (a capa no lugar)
     const f = iframeAtual();
@@ -2023,9 +2086,10 @@ const semLinhasDeAcordes = (sinc) => {
     tela.classList.toggle('com-local', Boolean(l.video));
     if (l.video && !btnTelaCheia.isConnected) tela.append(btnTelaCheia);
     if (m.dataset.de !== l.chave) {
-      const arquivo = await lerAudio(l.chave).catch(() => null);
-      if (local !== l) return; // trocou de música enquanto abria
-      if (!arquivo) {
+      const ok = await carregarLocal(m, l.chave);
+      if (local !== l) { velho?.pause(); return; } // trocou de música enquanto abria
+      if (!ok) {
+        velho?.pause();
         // o download sumiu (o navegador apagou, ou foi removido): toca pelo YouTube
         if (!l.chave.startsWith('yt:')) { estado = 'parado'; desenhar(); avisar(); toast('O áudio desta música não está neste aparelho: importe de novo pelo ⋯ da música'); return; }
         local = null;
@@ -2033,15 +2097,17 @@ const semLinhasDeAcordes = (sinc) => {
         pendente = t;
         return;
       }
-      if (m.src) URL.revokeObjectURL(m.src);
-      m.dataset.de = l.chave;
-      m.src = URL.createObjectURL(arquivo);
     }
     if (m.duration > 0 && Number.isFinite(m.duration)) duracao = m.duration; // (já aberto: a duração não muda de novo)
-    const ir = () => { try { m.currentTime = t; } catch { /* ainda abrindo */ } };
+    // (o ponto anda enquanto o arquivo abria: com a outra versão tocando por baixo, o ponto é o de agora)
+    const alvoAgora = () => t + (velho ? (performance.now() - desde) / 1000 : 0);
+    const ir = () => { try { m.currentTime = alvoAgora() + (velho ? 0.06 : 0); } catch { /* ainda abrindo */ } };
     if (m.readyState >= 1) ir(); else m.addEventListener('loadedmetadata', ir, { once: true });
-    if (tocar) m.play().catch(() => { estado = 'pausado'; desenhar(); avisar(); });
+    if (velho) cruzarLocal(velho, m, alvoAgora);
+    else m.volume = 1;
+    if (tocar) m.play().catch(() => { velho?.pause(); estado = 'pausado'; desenhar(); avisar(); });
     else m.pause();
+    setTimeout(prepararLocalOutra, 1500);
   };
   // volta ao YouTube: o arquivo do aparelho para e o vídeo embutido aparece de novo
   const pararLocal = () => {
@@ -4386,7 +4452,7 @@ const fotosArtistas = new Map();
 function fotoDoArtista(nome, slug = '') {
   const k = normalizar(nome);
   // a música veio do Cifra Club: o artista é o da página dela (sem adivinhar pelo nome)
-  if (slug && !fotosArtistas.has(k)) fotosArtistas.set(k, fotoDoCanal(nome).then((f) => f || carregarArtista(slug, nome).principal.then((x) => x?.foto || '').catch(() => '')
+  if (slug && !fotosArtistas.has(k)) fotosArtistas.set(k, fotoDoCanalDeVerdade(nome).then((f) => f || carregarArtista(slug, nome).principal.then((x) => x?.foto || '').catch(() => '')
     .then((f) => f || buscarArtistasCifraClub(nome).then((l) => l.find((a) => a.slug === slug)?.capa || '').catch(() => ''))
     .then((f) => f || fotoDeezer(nome))));
   if (!fotosArtistas.has(k)) {
@@ -4394,7 +4460,7 @@ function fotoDoArtista(nome, slug = '') {
     // que aparece ao abrir o artista (sem isso, o Deezer trazia a foto de outro artista com o mesmo nome)
     const cifraClub = () => buscarArtistasCifraClub(nome).then((l) => artistaCerto(l, nome)).then((a) => a?.capa
       || (a?.slug ? carregarArtista(a.slug, a.nome || nome).principal.then((x) => x?.foto || '') : '')).catch(() => '');
-    fotosArtistas.set(k, fotoDoCanal(nome).then((f) => f || cifraClub()).then((f) => f || fotoDeezer(nome)).then((f) => f || fotoWikipedia(nome)));
+    fotosArtistas.set(k, fotoDoCanalDeVerdade(nome).then((f) => f || cifraClub()).then((f) => f || fotoDeezer(nome)).then((f) => f || fotoWikipedia(nome)));
   }
   return comUltimoValor('foto', nome, fotosArtistas.get(k));
 }
@@ -4448,10 +4514,43 @@ async function fotoDeezer(nome) {
   const foto = a?.picture_medium && !/\/artist\/\//.test(a.picture_medium) ? a.picture_big || a.picture_medium : '';
   return foto && !(await ehFotoVaziaDoDeezer(foto)) ? foto : '';
 }
-// O Deezer, para o artista sem foto, também devolve um endereço com cara de foto de verdade, mas a imagem é a genérica
-// dele (a pessoinha cinza num fundo cinza claro): ela é reconhecida pela própria imagem (os cantos no cinza claro dela
-// e nenhuma cor), e aí o artista fica com o desenho do app (a pessoa com a nota). O Deezer deixa ler a imagem (CORS)
+// As fotos que não são foto: para o artista sem foto, o Deezer devolve um endereço com cara de foto de verdade, mas a
+// imagem é a genérica dele (a pessoinha cinza num fundo cinza claro), e o canal do YouTube sem foto tem a letra que o
+// YouTube gera (o "D" branco num fundo de uma cor só). As duas são reconhecidas pela própria imagem (os dois deixam
+// ler, CORS), e aí o artista fica com o desenho do app (a pessoa com a nota)
 const fotosVaziasDeezer = new Map();
+function ehFotoGenerica(url) {
+  if (/(ggpht|googleusercontent)\.com\//.test(url || '')) return ehAvatarDeLetra(url);
+  return ehFotoVaziaDoDeezer(url);
+}
+// o avatar de letra do YouTube: os quatro cantos da mesma cor e quase tudo nela ou no branco da letra
+const avataresDeLetra = new Map();
+function ehAvatarDeLetra(url) {
+  const pequena = url.replace(/=s\d+-/, '=s64-');
+  if (!avataresDeLetra.has(pequena)) {
+    avataresDeLetra.set(pequena, (async () => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = pequena;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = c.height = 16;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, 16, 16);
+      const d = ctx.getImageData(0, 0, 16, 16).data;
+      const px = (i) => [d[i * 4], d[i * 4 + 1], d[i * 4 + 2]];
+      const perto = (a, b, tol) => Math.abs(a[0] - b[0]) < tol && Math.abs(a[1] - b[1]) < tol && Math.abs(a[2] - b[2]) < tol;
+      const fundo = px(0);
+      if (![px(15), px(240), px(255)].every((x) => perto(x, fundo, 14))) return false;
+      let lisos = 0;
+      for (let i = 0; i < 256; i++) { const x = px(i); if (perto(x, fundo, 26) || Math.min(...x) > 215) lisos++; }
+      return lisos / 256 > 0.86;
+    })().catch(() => false));
+  }
+  return avataresDeLetra.get(pequena);
+}
+// a foto do canal do YouTube, sem o avatar de letra
+const fotoDoCanalDeVerdade = (nome) => fotoDoCanal(nome).then(async (f) => (f && !(await ehFotoGenerica(f)) ? f : ''));
 function ehFotoVaziaDoDeezer(url) {
   if (!/dzcdn\.net\/images\/artist\//.test(url || '')) return Promise.resolve(false);
   const pequena = url.replace(/\/\d+x\d+-/, '/56x56-');
@@ -4542,7 +4641,7 @@ async function abrirSobreArtista({ nome, slug = '' }) {
     // (a que não abrir ou vier minúscula, a imagem cinza de "sem foto" do YouTube, sai)
     caixaFotos.insertAdjacentHTML('beforeend', novas.map((u) => `<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()" onload="if (this.naturalWidth < 200) this.remove()">`).join(''));
   };
-  porFotos([foto, canal?.foto, ...(adb?.fotos || []), dz?.foto, info?.foto]);
+  porFotos([foto, canal?.foto && !(await ehFotoGenerica(canal.foto)) ? canal.foto : '', ...(adb?.fotos || []), dz?.foto, info?.foto]);
   if (!vistas.size) caixaFotos.innerHTML = `<div class="sa-sem-foto">${semFotoArtista(120)}</div>`;
   if (canal?.id) fotosDosVideosGuardadas(nome, canal.id).then((l) => { if (tela.isConnected && l) porFotos(l); });
   // os números grandes (como os ouvintes do Spotify): os seguidores no Spotify (pela TheAudioDB), os inscritos no

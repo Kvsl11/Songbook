@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 322, data: '2026-10-30', titulo: 'Troca sem engasgo também nas baixadas',
+    itens: [
+      { tipo: 'correcao', texto: 'Nas músicas baixadas, trocar entre a música e o vídeo não engasga mais: o arquivo de agora continua tocando até o outro começar no mesmo ponto, e os dois se cruzam suavemente (antes o som sumia por um instante).' },
+      { tipo: 'correcao', texto: 'O artista sem foto no canal do YouTube (a letra que o YouTube gera, como o “D”) agora fica com o desenho da pessoa com a nota, ou com a foto de verdade de outro lugar, quando houver.' },
+    ],
+  },
+  {
     versao: 321, data: '2026-10-30', titulo: 'Troca sem engasgo e capa mais bonita',
     itens: [
       { tipo: 'melhoria', texto: 'Trocar entre a música e o vídeo não engasga mais o som: a outra versão já fica carregada e as duas se cruzam suavemente no mesmo ponto.' },
@@ -78,14 +85,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'O áudio oficial vem primeiro do YouTube Music (o canal do artista), e a música da busca já ganha as duas versões ao abrir, sem precisar dar play.' },
       { tipo: 'novo', texto: 'No repertório e na playlist, o botão de baixar todas as músicas de uma vez, ao lado do play; nas listas, a setinha verde mostra as baixadas.' },
       { tipo: 'melhoria', texto: 'Como no Spotify, no modo vídeo de uma música com videoclipe não aparece a letra (nem a cifra): ela fica no modo música, sincronizada com o áudio oficial.' },
-    ],
-  },
-  {
-    versao: 312, data: '2026-10-29', titulo: 'Baixe as músicas, como no Spotify',
-    itens: [
-      { tipo: 'novo', texto: 'Toque na seta ao lado do “salvar” da música para baixá-la: o áudio e o vídeo ficam no aparelho, com a letra, a cifra, a capa e a partitura, e ela toca sem internet. A música baixada ganha a setinha verde.' },
-      { tipo: 'novo', texto: 'Ajustes → Economia de dados e offline: o que baixar (áudio e vídeo ou só o áudio), baixar com os dados móveis, baixar todas as músicas salvas, o armazenamento usado, remover os downloads e limpar o cache.' },
-      { tipo: 'novo', texto: 'Na Biblioteca, o filtro “Baixadas” mostra as músicas que tocam sem internet.' },
     ],
   },
 ];
