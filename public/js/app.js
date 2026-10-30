@@ -1365,14 +1365,31 @@ const player = (() => {
       tirar,
     };
   })();
+  // a capa oficial da música tocando (uma vez por música): chegando, entra no player e fica guardada na música salva
+  // que não tinha capa (a biblioteca também passa a mostrar ela)
+  const buscarCapaOficial = () => {
+    const a = atual;
+    if (!a || a.capaOficial !== undefined || (a.capa && /^(https?:|data:)/.test(a.capa)) || !a.titulo || !a.artista) return;
+    a.capaOficial = '';
+    capaOficial(a.titulo, a.artista).then((u) => {
+      if (!u) return;
+      a.capaOficial = u;
+      if (atual && atual.songId === a.songId && atual.titulo === a.titulo) { atual.capaOficial = u; mini.dataset.conteudo = ''; desenharCapa(); }
+      const s = a.songId && a.songId !== 'previa' && db.song(a.songId);
+      if (s && !s.cover) db.saveSong({ ...s, content: definirMeta(s.content, 'cover', u) });
+    });
+  };
   // a capa (no modo capa): a da música ou o quadro do vídeo; o botão de trocar diz para o que vai
   const desenharCapa = () => {
     // (tocando só o áudio, do aparelho: sempre a capa)
     const capa = modoCapa() || Boolean(atual?.semVideo) || Boolean(local && !local.video);
     el.classList.toggle('modo-capa', capa);
     const doYt = ytDaCapa();
-    const url = atual?.capa && /^(https?:|data:)/.test(atual.capa) ? atual.capa : doYt ? `https://i.ytimg.com/vi/${doYt}/hqdefault.jpg` : '';
-    const capaYt = !(atual?.capa && /^(https?:|data:)/.test(atual.capa));
+    // sem a capa na música, a capa de verdade (do álbum), quando chegar; até lá (ou sem achar), o quadro do vídeo
+    buscarCapaOficial();
+    const propria = atual?.capa && /^(https?:|data:)/.test(atual.capa) ? atual.capa : atual?.capaOficial || '';
+    const url = propria || (doYt ? `https://i.ytimg.com/vi/${doYt}/hqdefault.jpg` : '');
+    const capaYt = !propria;
     // sem capa nem vídeo: a cor da música com uma nota no meio. Com vídeo, no modo música, a capa tem movimento: os
     // quadros do clipe passando com zoom lento (como no topo da página da música) atrás de toda a parte de cima do
     // Tocando agora, sumindo num degradê no fundo; o lugar da capa fica vazio, mostrando os quadros (como o Canvas do
@@ -1404,9 +1421,9 @@ const player = (() => {
       canvas.montar(q);
     }
     mini.classList.toggle('capa-yt', (capa || barra) && capaYt);
-    // no modo vídeo, a capa pequena ao lado do nome (como no Spotify)
+    // a capa pequena ao lado do nome, no modo vídeo e no modo música (no modo música, em cima ficam as cenas do clipe)
     const capinha = $('.pl-capinha', el);
-    capinha.style.backgroundImage = !capa && url ? `url("${url}")` : '';
+    capinha.style.backgroundImage = url ? `url("${url}")` : '';
     capinha.classList.toggle('capa-yt', capaYt);
     capinha.hidden = !url;
     const b = $('.pl-troca', el);
@@ -4257,6 +4274,34 @@ function jsonp(url, tempo = 8000) {
     tag.src = `${url}${url.includes('?') ? '&' : '?'}output=jsonp&callback=${cb}`;
     document.head.append(tag);
   });
+}
+// A capa de verdade da música (a do álbum ou do single, como no Spotify), e não um quadro do vídeo: no Deezer e, sem
+// achar lá, no iTunes, pela música com o mesmo título e o mesmo artista. '' se nenhum tiver. O último valor fica
+// guardado no aparelho (vale sem internet)
+const capasOficiais = new Map();
+function capaOficial(titulo, artista) {
+  const t = normalizar(tituloLimpo(titulo));
+  const a = String(artista || '').split(/\s*(?:,|&| e | feat\.? | ft\.? | part\.? | x )\s*/i)[0].trim();
+  if (!t || !a) return Promise.resolve('');
+  const k = `${normalizar(a)}|${t}`;
+  const titulo0 = (x) => normalizar(tituloLimpo(x || ''));
+  const mesmaMusica = (tit, art) => mesmoNome(art || '', a) && (titulo0(tit) === t || ` ${titulo0(tit)} `.startsWith(` ${t} `));
+  if (!capasOficiais.has(k)) {
+    capasOficiais.set(k, (async () => {
+      // (a busca simples: a com artist:"" track:"" às vezes volta vazia para a música que existe)
+      const dz = await jsonp(`https://api.deezer.com/search?q=${encodeURIComponent(`${a} ${tituloLimpo(titulo)}`)}&limit=15`);
+      // (de preferência o título igual, sem "(Remix)", "(Live)"…: a capa do single ou do álbum, não a do remix)
+      const exata = (tit) => normalizar(tit || '') === t;
+      const ds = (dz?.data || []).filter((x) => mesmaMusica(x.title, x.artist?.name) && x.album?.cover_xl);
+      const d = ds.find((x) => exata(x.title)) || ds[0];
+      if (d) return d.album.cover_xl;
+      const it = await jsonp(`https://itunes.apple.com/search?term=${encodeURIComponent(`${a} ${tituloLimpo(titulo)}`)}&entity=song&limit=15`);
+      const ms = (it?.results || []).filter((x) => mesmaMusica(x.trackName, x.artistName) && x.artworkUrl100);
+      const m = ms.find((x) => exata(x.trackName)) || ms[0];
+      return m ? m.artworkUrl100.replace(/\/\d+x\d+(bb)?\.(jpg|png)$/, '/600x600bb.jpg') : '';
+    })().catch(() => ''));
+  }
+  return comUltimoValor('capa', k, capasOficiais.get(k));
 }
 async function fotoDeezer(nome) {
   const r = await jsonp(`https://api.deezer.com/search/artist?q=${encodeURIComponent(nome)}&limit=5`);

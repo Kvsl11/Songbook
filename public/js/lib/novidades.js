@@ -8,6 +8,7 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'melhoria', texto: 'Trocar entre a música e o vídeo cai no mesmo ponto cantado também sem o servidor: o próprio aparelho casa o áudio oficial e o clipe pelo som (como o Spotify), mesmo com cena antes da música, como em Espresso e Speed Demon.' },
       { tipo: 'novo', texto: 'Capa animada como o Canvas do Spotify: trechos do próprio clipe passam atrás da música, sem som, junto com ela. E a frase cantada aparece acima do “Mudar para vídeo”.' },
+      { tipo: 'novo', texto: 'A capa de verdade da música (a do álbum ou do single, pelo Deezer ou pelo iTunes), no lugar do quadro do vídeo, e a capinha ao lado do nome também no modo música.' },
       { tipo: 'correcao', texto: 'No modo vídeo não aparece mais a letra (ela fica só no modo música), também quando o vídeo é a própria gravação.' },
       { tipo: 'novo', texto: 'Qualidade de mídia, como no Spotify: escolha a qualidade do download do áudio e do vídeo (normal, alta ou muito alta, até 1080p). Vale para todos os downloads, e “Atualizar os downloads” baixa de novo os que estão em outra.' },
       { tipo: 'novo', texto: 'Baixar pelo ⋯ da música, e salvar na biblioteca já baixa a música (dá para desligar). O vídeo baixado ganhou o botão de tela inteira.' },
