@@ -50,3 +50,28 @@ test('letra sincronizada: casa com a cifra mesmo com a letra um pouco diferente'
   ];
   assert.deepEqual(casarLinhas(cantadas, tela), [0, 1, 2, 3, 4, -1, 0]);
 });
+
+test('servidor: recupera a entrega do arquivo após erro temporário 503', async () => {
+  const { baixarArquivoDoServidor } = await import('../public/js/lib/servidor-ia.js');
+  let chamadas = 0;
+  const resp = await baixarArquivoDoServidor({ url: 'https://servidor.test' }, 'abc', {
+    fetchImpl: async () => {
+      chamadas++;
+      if (chamadas === 1) return { ok: false, status: 503, text: async () => '{"detail":"temporariamente indisponível"}' };
+      return { ok: true, status: 200 };
+    },
+    aguardar: async () => {},
+  });
+  assert.equal(resp.status, 200);
+  assert.equal(chamadas, 2);
+});
+
+test('servidor: não repete entrega quando o identificador expirou (404)', async () => {
+  const { baixarArquivoDoServidor } = await import('../public/js/lib/servidor-ia.js');
+  let chamadas = 0;
+  await assert.rejects(() => baixarArquivoDoServidor({ url: 'https://servidor.test' }, 'sumiu', {
+    fetchImpl: async () => { chamadas++; return { ok: false, status: 404, text: async () => '{"detail":"arquivo expirado"}' }; },
+    aguardar: async () => {},
+  }), /arquivo expirado/);
+  assert.equal(chamadas, 1);
+});
