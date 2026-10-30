@@ -78,22 +78,32 @@ if (doLink !== null) {
   db.setPref('servidorPc', baseDoServidor(doLink));
   history.replaceState(null, '', location.pathname + location.hash);
 }
-const responde = (url) => fetch(url + '/saude', { headers: cabecalhos(url), signal: AbortSignal.timeout(8000) }).then((r) => r.ok).catch(() => false);
+const responde = (url) => fetch(url + '/saude', {
+  headers: cabecalhos(url), signal: AbortSignal.timeout(10000), cache: 'no-store',
+}).then((r) => r.ok).catch(() => false);
 let carregamentoServidor = null;
-// O servidor de IA só é localizado quando uma função que realmente o utiliza é aberta.
-// Abrir/tocar músicas nunca consulta o servidor: a sincronia de letras usa apenas o LRCLIB.
-function carregarServidor() {
+let servidorVerificadoEm = 0;
+// O servidor pode dormir, reiniciar ou demorar para acordar. A descoberta é compartilhada entre chamadas,
+// mas nunca fica presa para sempre ao primeiro resultado: revalida periodicamente e tenta de novo após falhas.
+function carregarServidor({ forcar = false } = {}) {
   if (carregamentoServidor) return carregamentoServidor;
+  if (!forcar && Date.now() - servidorVerificadoEm < 15000) return Promise.resolve(SERVIDOR_IA);
   carregamentoServidor = (async () => {
     const pc = baseDoServidor(db.prefs().servidorPc);
     if (pc && await responde(pc)) {
       SERVIDOR_IA = { url: pc, chave: '', pc: true, lumen: pc };
-    } else {
-      const d = await fetch(new URL('data/servidor-ia.json', document.baseURI)).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-      if (!d?.url) return;
+      return SERVIDOR_IA;
+    }
+    const d = await fetch(new URL('data/servidor-ia.json', document.baseURI), { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (d?.url) {
       SERVIDOR_IA = { url: baseDoServidor(d.url), chave: d.chave || '', lumen: baseDoServidor(d.lumen || '') };
     }
-  })().catch(() => {});
+    return SERVIDOR_IA;
+  })().catch(() => SERVIDOR_IA).finally(() => {
+    servidorVerificadoEm = Date.now();
+    carregamentoServidor = null;
+  });
   return carregamentoServidor;
 }
 const view = $('#view');
@@ -134,7 +144,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-350';
+export const APP_VERSAO = '2026.10.30-351';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -741,6 +751,7 @@ async function baixarMusica(song, { perguntou = false } = {}) {
       try {
         const atual = db.song(id);
         if (!atual) throw new Error('a música não está mais na biblioteca');
+        if (arquivosParaBaixar(atual).length) await carregarServidor();
         if (arquivosParaBaixar(atual).length && !servidorIA().url) {
           throw new Error('servidor de download não conectado. Confira Ajustes → Avançado no computador');
         }
