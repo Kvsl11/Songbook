@@ -131,7 +131,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-324';
+export const APP_VERSAO = '2026.10.30-325';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -855,7 +855,7 @@ async function baixarAgora(id) {
   let avisoClipe = falhas.some((f) => f.yt === song.youtube) ? 'o vídeo não deu para baixar' : '';
   const vsAqui = versoesDe(db.song(id) || song);
   if (vsAqui?.audio && arquivos[vsAqui.audio] && arquivos[vsAqui.video] && !vsAqui.casadas && !vsAqui.diferentes) {
-    await acertarVersoes(db.song(id) || song).catch(() => {});
+    await acertarVersoes(db.song(id) || song, null, { pedido: true }).catch(() => {});
     if (versoesDe(db.song(id))?.diferentes && !db.songs().some((x) => x.id !== id && x.baixado?.arquivos?.[vsAqui.video])) {
       await apagarAudio(chaveBaixada(vsAqui.video)).catch(() => {});
       delete arquivos[vsAqui.video];
@@ -987,11 +987,17 @@ window.addEventListener('offline', () => player.reavaliarFonte());
 window.addEventListener('songbook:downloads', () => {
   player.reavaliarFonte();
   document.querySelectorAll('[data-baixar-set]').forEach((b) => { const set = db.set(b.dataset.baixarSet); if (set) b.outerHTML = botaoBaixarSet(set); });
-  // (as setinhas verdes das listas)
-  document.querySelectorAll('.track[data-id], .track[data-musica]').forEach((li) => {
-    const s = db.song(li.dataset.id || li.dataset.musica);
-    const ind = li.querySelector('.ind-baixada');
-    if (s && Boolean(s.baixado) !== Boolean(ind)) { const sub = li.querySelector('.info .s'); const velho = sub?.querySelector('.ind'); if (velho) velho.outerHTML = indicadores(s); else sub?.insertAdjacentHTML('afterbegin', indicadores(s)); }
+  // (as setinhas verdes das listas, na hora: na biblioteca as linhas são .lib-item[data-k], que antes ficavam de fora e
+  // só mostravam a baixada depois de abrir a biblioteca de novo; e a setinha apagada enquanto ela baixa)
+  document.querySelectorAll('.track[data-id], .track[data-musica], .lib-item[data-k]').forEach((li) => {
+    const s = db.song(li.dataset.id || li.dataset.musica || li.dataset.k);
+    if (!s) return;
+    const agora = s.baixado ? 'ok' : baixando.has(s.id) ? 'andando' : '';
+    const antes = li.querySelector('.ind-baixada') ? 'ok' : li.querySelector('.ind-baixando') ? 'andando' : '';
+    if (agora === antes) return;
+    const sub = li.querySelector('.info .s');
+    const velho = sub?.querySelector('.ind');
+    if (velho) velho.outerHTML = indicadores(s); else sub?.insertAdjacentHTML('afterbegin', indicadores(s));
   });
   document.querySelectorAll('[data-baixar]').forEach((b) => { const s = db.song(b.dataset.baixar); if (s) b.outerHTML = botaoBaixar(s, [...b.classList].filter((c) => !['icon-btn', 'btn-baixar', 'baixada', 'baixando'].includes(c)).join(' ')); });
 });
@@ -1253,6 +1259,9 @@ const player = (() => {
   };
   // acompanha o lugar do vídeo a cada quadro (rolagem, troca de tela, ampliar)
   let quadro = 0;
+  // (só escreve no estilo o que mudou: isto roda a cada quadro, 60 vezes por segundo, e reescrever a posição, o tamanho
+  // e o recorte iguais fazia o tablet refazer a tela a cada quadro)
+  const poeEstilo = (prop, v) => { if (tela.style[prop] !== v) tela.style[prop] = v; };
   const seguir = () => {
     quadro = requestAnimationFrame(seguir);
     // o vídeo em tela cheia (o botão do YouTube ou o do vídeo baixado) fica onde está: mudar ele de lugar (ao girar a
@@ -1267,18 +1276,18 @@ const player = (() => {
     // player, ficava deslocado (uma parte cortada, outra sobrando)
     const naMini = a === mini && document.documentElement.classList.contains('pp');
     if (a && mover && (noPalco() || naMini)) porNaTelinha(a); else tirarDaTelinha();
-    if (dentro()) { tela.style.visibility = escondida ? 'hidden' : 'visible'; tela.style.clipPath = ''; tela.classList.toggle('no-palco', noPalco()); return; }
+    if (dentro()) { poeEstilo('visibility', escondida ? 'hidden' : 'visible'); poeEstilo('clipPath', ''); if (tela.classList.contains('no-palco') !== noPalco()) tela.classList.toggle('no-palco', noPalco()); return; }
     const r = a?.isConnected ? a.getBoundingClientRect() : null;
-    if (!r || !r.width || !r.height) { tela.style.visibility = 'hidden'; return; }
+    if (!r || !r.width || !r.height) { poeEstilo('visibility', 'hidden'); return; }
     const base = tela.parentElement.getBoundingClientRect();
-    tela.style.visibility = escondida ? 'hidden' : 'visible';
-    tela.style.transform = `translate(${r.left - base.left}px, ${r.top - base.top}px)`;
-    tela.style.width = r.width + 'px';
-    tela.style.height = r.height + 'px';
+    poeEstilo('visibility', escondida ? 'hidden' : 'visible');
+    poeEstilo('transform', `translate(${r.left - base.left}px, ${r.top - base.top}px)`);
+    poeEstilo('width', r.width + 'px');
+    poeEstilo('height', r.height + 'px');
     // (sem mudar de lugar: só a parte dentro do painel aparece)
     const p = naMini ? el.getBoundingClientRect() : null;
-    tela.style.clipPath = p ? `inset(${Math.max(0, p.top - r.top)}px ${Math.max(0, r.right - p.right)}px ${Math.max(0, r.bottom - p.bottom)}px ${Math.max(0, p.left - r.left)}px)` : '';
-    tela.classList.toggle('no-palco', noPalco());
+    poeEstilo('clipPath', p ? `inset(${Math.max(0, p.top - r.top)}px ${Math.max(0, r.right - p.right)}px ${Math.max(0, r.bottom - p.bottom)}px ${Math.max(0, p.left - r.left)}px)` : '');
+    if (tela.classList.contains('no-palco') !== noPalco()) tela.classList.toggle('no-palco', noPalco());
   };
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
   const avisar = () => ouvintes.forEach((fn) => fn());
@@ -2080,7 +2089,7 @@ const semLinhasDeAcordes = (sinc) => {
         if (k < 8) return;
         clearInterval(passo);
         // (a de antes vira a sombra: continua tocando sem volume, pronta para a próxima troca; no iPhone, para)
-        if (som !== velho && !sombraTocando()) { velho.pause(); velho.volume = 1; }
+        if (som !== velho && (!sombraTocando() || velho.tagName !== 'AUDIO')) { velho.pause(); velho.volume = 1; }
       }, 25);
     };
     if (jaNoPonto) { feito = true; subir(); return; }
@@ -2106,7 +2115,9 @@ const semLinhasDeAcordes = (sinc) => {
     const l2 = outra && localDe(outra, outra === atual.audio);
     if (!l2) return;
     const m2 = elementoDe(l2);
-    if (m2 === som) return;
+    // (só o áudio fica tocando junto: o vídeo escondido tocando o tempo todo pesava no tablet, junto com a capa
+    // animada; a troca para o vídeo baixado começa na hora, com o de agora tocando por baixo, sem engasgo)
+    if (m2 === som || m2.tagName !== 'AUDIO') return;
     if (m2.dataset.de !== l2.chave || estado !== 'tocando' || som.paused) { if (!m2.paused && m2.volume < 0.05) m2.pause(); return; }
     const alvo = noOutroLado(som.currentTime);
     if (m2.paused) { m2.volume = 0; try { m2.currentTime = alvo; } catch { /* ainda abrindo */ } m2.play().catch(() => {}); return; }
@@ -2331,7 +2342,7 @@ const semLinhasDeAcordes = (sinc) => {
       // da música, como Espresso ou Speed Demon): o servidor ouve as duas agora; quando ele responder, o clipe vai
       // sozinho para o ponto certo (veja versoes)
       const s = musicaTocando();
-      if (s && !versoesDe(s)?.casadas) acertarVersoes(s);
+      if (s && !versoesDe(s)?.casadas) acertarVersoes(s, null, { pedido: true });
     }
     if (atual && !atual.semVideo && (localDe(atual.youtube)?.chave || '') !== (local?.chave || '')) trocarVersao(atual.youtube, api.tempoAgora, true);
     // foi para o clipe com a letra na tela toda aberta: ela fecha (no clipe não há letra) e o vídeo aparece
@@ -3455,7 +3466,8 @@ function indicadores(s) {
   if (s.key) c = false;
   const tem = (ic, t) => `<span class="ind-i" title="${t}" aria-label="${t}">${icon(ic, 11)}</span>`;
   // baixada (toca sem internet): a setinha verde, como no Spotify
-  const baixada = s.baixado ? `<span class="ind-i ind-baixada" title="Baixada" aria-label="Baixada">${icon('baixada', 12)}</span>` : '';
+  const baixada = s.baixado ? `<span class="ind-i ind-baixada" title="Baixada" aria-label="Baixada">${icon('baixada', 12)}</span>`
+    : baixando.has(s.id) ? `<span class="ind-i ind-baixando" title="Baixando" aria-label="Baixando">${icon('baixar', 12)}</span>` : '';
   // (o vídeo que é outra gravação, na música sem clipe, não conta: ela é só música)
   const video = s.youtube && !versoesDe(s)?.diferentes;
   return c || video || baixada ? `<span class="ind">${baixada}${c ? tem('chord', 'Tem cifra') : ''}${video ? tem('youtube', 'Tem vídeo') : ''}</span>` : '';
@@ -10926,14 +10938,17 @@ function guardarVersoes(song, versoes) {
 // servidor): com o som do download, quando a música está baixada, ou o que o Piped entrega do YouTube
 const casandoVersoes = new Set();
 const casamentoFalhou = new Set(); // (uma vez por par enquanto o app está aberto: sem o som, não adianta insistir)
-async function acertarVersoes(song, lrc = null) {
+// pedido: a pessoa trocou para o vídeo (ou baixou a música): aí vale também o servidor da nuvem, e tenta de novo mesmo
+// se o casamento já falhou nesta vez que o app está aberto (sem o som das duas, sobrava a estimativa pela duração, que
+// erra nos clipes com cenas de filme antes e no meio da música, como Thriller)
+async function acertarVersoes(song, lrc = null, { pedido = false } = {}) {
   const vs = versoesDe(song);
-  if (!vs?.audio || !vs.video || vs.casadas || vs.diferentes || casandoVersoes.has(vs.video) || casamentoFalhou.has(`${vs.audio}|${vs.video}`)) return;
+  if (!vs?.audio || !vs.video || vs.casadas || vs.diferentes || casandoVersoes.has(vs.video) || (!pedido && casamentoFalhou.has(`${vs.audio}|${vs.video}`))) return;
   casandoVersoes.add(vs.video);
   try {
     let pares = null;
     let diferentes = false; // o vídeo não é a mesma gravação (um ao vivo, outra apresentação): o download não leva ele
-    if (sincPelaIA() && !ehArquivo(vs.audio)) {
+    if ((sincPelaIA() || (pedido && servidorIA().url)) && !ehArquivo(vs.audio)) {
       pares = (await chamarComEtapas(servidorIA(), '/versoes', { json: { audio: vs.audio, video: vs.video } }, () => {}).catch((e) => { if (e?.status === 422) diferentes = true; return null; }))?.pares;
     }
     if (!pares?.length && !diferentes) {

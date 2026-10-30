@@ -4,6 +4,15 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 325, data: '2026-10-30', titulo: 'Tablet sem piscar, capa sem emenda e mais músicas no tempo certo',
+    itens: [
+      { tipo: 'correcao', texto: 'Tablet: a tela não pisca mais nem some com a barra e os botões. As máscaras de esmaecido, o desfoque atrás do menu e as animações de enfeite que faziam o tablet redesenhar a tela a cada quadro saíram.' },
+      { tipo: 'correcao', texto: 'A capa animada termina num degradê na cor do fundo, sem o traço seco perto da letra (como em Love Me Harder).' },
+      { tipo: 'correcao', texto: 'O ícone de baixada aparece na biblioteca na hora, sem precisar abrir de novo (e fica apagado enquanto baixa).' },
+      { tipo: 'melhoria', texto: 'Mais músicas trocam no ponto certo entre a música e o vídeo, mesmo com clipe longo e cenas de filme no meio (como Thriller): ao trocar, o servidor, quando há um, casa as duas versões pelo som, e no aparelho a conta pesa muito menos.' },
+    ],
+  },
+  {
     versao: 324, data: '2026-10-30', titulo: 'Troca sem engasgo de verdade e a versão cantada certa',
     itens: [
       { tipo: 'correcao', texto: 'Trocar entre a música e o vídeo não engasga mais: a outra versão fica tocando junto, sem volume, no mesmo ponto, e a troca só cruza os volumes (com a Economia de dados ligada, ela só começa na hora da troca).' },
@@ -80,12 +89,6 @@ export const NOVIDADES = [
     versao: 316, data: '2026-10-29', titulo: 'Música e vídeo continuam no mesmo ponto (de verdade)',
     itens: [
       { tipo: 'correcao', texto: 'Trocar da música para o vídeo (ou o contrário) não volta mais para o começo: enquanto a outra versão carrega, o YouTube avisa o tempo zero, e o app tomava esse zero como o ponto da música. Agora ele espera o vídeo começar a tocar e confere se está na parte que estava sendo cantada.' },
-    ],
-  },
-  {
-    versao: 315, data: '2026-10-29', titulo: 'Trocar entre música e vídeo sem voltar ao começo',
-    itens: [
-      { tipo: 'correcao', texto: 'Ao trocar da música para o vídeo (ou do vídeo para a música) no player, ela continua do ponto em que estava, na parte que estava sendo cantada. Antes, às vezes, voltava para o começo.' },
     ],
   },
 ];

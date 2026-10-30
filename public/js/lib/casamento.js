@@ -96,33 +96,35 @@ export function caminho(a, v) {
     for (let n = 0; n < 12; n++) s += a.dados[i * 12 + n] * v.dados[j * 12 + n];
     return 1 - s;
   };
-  const C = new Float32Array(N * M);
-  for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) C[i * M + j] = custo(i, j);
-  const D = new Float32Array(N * M);
+  // (só duas linhas do custo acumulado e o passo de cada célula, para refazer o caminho: num clipe longo, como os 13 min
+  // de Thriller, as matrizes inteiras passavam de 60 MB e o celular podia não dar conta)
+  let ant = new Float32Array(M);
+  let cur = new Float32Array(M);
   const de = new Uint8Array(N * M); // 0: diagonal, 1: só o clipe, 2: só o áudio
-  for (let j = 0; j < M; j++) D[j] = C[j]; // (o começo do áudio pode cair em qualquer ponto do clipe)
+  for (let j = 0; j < M; j++) ant[j] = custo(0, j); // (o começo do áudio pode cair em qualquer ponto do clipe)
   for (let i = 1; i < N; i++) {
     for (let j = 0; j < M; j++) {
-      let melhor = D[(i - 1) * M + j] + 0.3;
+      let melhor = ant[j] + 0.3;
       let passo = 2;
       if (j > 0) {
-        const diag = D[(i - 1) * M + j - 1];
+        const diag = ant[j - 1];
         if (diag <= melhor) { melhor = diag; passo = 0; }
-        const lado = D[i * M + j - 1] + 0.3;
+        const lado = cur[j - 1] + 0.3;
         if (lado < melhor) { melhor = lado; passo = 1; }
       }
-      D[i * M + j] = C[i * M + j] + melhor;
+      cur[j] = custo(i, j) + melhor;
       de[i * M + j] = passo;
     }
+    [ant, cur] = [cur, ant];
   }
   let j = 0;
-  for (let k = 1; k < M; k++) if (D[(N - 1) * M + k] < D[(N - 1) * M + j]) j = k;
+  for (let k = 1; k < M; k++) if (ant[k] < ant[j]) j = k;
   const wp = [];
   let i = N - 1;
   let total = 0;
   while (i >= 0 && j >= 0) {
     wp.push([i, j]);
-    total += C[i * M + j];
+    total += custo(i, j);
     if (i === 0) break;
     const p = de[i * M + j];
     if (p === 0) { i--; j--; } else if (p === 1) j--; else i--;
