@@ -25,3 +25,19 @@ test('download: áudio e vídeo avançam em paralelo e o progresso inclui a tran
   assert.match(youtube, /"concurrent_fragment_downloads": 4/);
   assert.match(youtube, /if not pede_login\(e\) or indice == 5/);
 });
+
+test('download de vídeo não é omitido quando a faixa de áudio é outra gravação', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const inicio = app.indexOf('function arquivosParaBaixar(song)');
+  const fim = app.indexOf('// Se o áudio já baixou', inicio);
+  const rotina = app.slice(inicio, fim);
+  assert.match(rotina, /if \(song\.youtube && \(comVideo \|\| \(!audio && !song\.audioProprio\)\)\) lista\.push/);
+  assert.doesNotMatch(rotina, /vs\?\.diferentes\) lista\.push/);
+});
+
+test('download de vídeo prioriza o arquivo final mesclado e ignora fragmentos', async () => {
+  const youtube = await readFile(new URL('../servidor-ia/youtube.py', import.meta.url), 'utf8');
+  assert.match(youtube, /info\.get\("requested_downloads"\)/);
+  assert.match(youtube, /re\.search\(r"\\\.f\\d\+\\\."/);
+  assert.match(youtube, /arquivos\.sort\(key=lambda f: \(bool\(re\.search/);
+});
