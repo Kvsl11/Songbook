@@ -696,6 +696,15 @@ function arquivosParaBaixar(song) {
   if (song.youtube && (comVideo || (!audio && !song.audioProprio)) && !(audio && vs?.diferentes)) lista.push({ yt: song.youtube, video: comVideo });
   return lista;
 }
+// Se o áudio já baixou, mas o clipe falhou, o download continua incompleto e pode ser tentado de novo.
+// Também detecta quando a pessoa muda de "Só o áudio" para "Áudio e vídeo".
+function precisaBaixar(song) {
+  if (!song?.id) return false;
+  return arquivosParaBaixar(song).some(({ yt, video }) => {
+    const arquivo = song.baixado?.arquivos?.[yt] || baixadoDe(yt);
+    return !arquivo || (video && !String(arquivo.tipo || '').toLowerCase().startsWith('video/'));
+  });
+}
 // a qualidade dos downloads, como no Spotify (Ajustes → Economia de dados e offline): normal, alta ou muito alta, uma
 // para o áudio e outra para o vídeo; vale para todos os downloads dali em diante. Sem escolher, a muito alta (o vídeo
 // em até 1080p). No iPhone o áudio fica no máximo na alta: o muito alto vem em Opus, que o Safari não toca
@@ -711,7 +720,7 @@ const podeBaixarAgora = async () => navigator.connection?.type !== 'cellular' ||
   || ask({ title: 'Baixar com os dados móveis?', text: 'Você está sem Wi-Fi e o download pode gastar bastante do seu plano. Dá para liberar sempre em Ajustes → Economia de dados e offline.', ok: 'Baixar assim mesmo' });
 async function baixarMusica(song, { perguntou = false } = {}) {
   const s = song?.id && db.song(song.id);
-  if (!s || s.baixado || baixando.has(s.id)) return;
+  if (!s || !precisaBaixar(s) || baixando.has(s.id)) return;
   if (arquivosParaBaixar(s).length && !servidorIA().url) {
     toast('Para baixar o áudio e o vídeo, ligue o servidor no seu computador (Ajustes → Avançado)');
     return;
@@ -841,8 +850,9 @@ async function removerTodosDownloads() {
 function botaoBaixar(song, cls = '') {
   const s = song?.id && db.song(song.id);
   const b = baixando.get(song?.id);
-  const estado = s?.baixado ? 'baixada' : b ? 'baixando' : '';
-  const titulo = estado === 'baixada' ? 'Baixada: toca sem internet (tocar para remover)' : estado === 'baixando' ? `Baixando… ${b.pct}%` : 'Baixar para ouvir sem internet';
+  const completa = Boolean(s?.baixado) && !precisaBaixar(s);
+  const estado = completa ? 'baixada' : b ? 'baixando' : '';
+  const titulo = completa ? 'Baixada: toca sem internet (tocar para remover)' : estado === 'baixando' ? `Baixando… ${b.pct}%` : s?.baixado ? 'Completar download (arquivo que faltou)' : 'Baixar para ouvir sem internet';
   return `<button class="icon-btn btn-baixar ${estado} ${cls}" data-baixar="${esc(song.id)}" aria-label="${titulo}" title="${titulo}" style="--pct:${b?.pct || 0}">${icon(estado === 'baixada' ? 'baixada' : 'baixar', 22)}</button>`;
 }
 // o botão de baixar o repertório ou a playlist inteira (como no Spotify): verde com todas baixadas; baixando, o anel
@@ -851,7 +861,7 @@ const musicasDoSet = (set) => [...new Set(set.items.map((it) => it.songId))].map
 function botaoBaixarSet(set) {
   const ss = musicasDoSet(set);
   if (!ss.length) return '';
-  const feitas = ss.filter((s) => s.baixado).length;
+  const feitas = ss.filter((s) => !precisaBaixar(s)).length;
   const naFila = ss.filter((s) => baixando.has(s.id));
   const estado = feitas === ss.length ? 'baixada' : naFila.length ? 'baixando' : '';
   const pct = naFila.length ? Math.round(((feitas + naFila.reduce((a, s) => a + baixando.get(s.id).pct / 100, 0)) / ss.length) * 100) : 0;
@@ -865,9 +875,9 @@ document.addEventListener('click', async (e) => {
   const set = db.set(b.dataset.baixarSet);
   if (!set) return;
   const ss = musicasDoSet(set);
-  const faltam = ss.filter((s) => !s.baixado && !baixando.has(s.id));
+  const faltam = ss.filter((s) => precisaBaixar(s) && !baixando.has(s.id));
   if (!faltam.length && ss.some((s) => baixando.has(s.id))) { toast('Baixando as músicas…'); return; }
-  if (!faltam.length) {
+  if (!faltam.length && ss.every((s) => !precisaBaixar(s))) {
     if (await ask({ title: 'Remover os downloads?', text: `As ${ss.length} músicas de “${set.name}” continuam na biblioteca, mas só tocam com internet.`, ok: 'Remover', danger: true })) {
       for (const s of ss) await removerDownload(s);
       toast('Downloads removidos');
@@ -888,7 +898,7 @@ document.addEventListener('click', async (e) => {
   const s = db.song(b.dataset.baixar);
   if (!s) { toast('Salve a música na biblioteca para baixar'); return; }
   if (baixando.has(s.id)) { toast(`Baixando: ${baixando.get(s.id).pct}%`); return; }
-  if (s.baixado) {
+  if (s.baixado && !precisaBaixar(s)) {
     if (await ask({ title: 'Remover o download?', text: `“${s.title}” continua na biblioteca, mas só toca com internet.`, ok: 'Remover', danger: true })) { await removerDownload(s); toast('Download removido'); }
     return;
   }
@@ -5631,7 +5641,7 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
   const temPartitura = (x) => x.partitura?.pautas?.length || mxlDaPartitura(x.content) || paginasDaPartitura(x.content).length;
   const FILTROS = [['musicas', 'Músicas', todas.length], ['repertorios', 'Repertórios', sets.filter((x) => !ehPlaylist(x)).length], ['playlists', 'Playlists', sets.filter(ehPlaylist).length],
     ['video', 'Com vídeo', todas.filter((x) => x.youtube).length], ['partitura', 'Com partitura', todas.filter(temPartitura).length], ['proprias', 'Cifras próprias', todas.filter(ehPropria).length],
-    ['baixadas', 'Baixadas', todas.filter((x) => x.baixado).length]];
+    ['baixadas', 'Baixadas', todas.filter((x) => x.baixado && !precisaBaixar(x)).length]];
   if (!FILTROS.some(([k]) => k === filtro)) filtro = 'musicas';
   const ehRep = filtro === 'repertorios' || filtro === 'playlists';
   const ehPl = filtro === 'playlists';
@@ -5639,7 +5649,7 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
   if (filtro === 'video') songs = songs.filter((s) => s.youtube);
   if (filtro === 'proprias') songs = songs.filter(ehPropria);
   if (filtro === 'partitura') songs = songs.filter(temPartitura);
-  if (filtro === 'baixadas') songs = songs.filter((x) => x.baixado);
+  if (filtro === 'baixadas') songs = songs.filter((x) => x.baixado && !precisaBaixar(x));
   const itens = ehRep ? db.sets().filter((x) => ehPlaylist(x) === ehPl) : songs;
   const marca = (id) => `<span class="marca-sel" aria-hidden="true">${icon('check', 14)}</span>`;
   const lixeira = (id, nome) => `<button class="icon-btn lixo" data-excluir="${id}" aria-label="Excluir ${esc(nome)}" title="Excluir">${icon('trash', 16)}</button>`;
@@ -11777,8 +11787,8 @@ function viewOffline() {
   const desenhar = () => {
     const p = db.prefs();
     const salvas = db.songs();
-    const baixadas = salvas.filter((x) => x.baixado);
-    const faltam = salvas.filter((x) => !x.baixado && !baixando.has(x.id) && midiaDe(x));
+    const baixadas = salvas.filter((x) => x.baixado && !precisaBaixar(x));
+    const faltam = salvas.filter((x) => precisaBaixar(x) && !baixando.has(x.id) && midiaDe(x));
     const chave = (id, ic, t, sub, ligado) => `<label class="setting"><span class="ico">${icon(ic, 18)}</span><div class="grow"><div class="t">${t}</div><div class="s">${sub}</div></div><input type="checkbox" class="switch" id="${id}"${ligado ? ' checked' : ''}></label>`;
     view.innerHTML = `<div class="ajustes offline"><h2 class="aj-pagina">Downloads e economia de dados</h2>
       <section class="aj-sec"><h3 class="aj-titulo">Economia de dados</h3><div class="settings-group">
@@ -11835,8 +11845,8 @@ function viewOffline() {
   const aoMudar = () => {
     if (location.hash !== '#/offline') return;
     const salvas = db.songs();
-    const baixadas = salvas.filter((x) => x.baixado);
-    const faltam = salvas.filter((x) => !x.baixado && !baixando.has(x.id) && midiaDe(x));
+    const baixadas = salvas.filter((x) => x.baixado && !precisaBaixar(x));
+    const faltam = salvas.filter((x) => precisaBaixar(x) && !baixando.has(x.id) && midiaDe(x));
     const sub = $('#of-todas-s');
     if (sub) sub.textContent = (baixando.size ? `Baixando: ${baixando.size} na fila` : `${baixadas.length} de ${salvas.length} baixadas`) + (servidorIA().url ? '' : ' · o áudio e o vídeo vêm pelo servidor do seu computador (Ajustes → Avançado)');
     const bt = $('#of-todas');
@@ -11863,7 +11873,7 @@ function viewOffline() {
     if (!b) return;
     if (b.dataset.v) { db.setPref('baixarVideo', b.dataset.v === 'video'); $('#of-oque').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }
     if (b.id === 'of-todas') {
-      const faltam = db.songs().filter((x) => !x.baixado && !baixando.has(x.id) && midiaDe(x));
+      const faltam = db.songs().filter((x) => precisaBaixar(x) && !baixando.has(x.id) && midiaDe(x));
       if (!faltam.length) return;
       if (faltam.some((x) => arquivosParaBaixar(x).length) && !servidorIA().url) { toast('Para baixar o áudio e o vídeo, ligue o servidor no seu computador (Ajustes → Avançado)'); return; }
       if (!(await podeBaixarAgora())) return;
