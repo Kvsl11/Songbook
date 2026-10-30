@@ -693,7 +693,7 @@ function arquivosParaBaixar(song) {
   const audio = vs && !ehArquivo(vs.audio) ? vs.audio : '';
   const lista = audio ? [{ yt: audio, video: false }] : [];
   // (o vídeo que é outra gravação, como um ao vivo no lugar do clipe que a música não tem, não vai: só a música)
-  if (song.youtube && (comVideo || (!audio && !song.audioProprio)) && !(audio && vs?.diferentes)) lista.push({ yt: song.youtube, video: comVideo });
+  if (song.youtube && (comVideo || (!audio && !song.audioProprio))) lista.push({ yt: song.youtube, video: comVideo });
   return lista;
 }
 // Se o áudio já baixou, mas o clipe falhou, o download continua incompleto e pode ser tentado de novo.
