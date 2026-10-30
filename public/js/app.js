@@ -1424,6 +1424,7 @@ const player = (() => {
     let montagem = 0;
     let troca = false;
     let preparo = 0;
+    const preparacoes = new WeakMap();
     // 4 trechos de 4 s, distribuídos pelo clipe (evita abertura, letreiro e créditos)
     const PONTOS = [0.2, 0.38, 0.56, 0.74];
     const DURA = 4;
@@ -1474,13 +1475,15 @@ const player = (() => {
     // Decodifica o primeiro quadro do próximo trecho ANTES de torná-lo visível.
     // O vídeo atual continua na tela enquanto a reserva procura e decodifica esse quadro.
     const preparar = async (n) => {
-      if (!reserva || !trechos.length || reserva.dataset.pronto === '1' || reserva.dataset.preparando === '1') return;
+      if (!reserva || !trechos.length || reserva.dataset.pronto === '1') return;
+      if (preparacoes.has(reserva)) return preparacoes.get(reserva);
       const id = ++preparo;
       const video = reserva;
       video.dataset.preparando = '1';
       video.dataset.pronto = '';
       video.pause();
       const alvo = trechos[n % trechos.length];
+      const tarefa = (async () => {
       try {
         if (Math.abs(video.currentTime - alvo) > 0.08) {
           await new Promise((resolve, reject) => {
@@ -1509,6 +1512,9 @@ const player = (() => {
       } catch {
         if (id === preparo && video === reserva) { video.dataset.pronto = ''; video.dataset.preparando = ''; }
       }
+      })();
+      preparacoes.set(video, tarefa);
+      try { await tarefa; } finally { if (preparacoes.get(video) === tarefa) preparacoes.delete(video); }
     };
     const irAoTrecho = async (n) => {
       if (!caixa || !reserva || !trechos.length || troca) return;
@@ -1539,7 +1545,7 @@ const player = (() => {
       if (!tocar && !caixa.paused) caixa.pause();
       if (tocar && trechos.length && !troca) {
         const falta = trechos[k] + DURA - caixa.currentTime;
-        if (falta <= 0.9 && reserva?.dataset.pronto !== '1') preparar((k + 1) % trechos.length);
+        if (falta <= 2.2 && reserva?.dataset.pronto !== '1') preparar((k + 1) % trechos.length);
         if (falta <= 0.08 || caixa.currentTime < trechos[k] - 0.5) irAoTrecho(k + 1);
       }
     };
@@ -1559,7 +1565,7 @@ const player = (() => {
             url = URL.createObjectURL(blob);
             caixa = videoNovo();
             reserva = videoNovo();
-            caixa.addEventListener('playing', () => { caixa?.classList.add('pronto'); medirFaixas(); }, { once: true });
+            caixa.addEventListener('playing', () => { if (caixa?.readyState >= 2) { caixa.classList.add('pronto'); medirFaixas(); } }, { once: true });
             caixa.addEventListener('seeked', () => medirFaixas(), { once: true });
             caixa.addEventListener('loadedmetadata', () => {
               if (!caixa) return;
