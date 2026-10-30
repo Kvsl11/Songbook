@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 341, data: '2026-10-30', titulo: 'Música preparada antes de abrir',
+    itens: [
+      { tipo: 'melhoria', texto: 'Ao entrar numa música, a busca da faixa de áudio e a consulta ao LRCLIB começam em paralelo. A tela espera no máximo 1,1 segundo; se a rede demorar, abre sem travar e termina o preparo em segundo plano. As duas buscas do LRCLIB também são feitas em paralelo, com limite curto de tempo.' },
+    ],
+  },
+  {
     versao: 340, data: '2026-10-30', titulo: 'Sincronia LRCLIB sem procurar o servidor',
     itens: [
       { tipo: 'correcao', texto: 'Abrir ou tocar uma música não consulta mais o servidor de IA. A sincronização automática continua usando somente o LRCLIB; se não houver letra sincronizada correspondente, a música permanece sem sincronia. Avisos e notificações foram removidos.' },
@@ -58,13 +64,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'Quando a duração da letra sincronizada corresponde ao videoclipe longo, o Songbook ainda procura a gravação musical curta para o modo Áudio; o modo Vídeo mantém o videoclipe completo.' },
       { tipo: 'correcao', texto: 'A capa animada prepara e decodifica o próximo trecho antes da troca, mantendo o trecho atual visível até a transição.' },
     ],
-  },
-  {
-    versao: 331, data: '2026-10-30', titulo: 'Capa animada sem flash na troca dos trechos',
-    itens: [
-      { tipo: 'correcao', texto: 'A capa animada prepara e decodifica o próximo trecho antes da troca. O vídeo atual continua visível até o novo estar pronto, e os dois se cruzam suavemente, sem mostrar quadro congelado ou tela escura.' },
-    ],
-  },
 
  ];
 
