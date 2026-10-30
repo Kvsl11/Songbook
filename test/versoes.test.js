@@ -143,8 +143,8 @@ test('ao abrir uma música, prepara a faixa e o LRCLIB em paralelo antes de entr
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   const abrir = app.indexOf('async function abrirPrevia(');
   const rota = app.indexOf("if (jaNaPrevia) route(); else location.hash = '#/musica/previa';", abrir);
-  const preparo = app.indexOf('const preparo = prepararMusicaAoAbrir(novo);', abrir);
-  assert.ok(preparo > abrir && preparo < rota, 'o preparo deve começar antes de navegar para a música');
+  const preparo = app.indexOf('await prepararMusicaAoAbrir(novo);', abrir);
+  assert.ok(preparo > abrir && preparo < rota, 'a tela só navega depois de iniciar e concluir o preparo da música');
   assert.match(app, /await prepararMusicaAoAbrir\(novo\)/, 'a tela só abre depois de áudio e LRCLIB terminarem');
   assert.doesNotMatch(app, /Promise\.race\(\[preparo, new Promise\(\(ok\) => setTimeout\(ok, 1100\)\)\]\)/, 'não deve abrir antes da preparação terminar');
   const helper = app.slice(app.indexOf('function prepararMusicaAoAbrir(song)'), app.indexOf('function guardarSincronia(song, sinc)'));
