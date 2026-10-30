@@ -66,17 +66,25 @@ test('só compartilha o mesmo vídeo entre Música e Vídeo quando a sincronia �
   assert.equal(mesmaSincronia(null), false);
 });
 
-test('ao abrir uma música, a faixa separada é procurada sem depender de sincronizar a letra ou apertar Play', async () => {
+test('ao abrir uma música, inicia o preparo da faixa sem depender de sincronizar a letra ou apertar Play', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
-  const abrir = app.indexOf('function viewSong(');
-  const chamar = app.indexOf('prepararMusicaAoAbrir(song)', abrir);
+  const abrir = app.indexOf('async function abrirPrevia(');
+  const chamar = app.indexOf('prepararMusicaAoAbrir(novo)', abrir);
   const funcao = app.indexOf('async function descobrirVersoes(song)');
-  assert.ok(abrir >= 0 && chamar > abrir && chamar < abrir + 9000, 'viewSong deve iniciar a descoberta ao abrir a música');
+  assert.ok(abrir >= 0 && chamar > abrir && chamar < abrir + 9000, 'abrirPrevia deve iniciar o preparo antes de navegar');
   assert.ok(funcao > 0, 'a descoberta da faixa deve existir como fluxo independente');
   const fim = app.indexOf('// as duas versões da música (o clipe e o áudio oficial)', funcao);
   const corpo = app.slice(funcao, fim);
   assert.match(corpo, /procurarAudio\(song/);
   assert.doesNotMatch(corpo, /sincronizarMusica|letraSincronizada/);
+});
+
+test('um download parcial pode ser retomado e o áudio não precisa ser baixado novamente', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  assert.match(app, /function precisaBaixar\(song\)/);
+  assert.match(app, /video && !String\(arquivo\.tipo \|\| ''\)\.toLowerCase\(\)\.startsWith\('video\/'\)/);
+  assert.match(app, /if \(!s \|\| !precisaBaixar\(s\) \|\| baixando\.has\(s\.id\)\) return/);
+  assert.match(app, /const faltam = ss\.filter\(\(s\) => precisaBaixar\(s\)/);
 });
 
 
