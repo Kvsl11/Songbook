@@ -4,6 +4,16 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 321, data: '2026-10-30', titulo: 'Troca sem engasgo e capa mais bonita',
+    itens: [
+      { tipo: 'melhoria', texto: 'Trocar entre a música e o vídeo não engasga mais o som: a outra versão já fica carregada e as duas se cruzam suavemente no mesmo ponto.' },
+      { tipo: 'melhoria', texto: 'A capa oficial da música aparece em todo lugar: na página inicial, na biblioteca, nas listas e nos repertórios (as músicas já salvas ganham ela sozinhas, aos poucos). A capa que você escolheu continua.' },
+      { tipo: 'melhoria', texto: 'No modo música, sem a música baixada, aparece a capa oficial grande, como no Spotify. Com a música baixada com o vídeo, trechos do clipe passam atrás, sem som e sem os botões do YouTube por cima.' },
+      { tipo: 'correcao', texto: 'O artista sem foto no Deezer não aparece mais com a imagem cinza genérica: fica o desenho da pessoa com a nota.' },
+      { tipo: 'melhoria', texto: 'Sem os avisos rápidos na tela (“Salvo na biblioteca” e os outros): só o de erro continua, para o toque não ficar sem resposta.' },
+    ],
+  },
+  {
     versao: 320, data: '2026-10-30', titulo: 'A capa de verdade e notificações mais caprichadas',
     itens: [
       { tipo: 'melhoria', texto: 'Notificações mais bonitas: o ícone do app certinho na barra, a capa da música, o nome dela no título e “Baixando 80%” / “Download concluído” embaixo. Os avisos de quando você está usando o app aparecem rapidinho na tela, sem encher a barra do celular.' },
@@ -76,14 +86,6 @@ export const NOVIDADES = [
       { tipo: 'novo', texto: 'Toque na seta ao lado do “salvar” da música para baixá-la: o áudio e o vídeo ficam no aparelho, com a letra, a cifra, a capa e a partitura, e ela toca sem internet. A música baixada ganha a setinha verde.' },
       { tipo: 'novo', texto: 'Ajustes → Economia de dados e offline: o que baixar (áudio e vídeo ou só o áudio), baixar com os dados móveis, baixar todas as músicas salvas, o armazenamento usado, remover os downloads e limpar o cache.' },
       { tipo: 'novo', texto: 'Na Biblioteca, o filtro “Baixadas” mostra as músicas que tocam sem internet.' },
-    ],
-  },
-  {
-    versao: 311, data: '2026-10-29', titulo: 'Partitura pela IA, sozinha',
-    itens: [
-      { tipo: 'novo', texto: 'No ⋯ da música, “Criar partitura”: a IA do servidor ouve o áudio da música, escreve a partitura e ela já abre para você ver. Depois de criada, a opção vira “Ver partitura”.' },
-      { tipo: 'melhoria', texto: 'Gerar a partitura com IA começa sozinho pelo áudio da música (o vídeo ou o seu áudio), sem escolher arquivo nem colar link. Só se não der certo é que aparece a opção de importar o áudio.' },
-      { tipo: 'melhoria', texto: 'A tela de criar a partitura ficou mais clara: a automática, com IA, em destaque em cima; a manual, nota por nota, embaixo.' },
     ],
   },
 ];

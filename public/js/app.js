@@ -131,7 +131,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-320';
+export const APP_VERSAO = '2026.10.30-321';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -224,10 +224,11 @@ function toast(msg, opcoes = {}) {
   // o mesmo aviso de novo, logo em seguida, não empilha
   const ultima = notificacoes[0];
   if (ultima && !ultima.lida && ultima.titulo === titulo && ultima.texto === detalhe && Date.now() - ultima.t < 10000) return;
-  // com as notificações no sistema: usando o app, o aviso aparece rapidinho na tela (a resposta a um toque não vai para
-  // a barra do celular); com o app em segundo plano, os que importam (pronto, erro, a IA) vão para a barra
+  // com as notificações no sistema: usando o app, nada de aviso na tela (o "Salvo na biblioteca" e os outros só
+  // atrapalhavam); só o erro aparece, para o toque não ficar sem resposta. Com o app em segundo plano, os que importam
+  // (pronto, erro, a IA) vão para a barra do celular
   if (podeNotificarNoSistema()) {
-    if (document.visibilityState === 'visible') avisoRapido([titulo, detalhe].filter(Boolean).join(': '), tipo);
+    if (document.visibilityState === 'visible') { if (tipo === 'erro') avisoRapido([titulo, detalhe].filter(Boolean).join(': '), tipo); }
     else if (['sucesso', 'erro', 'ia'].includes(tipo)) notificarSistema({ titulo: titulo || 'Songbook Litúrgico', texto: detalhe || '' });
     return;
   }
@@ -556,6 +557,50 @@ function capa(item = {}, { ic = 'music', cls = '' } = {}) {
   if (src) return `<div class="cover ${cls}"><img src="${esc(src)}" alt="${esc(titulo)}" loading="lazy"></div>`;
   return `<div class="cover gen ${cls}" style="--h:${hue(titulo)}">${icon(ic, 24)}</div>`;
 }
+// A capa que a capa oficial (a do álbum, capaOficial) substitui: nenhuma, o quadro do vídeo do YouTube ou a foto do
+// artista que vem com a cifra (Cifra Club, Letras). A escolhida pela pessoa (uma foto do aparelho, outro endereço) fica
+const capaTrocavel = (u) => !u || /(^https?:\/\/(i\d?\.ytimg\.com|img\.youtube\.com)\/)|sscdn\.co\/letras\/[^/]+\/fotos\//.test(u);
+// Todas as músicas da biblioteca ganham a capa oficial, aos poucos e em segundo plano (ao abrir o app e ao salvar uma
+// música nova): a página inicial, a biblioteca, as listas e os repertórios passam a mostrar a mesma capa do player.
+// A que não tem capa em lugar nenhum é tentada de novo depois de uma semana
+const CHAVE_SEM_CAPA = 'songbook.semCapaOficial';
+let trocandoCapas = null;
+function atualizarCapasOficiais(ids = null) {
+  if (trocandoCapas) return trocandoCapas;
+  trocandoCapas = (async () => {
+    let tentadas = {};
+    try { tentadas = JSON.parse(localStorage.getItem(CHAVE_SEM_CAPA) || '{}'); } catch { /* sem armazenamento */ }
+    const semana = 7 * 864e5;
+    let semLugar = false; // alguma capa nova sem a antiga na tela para trocar (ela não tinha carregado)
+    const fila = db.songs().filter((x) => (!ids || ids.includes(x.id)) && x.title && x.artist && capaTrocavel(x.cover) && !(tentadas[x.id] > Date.now() - semana));
+    for (const x of fila) {
+      if (!navigator.onLine) break;
+      const u = await capaOficial(x.title, x.artist).catch(() => '');
+      const agora = db.song(x.id);
+      if (!agora) continue;
+      if (u && capaTrocavel(agora.cover) && agora.cover !== u) {
+        const antes = capa(agora).match(/src="([^"]+)"/)?.[1] || '';
+        db.saveSong({ ...agora, content: definirMeta(agora.content, 'cover', u) });
+        delete tentadas[x.id];
+        if (!trocarCapaNaTela(antes, u)) semLugar = true;
+      } else if (!u) tentadas[x.id] = Date.now();
+      await new Promise((ok) => setTimeout(ok, 250)); // (devagar: o Deezer e o iTunes limitam os pedidos)
+    }
+    try { localStorage.setItem(CHAVE_SEM_CAPA, JSON.stringify(tentadas)); } catch { /* sem armazenamento */ }
+    // (uma vez no fim, só na página inicial e na biblioteca, e sem ninguém digitando)
+    if (semLugar && /^(#\/?|#\/biblioteca(\/.*)?)?$/.test(location.hash) && !document.activeElement?.matches?.('input, textarea')) route();
+  })().finally(() => { trocandoCapas = null; });
+  return trocandoCapas;
+}
+// a capa nova entra na hora onde a antiga aparece (sem desenhar a tela de novo, que voltava ao topo)
+function trocarCapaNaTela(antes, depois) {
+  let achou = 0;
+  if (antes) document.querySelectorAll('.cover img').forEach((img) => { if (img.getAttribute('src') === antes.replace(/&amp;/g, '&')) { img.src = depois; achou++; } });
+  desenharLateral();
+  return achou > 0;
+}
+setTimeout(() => atualizarCapasOficiais(), 5000);
+window.addEventListener('songbook:nova-musica', (e) => setTimeout(() => atualizarCapasOficiais([e.detail.id]), 3000));
 function capaRepertorio(set, cls = '') {
   if (set.capa) return `<div class="cover ${cls}"><img src="${esc(set.capa)}" alt="${esc(set.name)}"></div>`;
   const songs = set.items.map((it) => db.song(it.songId)).filter(Boolean);
@@ -1148,7 +1193,8 @@ const player = (() => {
   // (com as duas versões, as duas são desta música)
   const desta = (id) => Boolean(atual && id && (atual.youtube === id || atual.video === id || atual.audio === id));
   const noPalco = () => Boolean(atual && palco?.isConnected && desta(palcoDe)) && !document.body.classList.contains('painel-cheio');
-  const iframeAtual = () => tela.querySelector('iframe');
+  // (o player que toca; o .pl-reserva é a outra versão da música, já carregada para a troca sem engasgo)
+  const iframeAtual = () => tela.querySelector('iframe:not(.pl-reserva)');
   // Na página da música o vídeo toca na telinha das Referências, com os controles do YouTube (dá para pular
   // o anúncio). O topo da música não toca o vídeo: continua só com os quadros do clipe passando.
   // Quando o vídeo sai da telinha (outra música tocando, player fechado), ela volta a mostrar a miniatura
@@ -1297,25 +1343,21 @@ const player = (() => {
   // o vídeo do YouTube tocando agora ('' no áudio da pessoa)
   const ytAgora = () => (ehArquivo(atual?.youtube) ? '' : atual?.youtube || '');
   // O Canvas, como no Spotify: no modo música, atrás da parte de cima, passam trechos do próprio clipe, sem som (o som é
-  // só o da música). É o clipe de verdade andando junto com a música (o mesmo ponto cantado, pelos pares das duas
-  // versões), num segundo player do YouTube mudo e sem botões, ou no vídeo baixado, quando a música está no aparelho.
-  // Os quadros parados ficam embaixo até ele começar a andar (e no lugar dele sem internet ou com a Economia de dados)
+  // só o da música). É o clipe baixado (o arquivo do aparelho) andando junto com a música (o mesmo ponto cantado, pelos
+  // pares das duas versões). Sem o download, fica a capa da música: o player do YouTube mudo, usado antes, mostrava os
+  // botões dele por cima ao pausar e vinha em resolução baixa
   const canvas = (() => {
     let de = '';
-    let caixa = null; // o <iframe> ou o <video>
-    let tempoDele = -1; // o último tempo que o player mudo informou
-    let andando = false;
+    let caixa = null; // o <video> com o clipe baixado
     let relogio = 0;
     let url = '';
     let montagem = 0;
-    let respondeu = false; // o player mudo já respondeu (antes disso, os comandos davam erro dentro dele)
     const noClipeAgora = () => {
       // o tempo do clipe que corresponde ao que toca agora
       if (!atual) return 0;
       if (atual.youtube === de) return api.tempoAgora;
       return atual.pares && atual.youtube === atual.audio ? tempoNoVideo(atual.pares, api.tempoAgora) : api.tempoAgora;
     };
-    const cmd = (func, args = []) => caixa?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
     const tirar = () => {
       clearInterval(relogio);
       relogio = 0;
@@ -1323,9 +1365,6 @@ const player = (() => {
       caixa = null;
       if (url) { URL.revokeObjectURL(url); url = ''; }
       de = '';
-      tempoDele = -1;
-      andando = false;
-      respondeu = false;
     };
     // a cada segundo: anda e para junto com a música e, se escorregar mais de 1,5 s, volta ao ponto
     const acompanhar = () => {
@@ -1333,28 +1372,10 @@ const player = (() => {
       const visivel = !fundo.hidden && !el.hidden && !el.classList.contains('letra-cheia') && fundo.getClientRects().length > 0;
       const tocar = visivel && estado === 'tocando';
       const alvo = noClipeAgora();
-      if (caixa.tagName === 'VIDEO') {
-        if (tocar && caixa.paused) caixa.play().catch(() => {});
-        if (!tocar && !caixa.paused) caixa.pause();
-        if (Math.abs(caixa.currentTime - alvo) > 1.5 && alvo < (caixa.duration || Infinity)) caixa.currentTime = alvo;
-        return;
-      }
-      if (!respondeu) { caixa.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'canvas' }), '*'); return; } // (ainda carregando)
-      if (tocar !== andando) { cmd(tocar ? 'playVideo' : 'pauseVideo'); andando = tocar; }
-      if (tocar && tempoDele >= 0 && Math.abs(tempoDele - alvo) > 1.5) { cmd('seekTo', [alvo, true]); tempoDele = alvo; }
+      if (tocar && caixa.paused) caixa.play().catch(() => {});
+      if (!tocar && !caixa.paused) caixa.pause();
+      if (Math.abs(caixa.currentTime - alvo) > 1.5 && alvo < (caixa.duration || Infinity)) caixa.currentTime = alvo;
     };
-    window.addEventListener('message', (e) => {
-      if (!caixa || caixa.tagName !== 'IFRAME' || e.source !== caixa.contentWindow) return;
-      try {
-        const msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-        const info = msg?.info;
-        if (msg?.event === 'onError') { caixa.remove(); caixa = null; return; } // (fica com os quadros)
-        if (msg?.event === 'onReady' || msg?.event === 'infoDelivery' || msg?.event === 'initialDelivery') respondeu = true;
-        if (typeof info?.currentTime === 'number') tempoDele = info.currentTime;
-        // começou a andar: aparece aos poucos por cima dos quadros (o título do YouTube some antes)
-        if (info?.playerState === 1 && !caixa.classList.contains('pronto')) setTimeout(() => caixa?.classList.add('pronto'), 900);
-      } catch { /* outra mensagem */ }
-    });
     return {
       async montar(q) {
         const quer = q && db.prefs().videoFundo !== false && !db.prefs().economiaDados ? q : '';
@@ -1378,21 +1399,8 @@ const player = (() => {
             caixa.addEventListener('loadedmetadata', () => { if (caixa) caixa.currentTime = noClipeAgora(); }, { once: true });
           }
         }
-        if (!caixa) {
-          if (!navigator.onLine) { de = ''; return; }
-          const p = new URLSearchParams({ autoplay: '1', mute: '1', controls: '0', playsinline: '1', loop: '1', playlist: quer, rel: '0', modestbranding: '1',
-            iv_load_policy: '3', disablekb: '1', fs: '0', enablejsapi: '1', start: String(Math.floor(noClipeAgora())), origin: location.origin });
-          caixa = document.createElement('iframe');
-          caixa.className = 'pl-canvas';
-          caixa.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(quer)}?${p}`;
-          caixa.allow = 'autoplay; encrypted-media';
-          caixa.tabIndex = -1;
-          caixa.setAttribute('aria-hidden', 'true');
-          caixa.title = '';
-          // pede ao player mudo que avise o tempo e o estado
-          caixa.addEventListener('load', () => { caixa?.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'canvas' }), '*'); andando = true; });
-          // (o mudo é garantido pelo endereço: mute=1)
-        }
+        // (sem o arquivo, nada: o player do YouTube mudo mostrava os botões dele por cima ao pausar)
+        if (!caixa) { de = ''; return; }
         fundo.append(caixa);
         relogio = setInterval(acompanhar, 1000);
       },
@@ -1403,14 +1411,18 @@ const player = (() => {
   // que não tinha capa (a biblioteca também passa a mostrar ela)
   const buscarCapaOficial = () => {
     const a = atual;
-    if (!a || a.capaOficial !== undefined || (a.capa && /^(https?:|data:)/.test(a.capa)) || !a.titulo || !a.artista) return;
+    if (!a || a.capaOficial !== undefined || !capaTrocavel(a.capa) || !a.titulo || !a.artista) return;
     a.capaOficial = '';
     capaOficial(a.titulo, a.artista).then((u) => {
       if (!u) return;
       a.capaOficial = u;
       if (atual && atual.songId === a.songId && atual.titulo === a.titulo) { atual.capaOficial = u; mini.dataset.conteudo = ''; desenharCapa(); }
       const s = a.songId && a.songId !== 'previa' && db.song(a.songId);
-      if (s && !s.cover) db.saveSong({ ...s, content: definirMeta(s.content, 'cover', u) });
+      if (s && capaTrocavel(s.cover) && s.cover !== u) {
+        const antes = capa(s).match(/src="([^"]+)"/)?.[1] || '';
+        db.saveSong({ ...s, content: definirMeta(s.content, 'cover', u) });
+        trocarCapaNaTela(antes, u);
+      }
     });
   };
   // a capa (no modo capa): a da música ou o quadro do vídeo; o botão de trocar diz para o que vai
@@ -1421,7 +1433,7 @@ const player = (() => {
     const doYt = ytDaCapa();
     // sem a capa na música, a capa de verdade (do álbum), quando chegar; até lá (ou sem achar), o quadro do vídeo
     buscarCapaOficial();
-    const propria = atual?.capa && /^(https?:|data:)/.test(atual.capa) ? atual.capa : atual?.capaOficial || '';
+    const propria = atual?.capaOficial || (atual?.capa && /^(https?:|data:)/.test(atual.capa) ? atual.capa : '');
     const url = propria || (doYt ? `https://i.ytimg.com/vi/${doYt}/hqdefault.jpg` : '');
     const capaYt = !propria;
     // sem capa nem vídeo: a cor da música com uma nota no meio. Com vídeo, no modo música, a capa tem movimento: os
@@ -1431,7 +1443,10 @@ const player = (() => {
     const semCapa = capa && !url;
     // (só com "Capa animada" ligada nos Ajustes; desligada, fica a capa parada e não baixa os quadros)
     // (com as duas versões, os quadros são os do clipe: o áudio oficial é só a capa parada)
-    const q = capa && !atual?.semVideo && doYt && db.prefs().videoFundo !== false ? doYt : '';
+    // (só com o clipe baixado: a capa animada é o próprio arquivo, sem os botões que o player do YouTube mostrava por
+    // cima ao pausar; sem o download, fica a capa da música, parada, como no Spotify sem Canvas)
+    const clipeBaixado = doYt && String(baixadoDe(doYt)?.tipo || '').startsWith('video');
+    const q = capa && !atual?.semVideo && clipeBaixado && db.prefs().videoFundo !== false ? doYt : '';
     const barra = capaNaBarra();
     el.classList.toggle('capa-na-barra', barra);
     mini.style.backgroundImage = (capa || barra) && url ? `url("${url}")` : ''; // (com os quadros no fundo, o CSS a esconde)
@@ -2040,8 +2055,88 @@ const semLinhasDeAcordes = (sinc) => {
   // passa para a outra versão da música (o áudio oficial ou o clipe) no segundo t dela, no mesmo vídeo embutido (sem
   // recriá-lo: recriar pausava e, no celular, não tocava sozinho). mesmo: a mesma versão, de outra fonte (o download
   // ou o YouTube, ao trocar de modo)
+  // A troca sem engasgo, como no Spotify: a outra versão da música (o clipe, tocando o áudio oficial, ou o contrário)
+  // fica carregada num segundo player do YouTube, escondido e parado. Na troca, ela começa a tocar sem volume no ponto
+  // certo enquanto a de agora continua; quando ela já está tocando (e no ponto), as duas se cruzam em 0,25 s (uma
+  // desce o volume, a outra sobe) e a de antes para, já pronta para a próxima troca. Antes o mesmo player descarregava
+  // uma e carregava a outra, e o som parava um instante ("dandan")
+  const reservaDe = () => tela.querySelector('iframe.pl-reserva');
+  const cmdEm = (f, func, args = []) => f?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+  const outraVersao = () => {
+    if (!atual?.audio || !atual.video || atual.semVideo) return '';
+    return atual.youtube === atual.audio ? atual.video : atual.youtube === atual.video ? atual.audio : '';
+  };
+  let trocando = null;
+  const prepararReserva = () => {
+    const outra = outraVersao();
+    if (!outra || local || trocando || ehArquivo(outra) || localDe(outra) || db.prefs().economiaDados || !iframeAtual()) return;
+    const r = reservaDe();
+    if (r?.dataset.yt === outra) return;
+    r?.remove();
+    const f = document.createElement('iframe');
+    f.className = 'pl-reserva';
+    f.dataset.yt = outra;
+    f.src = ytEmbed(outra, { autoplay: false });
+    f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+    f.title = '';
+    f.tabIndex = -1;
+    f.setAttribute('aria-hidden', 'true');
+    f.addEventListener('load', () => f.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 2 }), '*'));
+    tela.append(f);
+  };
+  // (ela está pronta quando o player dela responde)
+  window.addEventListener('message', (e) => {
+    const r = reservaDe();
+    if (r && e.source === r.contentWindow) r.dataset.pronto = '1';
+  });
+  const trocaSuave = (antigo, id, t) => {
+    const novo = reservaDe();
+    const velho = iframeAtual();
+    if (!novo || novo.dataset.yt !== id || novo.dataset.pronto !== '1' || !velho || trocando) return false;
+    const desde = performance.now();
+    const alvoAgora = () => t + (performance.now() - desde) / 1000;
+    // os papéis já trocam: os avisos (o tempo, o estado) passam a vir da nova; a velha continua tocando por baixo
+    novo.classList.remove('pl-reserva');
+    velho.classList.add('pl-reserva');
+    velho.dataset.yt = antigo;
+    delete velho.dataset.pronto;
+    cmdEm(novo, 'setVolume', [0]);
+    cmdEm(novo, 'seekTo', [t + 0.2, true]);
+    cmdEm(novo, 'playVideo');
+    estadoYt = -1;
+    pendente = null;
+    trocando = { novo, velho };
+    // (no iPhone o volume não muda pelo app: aí a de antes só para no instante em que a nova toca)
+    const semVolume = ehIOS();
+    let acertou = 0;
+    const cruzar = () => {
+      clearInterval(vigia);
+      let k = 0;
+      const passo = setInterval(() => {
+        k = semVolume ? 8 : k + 1;
+        cmdEm(novo, 'setVolume', [Math.min(100, k * 12.5)]);
+        cmdEm(velho, 'setVolume', [Math.max(0, 100 - k * 12.5)]);
+        if (k < 8) return;
+        clearInterval(passo);
+        cmdEm(velho, 'pauseVideo');
+        cmdEm(velho, 'setVolume', [100]);
+        velho.dataset.pronto = '1';
+        trocando = null;
+      }, 30);
+    };
+    const vigia = setInterval(() => {
+      const passou = performance.now() - desde;
+      if (estadoYt === 1 && passou - acertou > 300) {
+        // tocando: se ficou longe do ponto (o tempo que levou para começar), acerta uma vez, ainda sem volume
+        if (!acertou && Math.abs(tempo - alvoAgora()) > 0.2) { acertou = passou; cmdEm(novo, 'seekTo', [alvoAgora() + 0.12, true]); return; }
+        cruzar();
+      } else if (passou > 3500) cruzar(); // demorou (um anúncio, a internet): troca assim mesmo
+    }, 50);
+    return true;
+  };
   const trocarVersao = (id, t, mesmo = false) => {
     if (!atual || !id || (id === atual.youtube && !mesmo)) return;
+    const antigo = atual.youtube;
     atual = { ...atual, youtube: id };
     tempo = Math.max(0, t);
     marcaTempo = performance.now();
@@ -2058,8 +2153,11 @@ const semLinhasDeAcordes = (sinc) => {
     pendente = l ? null : tempo;
     estadoYt = -1;
     if (l) { comandoYt('pauseVideo'); tocarLocal(l, tempo, tocando); }
+    else if (tocando && !local && !mesmo && trocaSuave(antigo, id, tempo)) { /* a outra versão já estava carregada */ }
     else {
       pararLocal();
+      // (a reserva, se era desta versão, sai: este player passa a tocar ela)
+      if (reservaDe()?.dataset.yt === id) reservaDe().remove();
       if (iframeAtual()) comandoYt(tocando ? 'loadVideoById' : 'cueVideoById', [{ videoId: id, startSeconds: tempo }]);
       else { montar({ autoplay: tocando }); pendente = tempo; }
     }
@@ -2395,7 +2493,7 @@ const semLinhasDeAcordes = (sinc) => {
         }
       }
       const antes = estado;
-      if (info.playerState === 1) estado = 'tocando';
+      if (info.playerState === 1) { estado = 'tocando'; prepararReserva(); }
       else if (info.playerState === 2) estado = 'pausado';
       else if (info.playerState === 0) { estado = 'pausado'; if (fimDaMusica()) return; }
       desenhar();
@@ -4261,6 +4359,9 @@ function comUltimoValor(tipo, nome, promessa) {
   const k = `${tipo}:${normalizar(nome)}`;
   return Promise.resolve(promessa).catch(() => null).then((v) => {
     const vazio = v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length);
+    // (sem nada com internet: não há mesmo, e o guardado sai, como a foto genérica do Deezer guardada antes; sem
+    // internet, vale o último valor)
+    if (vazio && navigator.onLine && (tipo === 'foto' || tipo === 'capa')) { delete artistasGuardados[k]; return v; }
     if (vazio) return artistasGuardados[k]?.v ?? v;
     artistasGuardados[k] = { v, t: Date.now() };
     clearTimeout(guardandoArtistas);
@@ -4344,7 +4445,35 @@ async function fotoDeezer(nome) {
   // com vários do mesmo nome (o "justice" desconhecido vinha antes do Justice), o que tem mais fãs
   const a = (r?.data || []).filter((x) => mesmoNome(x.name, nome)).sort((x, y) => (y.nb_fan || 0) - (x.nb_fan || 0))[0];
   // sem foto, o Deezer devolve uma imagem genérica (o endereço fica com "/artist//")
-  return a?.picture_medium && !/\/artist\/\//.test(a.picture_medium) ? a.picture_big || a.picture_medium : '';
+  const foto = a?.picture_medium && !/\/artist\/\//.test(a.picture_medium) ? a.picture_big || a.picture_medium : '';
+  return foto && !(await ehFotoVaziaDoDeezer(foto)) ? foto : '';
+}
+// O Deezer, para o artista sem foto, também devolve um endereço com cara de foto de verdade, mas a imagem é a genérica
+// dele (a pessoinha cinza num fundo cinza claro): ela é reconhecida pela própria imagem (os cantos no cinza claro dela
+// e nenhuma cor), e aí o artista fica com o desenho do app (a pessoa com a nota). O Deezer deixa ler a imagem (CORS)
+const fotosVaziasDeezer = new Map();
+function ehFotoVaziaDoDeezer(url) {
+  if (!/dzcdn\.net\/images\/artist\//.test(url || '')) return Promise.resolve(false);
+  const pequena = url.replace(/\/\d+x\d+-/, '/56x56-');
+  if (!fotosVaziasDeezer.has(pequena)) {
+    fotosVaziasDeezer.set(pequena, (async () => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = pequena;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = c.height = 16;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, 16, 16);
+      const d = ctx.getImageData(0, 0, 16, 16).data;
+      const px = (x, y) => [...d.subarray((y * 16 + x) * 4, (y * 16 + x) * 4 + 3)];
+      const fundo = [px(0, 0), px(15, 0), px(0, 15), px(15, 15)].every(([r, g, b]) => Math.abs(r - 233) < 10 && Math.abs(g - 232) < 10 && Math.abs(b - 237) < 10);
+      let semCor = true;
+      for (let i = 0; i < d.length; i += 4) if (Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]) > 14) { semCor = false; break; }
+      return fundo && semCor;
+    })().catch(() => false));
+  }
+  return fotosVaziasDeezer.get(pequena);
 }
 // a apresentação do artista (o estilo, de onde é, os prêmios), para o "Sobre o artista": a introdução da página dele
 // na Wikipédia em português, com a foto e o endereço da página. Só vale a página que é mesmo de um músico com esse
@@ -4373,10 +4502,11 @@ const deezerArtistas = new Map();
 function deezerDoArtista(nome) {
   const k = normalizar(nome);
   if (!deezerArtistas.has(k)) {
-    deezerArtistas.set(k, jsonp(`https://api.deezer.com/search/artist?q=${encodeURIComponent(nome)}&limit=5`).then((r) => {
+    deezerArtistas.set(k, jsonp(`https://api.deezer.com/search/artist?q=${encodeURIComponent(nome)}&limit=5`).then(async (r) => {
       const a = (r?.data || []).filter((x) => mesmoNome(x.name, nome)).sort((x, y) => (y.nb_fan || 0) - (x.nb_fan || 0))[0];
       if (!a) return null;
-      const foto = a.picture_xl && !/\/artist\/\//.test(a.picture_xl) ? a.picture_xl : '';
+      const xl = a.picture_xl && !/\/artist\/\//.test(a.picture_xl) ? a.picture_xl : '';
+      const foto = xl && !(await ehFotoVaziaDoDeezer(xl)) ? xl : '';
       return { fas: a.nb_fan || 0, albuns: a.nb_album || 0, foto };
     }).catch(() => null));
   }
@@ -9823,7 +9953,7 @@ function viewSettings(topico) {
       <div class="setting wrap"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
       ${chave('diagramas', 'grid', 'Desenho dos acordes', 'Como montar cada acorde no violão', p.diagramas)}
-      ${chave('video-fundo', 'video', 'Capa animada', 'Trechos do clipe passam atrás da música, sem som, como o Canvas do Spotify. Desligue para economizar dados', p.videoFundo !== false)}
+      ${chave('video-fundo', 'video', 'Capa animada', 'Nas músicas baixadas com o vídeo, trechos do clipe passam atrás da música, sem som, como o Canvas do Spotify', p.videoFundo !== false)}
     </div>`)}
 
     ${secao('Downloads e dados', `
