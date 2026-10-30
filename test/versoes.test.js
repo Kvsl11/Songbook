@@ -80,7 +80,14 @@ test('ao abrir uma música, a faixa separada é procurada sem depender de sincro
 });
 
 
-test('LRCLIB também sincroniza quando o player está no videoclipe e existe áudio separado', async () => {
+test('a sincronia automática consulta somente o LRCLIB e nunca chama o servidor de IA', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
-  assert.match(app, /!atual\.semVideo && \(!noClipe\(\) \|\| Boolean\(atual\.audio\)\) && !lrclibTentado\.has\(atual\.youtube\)/);
+  const inicio = app.indexOf('async function sincronizarMusica(song');
+  const fim = app.indexOf('// A música sincronizada pelo LRCLIB direto no vídeo', inicio);
+  assert.ok(inicio >= 0 && fim > inicio);
+  const rotina = app.slice(inicio, fim);
+  assert.match(rotina, /letraSincronizada\(/);
+  assert.doesNotMatch(rotina, /servidorIA|chamarComEtapas|\/letra|notificar\(/);
+  assert.match(app, /if \(midiaDe\(song\)\) sincronizarAoTocar\(\)/);
+  assert.doesNotMatch(app, /id="btn-sincronizar"|valor: 'sincronizar'|sincronizarDoPlayer/);
 });
