@@ -35,8 +35,8 @@ export function escolherAudio(videos, { titulo = '', artista = '', duracao = 0, 
     if (CANAL_SEM_VOZ.test(canal) && !CANAL_SEM_VOZ.test(a)) continue;
     let n = 0;
     if (a && (canal === a || canal.startsWith(`${a} `) || ` ${a} `.includes(` ${canal} `))) n += 3;
-    if (/\b(audio|official audio|audio oficial)\b/.test(nome)) n += 2;
-    if (CLIPE.test(nome)) n -= 3;
+    if (/\\b(audio|official audio|audio oficial)\\b/.test(nome)) n += 3;
+    if (/\\b(lyrics?|letra|lyric video)\\b/.test(nome)) n -= 2;
     n -= Math.abs(v.segundos - duracao) / 2;
     if (n > nota) { nota = n; melhor = v; }
   }
