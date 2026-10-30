@@ -144,7 +144,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-351';
+export const APP_VERSAO = '2026.10.30-352';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -695,14 +695,14 @@ const baixando = new Map(); // id da música → { pct } (as que estão na fila 
 const filaBaixar = [];
 let andandoFila = null;
 const avisarDownloads = () => window.dispatchEvent(new CustomEvent('songbook:downloads'));
-// o que baixar do YouTube: o áudio oficial (das duas versões) e o clipe; com "Só o áudio" nos ajustes, o clipe só se a
-// música não tiver outro áudio (e vem só o som dele)
+// Em "Áudio e vídeo", baixa o áudio oficial e o videoclipe mesmo quando forem gravações diferentes.
+// Em "Só o áudio", baixa apenas o áudio oficial (ou o som do vídeo quando não houver outra faixa).
 function arquivosParaBaixar(song) {
   const comVideo = db.prefs().baixarVideo !== false;
   const vs = versoesDe(song);
   const audio = vs && !ehArquivo(vs.audio) ? vs.audio : '';
   const lista = audio ? [{ yt: audio, video: false }] : [];
-  // (o vídeo que é outra gravação, como um ao vivo no lugar do clipe que a música não tem, não vai: só a música)
+  // Com "Áudio e vídeo", o clipe é obrigatório mesmo se for uma gravação diferente do áudio oficial.
   if (song.youtube && (comVideo || (!audio && !song.audioProprio))) lista.push({ yt: song.youtube, video: comVideo });
   return lista;
 }
@@ -859,16 +859,14 @@ async function baixarAgora(id) {
   }));
 
   if (!Object.keys(arquivos).length) throw falhas[0]?.e || new Error('nada para baixar');
-  let avisoClipe = falhas.some((f) => f.yt === song.youtube) ? 'o vídeo não deu para baixar' : '';
   const vsAqui = versoesDe(db.song(id) || song);
   if (vsAqui?.audio && arquivos[vsAqui.audio] && arquivos[vsAqui.video] && !vsAqui.casadas && !vsAqui.diferentes) {
+    // A verificação de versões pode descobrir que áudio e clipe são gravações diferentes.
+    // Isso não autoriza descartar o clipe: com "Áudio e vídeo" os dois foram pedidos.
     await acertarVersoes(db.song(id) || song, null, { pedido: true }).catch(() => {});
-    if (versoesDe(db.song(id))?.diferentes && !db.songs().some((x) => x.id !== id && x.baixado?.arquivos?.[vsAqui.video])) {
-      await apagarAudio(chaveBaixada(vsAqui.video)).catch(() => {});
-      delete arquivos[vsAqui.video];
-      avisoClipe = 'o vídeo é outra gravação';
-    }
   }
+  const faltou = [...new Set(falhas.map((f) => f.video ? 'videoclipe' : 'áudio'))];
+  const avisoFalhas = faltou.length ? 'faltou ' + faltou.join(' e ') : '';
 
   if (!db.song(id)) return;
   const tamanho = Object.values(arquivos).reduce((a, x) => a + (x.tamanho || 0), 0);
@@ -881,7 +879,7 @@ async function baixarAgora(id) {
   avisarDownloads();
   void notificarSistema({
     titulo: song.title,
-    texto: `${avisoClipe ? 'Baixada só a música' : 'Download concluído'}${song.artist ? ` · ${song.artist}` : ''} · ${fmtBytes(tamanho)}`,
+    texto: `${avisoFalhas ? 'Download parcial · ' + avisoFalhas : 'Download concluído'}${song.artist ? ` · ${song.artist}` : ''} · ${fmtBytes(tamanho)}`,
     tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}`,
     imagem: capaDaNotificacao(song),
   });
