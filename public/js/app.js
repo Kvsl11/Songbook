@@ -134,7 +134,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-346';
+export const APP_VERSAO = '2026.10.30-347';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -785,7 +785,7 @@ async function baixarAgora(id) {
       return;
     }
     try {
-      if (!/^[\\w-]{11}$/.test(yt || '')) throw new Error('o vídeo desta versão não é do YouTube');
+      if (!/^[\w-]{11}$/.test(yt || '')) throw new Error('o vídeo desta versão não é do YouTube');
       const r = await chamarComEtapas(servidorIA(), '/baixar', {
         json: { url: `https://youtu.be/${yt}`, video, qualidade: qualidadeDoDownload(video) },
       }, (etapa, p) => { if (etapa === 'baixando' && p !== null) atualizarProgresso(yt, p * 0.8); });
