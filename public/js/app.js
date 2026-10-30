@@ -10731,8 +10731,11 @@ const OPÇÕES_LRCLIB_RÁPIDAS = { espera: 1000, timeout: 10000, tentativas: 4 }
 async function sincronizarMusica(song, { noVideo = '', audioPromise = null } = {}) {
   const previaOriginal = song?.id === 'previa' ? preview : null;
   song = (song?.id === 'previa' ? { ...song, ...preview } : db.song(song?.id)) || song;
-  if (!song?.id || sincronizando.has(song.id)) return undefined;
-  sincronizando.add(song.id);
+  // Cada prévia é uma tentativa independente. Todas usam o id "previa", então travar pelo id
+  // fazia uma busca antiga impedir a sincronização de uma nova música aberta logo em seguida.
+  const chaveSincronizacao = previaOriginal || song.id;
+  if (!song?.id || sincronizando.has(chaveSincronizacao)) return undefined;
+  sincronizando.add(chaveSincronizacao);
   try {
     // Primeiro confirma qual gravação de áudio acompanha o clipe. Só depois consulta o LRCLIB,
     // usando a duração da gravação correta; consultar antes com a duração do clipe podia descartar
@@ -10786,7 +10789,7 @@ async function sincronizarMusica(song, { noVideo = '', audioPromise = null } = {
   } catch {
     return 'erro';
   } finally {
-    sincronizando.delete(song.id);
+    sincronizando.delete(chaveSincronizacao);
   }
 }
 
