@@ -392,7 +392,7 @@ test('letra sincronizada do LRCLIB: LRC -> linhas e tempos da sincronia', async 
   assert.equal(fora.ajustar, true);
   // de outro artista não serve, nem com o ajuste
   assert.equal(await letraSincronizada({ titulo: 'Noites Traiçoeiras', artista: 'Fulano', duracao: 600 }, async () => resp(lista.slice(2))), null);
-  // sem letra sincronizada: null (o app vai para o servidor)
+  // sem letra sincronizada: null (o app permanece sem sincronia)
   assert.equal(await letraSincronizada({ titulo: 'Noites Traiçoeiras', artista: 'Padre Marcelo Rossi' }, async () => resp([{ ...lista[2], syncedLyrics: null }])), null);
 });
 
@@ -403,7 +403,7 @@ test('letra sincronizada: o LRCLIB ocupado (503) tenta de novo; sem resposta nen
   let n = 0;
   const r = await letraSincronizada({ titulo: 'Colo de Mãe', artista: 'Frei Gilson', duracao: 263 }, async () => (++n < 3 ? ocupado : ok), { espera: 1 });
   assert.equal(r.id, 5);
-  assert.equal(n, 3);
+  assert.equal(n, 4); // duas consultas paralelas, cada uma recebe um 503 e depois uma resposta válida
   await assert.rejects(letraSincronizada({ titulo: 'Colo de Mãe', artista: 'Frei Gilson' }, async () => ocupado, { espera: 1 }), /não respondeu|ocupado/);
 });
 
