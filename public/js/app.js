@@ -249,10 +249,6 @@ async function compartilhar(dados) {
   try { await navigator.clipboard.writeText([dados.text, dados.url].filter(Boolean).join('\n')); toast('Copiado: é só colar onde quiser'); } catch { toast('Não consegui compartilhar'); }
 }
 
-// Compatibilidade com chamadas antigas: notificações locais e do sistema estão desativadas.
-function notificar() {}
-async function notificarSistema() { return false; }
-const podeNotificarNoSistema = () => false;
 try { localStorage.removeItem('songbook.notificacoes'); } catch { /* armazenamento indisponível */ }
 if ('serviceWorker' in navigator) navigator.serviceWorker.ready.then((reg) => reg.getNotifications().then((ns) => ns.forEach((n) => n.close()))).catch(() => {});
 
@@ -715,8 +711,7 @@ async function baixarMusica(song, { perguntou = false } = {}) {
     while (filaBaixar.length) {
       const id = filaBaixar.shift();
       try { await baixarAgora(id); } catch (e) {
-        if (!podeNotificarNoSistema() || document.visibilityState === 'visible') toast(`Não baixou “${db.song(id)?.title || 'a música'}”: ${erroExplicado(e)}`, 5000);
-        notificarSistema({ titulo: db.song(id)?.title || 'Download', texto: `Não deu para baixar · ${erroExplicado(e)}`, tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}`, imagem: capaDaNotificacao(db.song(id)) });
+        toast(`Não baixou “${db.song(id)?.title || 'a música'}”: ${erroExplicado(e)}`, 5000);
       }
       baixando.delete(id);
       avisarDownloads();
@@ -724,8 +719,6 @@ async function baixarMusica(song, { perguntou = false } = {}) {
     andandoFila = null;
   })();
 }
-// a capa da música na notificação (a dela ou a do vídeo)
-const capaDaNotificacao = (song) => (song?.cover && /^https?:/.test(song.cover) ? song.cover : song?.youtube ? `https://i.ytimg.com/vi/${song.youtube}/hqdefault.jpg` : '');
 async function baixarAgora(id) {
   const song = db.song(id);
   if (!song) return;
@@ -742,8 +735,6 @@ async function baixarAgora(id) {
       const antes = baixando.get(id)?.pct ?? -100;
       baixando.set(id, { pct });
       avisarDownloads();
-      // na barra de notificações, como o Spotify: "Baixando… 40%" (a cada 10%, sem som), trocada pela de pronta no fim
-      if (Math.floor(pct / 10) !== Math.floor(antes / 10)) notificarSistema({ titulo: song.title, texto: `${song.artist ? `${song.artist} · ` : ''}Baixando ${pct}%`, tag: `baixar-${id}`, silenciosa: true, href: `#/musica/${id}`, imagem: capaDaNotificacao(song) });
     };
     try {
       if (!/^[\w-]{11}$/.test(yt || '')) throw new Error('o vídeo desta versão não é do YouTube');
@@ -774,9 +765,7 @@ async function baixarAgora(id) {
   await guardarImagensDaMusica(song);
   if (!db.song(id)) return; // saiu da biblioteca enquanto baixava
   db.updateSong(id, { baixado: { arquivos, tamanho: Object.values(arquivos).reduce((a, x) => a + (x.tamanho || 0), 0), em: Date.now() } });
-  // (com a notificação na barra, ela já diz; o aviso fica para quem não deu a permissão)
-  if (!podeNotificarNoSistema()) toast(avisoClipe ? `Baixada só a música: ${song.title} (${avisoClipe})` : `Baixada: ${song.title}`);
-  notificarSistema({ titulo: song.title, texto: `${avisoClipe ? 'Baixada só a música' : 'Download concluído'}${song.artist ? ` · ${song.artist}` : ''} · ${fmtBytes(db.song(id)?.baixado?.tamanho || 0)}`, tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}`, imagem: capaDaNotificacao(song) });
+  toast(avisoClipe ? `Baixada só a música: ${song.title} (${avisoClipe})` : `Baixada: ${song.title}`);
 }
 // as capas e a partitura da música no cache dos downloads (o service worker usa sem internet)
 async function guardarImagensDaMusica(song) {
@@ -1746,7 +1735,7 @@ const semLinhasDeAcordes = (sinc) => {
   const PAUSA_MEIO = 12;
   // A letra sincronizada do LRCLIB só diz quando cada frase começa: o fim dela fica sendo o começo da seguinte, e um solo
   // no meio da música ficava "dentro" da frase de antes (as notinhas só apareciam no começo). Quando o fim é esse
-  // (colado na frase seguinte, como no LRCLIB e na sincronia à mão), a frase dura o que se leva para cantá-la (pelo número de
+  // (colado na frase seguinte, como no LRCLIB), a frase dura o que se leva para cantá-la (pelo número de
   // palavras, de 3 a 9 s); o resto é a parte só de música. Um fim marcado de verdade (uma pausa no LRC) vale como está
   const fimCantado = (ts, ls, k) => {
     const { inicio, fim } = ts[k];
@@ -1817,7 +1806,7 @@ const semLinhasDeAcordes = (sinc) => {
       mapaCifra = casarLinhas(sinc.linhas, textos).map((i) => (i >= 0 ? linhasTela[i] : null));
     }
   };
-  // só a letra (na tela toda), para ler: sem o nome, o aviso da sincronia e a barra de baixo (compartilhar, tempo, play);
+  // só a letra (na tela toda), para ler: sem o nome e a barra de baixo (compartilhar, tempo, play);
   // ficam o voltar, este botão e o da cifra (com a cifra, também tom, capotraste, tamanho e rolagem). Fica guardado
   const definirLeitura = (ligar) => {
     el.classList.toggle('so-letra', ligar);
