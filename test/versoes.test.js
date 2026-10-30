@@ -115,7 +115,7 @@ test('abrir ou tocar música não procura o servidor de IA', async () => {
   const inicio = app.indexOf('let SERVIDOR_IA');
   const fim = app.indexOf("const view = $('#view');", inicio);
   const inicializacao = app.slice(inicio, fim);
-  assert.match(inicializacao, /function carregarServidor\\(/);
+  assert.ok(inicializacao.includes('function carregarServidor('));
   assert.doesNotMatch(inicializacao, /carregarServidor\(\);/);
   assert.match(app, /await carregarServidor\(\)/);
 });
