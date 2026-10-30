@@ -68,6 +68,18 @@ test('download: redescobre o servidor antes de iniciar cada fila e usa recupera�
   assert.ok(rotina.indexOf('await carregarServidor()') < rotina.indexOf('!servidorIA().url'));
   assert.match(app, /baixarArquivoDoServidor\(servidorIA\(\), r\.arquivo\)/);
 });
+test('download em Áudio e vídeo preserva o clipe mesmo quando é outra gravação', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const inicio = app.indexOf('function arquivosParaBaixar(song)');
+  const fim = app.indexOf('// Se o áudio já baixou', inicio);
+  const rotina = app.slice(inicio, fim);
+  assert.match(rotina, /if \(song\.youtube && \(comVideo \|\| \(!audio && !song\.audioProprio\)\)\) lista\.push/);
+  const baixar = app.slice(app.indexOf('async function baixarAgora(id)'), app.indexOf('// as capas e a partitura', app.indexOf('async function baixarAgora(id)')));
+  assert.doesNotMatch(baixar, /delete arquivos\[vsAqui\.video\]|apagarAudio\(chaveBaixada\(vsAqui\.video\)\)/);
+  assert.match(baixar, /Download parcial/);
+  assert.match(baixar, /faltou\.join\(' e '\)/);
+});
+
 test('YouTube: yt-dlp tem novas tentativas para falhas de rede e fragmentos', async () => {
   const youtube = await readFile(new URL('../servidor-ia/youtube.py', import.meta.url), 'utf8');
   assert.match(youtube, /"socket_timeout": 30/);
