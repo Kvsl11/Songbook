@@ -144,7 +144,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-352';
+export const APP_VERSAO = '2026.10.30-353';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -10794,9 +10794,9 @@ async function sincronizarMusica(song, { noVideo = '', audioPromise = null } = {
 
     // Se o LRCLIB indicar que a letra pertence a uma gravação mais curta que o clipe,
     // procura essa gravação e consulta novamente com a duração exata dela.
-    if (lrc.ajustar && !vs?.audio && song.youtube && !ehArquivo(yt)) {
+    if (lrc.ajustar && song.youtube && !ehArquivo(yt)) {
       const achado = await procurarAudio(song, Number(lrc.duracao) || 0).catch(() => null);
-      if (!achado || achado.id === song.youtube) return 'nada';
+      if (!achado || achado.id === yt || achado.id === song.youtube) return 'nada';
       const durClipe = (player.atual?.youtube === song.youtube && player.duracao)
         || await duracaoDaMusica(song).catch(() => 0);
       guardarVersoes(song, {
