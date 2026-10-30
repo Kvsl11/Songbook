@@ -69,7 +69,7 @@ test('só compartilha o mesmo vídeo entre Música e Vídeo quando a sincronia �
 test('ao abrir uma música, a faixa separada é procurada sem depender de sincronizar a letra ou apertar Play', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   const abrir = app.indexOf('function viewSong(');
-  const chamar = app.indexOf('descobrirVersoes(song)', abrir);
+  const chamar = app.indexOf('prepararMusicaAoAbrir(song)', abrir);
   const funcao = app.indexOf('async function descobrirVersoes(song)');
   assert.ok(abrir >= 0 && chamar > abrir && chamar < abrir + 9000, 'viewSong deve iniciar a descoberta ao abrir a música');
   assert.ok(funcao > 0, 'a descoberta da faixa deve existir como fluxo independente');
