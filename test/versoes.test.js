@@ -93,9 +93,22 @@ test('a sincronia automática consulta somente o LRCLIB e nunca chama o servidor
 });
 
 
-test('o app não cria notificações internas nem do sistema', async () => {
+test('abrir ou tocar música não procura o servidor de IA', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const inicio = app.indexOf('let SERVIDOR_IA');
+  const fim = app.indexOf("const view = $('#view');", inicio);
+  const inicializacao = app.slice(inicio, fim);
+  assert.match(inicializacao, /function carregarServidor\(\)/);
+  assert.doesNotMatch(inicializacao, /carregarServidor\(\);/);
+  assert.match(app, /await carregarServidor\(\)/);
+});
+
+test('o app não cria avisos nem notificações internas ou do sistema', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../public/css/app.css', import.meta.url), 'utf8');
   const sw = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
-  assert.doesNotMatch(app, /function notificar|notificarSistema|podeNotificarNoSistema|Notification\.requestPermission|showNotification/);
+  assert.match(app, /function toast\(\) \{\}/);
+  assert.doesNotMatch(app, /avisoRapido|aviso-rapido|Notification\.requestPermission|showNotification|getNotifications|notificarSistema|podeNotificarNoSistema/);
+  assert.doesNotMatch(css, /aviso-rapido/);
   assert.doesNotMatch(sw, /notificationclick|addEventListener.*push/);
 });
