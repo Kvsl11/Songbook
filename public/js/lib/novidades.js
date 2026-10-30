@@ -78,7 +78,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'O Tocando agora não pisca mais: o botão de trocar, o nome, os controles e o aviso da letra eram reescritos 4 vezes por segundo, mesmo sem mudar nada.' },
     ],
   },
-  },
  ];
 
 // as versões que a pessoa ainda não viu (mais nova primeiro); sem nenhuma vista ainda, só a atual
