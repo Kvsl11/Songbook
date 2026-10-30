@@ -25,12 +25,15 @@ permissions:
 # estava rodando, e cada merge mostrava um "cancelled" (o push e, logo depois, o fim da publicação do servidor da IA
 # disparavam duas publicações do mesmo commit)
 concurrency:
-  group: pages
+  # Testes de PR não ficam presos atrás de uma publicação diária ou de outro deploy.
+  # Publicações continuam serializadas para evitar dois deploys simultâneos.
+  group: pages-${{ github.event_name == 'pull_request' && 'testes' || 'publicacao' }}
   cancel-in-progress: false
 
 jobs:
   testes:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
