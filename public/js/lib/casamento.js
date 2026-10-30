@@ -139,20 +139,26 @@ export function caminho(a, v, { perto = null } = {}) {
 }
 
 // [segundo no áudio, segundo no clipe] a cada `cada` segundos do áudio, só onde o deslocamento muda mais que `folga`
-export function paresDoCaminho(wp, duracaoAudio, { cada = 1, folga = 0.4 } = {}) {
-  const primeiro = new Map(); // quadro do áudio → o primeiro quadro do clipe com ele (numa cena no meio, a música para ali)
-  for (const [i, j] of wp) if (!primeiro.has(i) || j < primeiro.get(i)) primeiro.set(i, j);
+export function paresDoCaminho(wp, duracaoAudio, { cada = 1 } = {}) {
+  // Guarda o primeiro E o último quadro do clipe para cada quadro do áudio.
+  // Quando há uma cena inserida, o caminho avança no vídeo sem avançar no áudio: perder o último
+  // quadro fazia a conversão vídeo → música correr durante a cena, em vez de ficar no mesmo trecho.
+  const limites = new Map();
+  for (const [i, j] of wp) {
+    const faixa = limites.get(i);
+    if (!faixa) limites.set(i, [j, j]);
+    else { faixa[0] = Math.min(faixa[0], j); faixa[1] = Math.max(faixa[1], j); }
+  }
   const pares = [];
-  let ultimo = null;
   for (let t = 0; t < duracaoAudio; t += cada) {
-    const j = primeiro.get(Math.round(t / PASSO));
-    if (j === undefined) continue;
-    const tv = j * PASSO;
-    const desloc = tv - t;
-    if (ultimo === null || Math.abs(desloc - ultimo) > folga) {
-      pares.push([Math.round(t * 100) / 100, Math.round(tv * 100) / 100]);
-      ultimo = desloc;
-    }
+    const faixa = limites.get(Math.round(t / PASSO));
+    if (!faixa) continue;
+    const ta = Math.round(t * 100) / 100;
+    const primeiro = Math.round(faixa[0] * PASSO * 100) / 100;
+    const ultimo = Math.round(faixa[1] * PASSO * 100) / 100;
+    pares.push([ta, primeiro]);
+    // Dois pares com o mesmo tempo de áudio descrevem o começo e o fim da cena no videoclipe.
+    if (faixa[1] - faixa[0] >= 2) pares.push([ta, ultimo]);
   }
   return pares;
 }
@@ -178,9 +184,18 @@ export function casarPorTrechos(a, v) {
     const { wp, parecenca } = caminho({ dados, quadros: TRECHO }, v, { perto: desloc === null ? null : i0 + desloc + TRECHO - 1 });
     if (!(parecenca >= PARECENCA_TRECHO)) continue;
     achados++;
-    const d = wp.map(([i, j]) => j - (i0 + i)).sort((x, y) => x - y)[Math.floor(wp.length / 2)]; // (a mediana)
-    if (desloc === null || Math.abs(d - desloc) * PASSO > 0.4) pares.push([Math.round(i0 * PASSO * 100) / 100, Math.round((i0 + d) * PASSO * 100) / 100]);
+    const d = wp.map(([i, j]) => j - (i0 + i)).sort((x, y) => x - y)[Math.floor(wp.length / 2)]; // (a mediana, para orientar refrões repetidos)
     desloc = d;
+    // Usa o caminho detalhado do trecho, não só um deslocamento médio. As janelas se sobrepõem em 5 s;
+    // cada uma entrega apenas sua região central, evitando âncoras duplicadas de refrões semelhantes.
+    const locais = paresDoCaminho(wp, TRECHO * PASSO);
+    const inicioLocal = i0 === 0 ? 0 : TRECHO * PASSO / 4;
+    const ultimoTrecho = i0 + TRECHO + TRECHO / 2 > a.quadros;
+    const fimLocal = ultimoTrecho ? TRECHO * PASSO : TRECHO * PASSO * 3 / 4;
+    for (const [ta, tv] of locais) {
+      if (ta + 0.001 < inicioLocal || ta >= fimLocal) continue;
+      pares.push([Math.round((i0 * PASSO + ta) * 100) / 100, tv]);
+    }
   }
   return { pares, cobertura: comSom ? achados / comSom : 0 };
 }
@@ -192,12 +207,14 @@ export function casar(audio, video, taxa = TAXA) {
   const a = croma(audio, taxa);
   const v = croma(video, taxa);
   if (a.quadros < 10 || v.quadros < 10) return null;
+  // O casamento por janelas é avaliado primeiro: encontra cada trecho no ponto em que realmente aparece,
+  // mesmo com introdução longa, cenas inseridas, refrões repetidos ou partes editadas fora de ordem.
+  const t = a.quadros >= TRECHO ? casarPorTrechos(a, v) : null;
+  if (t && t.cobertura >= 0.5 && t.pares.length)
+    return { pares: t.pares, confianca: Math.round(t.cobertura * 100) / 100, mesma: true, trechos: true };
+  // Reserva o alinhamento da música inteira para faixas curtas ou quando as janelas não encontrarem cobertura suficiente.
   const { wp, parecenca } = caminho(a, v);
   const confianca = Math.round(parecenca * 100) / 100;
-  if (parecenca >= 0.7) return { pares: paresDoCaminho(wp, audio.length / taxa), confianca, mesma: true };
-  const t = a.quadros >= TRECHO ? casarPorTrechos(a, v) : null;
-  if (t && t.cobertura >= 0.5 && t.pares.length) return { pares: t.pares, confianca: Math.round(t.cobertura * 100) / 100, mesma: true, trechos: true };
-  // (não parecem a mesma gravação: o vídeo é outra apresentação, como um ao vivo, e não o clipe da gravação)
   if (!(parecenca >= CONFIANCA_MINIMA)) return { pares: null, confianca, mesma: false };
   return { pares: paresDoCaminho(wp, audio.length / taxa), confianca, mesma: true };
 }
