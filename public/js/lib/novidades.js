@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 331, data: '2026-10-30', titulo: 'Capa animada sem flash na troca dos trechos',
+    itens: [
+      { tipo: 'correcao', texto: 'A capa animada prepara e decodifica o próximo trecho antes da troca. O vídeo atual continua visível até o novo estar pronto, e os dois se cruzam suavemente, sem mostrar quadro congelado ou tela escura.' },
+    ],
+  },
+  {
     versao: 330, data: '2026-10-30', titulo: 'Versão música com a duração da gravação',
     itens: [
       { tipo: 'correcao', texto: 'O Songbook procura a gravação cantada pela duração própria da música mesmo quando a letra sincronizada já parece combinar com o videoclipe. O modo música usa a gravação curta e o modo vídeo mantém o clipe completo.' },
@@ -72,22 +78,4 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'O artista sem foto no canal do YouTube (a letra que o YouTube gera, como o “D”) agora fica com o desenho da pessoa com a nota, ou com a foto de verdade de outro lugar, quando houver.' },
     ],
   },
-  {
-    versao: 321, data: '2026-10-30', titulo: 'Troca sem engasgo e capa mais bonita',
-    itens: [
-      { tipo: 'melhoria', texto: 'Trocar entre a música e o vídeo não engasga mais o som: a outra versão já fica carregada e as duas se cruzam suavemente no mesmo ponto.' },
-      { tipo: 'melhoria', texto: 'A capa oficial da música aparece em todo lugar: na página inicial, na biblioteca, nas listas e nos repertórios (as músicas já salvas ganham ela sozinhas, aos poucos). A capa que você escolheu continua.' },
-      { tipo: 'melhoria', texto: 'No modo música, sem a música baixada, aparece a capa oficial grande, como no Spotify. Com a música baixada com o vídeo, trechos do clipe passam atrás, sem som e sem os botões do YouTube por cima.' },
-      { tipo: 'correcao', texto: 'O artista sem foto no Deezer não aparece mais com a imagem cinza genérica: fica o desenho da pessoa com a nota.' },
-      { tipo: 'melhoria', texto: 'Sem os avisos rápidos na tela (“Salvo na biblioteca” e os outros): só o de erro continua, para o toque não ficar sem resposta.' },
-    ],
-  },
-
-];
-
-// as versões que a pessoa ainda não viu (mais nova primeiro); sem nenhuma vista ainda, só a atual
-export function novidadesNaoVistas(vista) {
-  const v = Number(vista) || 0;
-  if (!v) return NOVIDADES.slice(0, 1);
-  return NOVIDADES.filter((n) => n.versao > v);
-}
+ ];

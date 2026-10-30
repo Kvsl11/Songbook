@@ -133,7 +133,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-330';
+export const APP_VERSAO = '2026.10.30-331';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1417,65 +1417,137 @@ const player = (() => {
   // botões dele por cima ao pausar e vinha em resolução baixa
   const canvas = (() => {
     let de = '';
-    let caixa = null; // o <video> com o clipe baixado
+    let caixa = null; // vídeo visível
+    let reserva = null; // próximo trecho, preparado fora da tela
     let relogio = 0;
     let url = '';
     let montagem = 0;
-    // os trechinhos em loop, como o Canvas do Spotify (não o clipe inteiro): 4 de 4 s, do meio do clipe (o começo e o
-    // fim costumam ser cena sem música, letreiro ou créditos)
+    let troca = false;
+    let preparo = 0;
+    const preparacoes = new WeakMap();
+    // 4 trechos de 4 s, distribuídos pelo clipe (evita abertura, letreiro e créditos)
     const PONTOS = [0.2, 0.38, 0.56, 0.74];
     const DURA = 4;
     let trechos = [];
     let k = 0;
-    // as faixas pretas do próprio clipe: os de cinema (como Love Me Harder) vêm com elas em cima e embaixo do quadro e,
-    // com o quadro na altura toda, elas apareciam como um traço seco onde o vídeo começa e acaba. Medidas nos quadros
-    // (a menor de todas: uma cena escura perto delas parece faixa), saem com um zoom a mais
     let faixa = null;
     let medidor = null;
-    const medirFaixas = () => {
-      if (!caixa || caixa.readyState < 2 || !caixa.videoWidth) return;
+    const medirFaixas = (video = caixa) => {
+      if (!video || video.readyState < 2 || !video.videoWidth) return;
       const w = 96;
-      const h = Math.max(12, Math.round((w * caixa.videoHeight) / caixa.videoWidth));
+      const h = Math.max(12, Math.round((w * video.videoHeight) / video.videoWidth));
       medidor = medidor || document.createElement('canvas');
       medidor.width = w;
       medidor.height = h;
       const ctx = medidor.getContext('2d', { willReadFrequently: true });
       let px;
-      try { ctx.drawImage(caixa, 0, 0, w, h); px = ctx.getImageData(0, 0, w, h).data; } catch { return; }
+      try { ctx.drawImage(video, 0, 0, w, h); px = ctx.getImageData(0, 0, w, h).data; } catch { return; }
       const escura = (y) => { for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; if (px[i] * 0.3 + px[i + 1] * 0.59 + px[i + 2] * 0.11 > 28) return false; } return true; };
       let cima = 0;
       while (cima < h && escura(cima)) cima++;
-      if (cima >= h) return; // (o quadro todo escuro não diz nada)
+      if (cima >= h) return;
       let baixo = 0;
       while (baixo < h && escura(h - 1 - baixo)) baixo++;
       faixa = Math.min(faixa ?? 1, Math.min(cima, baixo) / h, 0.2);
-      caixa.style.setProperty('--zoom', faixa > 0.02 ? Math.max(1.18, 1.03 / (1 - 2 * faixa)).toFixed(3) : '');
+      const zoom = faixa > 0.02 ? Math.max(1.18, 1.03 / (1 - 2 * faixa)).toFixed(3) : '';
+      [caixa, reserva].filter(Boolean).forEach((v) => v.style.setProperty('--zoom', zoom));
+    };
+    const videoNovo = () => {
+      const v = document.createElement('video');
+      Object.assign(v, { muted: true, defaultMuted: true, playsInline: true, loop: false, preload: 'auto', src: url });
+      v.setAttribute('playsinline', '');
+      v.className = 'pl-canvas';
+      return v;
     };
     const tirar = () => {
       clearInterval(relogio);
       relogio = 0;
-      caixa?.remove();
+      preparo++;
+      troca = false;
+      [caixa, reserva].forEach((v) => { if (v) { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); } });
       caixa = null;
+      reserva = null;
       if (url) { URL.revokeObjectURL(url); url = ''; }
       de = '';
       trechos = [];
       faixa = null;
     };
-    const irAoTrecho = (n) => {
-      if (!caixa || !trechos.length) return;
-      k = n % trechos.length;
-      // (passa de um trecho para o outro esmaecendo, sem o corte seco)
-      caixa.classList.add('pulando');
-      setTimeout(() => { if (!caixa) return; try { caixa.currentTime = trechos[k]; } catch { /* ainda abrindo */ } setTimeout(() => caixa?.classList.remove('pulando'), 120); }, 180);
+    // Decodifica o primeiro quadro do próximo trecho ANTES de torná-lo visível.
+    // O vídeo atual continua na tela enquanto a reserva procura e decodifica esse quadro.
+    const preparar = async (n) => {
+      if (!reserva || !trechos.length || reserva.dataset.pronto === '1') return;
+      if (preparacoes.has(reserva)) return preparacoes.get(reserva);
+      const id = ++preparo;
+      const video = reserva;
+      video.dataset.preparando = '1';
+      video.dataset.pronto = '';
+      video.pause();
+      const alvo = trechos[n % trechos.length];
+      const tarefa = (async () => {
+      try {
+        if (Math.abs(video.currentTime - alvo) > 0.08) {
+          await new Promise((resolve, reject) => {
+            const fim = () => { video.removeEventListener('seeked', fim); video.removeEventListener('error', erro); resolve(); };
+            const erro = () => { video.removeEventListener('seeked', fim); video.removeEventListener('error', erro); reject(new Error('seek')); };
+            video.addEventListener('seeked', fim, { once: true });
+            video.addEventListener('error', erro, { once: true });
+            video.currentTime = alvo;
+          });
+        }
+        if (id !== preparo || video !== reserva) return;
+        if (video.readyState < 2) await new Promise((resolve) => video.addEventListener('loadeddata', resolve, { once: true }));
+        if (id !== preparo || video !== reserva) return;
+        await video.play();
+        // playing confirma que o navegador começou a apresentar; RVFC confirma um quadro decodificado.
+        if (typeof video.requestVideoFrameCallback === 'function') {
+          await new Promise((resolve) => video.requestVideoFrameCallback(() => resolve()));
+        } else {
+          await new Promise((resolve) => setTimeout(resolve, 90));
+        }
+        if (id !== preparo || video !== reserva) return;
+        video.pause();
+        video.dataset.pronto = '1';
+        video.dataset.preparando = '';
+        medirFaixas(video);
+      } catch {
+        if (id === preparo && video === reserva) { video.dataset.pronto = ''; video.dataset.preparando = ''; }
+      }
+      })();
+      preparacoes.set(video, tarefa);
+      try { await tarefa; } finally { if (preparacoes.get(video) === tarefa) preparacoes.delete(video); }
     };
-    // anda (só com a música tocando e o fundo à vista) e, no fim de cada trecho, vai para o próximo
+    const irAoTrecho = async (n) => {
+      if (!caixa || !reserva || !trechos.length || troca) return;
+      const proximo = n % trechos.length;
+      troca = true;
+      if (reserva.dataset.pronto !== '1') await preparar(proximo);
+      if (!caixa || !reserva || reserva.dataset.pronto !== '1') { troca = false; return; }
+      const anterior = caixa;
+      const seguinte = reserva;
+      k = proximo;
+      // As duas camadas se cruzam; nunca se revela um vídeo no meio do seek.
+      seguinte.classList.add('pronto');
+      anterior.classList.remove('pronto');
+      caixa = seguinte;
+      reserva = anterior;
+      // A antiga camada ativa agora precisa ser preparada para outro ponto; ela não conserva
+      // o marcador de quadro pronto do trecho que acabou de sair.
+      reserva.dataset.pronto = '';
+      reserva.dataset.preparando = '';
+      troca = false;
+      preparar((k + 1) % trechos.length);
+    };
     const acompanhar = () => {
       if (!caixa || !atual) return;
       const visivel = !fundo.hidden && !el.hidden && !el.classList.contains('letra-cheia') && fundo.getClientRects().length > 0;
       const tocar = visivel && estado === 'tocando';
       if (tocar && caixa.paused) caixa.play().catch(() => {});
       if (!tocar && !caixa.paused) caixa.pause();
-      if (trechos.length && !caixa.classList.contains('pulando') && (caixa.currentTime >= trechos[k] + DURA || caixa.currentTime < trechos[k] - 0.5)) irAoTrecho(k + 1);
+      if (tocar && trechos.length && !troca) {
+        const falta = trechos[k] + DURA - caixa.currentTime;
+        if (falta <= 2.2 && reserva?.dataset.pronto !== '1') preparar((k + 1) % trechos.length);
+        if (falta <= 0.08 || caixa.currentTime < trechos[k] - 0.5) irAoTrecho(k + 1);
+      }
     };
     return {
       async montar(q) {
@@ -1485,33 +1557,43 @@ const player = (() => {
         if (!quer) return;
         de = quer;
         const vez = ++montagem;
-        // baixado com o vídeo: o arquivo do aparelho (sem gastar internet)
         const baixado = baixadoDe(quer);
         if (baixado && String(baixado.tipo).startsWith('video')) {
           const blob = await lerAudio(chaveBaixada(quer)).catch(() => null);
           if (vez !== montagem) return;
           if (blob) {
             url = URL.createObjectURL(blob);
-            caixa = document.createElement('video');
-            Object.assign(caixa, { muted: true, defaultMuted: true, playsInline: true, loop: true, preload: 'auto', src: url });
-            caixa.setAttribute('playsinline', '');
-            caixa.className = 'pl-canvas';
-            caixa.loop = false;
-            caixa.addEventListener('playing', () => { caixa?.classList.add('pronto'); medirFaixas(); }, { once: true });
-            caixa.addEventListener('seeked', medirFaixas); // (a cada trecho: antes do primeiro aparecer e nos outros)
+            caixa = videoNovo();
+            reserva = videoNovo();
+            caixa.addEventListener('seeked', () => medirFaixas(), { once: false });
             caixa.addEventListener('loadedmetadata', () => {
               if (!caixa) return;
               const d = caixa.duration;
               trechos = Number.isFinite(d) && d > 20 ? PONTOS.map((f) => Math.max(0, Math.min(d - DURA, f * d))) : [0];
               k = 0;
-              caixa.currentTime = trechos[0];
+              // Não revelar o início do arquivo: a primeira imagem só entra depois do seek e da decodificação.
+              const inicial = trechos[0];
+              caixa.addEventListener('seeked', async () => {
+                if (!caixa) return;
+                try {
+                  await caixa.play();
+                  if (typeof caixa.requestVideoFrameCallback === 'function') {
+                    await new Promise((resolve) => caixa.requestVideoFrameCallback(() => resolve()));
+                  } else {
+                    await new Promise((resolve) => setTimeout(resolve, 100));
+                  }
+                  if (caixa) { caixa.classList.add('pronto'); medirFaixas(); }
+                } catch { /* o acompanhamento tenta iniciar quando o player estiver tocando */ }
+              }, { once: true });
+              caixa.currentTime = inicial;
+              if (reserva.readyState >= 1) preparar((k + 1) % trechos.length);
+              else reserva.addEventListener('loadedmetadata', () => preparar((k + 1) % trechos.length), { once: true });
             }, { once: true });
           }
         }
-        // (sem o arquivo, nada: o player do YouTube mudo mostrava os botões dele por cima ao pausar)
-        if (!caixa) { de = ''; return; }
-        fundo.append(caixa);
-        relogio = setInterval(acompanhar, 250);
+        if (!caixa || !reserva) { de = ''; return; }
+        fundo.append(caixa, reserva);
+        relogio = setInterval(acompanhar, 180);
       },
       tirar,
     };
