@@ -545,7 +545,7 @@ export const PIPED = ['https://api.piped.private.coffee', 'https://pipedapi.kavi
 
 export function videosDoPiped(json) {
   return (json?.items || [])
-    .filter((v) => v.type === 'stream' && /[?&]v=([\w-]{11})/.test(v.url || ''))
+    .filter((v) => ['stream', 'music'].includes(v.type) && /[?&]v=([\w-]{11})/.test(v.url || ''))
     .map((v) => {
       const id = /[?&]v=([\w-]{11})/.exec(v.url)[1];
       return {
