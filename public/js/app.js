@@ -18,7 +18,7 @@ import { corCss, corDominante } from './lib/cores.js';
 import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
 import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } from './lib/alinhamento.js';
 import { NOVIDADES } from './lib/novidades.js';
-import { baseDoServidor, cabecalhos, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
+import { baseDoServidor, baixarArquivoDoServidor, cabecalhos, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, dataDaPergunta, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { apagarAudio, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } from './audios.js';
 import { escolherAudio, mesmaSincronia, paresPelaDuracao, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
@@ -826,9 +826,7 @@ async function baixarAgora(id) {
         json: { url: `https://youtu.be/${yt}`, video, qualidade: qualidadeDoDownload(video) },
       }, (etapa, p) => { if (etapa === 'baixando' && p !== null) atualizarProgresso(yt, p * 0.8); });
 
-      const base = baseDoServidor(servidorIA().url);
-      const resp = await fetch(`${base}/baixar/${r.arquivo}`, { headers: cabecalhos(base, servidorIA().chave) });
-      if (!resp.ok) throw new Error('o arquivo não chegou do servidor: tente de novo');
+      const resp = await baixarArquivoDoServidor(servidorIA(), r.arquivo);
 
       // Lê o arquivo em blocos para a barra continuar avançando enquanto ele
       // atravessa a rede do servidor até o celular (não ficar parada em 80%).
