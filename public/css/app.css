@@ -4088,7 +4088,12 @@ html.tablet .aj-topico small { font-size: 14.5px; }
 
 /* o vídeo baixado: o botão de tela inteira no canto (o do YouTube só existe no player dele) */
 #pl-tela .pl-tela-cheia { display: none; }
-#pl-tela.com-local .pl-tela-cheia { display: grid; place-items: center; position: absolute; z-index: 3; right: 10px; bottom: 10px; width: 38px; height: 38px; padding: 0;
+/* (só com o vídeo grande: no Tocando agora e na página da música. Na barrinha de baixo, o vídeo pequeno ficava coberto
+   por ele) */
+#pl-tela { container-type: inline-size; }
+#pl-tela.com-local .pl-tela-cheia { display: none; }
+@container (min-width: 260px) { #pl-tela.com-local .pl-tela-cheia { display: grid; } }
+#pl-tela.com-local .pl-tela-cheia { place-items: center; position: absolute; z-index: 3; right: 10px; bottom: 10px; width: 38px; height: 38px; padding: 0;
   border: 0; border-radius: 50%; color: #fff; background: rgb(0 0 0 / 0.55); cursor: pointer; }
 #pl-tela.com-local .pl-tela-cheia:active { transform: scale(0.94); }
 #pl-tela video.pl-local:fullscreen { object-fit: contain; }

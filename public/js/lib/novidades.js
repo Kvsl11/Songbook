@@ -9,6 +9,8 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'Notificações mais bonitas: o ícone do app certinho na barra, a capa da música, o nome dela no título e “Baixando 80%” / “Download concluído” embaixo. Os avisos de quando você está usando o app aparecem rapidinho na tela, sem encher a barra do celular.' },
       { tipo: 'novo', texto: 'A capa de verdade da música (a do álbum ou do single, pelo Deezer ou pelo iTunes), no lugar do quadro do vídeo. Fica guardada na música e aparece também na biblioteca.' },
       { tipo: 'melhoria', texto: 'A capinha ao lado do nome aparece também no modo música, no mesmo lugar do modo vídeo.' },
+      { tipo: 'correcao', texto: 'O vídeo em tela cheia não sai mais sozinho ao virar o celular (antes ele girava, saía e voltava ao normal).' },
+      { tipo: 'correcao', texto: 'Na barrinha de baixo, o vídeo pequeno não fica mais coberto pelo botão de tela cheia: ele só aparece com o vídeo grande.' },
     ],
   },
   {

@@ -35,10 +35,11 @@ const ehCelular = () => Math.min(screen.width, screen.height) < 600 && matchMedi
 // flutuando embaixo e o "Tocando agora" (vídeo, controles e a letra) num painel à direita, em pé e deitado
 const ehTablet = () => Math.min(screen.width, screen.height) >= 600 && matchMedia('(pointer: coarse)').matches;
 document.documentElement.classList.toggle('tablet', ehTablet());
-const travarEmPe = () => {
+const travarEmPe = (e) => {
   if (!ehCelular()) return;
-  // o vídeo em tela cheia pode deitar (assistir de lado); o resto do app, não
-  if (/^(IFRAME|VIDEO)$/.test(document.fullscreenElement?.tagName || '')) screen.orientation?.unlock?.();
+  // o vídeo em tela cheia pode deitar (assistir de lado); o resto do app, não. (Girar com o vídeo na tela cheia não
+  // mexe em nada: destravar de novo a cada giro fazia a tela voltar)
+  if (/^(IFRAME|VIDEO)$/.test(document.fullscreenElement?.tagName || '')) { if (e?.type !== 'change') screen.orientation?.unlock?.(); }
   else screen.orientation?.lock?.('portrait').catch(() => {});
 };
 document.documentElement.classList.toggle('celular', ehCelular());
@@ -1187,6 +1188,10 @@ const player = (() => {
   let quadro = 0;
   const seguir = () => {
     quadro = requestAnimationFrame(seguir);
+    // o vídeo em tela cheia (o botão do YouTube ou o do vídeo baixado) fica onde está: mudar ele de lugar (ao girar a
+    // tela, o lugar dele no player muda) tirava da tela cheia, e o vídeo girava, saía e voltava ao normal
+    const cheia = document.fullscreenElement || document.webkitFullscreenElement;
+    if (cheia && (cheia === tela || tela.contains(cheia))) return;
     const a = alvo();
     if (!tela.isConnected) { casa.append(tela); tela.classList.remove('na-telinha'); montar(); return; } // saiu junto com uma página (não deveria): refaz
     const escondida = (modoCapa() || capaNaBarra() || atual?.semVideo || el.classList.contains('letra-cheia')) && !noPalco();
@@ -1981,7 +1986,9 @@ const semLinhasDeAcordes = (sinc) => {
     document.addEventListener('fullscreenchange', sair);
     document.addEventListener('webkitfullscreenchange', sair);
     const pedir = v.requestFullscreen?.bind(v) || v.webkitRequestFullscreen?.bind(v);
-    if (pedir) Promise.resolve(pedir()).then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => v.webkitEnterFullscreen?.());
+    // (sem travar a tela deitada: é só virar o aparelho, como no YouTube; a trava brigava com a do app e a tela girava
+    // e voltava)
+    if (pedir) Promise.resolve(pedir()).catch(() => v.webkitEnterFullscreen?.());
     else v.webkitEnterFullscreen?.(); // (iPhone: só o próprio vídeo vai para a tela cheia)
     v.addEventListener('webkitendfullscreen', () => { v.controls = false; }, { once: true });
   });
