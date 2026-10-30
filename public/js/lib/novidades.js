@@ -59,6 +59,13 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'O Songbook procura a gravação cantada pela duração própria da música mesmo quando a letra sincronizada já parece combinar com o videoclipe. O modo música usa a gravação curta e o modo vídeo mantém o clipe completo.' },
     ],
   },
+  {
+    versao: 329, data: '2026-10-30', titulo: 'Versão cantada e clipe escolhidos automaticamente',
+    itens: [
+      { tipo: 'melhoria', texto: 'Ao buscar uma música, o Songbook procura automaticamente a gravação cantada para acompanhar a letra e o videoclipe.' },
+      { tipo: 'correcao', texto: 'A versão musical não precisa mais ser escolhida manualmente no menu.' },
+    ],
+  },
 
  ];
 
