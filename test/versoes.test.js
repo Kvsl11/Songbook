@@ -83,7 +83,7 @@ test('ao abrir uma música, a faixa separada é procurada sem depender de sincro
 test('a sincronia automática consulta somente o LRCLIB e nunca chama o servidor de IA', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   const inicio = app.indexOf('async function sincronizarMusica(song');
-  const fim = app.indexOf('// o áudio oficial da gravação no YouTube', inicio);
+  const fim = app.indexOf('function guardarSincronia(song, sinc)', inicio);
   assert.ok(inicio >= 0 && fim > inicio);
   const rotina = app.slice(inicio, fim);
   assert.match(rotina, /letraSincronizada\(/);
