@@ -1474,9 +1474,10 @@ const player = (() => {
     // Decodifica o primeiro quadro do próximo trecho ANTES de torná-lo visível.
     // O vídeo atual continua na tela enquanto a reserva procura e decodifica esse quadro.
     const preparar = async (n) => {
-      if (!reserva || !trechos.length || reserva.dataset.pronto === '1') return;
+      if (!reserva || !trechos.length || reserva.dataset.pronto === '1' || reserva.dataset.preparando === '1') return;
       const id = ++preparo;
       const video = reserva;
+      video.dataset.preparando = '1';
       video.dataset.pronto = '';
       video.pause();
       const alvo = trechos[n % trechos.length];
@@ -1503,9 +1504,10 @@ const player = (() => {
         if (id !== preparo || video !== reserva) return;
         video.pause();
         video.dataset.pronto = '1';
+        video.dataset.preparando = '';
         medirFaixas(video);
       } catch {
-        if (id === preparo && video === reserva) video.dataset.pronto = '';
+        if (id === preparo && video === reserva) { video.dataset.pronto = ''; video.dataset.preparando = ''; }
       }
     };
     const irAoTrecho = async (n) => {
@@ -1561,7 +1563,8 @@ const player = (() => {
               trechos = Number.isFinite(d) && d > 20 ? PONTOS.map((f) => Math.max(0, Math.min(d - DURA, f * d))) : [0];
               k = 0;
               caixa.currentTime = trechos[0];
-              reserva.addEventListener('loadedmetadata', () => preparar((k + 1) % trechos.length), { once: true });
+              if (reserva.readyState >= 1) preparar((k + 1) % trechos.length);
+              else reserva.addEventListener('loadedmetadata', () => preparar((k + 1) % trechos.length), { once: true });
             }, { once: true });
           }
         }
