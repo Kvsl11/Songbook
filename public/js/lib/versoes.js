@@ -14,7 +14,7 @@ const CANAL_SEM_VOZ = /\b(karaoke|instrumentals?|backing|playback|minus one|sing
 const CLIPE = /\b(official (music )?video|music video|videoclipe|clipe oficial|clipe)\b/;
 
 // Entre os vídeos achados no YouTube ({ id, titulo, canal, segundos }), o áudio oficial da gravação: o mesmo título,
-// a duração da gravação do LRCLIB (até 2 s de diferença) e, de preferência, do canal do artista (os "- Topic" do
+// a duração aproximada da gravação do LRCLIB e, de preferência, do canal do artista
 // YouTube Music são o áudio puro). null se nenhum servir
 export function escolherAudio(videos, { titulo = '', artista = '', duracao = 0, evitar = '' } = {}) {
   const t = normal(titulo).replace(/\b(feat|ft)\b.*$/, '').trim();
@@ -35,8 +35,8 @@ export function escolherAudio(videos, { titulo = '', artista = '', duracao = 0, 
     if (CANAL_SEM_VOZ.test(canal) && !CANAL_SEM_VOZ.test(a)) continue;
     let n = 0;
     if (a && (canal === a || canal.startsWith(`${a} `) || ` ${a} `.includes(` ${canal} `))) n += 3;
-    if (/\\b(audio|official audio|audio oficial)\\b/.test(nome)) n += 3;
-    if (/\\b(lyrics?|letra|lyric video)\\b/.test(nome)) n -= 2;
+    if (/\b(audio|official audio|audio oficial)\b/.test(nome)) n += 3;
+    if (/\b(lyrics?|letra|lyric video)\b/.test(nome)) n -= 2;
     n -= Math.abs(v.segundos - duracao) / 2;
     if (n > nota) { nota = n; melhor = v; }
   }
