@@ -455,35 +455,42 @@ export function sincroniaDoLrc(lrc, duracao = 0) {
 // versão editada), vem com ajustar: true: a letra está certa, mas falta acertar onde a música começa no vídeo (ou, como
 // no app, tocar o áudio oficial no modo música).
 // duracao: a da gravação (para achar o áudio oficial dela no YouTube)
-export async function letraSincronizada({ titulo = '', artista = '', duracao = 0 } = {}, fetchImpl, { espera = 1500 } = {}) {
+export async function letraSincronizada(
+  { titulo = '', artista = '', duracao = 0 } = {},
+  fetchImpl,
+  { espera = 1500, timeout = 10000, tentativas = 4 } = {},
+) {
   const t = String(titulo || '').trim();
   const a = String(artista || '').trim();
   if (!t) return null;
-  // o LRCLIB às vezes responde "ocupado" (503 ServerOverloaded) ou demora: tenta de novo (até 4 vezes, esperando um
-  // pouco mais a cada vez) antes de desistir. Se nenhum pedido deu certo, é erro (não "não achou")
   let respondeu = false;
   const pedir = async (params) => {
-    for (let vez = 0; ; vez++) {
+    for (let vez = 0; vez < tentativas; vez++) {
       try {
-        const res = await buscar(`https://lrclib.net/api/search?${params}`, { fetchImpl, timeout: 10000 });
-        if (res.ok) { const j = await res.json(); respondeu = true; return Array.isArray(j) ? j : []; }
+        const res = await buscar(`https://lrclib.net/api/search?${params}`, { fetchImpl, timeout });
+        if (res.ok) {
+          const j = await res.json();
+          respondeu = true;
+          return Array.isArray(j) ? j : [];
+        }
         if (![429, 500, 502, 503, 504].includes(res.status)) throw new Error(`LRCLIB respondeu ${res.status}`);
       } catch (e) {
-        if (/LRCLIB respondeu/.test(e.message) || vez >= 3) throw e;
+        if (/LRCLIB respondeu/.test(e.message) || vez + 1 >= tentativas) throw e;
       }
-      if (vez >= 3) throw new Error('O LRCLIB está ocupado');
-      await new Promise((ok) => setTimeout(ok, espera * (vez + 1)));
+      if (vez + 1 < tentativas) await new Promise((ok) => setTimeout(ok, espera * (vez + 1)));
     }
+    return [];
   };
-  const tentativas = [
+  // Busca exata e busca ampla ao mesmo tempo: evita esperar uma resposta para só então iniciar a outra.
+  const consultas = [
     a && `track_name=${encodeURIComponent(t)}&artist_name=${encodeURIComponent(a)}`,
     `q=${encodeURIComponent(`${t} ${a}`.trim())}`,
   ].filter(Boolean);
-  for (const params of tentativas) {
-    const lista = await pedir(params).catch(() => []);
-    const mesmas = (Array.isArray(lista) ? lista : []).filter((r) => r.syncedLyrics && !r.instrumental && mesmoTitulo(r.trackName, t) && (!a || mesmoArtista(r.artistName, a)));
-    if (!mesmas.length) continue;
-    // a letra da gravação oficial; o vídeo com outra duração é um clipe (ou outra edição): vem com ajustar
+  const respostas = await Promise.all(consultas.map((params) => pedir(params).catch(() => null)));
+  const listas = respostas.filter(Array.isArray);
+  const mesmas = listas.flat().filter((r) =>
+    r.syncedLyrics && !r.instrumental && mesmoTitulo(r.trackName, t) && (!a || mesmoArtista(r.artistName, a)));
+  if (mesmas.length) {
     const oficial = gravacaoOficial(mesmas, duracao);
     const bate = !(duracao > 0) || !(oficial.duration > 0) || Math.abs(oficial.duration - duracao) <= 4;
     const sinc = sincroniaDoLrc(oficial.syncedLyrics, oficial.duration || duracao);
@@ -492,7 +499,6 @@ export async function letraSincronizada({ titulo = '', artista = '', duracao = 0
   if (!respondeu) throw new Error('O LRCLIB não respondeu agora');
   return null;
 }
-
 // A gravação oficial entre as letras da mesma música no LRCLIB: a duração que mais aparece (até 2 s de diferença; as
 // coletâneas repetem a do álbum), de preferência não ao vivo; no empate, a da duração do vídeo. Antes valia a letra
 // com a duração do vídeo, e uma feita para o videoclipe (como a de "Tears", de 304 s, contra 160 s da gravação) fazia
