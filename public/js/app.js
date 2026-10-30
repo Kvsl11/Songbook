@@ -134,7 +134,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-345';
+export const APP_VERSAO = '2026.10.30-346';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -11865,26 +11865,25 @@ function viewOffline() {
   // a barra do armazenamento: os downloads, os áudios seus, o resto do app (cache e dados) e o espaço livre
   const medir = async (baixadas) => {
     const est = await navigator.storage?.estimate?.().catch(() => null) || {};
-    const dl = baixadas.reduce((a, x) => a + (x.baixado.tamanho || 0), 0);
+    // Conta os arquivos realmente presentes no IndexedDB, sem depender do tamanho salvo nos metadados.
+    const arquivosBaixados = new Set(baixadas.flatMap((s) => Object.keys(s.baixado?.arquivos || {}).map(chaveBaixada)));
+    let dl = 0;
+    for (const id of arquivosBaixados) dl += (await lerAudio(id).catch(() => null))?.size || 0;
     let meus = 0;
     for (const s of db.songs().filter((x) => x.audioProprio)) meus += (await lerAudio(s.id).catch(() => null))?.size || 0;
-    const usado = Math.max(est.usage || 0, dl + meus);
+    // estimate() mede o uso real desta origem (IndexedDB, CacheStorage e localStorage) informado pelo navegador.
+    // Se a API não existir, mostramos ao menos o tamanho dos arquivos locais que conseguimos medir.
+    const temMedidaReal = Number.isFinite(est.usage);
+    const usado = temMedidaReal ? est.usage : dl + meus;
     const cache = Math.max(0, usado - dl - meus);
-    // O "livre" do navegador não é o espaço do aparelho: é o limite que ele dá ao app, e o Chrome informa sempre o que
-    // o app já usa mais 10 GiB fixos (para os sites não saberem o tamanho do disco). Nenhum navegador deixa um app da
-    // web ler o espaço livre de verdade do aparelho: com o número fixo, a linha do livre sai e a barra mostra só o que o
-    // app ocupa (antes aparecia "10,7 GB livres" em qualquer aparelho)
-    const sobra = Math.max(0, (est.quota || 0) - usado);
-    const fixo = !est.quota || Math.abs(sobra - 10 * 2 ** 30) < 0.06 * 2 ** 30 || Math.abs((est.quota || 0) - (est.usage || 0) - 10 * 2 ** 30) < 0.06 * 2 ** 30;
-    const livre = fixo ? 0 : sobra;
-    const total = usado + livre || 1;
+    const total = usado || 1;
     const barra = $('#of-barra');
     if (!barra) return;
     [['.of-dl', dl], ['.of-meus', meus], ['.of-cache', cache]].forEach(([c, n]) => { barra.querySelector(c).style.width = `${Math.max(n ? 0.6 : 0, (n / total) * 100)}%`; });
-    $('#of-legenda').innerHTML = [['of-dl', 'Downloads', dl], ['of-meus', 'Áudios seus', meus], ['of-cache', 'Dados e cache do app', cache], ...(fixo ? [] : [['of-livre', 'Ainda cabe no app', livre]])]
+    $('#of-legenda').innerHTML = [['of-dl', 'Downloads', dl], ['of-meus', 'Áudios seus', meus], ['of-cache', 'Outros dados e cache do app', cache]]
       .map(([c, n, v]) => `<li><i class="${c}"></i><span>${n}</span><b>${fmtBytes(v)}</b></li>`).join('')
-      + `<li class="of-total"><span>Total usado pelo app</span><b>${fmtBytes(usado)}</b></li>`
-      + (fixo ? `<li class="of-aviso muted">${icon('info', 14)}<span>O espaço livre do aparelho fica em Configurações → Armazenamento: o navegador não deixa o app ver.</span></li>` : '');
+      + `<li class="of-total"><span>Total ocupado pelo Songbook</span><b>${fmtBytes(usado)}</b></li>`
+      + `<li class="of-aviso muted">${icon('info', 14)}<span>${temMedidaReal ? 'Uso medido pelo navegador para o Songbook. ' : 'Estimativa parcial: este navegador não oferece a medição completa. '}O espaço livre total do celular não pode ser consultado por um site ou PWA.</span></li>`;
   };
   desenhar();
   // a cada avanço de um download só os números mudam (antes a tela inteira era desenhada de novo a cada 1%, com o
@@ -11934,10 +11933,35 @@ function viewOffline() {
       desenhar();
     }
     if (b.id === 'of-cache') {
-      const nomes = 'caches' in window ? (await caches.keys()).filter(ehCacheLimpavel) : [];
-      await Promise.all(nomes.map((k) => caches.delete(k)));
-      toast('Cache limpo');
-      desenhar();
+      if (b.disabled) return;
+      b.disabled = true;
+      b.textContent = 'Limpando…';
+      let removidos = 0;
+      let falhas = 0;
+      try {
+        // Remove capas, bibliotecas externas e respostas de API; preserva o pacote do app,
+        // os downloads offline e os arquivos recebidos pelo botão Compartilhar.
+        if ('caches' in window) {
+          let nomes = [];
+          try { nomes = (await caches.keys()).filter(ehCacheLimpavel); } catch { falhas++; }
+          for (const nome of nomes) {
+            try { if (await caches.delete(nome)) removidos++; else falhas++; } catch { falhas++; }
+          }
+        }
+        // A fonte também mantém respostas em localStorage; limpar só esse prefixo evita apagar
+        // biblioteca, preferências, rascunhos e demais dados pessoais.
+        for (const chave of Object.keys(localStorage).filter((k) => k.startsWith('songbook.cache.'))) {
+          try { localStorage.removeItem(chave); removidos++; } catch { falhas++; }
+        }
+        const salvas = db.songs();
+        const atuais = salvas.filter((x) => x.baixado && !precisaBaixar(x));
+        await medir(atuais);
+        toast(falhas ? `Cache parcialmente limpo · ${removidos} itens removidos` : `Cache limpo · ${removidos} itens removidos`);
+      } catch {
+        toast('Não foi possível concluir a limpeza do cache');
+      } finally {
+        if (b.isConnected) { b.disabled = false; b.textContent = 'Limpar'; }
+      }
     }
   });
 }
