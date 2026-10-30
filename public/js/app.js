@@ -144,7 +144,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-353';
+export const APP_VERSAO = '2026.10.30-354';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4389,6 +4389,27 @@ async function abrirPrevia(content, source, back, videoJa = null) {
 
   const jaNaPrevia = location.hash === '#/musica/previa';
   preview = novo;
+
+  // A capa original é buscada em paralelo com áudio e LRCLIB. Ela não depende do resultado dessas etapas.
+  const buscaCapaDaPrevia = novo.title && novo.artist
+    ? capaOficial(novo.title, novo.artist).catch(() => '')
+    : Promise.resolve('');
+  const aplicarCapaDaPrevia = (url) => {
+    if (!url || preview !== novo || !capaTrocavel(novo.cover)) return;
+    novo.cover = url;
+    novo.content = definirMeta(novo.content, 'cover', url);
+    if (player.atual?.songId === 'previa') player.atualizar({ capa: url });
+    // Se a busca terminar depois da navegação, atualiza a capa que já está na tela sem reiniciar o player.
+    if (location.hash === '#/musica/previa') {
+      const box = $('#view .song-hero > .cover');
+      if (box) {
+        box.classList.remove('gen');
+        box.innerHTML = `<img src="${esc(url)}" alt="${esc(novo.title)}" loading="eager">`;
+      }
+    }
+  };
+  void buscaCapaDaPrevia.then(aplicarCapaDaPrevia);
+
   // Só abre a tela da música quando terminar a busca do áudio oficial e a sincronização LRCLIB.
   // prepararMusicaAoAbrir coordena as duas tarefas em paralelo e guarda os resultados na prévia.
   const preparo = await prepararMusicaAoAbrir(novo);
@@ -4674,7 +4695,7 @@ function capaOficial(titulo, artista) {
   const titulo0 = (x) => normalizar(tituloLimpo(x || ''));
   const mesmaMusica = (tit, art) => mesmoNome(art || '', a) && (titulo0(tit) === t || ` ${titulo0(tit)} `.startsWith(` ${t} `));
   if (!capasOficiais.has(k)) {
-    capasOficiais.set(k, (async () => {
+    const busca = (async () => {
       // (a busca simples: a com artist:"" track:"" às vezes volta vazia para a música que existe)
       const dz = await jsonp(`https://api.deezer.com/search?q=${encodeURIComponent(`${a} ${tituloLimpo(titulo)}`)}&limit=15`);
       // (de preferência o título igual, sem "(Remix)", "(Live)"…: a capa do single ou do álbum, não a do remix)
@@ -4686,7 +4707,12 @@ function capaOficial(titulo, artista) {
       const ms = (it?.results || []).filter((x) => mesmaMusica(x.trackName, x.artistName) && x.artworkUrl100);
       const m = ms.find((x) => exata(x.trackName)) || ms[0];
       return m ? m.artworkUrl100.replace(/\/\d+x\d+(bb)?\.(jpg|png)$/, '/600x600bb.jpg') : '';
-    })().catch(() => ''));
+    })().catch(() => '');
+    capasOficiais.set(k, busca.then((url) => {
+      // Uma falha temporária não pode ficar memorizada como "sem capa" para sempre.
+      if (!url) capasOficiais.delete(k);
+      return url;
+    }));
   }
   return comUltimoValor('capa', k, capasOficiais.get(k));
 }
