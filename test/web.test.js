@@ -222,6 +222,19 @@ test('discografia do Cifra Club: álbuns com ano, capa e faixas (só letra conta
   ]);
 });
 
+test('discografia do Cifra Club: um álbum com aspas no nome não quebra os outros', async () => {
+  const { parseDiscografiaCifraClub } = await import('../public/js/lib/web.js');
+  const albums = [
+    { title: 'Brand New You (From "13")', url: 'brand-new-you-2014', type: 'single', releaseYear: 2014, discs: [{ songs: [{ name: 'Brand New You', song: { name: 'Brand New You', url: 'brand-new-you', guitar: 2 } }] }] },
+    { title: 'My Everything', url: 'my-everything-2014', type: 'album', releaseYear: 2014, discs: [{ songs: [{ name: 'Love Me Harder', song: { name: 'Love Me Harder', url: 'love-me-harder', guitar: 2, tone: 'Am' } }] }] },
+  ];
+  // como a página traz: o JSON dentro de um texto do JavaScript (as aspas e as barras escapadas)
+  const html = `<script>self.__next_f.push([1,${JSON.stringify(JSON.stringify({ albums }))}])</script>`;
+  const d = parseDiscografiaCifraClub(html, 'ariana-grande');
+  assert.deepEqual(d.map((a) => a.titulo), ['Brand New You (From "13")', 'My Everything']);
+  assert.equal(d[1].faixas[0].url, 'https://www.cifraclub.com.br/ariana-grande/love-me-harder/');
+});
+
 test('partes automáticas: refrão (mesmo com variações), pré-refrão e ponte', () => {
   const v1 = ['Deus está aqui', 'neste momento', 'sua presença', 'é real em meu viver'];
   const v2 = ['E ainda se vier', 'noite traiçoeira', 'se a cruz pesada for', 'Cristo estará contigo'];

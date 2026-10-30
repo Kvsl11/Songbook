@@ -260,7 +260,9 @@ export function getArtistaCifraClub(slug, opcoes = {}) {
 // Um array JSON que a página traz embutido nos dados ("albums":[...]): acha o fim pelos colchetes,
 // respeitando os textos entre aspas, e lê
 function arrayJsonEmbutido(html, chave) {
-  const s = String(html).replace(/\\"/g, '"');
+  // (os dados vêm dentro de um texto do JavaScript: \" vira " e \\ vira \ numa passada só; trocando só o \", um
+  // nome com aspas, como Brand New You (From "13"), virava \\" e quebrava a discografia inteira)
+  const s = String(html).replace(/\\(["\\])/g, '$1');
   const ini = s.indexOf(`"${chave}":[`);
   if (ini < 0) return null;
   let i = s.indexOf('[', ini);

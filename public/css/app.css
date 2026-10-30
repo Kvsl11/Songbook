@@ -642,7 +642,7 @@ label.setting { cursor: pointer; }
 
 .empty { text-align: center; color: var(--muted); padding: 40px 20px; }
 .empty .bubble { width: 80px; height: 80px; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 18px; background: var(--surface-2); color: var(--text); }
-.empty h3 { color: var(--text); margin: 0 0 8px; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+.empty h3 { text-align: center; color: var(--text); margin: 0 0 8px; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
 .empty p { margin: 0 auto 20px; max-width: 380px; }
 .empty .row { justify-content: center; }
 
@@ -2389,6 +2389,11 @@ dialog.lista-dlg[open] { display: flex; flex-direction: column; overflow: hidden
 .bib-capas .cover { width: 100%; height: auto; aspect-ratio: 1; border-radius: 8px; box-shadow: 0 14px 30px rgb(0 0 0 / 0.5); }
 .bib-capas .cover img { width: 100%; height: 100%; object-fit: cover; }
 .bib-hero h2 { margin: 4px 0 10px; font-size: clamp(26px, 5.5vw, 40px); font-weight: 900; letter-spacing: -0.03em; line-height: 1.04; }
+.bib-titulo { margin: 4px 0 14px; font-size: 26px; font-weight: 900; letter-spacing: -0.02em; }
+/* os filtros e a busca, presos logo abaixo do topo ao rolar (como no Spotify); com a cor do topo quando ele também a tem */
+.bib-fixo { position: sticky; top: -4px; top: calc(env(safe-area-inset-top) - 4px); /* (a rolagem já desconta os 64px do topo) */ z-index: 15; margin: 0 calc(-1 * var(--gutter)) 12px; padding: 4px var(--gutter) 10px; transition: background 0.25s; }
+.main-col:has(.topbar.scrolled) .bib-fixo { background: color-mix(in srgb, var(--tint) 45%, var(--bg)); }
+.bib-fixo .bib-busca { display: flex; margin: 0; }
 .bib-filtros { margin: 0 0 10px; }
 .bib-filtros .chip { display: inline-flex; align-items: center; gap: 7px; }
 .bib-filtros .chip b { min-width: 20px; padding: 0 6px; border-radius: 999px; background: rgb(127 127 127 / 0.22); font-size: 11.5px; font-weight: 800; line-height: 18px; text-align: center; }
@@ -4063,7 +4068,7 @@ html.pp #player .pl-artista-bio.so-mais .pl-artista-mais { position: static; pad
    recebe toques (os botões do player ficam por cima) */
 #player .pl-fundo, .pl-fundo-casa .pl-fundo { container-type: size; }
 .pl-fundo .pl-canvas { position: absolute; z-index: 1; left: 50%; top: 50%; border: 0; pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
-  width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.18); object-fit: cover; background: transparent; }
+  width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(var(--zoom, 1.18)); object-fit: cover; background: transparent; }
 .pl-fundo .pl-canvas.pronto { opacity: 1; }
 .pl-fundo .pl-canvas.pronto.pulando { opacity: 0.25; transition-duration: 0.18s; } /* (a passagem entre os trechinhos) */
 /* (o escurecido em cima e embaixo, para os textos, fica por cima do clipe também) */

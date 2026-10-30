@@ -4,6 +4,15 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 326, data: '2026-10-30', titulo: 'Trocar o vídeo na hora, álbum e artista sem tela preta',
+    itens: [
+      { tipo: 'correcao', texto: 'Trocar o vídeo (no ⋯ da música ou do Tocando agora) troca na hora: o vídeo novo já toca, no mesmo ponto da música, sem precisar sair da página e voltar. No modo música, a música continua e o novo passa a ser o clipe dela.' },
+      { tipo: 'correcao', texto: '“Ver álbum” e “Ver artista” não deixam mais a tela preta: a página abre na hora, com “Procurando…”, e o álbum aparece logo depois. E os álbuns de artistas com aspas no nome de algum disco (como Ariana Grande) voltaram a ser achados.' },
+      { tipo: 'correcao', texto: 'A capa animada não mostra mais as faixas pretas dos clipes de cinema (como Love Me Harder): elas ficam de fora, e o vídeo vai até o topo e se mistura no degradê embaixo, sem emenda. Vale também para as músicas já baixadas.' },
+      { tipo: 'melhoria', texto: 'Biblioteca mais limpa: sem o cartão grande em cima, e os filtros e a busca ficam presos no topo ao rolar a lista.' },
+    ],
+  },
+  {
     versao: 325, data: '2026-10-30', titulo: 'Tablet sem piscar, capa sem emenda e mais músicas no tempo certo',
     itens: [
       { tipo: 'correcao', texto: 'Tablet: a tela não pisca mais nem some com a barra e os botões. As máscaras de esmaecido, o desfoque atrás do menu e as animações de enfeite que faziam o tablet redesenhar a tela a cada quadro saíram.' },
@@ -83,12 +92,6 @@ export const NOVIDADES = [
     versao: 317, data: '2026-10-29', titulo: 'O + do Tocando agora salva de novo',
     itens: [
       { tipo: 'correcao', texto: 'O botão + do Tocando agora (salvar na biblioteca) não fazia nada no modo música das músicas que têm áudio oficial e clipe: agora salva na hora.' },
-    ],
-  },
-  {
-    versao: 316, data: '2026-10-29', titulo: 'Música e vídeo continuam no mesmo ponto (de verdade)',
-    itens: [
-      { tipo: 'correcao', texto: 'Trocar da música para o vídeo (ou o contrário) não volta mais para o começo: enquanto a outra versão carrega, o YouTube avisa o tempo zero, e o app tomava esse zero como o ponto da música. Agora ele espera o vídeo começar a tocar e confere se está na parte que estava sendo cantada.' },
     ],
   },
 ];
