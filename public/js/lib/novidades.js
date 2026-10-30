@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 354, data: '2026-10-30', titulo: 'Capa original carregada ao abrir a música',
+    itens: [
+      { tipo: 'correcao', texto: 'A busca pela capa oficial do álbum ou single agora começa junto com a preparação do áudio e da letra, sem depender da sincronização LRCLIB. Quando a imagem chega depois da abertura, a capa da tela e do player é atualizada sem reiniciar a música. Falhas temporárias na busca não ficam guardadas como ausência definitiva de capa.' },
+    ],
+  },
+  {
     versao: 353, data: '2026-10-30', titulo: 'Sincronia LRCLIB recupera a gravação correta',
     itens: [
       { tipo: 'correcao', texto: 'Quando o LRCLIB encontra a letra sincronizada, o Songbook agora refaz a busca do áudio pela duração exata da gravação, mesmo que já tenha associado outra versão antes. As consultas ao LRCLIB também são sequenciais para evitar bloqueios temporários.' },
@@ -58,18 +64,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'O videoclipe não é mais descartado apenas porque a faixa de áudio oficial é outra gravação. O servidor também identifica o arquivo MP4 final depois de juntar imagem e som, sem confundir fragmentos temporários com o vídeo completo.' },
     ],
   },
-  {
-    versao: 344, data: '2026-10-30', titulo: 'Downloads mais rápidos e progresso detalhado',
-    itens: [
-      { tipo: 'melhoria', texto: 'Áudio e videoclipe agora são baixados em paralelo. O progresso da notificação avança de 1% em 1%, incluindo a transferência do arquivo para o celular. Capas, fotos e informações adicionais do artista são guardadas em segundo plano para não atrasar a conclusão do download.' },
-      { tipo: 'melhoria', texto: 'O servidor baixa fragmentos em paralelo e evita repetir tentativas de conexão que não resolvem falhas comuns de rede.' },
-    ],
-  },
-
-
-
-
-
 
 ];
 
