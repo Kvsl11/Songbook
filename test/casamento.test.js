@@ -18,9 +18,13 @@ function musica(segundos, semente = 1) {
 const ruido = (segundos) => Float32Array.from({ length: Math.round(segundos * TAXA) }, () => (Math.random() - 0.5) * 0.004);
 const juntar = (...partes) => { const n = partes.reduce((a, p) => a + p.length, 0); const o = new Float32Array(n); let k = 0; for (const p of partes) { o.set(p, k); k += p.length; } return o; };
 
-test('paresDoCaminho marca cada mudança de deslocamento', () => {
+test('paresDoCaminho preserva as duas bordas de uma cena inserida', () => {
   const wp = [...Array.from({ length: 50 }, (_, i) => [i, i + 15]), ...Array.from({ length: 25 }, (_, k) => [49, 65 + k]), ...Array.from({ length: 50 }, (_, k) => [50 + k, 90 + k])];
-  assert.deepEqual(paresDoCaminho(wp, 20), [[0, 3], [10, 18]]);
+  const pares = paresDoCaminho(wp, 20);
+  assert.deepEqual(pares.slice(0, 2), [[0, 3], [1, 4]]);
+  assert.ok(pares.some(([ta, tv]) => ta === 9.8 && tv === 12.8));
+  assert.ok(pares.some(([ta, tv]) => ta === 9.8 && tv === 17.8));
+  assert.ok(pares.some(([ta, tv]) => ta === 10 && tv === 18));
 });
 
 test('casar acha a cena antes e no meio do clipe (como Espresso, com a música começando depois)', () => {
