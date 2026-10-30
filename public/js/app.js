@@ -3255,11 +3255,13 @@ const semLinhasDeAcordes = (sinc) => {
       return;
     }
     if (b.dataset.pl === 'aleatorio') {
+      const f = fila();
       aleatorio = !aleatorio;
       db.setPref('aleatorio', aleatorio);
-      tocadas = new Set(fila() ? [fila().i] : []);
+      if (f) filaOrdem = aleatorio ? embaralharIndices(filaOrdem, f.indices[f.i]) : filaOrdem.map((_, i) => i);
+      tocadas = new Set(f ? [f.i] : []);
       historico = [];
-      toast(aleatorio ? 'Aleatório ligado' : 'Aleatório desligado');
+      toast(aleatorio ? 'Aleatório ligado · fila embaralhada' : 'Aleatório desligado');
       desenhar();
     }
     if (b.dataset.pl === 'repetir') {
