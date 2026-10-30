@@ -4,9 +4,9 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
-    versao: 341, data: '2026-10-30', titulo: 'Música preparada antes de abrir',
+    versao: 341, data: '2026-10-30', titulo: 'Música preparada antes de abrir e notificações de download restauradas',
     itens: [
-      { tipo: 'melhoria', texto: 'Ao entrar numa música, a busca da faixa de áudio e a consulta ao LRCLIB começam em paralelo. A tela espera no máximo 1,1 segundo; se a rede demorar, abre sem travar e termina o preparo em segundo plano. As duas buscas do LRCLIB também são feitas em paralelo, com limite curto de tempo.' },
+      { tipo: 'melhoria', texto: 'Ao entrar numa música, a busca da faixa de áudio e a consulta ao LRCLIB começam em paralelo. A tela espera no máximo 1,1 segundo; se a rede demorar, abre sem travar e termina o preparo em segundo plano. As duas buscas do LRCLIB também são feitas em paralelo, com limite curto de tempo. As notificações de progresso, conclusão e falha dos downloads voltaram à barra do celular; notificações de sincronização continuam desativadas.' },
     ],
   },
   {
