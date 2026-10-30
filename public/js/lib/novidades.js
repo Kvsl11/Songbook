@@ -4,6 +4,16 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 324, data: '2026-10-30', titulo: 'Troca sem engasgo de verdade e a versão cantada certa',
+    itens: [
+      { tipo: 'correcao', texto: 'Trocar entre a música e o vídeo não engasga mais: a outra versão fica tocando junto, sem volume, no mesmo ponto, e a troca só cruza os volumes (com a Economia de dados ligada, ela só começa na hora da troca).' },
+      { tipo: 'correcao', texto: 'A versão só música nunca é a instrumental: as bases, os playbacks, os karaokês e as versões só num instrumento ficam de fora. E dá para escolher a versão certa à mão no ⋯ do Tocando agora (“Escolher a versão só música”).' },
+      { tipo: 'correcao', texto: 'A letra sincroniza na versão que está tocando (antes podia ficar presa à versão de antes, e o “Sincronizar” voltava para ela).' },
+      { tipo: 'melhoria', texto: 'O download não falha mais por causa do vídeo: se ele não baixa, ou se é outra gravação (um ao vivo, na música que não tem clipe), fica baixada só a música. Essas músicas tocam só a música, sem o “Mudar para vídeo” e sem o sinal de vídeo na biblioteca e na busca.' },
+      { tipo: 'melhoria', texto: 'A capa animada passa 4 trechinhos do clipe em loop, como o Canvas do Spotify, em vez do clipe inteiro.' },
+    ],
+  },
+  {
     versao: 323, data: '2026-10-30', titulo: 'Música e letra certas no tablet, sem piscar',
     itens: [
       { tipo: 'correcao', texto: 'Quando a busca do áudio oficial não respondia, a música ficava só com o clipe e a letra fora do tempo, para sempre. Agora o app tenta de novo (daqui a um minuto e na próxima vez que ela tocar) e, com a busca de vídeos fora do ar, procura direto na página do YouTube.' },
@@ -76,13 +86,6 @@ export const NOVIDADES = [
     versao: 315, data: '2026-10-29', titulo: 'Trocar entre música e vídeo sem voltar ao começo',
     itens: [
       { tipo: 'correcao', texto: 'Ao trocar da música para o vídeo (ou do vídeo para a música) no player, ela continua do ponto em que estava, na parte que estava sendo cantada. Antes, às vezes, voltava para o começo.' },
-    ],
-  },
-  {
-    versao: 314, data: '2026-10-29', titulo: 'A partitura gera sozinha',
-    itens: [
-      { tipo: 'correcao', texto: 'Gerar a partitura com IA começa a gerar de verdade, sem cair na tela de importar o arquivo: o app espera saber do servidor, usa o do computador ou o da nuvem e, se a música não tem vídeo, procura um no YouTube. Importar o arquivo só aparece se não der para gerar.' },
-      { tipo: 'melhoria', texto: 'A partitura saiu do ⋯ da letra e foi para o ⋯ do Tocando agora (no canto de cima): “Criar partitura”, que a IA gera sozinha, ou “Ver partitura”, se a música já tem.' },
     ],
   },
 ];

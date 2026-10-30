@@ -4065,6 +4065,7 @@ html.pp #player .pl-artista-bio.so-mais .pl-artista-mais { position: static; pad
 .pl-fundo .pl-canvas { position: absolute; z-index: 1; left: 50%; top: 50%; border: 0; pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
   width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.18); object-fit: cover; background: transparent; }
 .pl-fundo .pl-canvas.pronto { opacity: 1; }
+.pl-fundo .pl-canvas.pronto.pulando { opacity: 0.25; transition-duration: 0.18s; } /* (a passagem entre os trechinhos) */
 /* (o escurecido em cima e embaixo, para os textos, fica por cima do clipe também) */
 html.pp .pl-fundo::after { z-index: 2; }
 

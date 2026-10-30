@@ -36,3 +36,18 @@ test('o áudio oficial sai dela como sai do Piped', () => {
   const achado = escolherAudio(videosDaPaginaDoYoutube(PAGINA), { titulo: 'Espresso', artista: 'Sabrina Carpenter', duracao: 175, evitar: 'eVli-tstM5E' });
   assert.equal(achado?.id, '51zjlMhdSTE');
 });
+
+test('o áudio oficial nunca é a versão sem voz (instrumental, base, karaokê, playback), mesmo com a mesma duração', () => {
+  const v = (id, titulo, canal, segundos = 176) => ({ id, titulo, canal, segundos });
+  const lista = [
+    v('aaaaaaaaaaa', 'Sabrina Carpenter - Espresso (Instrumental)', 'Sabrina Carpenter'),
+    v('bbbbbbbbbbb', 'Espresso - Sabrina Carpenter | Base / Playback', 'Bases Gospel'),
+    v('ccccccccccc', 'Sabrina Carpenter - Espresso', 'Sing King'),
+    v('ddddddddddd', 'Espresso (Piano Version)', 'Sabrina Carpenter'),
+    v('eeeeeeeeeee', 'Sabrina Carpenter - Espresso (Official Audio)', 'Sabrina Carpenter'),
+  ];
+  assert.equal(escolherAudio(lista, { titulo: 'Espresso', artista: 'Sabrina Carpenter', duracao: 175 })?.id, 'eeeeeeeeeee');
+  assert.equal(escolherAudio(lista.slice(0, 4), { titulo: 'Espresso', artista: 'Sabrina Carpenter', duracao: 175 }), null);
+  // (a música que se chama "Base" ou é de um pianista continua valendo)
+  assert.equal(escolherAudio([v('fffffffffff', 'Base', 'Fulano', 200)], { titulo: 'Base', artista: 'Fulano', duracao: 200 })?.id, 'fffffffffff');
+});
