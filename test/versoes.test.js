@@ -93,12 +93,9 @@ test('a sincronia automática consulta somente o LRCLIB e nunca chama o servidor
 });
 
 
-test('as notificações internas e do sistema estão desativadas', async () => {
+test('o app não cria notificações internas nem do sistema', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   const sw = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
-  assert.match(app, /function notificar\(\) \{\}/);
-  assert.match(app, /async function notificarSistema\(\) \{ return false; \}/);
-  assert.match(app, /const podeNotificarNoSistema = \(\) => false;/);
-  assert.doesNotMatch(app, /Notification\.requestPermission|showNotification|const sino =/);
+  assert.doesNotMatch(app, /function notificar|notificarSistema|podeNotificarNoSistema|Notification\.requestPermission|showNotification/);
   assert.doesNotMatch(sw, /notificationclick|addEventListener.*push/);
 });
