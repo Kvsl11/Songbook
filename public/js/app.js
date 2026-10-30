@@ -752,43 +752,79 @@ async function baixarAgora(id) {
   if (!song) return;
   const lista = arquivosParaBaixar(song);
   const arquivos = {};
-  // (cada arquivo por si: o vídeo que não baixa — "vídeo inválido", fora do ar, bloqueado — não derruba a música, que
-  // fica baixada só com o áudio)
   const falhas = [];
-  for (const [n, { yt, video }] of lista.entries()) {
+  const progressoArquivos = new Map();
+  let ultimoAviso = -1;
+
+  // Áudio e videoclipe são baixados ao mesmo tempo. O progresso geral considera
+  // cada arquivo como metade (ou a fração correspondente, se houver só um).
+  const atualizarProgresso = (yt, p) => {
+    progressoArquivos.set(yt, Math.max(progressoArquivos.get(yt) || 0, Math.min(1, p)));
+    const pct = Math.min(99, Math.round([...progressoArquivos.values()].reduce((a, v) => a + v, 0) / lista.length * 100));
+    const antes = baixando.get(id)?.pct ?? -1;
+    baixando.set(id, { pct });
+    avisarDownloads();
+    // A notificação usa o mesmo identificador para atualizar a existente, sem
+    // som. Atualiza em cada ponto percentual, em vez de saltar de 10 em 10.
+    if (pct > ultimoAviso && pct > antes) {
+      ultimoAviso = pct;
+      void notificarSistema({
+        titulo: song.title,
+        texto: `Baixando ${pct}%`,
+        tag: `baixar-${id}`, silenciosa: true, href: `#/musica/${id}`,
+        imagem: capaDaNotificacao(song),
+      });
+    }
+  };
+
+  await Promise.all(lista.map(async ({ yt, video }) => {
     const ja = baixadoDe(yt);
-    if (ja && (!video || String(ja.tipo).startsWith('video'))) { arquivos[yt] = ja; continue; }
-    const andou = (p) => {
-      const pct = Math.round(((n + p) / lista.length) * 100);
-      const antes = baixando.get(id)?.pct ?? -100;
-      baixando.set(id, { pct });
-      avisarDownloads();
-      // Atualiza a notificação do sistema a cada 10%, sem som.
-      if (Math.floor(pct / 10) !== Math.floor(antes / 10)) {
-        void notificarSistema({
-          titulo: song.title,
-          texto: `${song.artist ? `${song.artist} · ` : ''}Baixando ${pct}%`,
-          tag: `baixar-${id}`, silenciosa: true, href: `#/musica/${id}`,
-          imagem: capaDaNotificacao(song),
-        });
-      }
-    };
+    if (ja && (!video || String(ja.tipo).startsWith('video'))) {
+      arquivos[yt] = ja;
+      progressoArquivos.set(yt, 1);
+      return;
+    }
     try {
-      if (!/^[\w-]{11}$/.test(yt || '')) throw new Error('o vídeo desta versão não é do YouTube');
-      const r = await chamarComEtapas(servidorIA(), '/baixar', { json: { url: `https://youtu.be/${yt}`, video, qualidade: qualidadeDoDownload(video) } }, (etapa, p) => { if (etapa === 'baixando' && p !== null) andou(p * 0.8); });
-      andou(0.85);
+      if (!/^[\\w-]{11}$/.test(yt || '')) throw new Error('o vídeo desta versão não é do YouTube');
+      const r = await chamarComEtapas(servidorIA(), '/baixar', {
+        json: { url: `https://youtu.be/${yt}`, video, qualidade: qualidadeDoDownload(video) },
+      }, (etapa, p) => { if (etapa === 'baixando' && p !== null) atualizarProgresso(yt, p * 0.8); });
+
       const base = baseDoServidor(servidorIA().url);
       const resp = await fetch(`${base}/baixar/${r.arquivo}`, { headers: cabecalhos(base, servidorIA().chave) });
       if (!resp.ok) throw new Error('o arquivo não chegou do servidor: tente de novo');
-      const blob = await resp.blob();
+
+      // Lê o arquivo em blocos para a barra continuar avançando enquanto ele
+      // atravessa a rede do servidor até o celular (não ficar parada em 80%).
+      let blob;
+      if (resp.body?.getReader) {
+        const reader = resp.body.getReader();
+        const blocos = [];
+        let recebido = 0;
+        const total = Number(resp.headers.get('content-length')) || 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          blocos.push(value);
+          recebido += value.byteLength;
+          if (total > 0) atualizarProgresso(yt, 0.8 + 0.19 * Math.min(1, recebido / total));
+        }
+        blob = new Blob(blocos, { type: r.tipo || resp.headers.get('content-type') || 'application/octet-stream' });
+      } else {
+        blob = await resp.blob();
+      }
+      atualizarProgresso(yt, 0.99);
       await guardarAudio(chaveBaixada(yt), blob);
       arquivos[yt] = { tipo: r.tipo || blob.type, tamanho: blob.size, ...(r.qualidade ? { qualidade: r.qualidade } : {}), ...(r.altura ? { altura: r.altura } : {}) };
-    } catch (e) { falhas.push({ yt, video, e }); }
-    andou(1);
-  }
+      atualizarProgresso(yt, 1);
+    } catch (e) {
+      falhas.push({ yt, video, e });
+      progressoArquivos.set(yt, 1);
+      atualizarProgresso(yt, 1);
+    }
+  }));
+
   if (!Object.keys(arquivos).length) throw falhas[0]?.e || new Error('nada para baixar');
-  // com a música e o vídeo no aparelho: os dois são casados pelo som; se o vídeo é outra gravação (um ao vivo, outra
-  // apresentação, na música que não tem clipe), ele sai e fica só a música
   let avisoClipe = falhas.some((f) => f.yt === song.youtube) ? 'o vídeo não deu para baixar' : '';
   const vsAqui = versoesDe(db.song(id) || song);
   if (vsAqui?.audio && arquivos[vsAqui.audio] && arquivos[vsAqui.video] && !vsAqui.casadas && !vsAqui.diferentes) {
@@ -799,12 +835,19 @@ async function baixarAgora(id) {
       avisoClipe = 'o vídeo é outra gravação';
     }
   }
-  await guardarImagensDaMusica(song);
-  if (!db.song(id)) return; // saiu da biblioteca enquanto baixava
-  db.updateSong(id, { baixado: { arquivos, tamanho: Object.values(arquivos).reduce((a, x) => a + (x.tamanho || 0), 0), em: Date.now() } });
+
+  if (!db.song(id)) return;
+  const tamanho = Object.values(arquivos).reduce((a, x) => a + (x.tamanho || 0), 0);
+  db.updateSong(id, { baixado: { arquivos, tamanho, em: Date.now() } });
+  // A música fica pronta assim que áudio/vídeo forem guardados. Capas, fotos,
+  // biografia e outros dados do artista são enriquecimento offline em segundo
+  // plano: uma API lenta não deve segurar o download principal.
+  void guardarImagensDaMusica(song).catch(() => {});
+  baixando.set(id, { pct: 100 });
+  avisarDownloads();
   void notificarSistema({
     titulo: song.title,
-    texto: `${avisoClipe ? 'Baixada só a música' : 'Download concluído'}${song.artist ? ` · ${song.artist}` : ''} · ${fmtBytes(db.song(id)?.baixado?.tamanho || 0)}`,
+    texto: `${avisoClipe ? 'Baixada só a música' : 'Download concluído'}${song.artist ? ` · ${song.artist}` : ''} · ${fmtBytes(tamanho)}`,
     tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}`,
     imagem: capaDaNotificacao(song),
   });
