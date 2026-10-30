@@ -223,7 +223,32 @@ function toast(msg, opcoes = {}) {
   // o mesmo aviso de novo, logo em seguida, não empilha
   const ultima = notificacoes[0];
   if (ultima && !ultima.lida && ultima.titulo === titulo && ultima.texto === detalhe && Date.now() - ultima.t < 10000) return;
+  // com as notificações no sistema: usando o app, o aviso aparece rapidinho na tela (a resposta a um toque não vai para
+  // a barra do celular); com o app em segundo plano, os que importam (pronto, erro, a IA) vão para a barra
+  if (podeNotificarNoSistema()) {
+    if (document.visibilityState === 'visible') avisoRapido([titulo, detalhe].filter(Boolean).join(': '), tipo);
+    else if (['sucesso', 'erro', 'ia'].includes(tipo)) notificarSistema({ titulo: titulo || 'Songbook Litúrgico', texto: detalhe || '' });
+    return;
+  }
   notificar(detalhe, { tipo, titulo });
+}
+// o aviso rápido na tela (some sozinho em 3 s, como o do Spotify)
+let avisoTempo = 0;
+function avisoRapido(texto, tipo = 'info') {
+  let el = $('#aviso-rapido');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'aviso-rapido';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    document.body.append(el);
+  }
+  el.dataset.tipo = tipo;
+  el.innerHTML = `${icon(ICONE_AVISO[tipo] || 'info', 16)}<span>${esc(texto)}</span>`;
+  el.classList.remove('some');
+  el.classList.add('aparece');
+  clearTimeout(avisoTempo);
+  avisoTempo = setTimeout(() => el.classList.replace('aparece', 'some'), 3200);
 }
 // compartilhar pelo sistema (WhatsApp, e-mail…); sem isso, copia o texto
 async function compartilhar(dados) {
@@ -253,13 +278,14 @@ function desenharSino() {
 // As notificações vão para a barra de notificações do celular (como as de qualquer app), com a permissão dada: aí o
 // sininho de dentro do app sai. Sem a permissão (negada, ou o iPhone sem o app instalado), ficam no sininho, como antes
 const podeNotificarNoSistema = () => typeof Notification !== 'undefined' && Notification.permission === 'granted' && 'serviceWorker' in navigator;
-async function notificarSistema({ titulo, texto = '', tag = '', href = '', silenciosa = false, renovar = false }) {
+// (o ícone pequeno da barra é a palheta branca vazada, que o Android pinta; a imagem grande, a capa da música)
+async function notificarSistema({ titulo, texto = '', tag = '', href = '', silenciosa = false, renovar = false, imagem = '' }) {
   if (!podeNotificarNoSistema()) return false;
   try {
     const reg = await navigator.serviceWorker.ready;
     await reg.showNotification(titulo || 'Songbook Litúrgico', {
-      body: texto, tag: tag || undefined, renotify: Boolean(tag && renovar), silent: silenciosa,
-      icon: new URL('icon-192-v7.png', document.baseURI).href, badge: new URL('icon-maskable-192-v7.png', document.baseURI).href,
+      body: texto, tag: tag || undefined, renotify: Boolean(tag && renovar), silent: silenciosa, timestamp: Date.now(),
+      icon: imagem || new URL('icon-192-v7.png', document.baseURI).href, badge: new URL('badge-96.png', document.baseURI).href,
       data: { href: href ? new URL(href, location.href).href : location.href.split('#')[0] },
     });
     return true;
@@ -732,8 +758,8 @@ async function baixarMusica(song, { perguntou = false } = {}) {
     while (filaBaixar.length) {
       const id = filaBaixar.shift();
       try { await baixarAgora(id); } catch (e) {
-        toast(`Não baixou “${db.song(id)?.title || 'a música'}”: ${erroExplicado(e)}`, 5000);
-        notificarSistema({ titulo: `Não baixou: ${db.song(id)?.title || 'a música'}`, texto: erroExplicado(e), tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}` });
+        if (!podeNotificarNoSistema() || document.visibilityState === 'visible') toast(`Não baixou “${db.song(id)?.title || 'a música'}”: ${erroExplicado(e)}`, 5000);
+        notificarSistema({ titulo: db.song(id)?.title || 'Download', texto: `Não deu para baixar · ${erroExplicado(e)}`, tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}`, imagem: capaDaNotificacao(db.song(id)) });
       }
       baixando.delete(id);
       avisarDownloads();
@@ -741,6 +767,8 @@ async function baixarMusica(song, { perguntou = false } = {}) {
     andandoFila = null;
   })();
 }
+// a capa da música na notificação (a dela ou a do vídeo)
+const capaDaNotificacao = (song) => (song?.cover && /^https?:/.test(song.cover) ? song.cover : song?.youtube ? `https://i.ytimg.com/vi/${song.youtube}/hqdefault.jpg` : '');
 async function baixarAgora(id) {
   const song = db.song(id);
   if (!song) return;
@@ -755,7 +783,7 @@ async function baixarAgora(id) {
       baixando.set(id, { pct });
       avisarDownloads();
       // na barra de notificações, como o Spotify: "Baixando… 40%" (a cada 10%, sem som), trocada pela de pronta no fim
-      if (Math.floor(pct / 10) !== Math.floor(antes / 10)) notificarSistema({ titulo: `Baixando: ${song.title}`, texto: `${pct}% · ${song.artist || 'Songbook Litúrgico'}`, tag: `baixar-${id}`, silenciosa: true, href: `#/musica/${id}` });
+      if (Math.floor(pct / 10) !== Math.floor(antes / 10)) notificarSistema({ titulo: song.title, texto: `${song.artist ? `${song.artist} · ` : ''}Baixando ${pct}%`, tag: `baixar-${id}`, silenciosa: true, href: `#/musica/${id}`, imagem: capaDaNotificacao(song) });
     };
     const r = await chamarComEtapas(servidorIA(), '/baixar', { json: { url: `https://youtu.be/${yt}`, video, qualidade: qualidadeDoDownload(video) } }, (etapa, p) => { if (etapa === 'baixando' && p !== null) andou(p * 0.8); });
     andou(0.85);
@@ -770,8 +798,9 @@ async function baixarAgora(id) {
   await guardarImagensDaMusica(song);
   if (!db.song(id)) return; // saiu da biblioteca enquanto baixava
   db.updateSong(id, { baixado: { arquivos, tamanho: Object.values(arquivos).reduce((a, x) => a + (x.tamanho || 0), 0), em: Date.now() } });
-  toast(`Baixada: ${song.title}`);
-  notificarSistema({ titulo: `Baixada: ${song.title}`, texto: `${song.artist ? `${song.artist} · ` : ''}Toca sem internet (${fmtBytes(db.song(id)?.baixado?.tamanho || 0)})`, tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}` });
+  // (com a notificação na barra, ela já diz; o aviso fica para quem não deu a permissão)
+  if (!podeNotificarNoSistema()) toast(`Baixada: ${song.title}`);
+  notificarSistema({ titulo: song.title, texto: `Download concluído${song.artist ? ` · ${song.artist}` : ''} · ${fmtBytes(db.song(id)?.baixado?.tamanho || 0)}`, tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}`, imagem: capaDaNotificacao(song) });
 }
 // as capas e a partitura da música no cache dos downloads (o service worker usa sem internet)
 async function guardarImagensDaMusica(song) {
