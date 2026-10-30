@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 353, data: '2026-10-30', titulo: 'Sincronia LRCLIB recupera a gravação correta',
+    itens: [
+      { tipo: 'correcao', texto: 'Quando o LRCLIB encontra a letra sincronizada, o Songbook agora refaz a busca do áudio pela duração exata da gravação, mesmo que já tenha associado outra versão antes. As consultas ao LRCLIB também são sequenciais para evitar bloqueios temporários.' },
+    ],
+  },
+  {
     versao: 352, data: '2026-10-30', titulo: 'Download de áudio e videoclipe sem cortes',
     itens: [
       { tipo: 'correcao', texto: 'Com “Áudio e vídeo” ativado, o Songbook mantém o videoclipe mesmo quando ele é uma gravação diferente do áudio oficial. Se um dos arquivos falhar, o download fica parcial e informa qual arquivo faltou, permitindo completar depois.' },
@@ -65,12 +71,7 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'Ao tocar numa música da busca, o Songbook aguarda localizar o videoclipe, encontrar a gravação de áudio e consultar a sincronia da letra no LRCLIB antes de abrir a música.' },
     ],
   },
-  {
-    versao: 342, data: '2026-10-30', titulo: 'Download retoma o arquivo que faltou',
-    itens: [
-      { tipo: 'correcao', texto: 'Se o áudio baixar, mas o videoclipe falhar, o Songbook não considera o download completo. Agora é possível tentar novamente e baixar só o arquivo que faltou; mudar de “Só o áudio” para “Áudio e vídeo” também completa o download sem repetir o áudio.' },
-    ],
-  },
+
 
 
 
