@@ -2756,10 +2756,9 @@ const semLinhasDeAcordes = (sinc) => {
   const abrirMenu = async () => {
     if (!atual) return;
     const salva = Boolean(atual.songId && db.song(atual.songId));
-    // no ⋯ da letra (tela toda): sincronizar a letra; o modo vídeo/música fica no ⋯ das listas (trocar o vídeo, nos dois)
+    // no ⋯ da letra (tela toda): opções de leitura; a sincronia é automática pelo LRCLIB
     const naLetra = el.classList.contains('letra-cheia');
     const song = musicaTocando();
-    const sincronizada = song?.sincronia?.video && song.sincronia.video === atual.youtube;
     const opcoes = [
       !naLetra && (atual.href || atual.abrir) && !telaDeCelular() && { valor: 'abrir', rotulo: 'Abrir a música', ic: 'music' },
       salva ? { valor: 'add-repertorio', rotulo: 'Adicionar a um repertório', ic: 'plus' } : { valor: 'salva', rotulo: 'Salvar na biblioteca', ic: 'download' },
@@ -2769,7 +2768,6 @@ const semLinhasDeAcordes = (sinc) => {
       naLetra && atual.songId && db.song(atual.songId) && { valor: 'editar', rotulo: 'Editar a cifra', ic: 'edit' },
       // a partitura no ⋯ do Tocando agora (não no da letra): ver a que a música tem, ou a IA criar sozinha
       !naLetra && atual.songId && { valor: 'partitura', rotulo: temPartituraMusica(song) ? 'Ver partitura' : 'Criar partitura', ic: temPartituraMusica(song) ? 'score' : 'sparkles' },
-      naLetra && song && atual.youtube && !atual.semVideo && !noClipe() && { valor: 'sincronizar', rotulo: sincronizada ? 'Sincronizar a letra de novo' : 'Sincronizar a letra', ic: 'sparkles' },
       (salva || (preview && (atual.songId === 'previa' || atual.href === '#/musica/previa'))) && { valor: 'trocar', rotulo: atual.semVideo ? 'Escolher um vídeo' : 'Trocar o vídeo', ic: atual.semVideo ? 'youtube' : 'refresh' },
       !naLetra && !atual.semVideo && !atual.soMusica && !(ehArquivo(atual.youtube) && !atual.video) && { valor: 'troca', rotulo: modoCapa() ? 'Mudar para vídeo' : 'Mudar para música', ic: modoCapa() ? 'video' : 'music' },
       (atual.artista || ehCifraClub(song?.source || '')) && { valor: 'album', rotulo: 'Ver álbum', ic: 'disc' },
