@@ -192,15 +192,26 @@ export function casarPorTrechos(a, v) {
     // Usa o caminho detalhado do trecho, não só um deslocamento médio. As janelas se sobrepõem em 5 s;
     // cada uma entrega apenas sua região central, evitando âncoras duplicadas de refrões semelhantes.
     const locais = paresDoCaminho(wp, TRECHO * PASSO);
-    const inicioLocal = i0 === 0 ? 0 : TRECHO * PASSO / 4;
-    const ultimoTrecho = i0 + TRECHO + TRECHO / 2 > a.quadros;
-    const fimLocal = ultimoTrecho ? TRECHO * PASSO : TRECHO * PASSO * 3 / 4;
+    // Âncoras do início e do fim de cada janela: duas janelas vizinhas podem delimitar uma cena
+    // inserida exatamente na fronteira (uma aponta para antes da cena, a outra para depois).
     for (const [ta, tv] of locais) {
-      if (ta + 0.001 < inicioLocal || ta >= fimLocal) continue;
-      pares.push([Math.round((i0 * PASSO + ta) * 100) / 100, tv]);
+      if (ta === 0) pares.push([Math.round(i0 * PASSO * 100) / 100, tv]);
+      if (ta >= TRECHO * PASSO / 4 && ta < TRECHO * PASSO * 3 / 4)
+        pares.push([Math.round((i0 * PASSO + ta) * 100) / 100, tv]);
+    }
+    const fimQuadro = wp.filter(([i]) => i === TRECHO - 1).map(([, j]) => j);
+    if (fimQuadro.length) {
+      const tFim = Math.round((i0 + TRECHO) * PASSO * 100) / 100;
+      const jMin = Math.min(...fimQuadro);
+      const jMax = Math.max(...fimQuadro);
+      pares.push([tFim, Math.round((jMin + 1) * PASSO * 100) / 100]);
+      if (jMax > jMin) pares.push([tFim, Math.round((jMax + 1) * PASSO * 100) / 100]);
     }
   }
-  return { pares, cobertura: comSom ? achados / comSom : 0 };
+  // Janelas sobrepostas podem repetir a mesma âncora; remove só duplicatas exatas, nunca os dois lados de uma cena.
+  pares.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+  const unicos = pares.filter((p, i) => !i || Math.abs(p[0] - pares[i - 1][0]) > 0.01 || Math.abs(p[1] - pares[i - 1][1]) > 0.05);
+  return { pares: unicos, cobertura: comSom ? achados / comSom : 0 };
 }
 
 // { pares, confianca, mesma } (mesma: false, sem os pares, se não parecem a mesma gravação), ou null sem som bastante.
