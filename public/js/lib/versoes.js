@@ -14,7 +14,7 @@ const CANAL_SEM_VOZ = /\b(karaoke|instrumentals?|backing|playback|minus one|sing
 const CLIPE = /\b(official (music )?video|music video|videoclipe|clipe oficial|clipe)\b/;
 
 // Entre os vídeos achados no YouTube ({ id, titulo, canal, segundos }), o áudio oficial da gravação: o mesmo título,
-// a duração da gravação do LRCLIB (até 2 s de diferença) e, de preferência, do canal do artista (os "- Topic" do
+// a duração aproximada da gravação do LRCLIB e, de preferência, do canal do artista
 // YouTube Music são o áudio puro). null se nenhum servir
 export function escolherAudio(videos, { titulo = '', artista = '', duracao = 0, evitar = '' } = {}) {
   const t = normal(titulo).replace(/\b(feat|ft)\b.*$/, '').trim();
@@ -23,17 +23,20 @@ export function escolherAudio(videos, { titulo = '', artista = '', duracao = 0, 
   let melhor = null;
   let nota = -Infinity;
   for (const v of videos || []) {
-    if (!v?.id || v.id === evitar || !(v.segundos > 0) || Math.abs(v.segundos - duracao) > 2) continue;
+    // LRCLIB e YouTube podem arredondar/cortar silêncios de formas diferentes.
+    // A tolerância proporcional evita descartar faixas longas como Thriller por poucos segundos.
+    const tolerancia = Math.max(8, duracao * 0.025);
+    if (!v?.id || v.id === evitar || !(v.segundos > 0) || Math.abs(v.segundos - duracao) > tolerancia) continue;
     const nome = normal(v.titulo);
-    if (!` ${nome} `.includes(` ${t} `) || (OUTRA_GRAVACAO.test(nome) && !OUTRA_GRAVACAO.test(t))) continue;
+    if (!` ${nome} `.includes(` ${t} `) || CLIPE.test(nome) || (OUTRA_GRAVACAO.test(nome) && !OUTRA_GRAVACAO.test(t))) continue;
     // (a instrumental tem a mesma duração da gravação: só o nome diz que ela não tem a voz)
     if (SEM_VOZ.test(nome) && !SEM_VOZ.test(t)) continue;
     const canal = normal(v.canal);
     if (CANAL_SEM_VOZ.test(canal) && !CANAL_SEM_VOZ.test(a)) continue;
     let n = 0;
     if (a && (canal === a || canal.startsWith(`${a} `) || ` ${a} `.includes(` ${canal} `))) n += 3;
-    if (/\b(audio|official audio|audio oficial)\b/.test(nome)) n += 2;
-    if (CLIPE.test(nome)) n -= 3;
+    if (/\b(audio|official audio|audio oficial)\b/.test(nome)) n += 3;
+    if (/\b(lyrics?|letra|lyric video)\b/.test(nome)) n -= 2;
     n -= Math.abs(v.segundos - duracao) / 2;
     if (n > nota) { nota = n; melhor = v; }
   }

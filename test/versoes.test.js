@@ -16,6 +16,13 @@ test('acha o áudio oficial da gravação (e não o clipe, o ao vivo ou outra du
   assert.equal(a.id, 'topic000001');
   assert.equal(escolherAudio(achados, { titulo: 'Espresso', artista: 'X', duracao: 300 }), null);
   assert.equal(escolherAudio(achados, { titulo: 'Espresso', duracao: 0 }), null);
+  // A diferença de alguns segundos entre LRCLIB e YouTube não deve impedir o áudio oficial.
+  const thriller = [
+    v('thrillerclip1', 'Michael Jackson - Thriller (Official Music Video)', 'Michael Jackson', 858),
+    v('thrilleraudio', 'Michael Jackson - Thriller (Official Audio)', 'Michael Jackson - Topic', 363),
+    v('thrillerlive1', 'Michael Jackson - Thriller (Live)', 'Michael Jackson', 360),
+  ];
+  assert.equal(escolherAudio(thriller, { titulo: 'Thriller', artista: 'Michael Jackson', duracao: 357, evitar: 'thrillerclip1' })?.id, 'thrilleraudio');
 });
 
 test('o tempo passa do áudio para o clipe e volta, trecho por trecho (cena antes e no meio)', () => {
