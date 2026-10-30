@@ -481,22 +481,21 @@ export async function letraSincronizada(
     }
     return [];
   };
-  // Busca exata e busca ampla ao mesmo tempo: evita esperar uma resposta para só então iniciar a outra.
+  // O LRCLIB pede consultas sequenciais para evitar limite de requisições (429).
+  // Para assim que encontra a gravação sincronizada correta; só amplia a busca se necessário.
   const consultas = [
     a && `track_name=${encodeURIComponent(t)}&artist_name=${encodeURIComponent(a)}`,
     `q=${encodeURIComponent(`${t} ${a}`.trim())}`,
+    `track_name=${encodeURIComponent(t)}`,
   ].filter(Boolean);
-  const respostas = await Promise.all(consultas.map((params) => pedir(params).catch(() => null)));
-  const listas = respostas.filter(Array.isArray);
   const corresponde = (r) =>
     r.syncedLyrics && !r.instrumental && mesmoTitulo(r.trackName, t) && (!a || mesmoArtista(r.artistName, a));
-  let mesmas = listas.flat().filter(corresponde);
-  // Algumas entradas do LRCLIB têm o artista cadastrado com créditos adicionais ou variações de nome.
-  // Se as buscas exata e ampla não trouxerem uma correspondência, busca só pelo título e valida o artista
-  // localmente. Assim não aceita outra música de mesmo nome nem uma gravação de outro intérprete.
-  if (!mesmas.length) {
-    const porTitulo = await pedir(`track_name=${encodeURIComponent(t)}`).catch(() => null);
-    if (Array.isArray(porTitulo)) mesmas = porTitulo.filter(corresponde);
+  let mesmas = [];
+  for (let i = 0; i < consultas.length; i++) {
+    const lista = await pedir(consultas[i]).catch(() => null);
+    if (Array.isArray(lista)) mesmas = lista.filter(corresponde);
+    if (mesmas.length) break;
+    if (i + 1 < consultas.length) await new Promise((ok) => setTimeout(ok, 350));
   }
   if (mesmas.length) {
     const oficial = gravacaoOficial(mesmas, duracao);
