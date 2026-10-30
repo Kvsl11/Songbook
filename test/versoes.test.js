@@ -99,6 +99,6 @@ test('as notificações internas e do sistema estão desativadas', async () => {
   assert.match(app, /function notificar\(\) \{\}/);
   assert.match(app, /async function notificarSistema\(\) \{ return false; \}/);
   assert.match(app, /const podeNotificarNoSistema = \(\) => false;/);
-  assert.doesNotMatch(app, /Notification\\.requestPermission|showNotification|const sino =/);
-  assert.doesNotMatch(sw, /notificationclick|addEventListener\\(['"]push/);
+  assert.doesNotMatch(app, /Notification\.requestPermission|showNotification|const sino =/);
+  assert.doesNotMatch(sw, /notificationclick|addEventListener.*push/);
 });
