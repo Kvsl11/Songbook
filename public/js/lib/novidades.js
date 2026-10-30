@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 340, data: '2026-10-30', titulo: 'Sincronia LRCLIB sem procurar o servidor',
+    itens: [
+      { tipo: 'correcao', texto: 'Abrir ou tocar uma música não consulta mais o servidor de IA. A sincronização automática continua usando somente o LRCLIB; se não houver letra sincronizada correspondente, a música permanece sem sincronia. Avisos e notificações foram removidos.' },
+    ],
+  },
+  {
     versao: 339, data: '2026-10-30', titulo: 'Sincronia automática somente pelo LRCLIB',
     itens: [
       { tipo: 'correcao', texto: 'A sincronia de letras usa exclusivamente o LRCLIB. A sincronização por IA do servidor e os comandos manuais foram removidos. Se o LRCLIB não encontrar a gravação correspondente, a música permanece sem sincronia. Foram removidas as notificações do sininho e do sistema.' },
