@@ -74,16 +74,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'Mais músicas trocam no ponto certo entre a música e o vídeo, mesmo com clipe longo e cenas de filme no meio (como Thriller): ao trocar, o servidor, quando há um, casa as duas versões pelo som, e no aparelho a conta pesa muito menos.' },
     ],
   },
-  {
-    versao: 324, data: '2026-10-30', titulo: 'Troca sem engasgo de verdade e a versão cantada certa',
-    itens: [
-      { tipo: 'correcao', texto: 'Trocar entre a música e o vídeo não engasga mais: a outra versão fica tocando junto, sem volume, no mesmo ponto, e a troca só cruza os volumes (com a Economia de dados ligada, ela só começa na hora da troca).' },
-      { tipo: 'correcao', texto: 'A versão só música nunca é a instrumental: as bases, os playbacks, os karaokês e as versões só num instrumento ficam de fora. E dá para escolher a versão certa à mão no ⋯ do Tocando agora (“Escolher a versão só música”).' },
-      { tipo: 'correcao', texto: 'A letra sincroniza na versão que está tocando (antes podia ficar presa à versão de antes, e o “Sincronizar” voltava para ela).' },
-      { tipo: 'melhoria', texto: 'O download não falha mais por causa do vídeo: se ele não baixa, ou se é outra gravação (um ao vivo, na música que não tem clipe), fica baixada só a música. Essas músicas tocam só a música, sem o “Mudar para vídeo” e sem o sinal de vídeo na biblioteca e na busca.' },
-      { tipo: 'melhoria', texto: 'A capa animada passa 4 trechinhos do clipe em loop, como o Canvas do Spotify, em vez do clipe inteiro.' },
-    ],
-  },
  ];
 
 // as versões que a pessoa ainda não viu (mais nova primeiro); sem nenhuma vista ainda, só a atual
