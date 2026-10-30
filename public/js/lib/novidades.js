@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 346, data: '2026-10-30', titulo: 'Limpeza de cache e armazenamento medido no aparelho',
+    itens: [
+      { tipo: 'correcao', texto: 'O botão Limpar cache agora remove também as respostas guardadas em localStorage, informa quantos itens foram removidos e atualiza os números sem piscar a tela. Os downloads, a biblioteca e o pacote do aplicativo são preservados.' },
+      { tipo: 'melhoria', texto: 'O armazenamento mostra o tamanho dos arquivos de download realmente presentes no aparelho e o uso total informado pelo navegador para o Songbook. O espaço livre total do celular não é disponibilizado a aplicativos web.' },
+    ],
+  },
+  {
     versao: 345, data: '2026-10-30', titulo: 'Correção do download do videoclipe',
     itens: [
       { tipo: 'correcao', texto: 'O videoclipe não é mais descartado apenas porque a faixa de áudio oficial é outra gravação. O servidor também identifica o arquivo MP4 final depois de juntar imagem e som, sem confundir fragmentos temporários com o vídeo completo.' },
@@ -58,12 +65,7 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'A procura da faixa separada agora começa assim que a música é aberta, sem depender de apertar Play ou de encontrar uma letra sincronizada. Se uma instância do Piped não oferecer a busca do YouTube Music, o app tenta também a busca pública do YouTube.' },
     ],
   },
-  {
-    versao: 336, data: '2026-10-30', titulo: 'Busca a faixa de áudio mesmo sem letra sincronizada',
-    itens: [
-      { tipo: 'correcao', texto: 'A procura da gravação musical não depende mais de o LRCLIB fornecer uma letra com duração. O Songbook tenta encontrar a faixa oficial pelo título, artista e resultados do YouTube Music; o videoclipe continua separado no modo Vídeo.' },
-    ],
-  },
+
 ];
 
 // as versões que a pessoa ainda não viu (mais nova primeiro); sem nenhuma vista ainda, só a atual
