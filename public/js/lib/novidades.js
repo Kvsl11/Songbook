@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 351, data: '2026-10-30', titulo: 'Conexão mais estável com o servidor e YouTube',
+    itens: [
+      { tipo: 'correcao', texto: 'A descoberta do servidor é revalidada e pode se recuperar de falhas temporárias. O acompanhamento de tarefas tolera oscilações de gateway, e transferências interrompidas podem ser retomadas. O yt-dlp ganhou mais tentativas para falhas temporárias do YouTube.' },
+    ],
+  },
+  {
     versao: 350, data: '2026-10-30', titulo: 'Estado de download imediato',
     itens: [
       { tipo: 'correcao', texto: 'Ao tocar em Baixar, o ícone da música entra imediatamente em modo de download. O app também avisa quando o servidor não está conectado e envia notificações de início, progresso, conclusão ou falha.' },
