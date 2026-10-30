@@ -4126,3 +4126,50 @@ html.pp #player .pl-artista-foto span.sem-foto-artista, html.pp #player .pl-arti
 #aviso-rapido[data-tipo="erro"] svg { color: var(--danger); }
 #aviso-rapido span { min-width: 0; }
 html.tablet #aviso-rapido { bottom: calc(var(--nav-alt, 84px) + var(--nav-pe, 16px) + 16px + env(safe-area-inset-bottom)); font-size: 15px; }
+
+/* ---------------------------------------------------------------- tablet: sem as camadas que piscam
+   No tablet (Android), um vídeo tocando, ou imagens animando, dentro de uma camada com máscara de esmaecido
+   (mask-image) ou atrás de um desfoque (backdrop-filter) faz o navegador redesenhar a tela inteira a cada quadro: a
+   barra do tempo, os botões e partes da tela sumiam e voltavam ("tudo piscando"). Aqui o esmaecido é um degradê por
+   cima (no lugar da máscara), o menu é sólido (sem o desfoque) e as animações só de enfeite param */
+html.tablet #player .pl-linhas { -webkit-mask-image: none; mask-image: none; }
+html.tablet #player:not(.letra-cheia) .pl-letra { position: relative; }
+html.tablet #player:not(.letra-cheia) .pl-letra::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 30%; pointer-events: none;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--cor-musica, var(--tint)) 60%, #000)); }
+html.tablet #player.letra-cheia .pl-linhas { -webkit-mask-image: none; mask-image: none; }
+@media (min-width: 641px) {
+  html.tablet .song-topo.canvas-on .canvas-fundo { -webkit-mask-image: none; mask-image: none; }
+  html.tablet .song-topo.canvas-on .canvas-fundo::after { background:
+    linear-gradient(90deg, rgb(0 0 0 / 0.62) 0%, rgb(0 0 0 / 0.32) 40%, transparent 70%),
+    linear-gradient(180deg, rgb(0 0 0 / 0.35) 0%, transparent 20%, transparent 36%, rgb(0 0 0 / 0.5) 62%, color-mix(in srgb, var(--bg) 70%, #000) 88%, var(--bg) 100%); }
+}
+html.tablet .quadros img.q { will-change: auto; }
+html.tablet .nav, html.tablet .topbar, html.tablet .song-toolbar, html.tablet .cta-bar, html.tablet .rolagem, html.tablet .song-hero .kind,
+html.tablet .lit-dia, html.tablet body.performance .palco-ctrl { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+html.tablet .cta-bar, html.tablet .rolagem { background: var(--surface-2); }
+html.tablet .nav { background: rgb(30 30 30 / 0.97); }
+:root[data-theme="light"].tablet .nav { background: rgb(255 255 255 / 0.98); }
+html.tablet .cat .ic, html.tablet .hero, html.tablet .song-hero > .cover { animation: none !important; }
+/* o player escondido da outra versão (a sombra, para a troca sem engasgo): invisível de verdade (visibility), sem uma
+   camada transparente de vídeo por cima de tudo */
+#pl-tela iframe.pl-reserva { visibility: hidden; }
+
+/* A capa animada (os quadros ou os trechinhos do clipe) sem a máscara de esmaecido: com o vídeo de verdade tocando, o
+   Android ignorava a máscara e o vídeo terminava num traço seco, perto da letra (e no tablet a tela piscava). Agora um
+   degradê por cima leva a capa até uma cor só (--pe-fundo), e o fundo do player fica nessa mesma cor exatamente onde
+   a capa acaba (--fundo-h): não fica emenda nenhuma */
+html.pp #player, html.pp .pl-fundo-casa { --pe-fundo: color-mix(in srgb, var(--cor-musica, var(--tint)) 45%, #121212); }
+html.pp #player .pl-fundo:not([hidden]), html.pp .pl-fundo-casa .pl-fundo:not([hidden]) { -webkit-mask-image: none !important; mask-image: none !important; will-change: auto; }
+html.pp .pl-fundo::after { background: linear-gradient(180deg, rgb(0 0 0 / 0.35) 0%, transparent 22%, transparent 45%,
+  color-mix(in srgb, var(--pe-fundo) 55%, transparent) 72%, color-mix(in srgb, var(--pe-fundo) 90%, transparent) 90%, var(--pe-fundo) 100%); }
+/* (o fundo: a cor da música em cima, a cor do pé da capa onde ela acaba e o escuro mais embaixo; no celular ele rola
+   junto com o conteúdo, como a capa) */
+html.pp:not(.tablet) #player.modo-capa:has(> .pl-fundo:not([hidden])) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--cor-musica, var(--tint)) 88%, #000) 0, var(--pe-fundo) var(--fundo-h, 60%), #121212 calc(var(--fundo-h, 60%) + 420px));
+  background-attachment: local; }
+html.pp.tablet body.com-player:not(.painel-recolhido):not(.com-letra-cheia) .pl-fundo-casa.ativo {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--cor-musica, var(--tint)) 88%, #000) 0, var(--pe-fundo) min(var(--fundo-h, 60%), 100%), #121212 calc(min(var(--fundo-h, 60%), 100%) + 420px)); }
+/* baixando: a setinha apagada, pulsando de leve, até virar a verde */
+.ind-i.ind-baixando { background: none; color: var(--muted); animation: baixando-pulsa 1.2s ease-in-out infinite; }
+@keyframes baixando-pulsa { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .ind-i.ind-baixando { animation: none; } }
