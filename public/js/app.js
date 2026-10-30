@@ -133,7 +133,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-337';
+export const APP_VERSAO = '2026.10.30-338';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1831,7 +1831,7 @@ const semLinhasDeAcordes = (sinc) => {
     // a música sincronizada antes das duas versões (a letra do LRCLIB posta no clipe): confere uma vez se ela tem o
     // áudio oficial
     if (sinc && !marcando && song && !atual.semVideo && precisaConferirVersoes(song)) conferirVersoes(alvoDaMusica(song));
-    if (!sinc && !marcando && song && atual?.youtube && !atual.semVideo && !noClipe() && !lrclibTentado.has(atual.youtube)) {
+    if (!sinc && !marcando && song && atual?.youtube && !atual.semVideo && (!noClipe() || Boolean(atual.audio)) && !lrclibTentado.has(atual.youtube)) {
       const yt = atual.youtube;
       lrclibTentado.add(yt);
       sincEstado.set(yt, { tipo: 'buscando', texto: 'Sincronizando a letra…' });
