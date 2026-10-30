@@ -3158,25 +3158,6 @@ html.pp #player .pl-letra.sincronizada .pl-cifra .line.agora .lyric { color: #ff
 html.pp #player.letra-cheia .pl-linhas p { font-size: calc(26px * var(--font-scale)); }
 #player .pl-ver-cifra[aria-pressed="true"] { background: #fff; color: #111; }
 
-/* o aviso da sincronia, em cima da letra (cartão e tela toda): sincronizando (barrinhas), sincronizada (✓), falta
-   acertar o começo, não achou (com "Sincronizar à mão") e a marcação à mão (com o botão "Agora") */
-#player .pl-sinc { display: none; }
-html.pp #player .pl-sinc:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: none; margin: 0 0 12px; padding: 8px 10px;
-  border-radius: 12px; background: rgb(0 0 0 / 0.24); color: #fff; font-size: 13px; font-weight: 600; line-height: 1.35; cursor: default; }
-html.pp #player .pl-sinc-txt { flex: 1 1 150px; min-width: 0; }
-html.pp #player .pl-sinc-ic { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: rgb(255 255 255 / 0.16); flex: none; }
-html.pp #player .pl-sinc-ic.ok { background: #1db954; }
-html.pp #player .pl-sinc-ic.erro { background: rgb(255 120 90 / 0.3); }
-html.pp #player .pl-sinc button { height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: rgb(255 255 255 / 0.16); color: #fff;
-  font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; flex: none; }
-html.pp #player .pl-sinc button.forte { background: #fff; color: #111; }
-html.pp #player .pl-letra.marcando .pl-sinc button[data-pl="sinc-agora"] { min-width: 96px; height: 38px; font-size: 15px; }
-html.pp #player .pl-sinc-eq { display: inline-flex; align-items: flex-end; gap: 2px; width: 24px; height: 16px; flex: none; justify-content: center; }
-html.pp #player .pl-sinc-eq i { width: 3px; height: 100%; border-radius: 2px; background: #fff; animation: sinc-barra 0.9s ease-in-out infinite; }
-html.pp #player .pl-sinc-eq i:nth-child(2) { animation-delay: 0.15s; }
-html.pp #player .pl-sinc-eq i:nth-child(3) { animation-delay: 0.3s; }
-@keyframes sinc-barra { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
-html.pp #player.letra-cheia .pl-sinc:not([hidden]) { margin: 4px 0 6px; }
 /* partes só de música: três notinhas; enquanto tocam, acendem e pulam uma depois da outra */
 html.pp #player .pl-linhas p.pl-pausa { display: flex; gap: 10px; cursor: default; color: rgb(255 255 255 / 0.32); font-size: 22px; }
 html.pp #player .pl-linhas p.pl-pausa i { font-style: normal; display: inline-block; }
@@ -3225,7 +3206,7 @@ html.pp #player .pl-leitura { width: 32px; height: 32px; min-width: 32px; paddin
 html.pp #player .pl-leitura[aria-pressed="true"] { background: #fff; color: #111; }
 /* só a letra (para ler): sem o nome, o aviso da sincronia e a barra de baixo; sem a cifra, nem as ferramentas */
 html.pp #player.letra-cheia.so-letra .pl-letra-nome { visibility: hidden; }
-html.pp #player.letra-cheia.so-letra .pl-letra-pe, html.pp #player.letra-cheia.so-letra .pl-sinc,
+html.pp #player.letra-cheia.so-letra .pl-letra-pe,
 html.pp #player.letra-cheia.so-letra:not(.cifra-on) .pl-ferr { display: none !important; }
 html.pp #player .pl-letra-nome { min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
 html.pp #player .pl-letra-nome b, html.pp #player .pl-letra-nome small { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -3442,39 +3423,6 @@ html.tablet body.na-musica.com-player.painel-recolhido .main-col { margin-bottom
   html.tablet body.com-player.painel-recolhido .nav { padding: 0 4px; }
 }
 
-/* ---------------------------------------------------------------- Notificações: o sino no topo guarda os avisos do
-   servidor (letra sincronizada, YouTube pedindo login…) em vez de eles pularem na tela; o número diz quantos são novos */
-.sino { position: relative; }
-.sino-n { position: absolute; top: 3px; right: 2px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; display: grid; place-items: center;
-  font-size: 10px; font-weight: 900; line-height: 1; color: #fff; background: #e5484d; box-shadow: 0 0 0 2px var(--bg); }
-.sino.tocou svg { animation: badalar 0.9s ease; transform-origin: 50% 10%; }
-@keyframes badalar { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(16deg); } 35% { transform: rotate(-13deg); } 55% { transform: rotate(8deg); } 75% { transform: rotate(-4deg); } }
-@media (prefers-reduced-motion: reduce) { .sino.tocou svg { animation: none; } }
-#notificacoes {
-  position: fixed; z-index: 60; top: calc(58px + env(safe-area-inset-top)); right: 12px; width: min(380px, calc(100vw - 24px));
-  max-height: min(70dvh, 520px); display: flex; flex-direction: column; overflow: hidden; border-radius: 16px;
-  background: var(--surface, #1f1f1f); color: var(--text); border: 1px solid rgb(255 255 255 / 0.08);
-  box-shadow: 0 18px 50px rgb(0 0 0 / 0.5); animation: surgir 0.2s both;
-}
-:root[data-theme="light"] #notificacoes { background: #fff; border-color: rgb(0 0 0 / 0.08); box-shadow: 0 18px 50px rgb(0 0 0 / 0.18); }
-.nt-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 16px 10px; }
-.nt-cab b { font-size: 16px; }
-.nt-cab .link-btn { font-size: 13px; }
-#notificacoes ul { list-style: none; margin: 0; padding: 0 6px 8px; overflow-y: auto; overscroll-behavior: contain; }
-#notificacoes li { position: relative; display: grid; grid-template-columns: 34px 1fr 32px; align-items: start; gap: 10px; padding: 10px 6px 10px 10px; border-radius: 12px; }
-#notificacoes li + li { margin-top: 2px; }
-#notificacoes li.nova { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-#notificacoes li.nova::before { content: ""; position: absolute; left: 3px; top: 50%; width: 6px; height: 6px; margin-top: -3px; border-radius: 50%; background: var(--accent); }
-.nt-ic { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3, rgb(127 127 127 / 0.15)); color: var(--muted); }
-#notificacoes li[data-tipo="erro"] .nt-ic { color: #e5484d; background: rgb(229 72 77 / 0.14); }
-#notificacoes li[data-tipo="sucesso"] .nt-ic { color: #30a46c; background: rgb(48 164 108 / 0.15); }
-.nt-txt { min-width: 0; display: flex; flex-direction: column; gap: 2px; color: inherit; text-decoration: none; font-size: 14px; line-height: 1.35; }
-.nt-txt b { font-size: 14px; }
-.nt-txt small { color: var(--muted); font-size: 12px; }
-a.nt-txt span { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: 2px; }
-#notificacoes li .icon-btn { width: 32px; height: 32px; color: var(--muted); }
-.nt-vazio { margin: 0; padding: 18px 16px 24px; text-align: center; }
-
 /* ---------------------------------------------------------------- Conectar o YouTube (os cookies, uma vez só) */
 .conectar-yt { display: flex; flex-direction: column; gap: 16px; max-width: 640px; margin: 0 auto; padding: 8px 0 24px; }
 /* topo: cartão vermelho do YouTube, com o estado da conexão */
@@ -3530,37 +3478,6 @@ a.nt-txt span { text-decoration: underline; text-decoration-color: color-mix(in 
 .cy-nota { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 0 4px; font-size: 13px; line-height: 1.45; }
 .cy-nota svg { flex: none; margin-top: 2px; }
 
-/* sincronizar a letra: o andamento logo acima da letra (carregando com a etapa, deu certo ou o erro e o que fazer),
-   na cor do fundo da letra (a da música), com barrinhas de equalizador e um fio correndo embaixo enquanto ouve */
-.sinc-status { --cor: color-mix(in srgb, var(--tint, var(--accent)) 70%, #000); position: relative; overflow: hidden; display: flex; align-items: center; gap: 12px;
-  margin: 0 0 12px; padding: 12px 12px 12px 14px; border-radius: 16px; color: #fff;
-  background: linear-gradient(120deg, color-mix(in srgb, var(--cor) 92%, #fff) 0%, var(--cor) 55%, color-mix(in srgb, var(--cor) 80%, #000) 100%);
-  box-shadow: 0 10px 28px color-mix(in srgb, var(--cor) 45%, transparent), inset 0 0 0 1px rgb(255 255 255 / 0.1); animation: pop 0.25s ease; }
-.sinc-status[data-tipo="ok"] .sinc-ic { background: #fff; color: color-mix(in srgb, var(--tint, var(--accent)) 80%, #000); }
-.sinc-status[data-tipo="erro"] { flex-wrap: wrap; }
-.sinc-status[data-tipo="erro"] .sinc-ic { background: rgb(255 255 255 / 0.18); color: #ffd1d1; }
-.sinc-ic { flex: none; width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; color: #fff; background: rgb(255 255 255 / 0.16); }
-.sinc-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 14.5px; font-weight: 700; line-height: 1.3; }
-.sinc-txt small { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(255 255 255 / 0.7); }
-.sinc-status[data-tipo="erro"] .sinc-txt { flex-basis: calc(100% - 90px); }
-.sinc-status .btn { flex: none; background: rgb(255 255 255 / 0.95); color: #111; border-color: transparent; }
-.sinc-status .icon-btn { flex: none; width: 32px; height: 32px; color: rgb(255 255 255 / 0.85); }
-/* no celular o botão (Refazer, Tentar de novo…) espremia o texto numa coluna estreita: o texto fica na largura toda,
-   entre o ícone e o fechar, e o botão desce para uma linha só dele */
-@media (max-width: 600px) {
-  .sinc-status { flex-wrap: wrap; }
-  .sinc-status .sinc-txt, .sinc-status[data-tipo="erro"] .sinc-txt { flex: 1 1 calc(100% - 104px); }
-  .sinc-status .btn { order: 1; flex: 1 1 100%; justify-content: center; }
-}
-.sinc-eq { display: flex; align-items: flex-end; gap: 3px; height: 16px; }
-.sinc-eq i { width: 3px; height: 100%; border-radius: 2px; background: #fff; transform-origin: bottom; animation: sinc-eq 0.9s ease-in-out infinite; }
-.sinc-eq i:nth-child(2) { animation-delay: -0.3s; } .sinc-eq i:nth-child(3) { animation-delay: -0.6s; } .sinc-eq i:nth-child(4) { animation-delay: -0.15s; }
-@keyframes sinc-eq { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
-.sinc-fio { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgb(255 255 255 / 0.15); overflow: hidden; }
-.sinc-fio::after { content: ""; position: absolute; top: 0; bottom: 0; width: 35%; border-radius: 2px; background: linear-gradient(90deg, transparent, #fff, transparent); animation: sinc-fio 1.4s ease-in-out infinite; }
-@keyframes sinc-fio { from { left: -35%; } to { left: 100%; } }
-@media (prefers-reduced-motion: reduce) { .sinc-eq i, .sinc-fio::after { animation: none; } }
-
 /* ---------------------------------------------------------------- Novidades: o que mudou em cada atualização */
 .nv-intro { margin: -4px 0 18px; }
 .nv-lista { display: grid; gap: 14px; max-width: 760px; }
@@ -3575,7 +3492,6 @@ a.nt-txt span { text-decoration: underline; text-decoration-color: color-mix(in 
 .nv-ic { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--accent-ink); background: var(--accent-soft); }
 .nv-versao li[data-tipo="correcao"] .nv-ic { color: #30a46c; background: rgb(48 164 108 / 0.15); }
 .nv-versao li[data-tipo="novo"] .nv-ic { color: #f5a524; background: rgb(245 165 36 / 0.15); }
-#notificacoes li[data-tipo="atualizacao"] .nt-ic { color: var(--accent-ink); background: var(--accent-soft); }
 
 
 /* ============================================================
@@ -4117,8 +4033,6 @@ html.tablet .aj-topico small { font-size: 14.5px; }
 .of-legenda li.of-aviso svg { margin-top: 2px; }
 .aj-pagina { margin: 8px 4px 4px; font-size: 26px; font-weight: 900; letter-spacing: -0.02em; }
 html.tablet .aj-pagina { font-size: 30px; }
-/* com as notificações na barra do celular, o sininho de dentro do app sai */
-.sino.no-sistema { display: none !important; }
 
 /* artista sem foto: a pessoa com a nota musical (como no Spotify), num fundo cinza azulado, em vez das iniciais */
 .ref-avatar.sem-foto { background: #3d444d; color: #a7adb4; }
