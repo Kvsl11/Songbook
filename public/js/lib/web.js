@@ -488,8 +488,16 @@ export async function letraSincronizada(
   ].filter(Boolean);
   const respostas = await Promise.all(consultas.map((params) => pedir(params).catch(() => null)));
   const listas = respostas.filter(Array.isArray);
-  const mesmas = listas.flat().filter((r) =>
-    r.syncedLyrics && !r.instrumental && mesmoTitulo(r.trackName, t) && (!a || mesmoArtista(r.artistName, a)));
+  const corresponde = (r) =>
+    r.syncedLyrics && !r.instrumental && mesmoTitulo(r.trackName, t) && (!a || mesmoArtista(r.artistName, a));
+  let mesmas = listas.flat().filter(corresponde);
+  // Algumas entradas do LRCLIB têm o artista cadastrado com créditos adicionais ou variações de nome.
+  // Se as buscas exata e ampla não trouxerem uma correspondência, busca só pelo título e valida o artista
+  // localmente. Assim não aceita outra música de mesmo nome nem uma gravação de outro intérprete.
+  if (!mesmas.length) {
+    const porTitulo = await pedir(`track_name=${encodeURIComponent(t)}`).catch(() => null);
+    if (Array.isArray(porTitulo)) mesmas = porTitulo.filter(corresponde);
+  }
   if (mesmas.length) {
     const oficial = gravacaoOficial(mesmas, duracao);
     const bate = !(duracao > 0) || !(oficial.duration > 0) || Math.abs(oficial.duration - duracao) <= 4;
