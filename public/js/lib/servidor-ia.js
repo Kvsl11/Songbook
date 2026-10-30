@@ -100,6 +100,31 @@ const esperar = (ms, sinal) => new Promise((ok, falha) => {
   sinal?.addEventListener('abort', () => { clearTimeout(t); falha(new Error('Cancelado')); }, { once: true });
 });
 
+// A entrega do arquivo pode falhar por oscilação entre o servidor e o navegador.
+// O endpoint mantém o arquivo disponível até concluir a resposta, então repetir o GET é seguro.
+export async function baixarArquivoDoServidor(cfg, numero, { tentativas = 3, fetchImpl = fetch, aguardar = esperar } = {}) {
+  const base = baseDoServidor(cfg?.url);
+  if (!base) throw new Error('A IA do servidor ainda não está disponível');
+  let ultimo;
+  for (let i = 0; i < tentativas; i++) {
+    try {
+      const resp = await fetchImpl(`${base}/baixar/${encodeURIComponent(numero)}`, {
+        headers: cabecalhos(base, cfg?.chave), cache: 'no-store',
+      });
+      if (resp.ok) return resp;
+      const texto = await resp.text().catch(() => '');
+      const erro = erroDaResposta(resp.status, texto);
+      if (![502, 503, 504].includes(resp.status)) throw erro;
+      ultimo = erro;
+    } catch (e) {
+      if (e.status && ![502, 503, 504].includes(e.status)) throw e;
+      ultimo = e;
+    }
+    if (i + 1 < tentativas) await aguardar(700 * (i + 1));
+  }
+  throw ultimo || new Error('Não foi possível receber o arquivo do servidor');
+}
+
 // pergunta pela tarefa a cada 1,5 s; uma pergunta que falha (a internet do celular oscilou) é repetida, e só depois de
 // um minuto sem resposta o app desiste
 async function acompanharTarefa(cfg, base, id, { sinal, limite, aoEtapa }) {
