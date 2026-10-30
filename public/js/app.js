@@ -11084,7 +11084,11 @@ async function procurarAudio(song, duracao) {
   let respondeu = false;
   // Busca em paralelo nas faixas do YouTube Music e nos vídeos. Usa os mesmos resultados
   // do seletor antigo, mas escolhe automaticamente a gravação cantada mais provável.
-  const consultas = [[termo, 'music_songs'], [`${termo} audio`, 'videos'], [termo, 'videos']];
+  const consultas = [
+    // music_songs devolve itens type=music (o conversor também os reconhece); é a busca principal do YouTube Music.
+    [termo, 'music_songs'], [`${termo} official audio`, 'videos'], [`${termo} audio oficial`, 'videos'],
+    [`${termo} topic`, 'videos'], [termo, 'videos'],
+  ];
   const listas = await Promise.all(consultas.map(async ([q, filtro]) => {
     try {
       const lista = await buscarYoutube(q, { filtro });
