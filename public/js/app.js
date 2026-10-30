@@ -1565,14 +1565,27 @@ const player = (() => {
             url = URL.createObjectURL(blob);
             caixa = videoNovo();
             reserva = videoNovo();
-            caixa.addEventListener('playing', () => { if (caixa?.readyState >= 2) { caixa.classList.add('pronto'); medirFaixas(); } }, { once: true });
-            caixa.addEventListener('seeked', () => medirFaixas(), { once: true });
+            caixa.addEventListener('seeked', () => medirFaixas(), { once: false });
             caixa.addEventListener('loadedmetadata', () => {
               if (!caixa) return;
               const d = caixa.duration;
               trechos = Number.isFinite(d) && d > 20 ? PONTOS.map((f) => Math.max(0, Math.min(d - DURA, f * d))) : [0];
               k = 0;
-              caixa.currentTime = trechos[0];
+              // Não revelar o início do arquivo: a primeira imagem só entra depois do seek e da decodificação.
+              const inicial = trechos[0];
+              caixa.addEventListener('seeked', async () => {
+                if (!caixa) return;
+                try {
+                  await caixa.play();
+                  if (typeof caixa.requestVideoFrameCallback === 'function') {
+                    await new Promise((resolve) => caixa.requestVideoFrameCallback(() => resolve()));
+                  } else {
+                    await new Promise((resolve) => setTimeout(resolve, 100));
+                  }
+                  if (caixa) { caixa.classList.add('pronto'); medirFaixas(); }
+                } catch { /* o acompanhamento tenta iniciar quando o player estiver tocando */ }
+              }, { once: true });
+              caixa.currentTime = inicial;
               if (reserva.readyState >= 1) preparar((k + 1) % trechos.length);
               else reserva.addEventListener('loadedmetadata', () => preparar((k + 1) % trechos.length), { once: true });
             }, { once: true });
