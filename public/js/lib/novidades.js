@@ -4,9 +4,9 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
-    versao: 338, data: '2026-10-30', titulo: 'Mantém a sincronia LRCLIB com áudio e videoclipe separados',
+    versao: 339, data: '2026-10-30', titulo: 'Sincronia automática somente pelo LRCLIB',
     itens: [
-      { tipo: 'correcao', texto: 'A letra sincronizada pelo LRCLIB volta a ser procurada também quando o player está mostrando o videoclipe e a música já tem uma faixa de áudio separada. A letra fica vinculada à gravação musical correta, sem alterar a separação entre Música e Vídeo.' },
+      { tipo: 'correcao', texto: 'A sincronia de letras usa exclusivamente o LRCLIB. A sincronização por IA do servidor e os comandos manuais foram removidos. Se o LRCLIB não encontrar a gravação correspondente, a música permanece sem sincronia e sem notificações desse processo.' },
     ],
   },
   {
@@ -57,13 +57,6 @@ export const NOVIDADES = [
     versao: 330, data: '2026-10-30', titulo: 'Versão música com a duração da gravação',
     itens: [
       { tipo: 'correcao', texto: 'O Songbook procura a gravação cantada pela duração própria da música mesmo quando a letra sincronizada já parece combinar com o videoclipe. O modo música usa a gravação curta e o modo vídeo mantém o clipe completo.' },
-    ],
-  },
-  {
-    versao: 329, data: '2026-10-30', titulo: 'Versão cantada e clipe escolhidos automaticamente',
-    itens: [
-      { tipo: 'melhoria', texto: 'Ao buscar uma música, o Songbook procura automaticamente a gravação cantada para acompanhar a letra e o videoclipe. A troca entre as versões mantém a posição da música.' },
-      { tipo: 'correcao', texto: 'A versão musical não precisa mais ser escolhida manualmente no menu.' },
     ],
   },
 
