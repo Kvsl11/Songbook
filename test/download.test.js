@@ -59,3 +59,19 @@ test('download: o ícone entra em andamento imediatamente, antes da verificaçã
   assert.match(rotina, /Não deu para baixar/);
   assert.match(rotina, /finally[\s\S]*baixando\.delete\(id\)/);
 });
+
+test('download: redescobre o servidor antes de iniciar cada fila e usa recuperação de entrega', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const inicio = app.indexOf('async function baixarMusica(song');
+  const fim = app.indexOf('async function baixarAgora(id)', inicio);
+  const rotina = app.slice(inicio, fim);
+  assert.ok(rotina.indexOf('await carregarServidor()') < rotina.indexOf('!servidorIA().url'));
+  assert.match(app, /baixarArquivoDoServidor\(servidorIA\(\), r\.arquivo\)/);
+});
+test('YouTube: yt-dlp tem novas tentativas para falhas de rede e fragmentos', async () => {
+  const youtube = await readFile(new URL('../servidor-ia/youtube.py', import.meta.url), 'utf8');
+  assert.match(youtube, /"socket_timeout": 30/);
+  assert.match(youtube, /"retries": 6/);
+  assert.match(youtube, /"fragment_retries": 6/);
+  assert.match(youtube, /"extractor_retries": 5/);
+});
