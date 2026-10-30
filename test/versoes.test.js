@@ -22,6 +22,13 @@ test('acha o áudio oficial da gravação (e não o clipe, o ao vivo ou outra du
   assert.equal(escolherAudio(tipos, { titulo: 'Espresso', artista: 'Sabrina Carpenter', duracao: 175 })?.id, 'musictrack01');
   assert.equal(escolherAudio(achados, { titulo: 'Espresso', artista: 'X', duracao: 300 }), null);
   assert.equal(escolherAudio(achados, { titulo: 'Espresso', duracao: 0 }), null);
+  // Sem LRCLIB, o resultado type=music ainda deve ser encontrado pelo título e artista.
+  const semLrc = [
+    { ...v('yummyclip01', 'Justin Bieber - Yummy (Official Music Video)', 'Justin Bieber', 230), tipo: 'stream' },
+    { ...v('yummyaudio1', 'Yummy', 'Justin Bieber - Topic', 210), tipo: 'music' },
+  ];
+  assert.equal(escolherAudio(semLrc, { titulo: 'Yummy', artista: 'Justin Bieber', duracao: 0 })?.id, 'yummyaudio1');
+  assert.equal(escolherAudio(semLrc, { titulo: 'Yummy', artista: 'Justin Bieber', duracao: 0, evitar: 'yummyaudio1' }), null);
   // A diferença de alguns segundos entre LRCLIB e YouTube não deve impedir o áudio oficial.
   const thriller = [
     v('thrillerclip1', 'Michael Jackson - Thriller (Official Music Video)', 'Michael Jackson', 858),

@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 336, data: '2026-10-30', titulo: 'Busca a faixa de áudio mesmo sem letra sincronizada',
+    itens: [
+      { tipo: 'correcao', texto: 'A procura da gravação musical não depende mais de o LRCLIB fornecer uma letra com duração. O Songbook tenta encontrar a faixa oficial pelo título, artista e resultados do YouTube Music; o videoclipe continua separado no modo Vídeo.' },
+    ],
+  },
+  {
     versao: 335, data: '2026-10-30', titulo: 'Videoclipe só fica nos dois modos quando a sincronia é igual',
     itens: [
       { tipo: 'correcao', texto: 'Quando o áudio e o videoclipe têm a mesma linha do tempo, o Songbook mantém o próprio clipe nos modos Música e Vídeo. Se houver introdução, cortes ou deslocamentos, mantém a faixa musical separada no modo Música.' },

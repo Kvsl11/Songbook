@@ -10964,22 +10964,21 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
   // ganha as duas versões. O áudio oficial da gravação (achado no YouTube pela duração dela) toca no modo música, com a
   // letra certinha; o clipe, no modo vídeo. Devolve a letra para o áudio (ou a mesma, se não achou o áudio)
   const comAudio = async (lrc) => {
-    // A duração do clipe não determina a duração da gravação: mesmo quando o LRCLIB aceita a letra
-    // sem ajuste (por coincidência, ou por uma entrada do clipe), procuramos a gravação com a duração
-    // própria da música. Assim o modo música nunca fica preso ao videoclipe mais longo.
-    if (!(lrc?.duracao > 0) || versoesDe(song) || !song.youtube) return lrc;
-    status('carregando', 'Procurando o áudio oficial da música…');
-    const achado = await procurarAudio(song, lrc.duracao);
+    // A busca da faixa não pode depender do LRCLIB: se a letra sincronizada não existir ou não trouxer duração,
+    // ainda procuramos a gravação musical pelo título, artista e tipo music do YouTube Music.
+    if (versoesDe(song)?.audio || !song.youtube) return lrc;
+    status('carregando', 'Procurando a gravação de áudio da música…');
+    const duracaoFaixa = Number(lrc?.duracao) || Number(song.duracaoAudio) || 0;
+    const achado = await procurarAudio(song, duracaoFaixa);
     if (!achado) return lrc;
-    // onde a música está no clipe: pela sincronia dele que já existia (acertada à mão ou pela IA, com as mesmas
-    // linhas) ou, sem ela, pela diferença de duração (a cena antes da música); com a IA do servidor, ela ouve o clipe
-    // depois e acerta trecho por trecho
-    const doClipe = song.sincronia?.video === song.youtube && !song.sincronia.ajustar ? paresDasSincronias(lrc.tempos, song.sincronia.tempos) : null;
+    // A letra só participa do casamento quando existe. Sem LRCLIB, a duração e a análise do áudio fazem a reserva.
+    const doClipe = lrc?.tempos && song.sincronia?.video === song.youtube && !song.sincronia.ajustar
+      ? paresDasSincronias(lrc.tempos, song.sincronia.tempos) : null;
     const durClipe = (player.atual?.youtube === song.youtube && player.duracao) || await duracaoDaMusica(song).catch(() => 0);
     guardarVersoes(song, { video: song.youtube, audio: achado.id, duracao: achado.segundos, pares: doClipe || paresPelaDuracao(durClipe, achado.segundos) });
     yt = achado.id;
-    acertarVersoes(song, doClipe ? null : lrc); // (pelo servidor ou, sem ele, no aparelho)
-    return { ...lrc, ajustar: false };
+    acertarVersoes(song, doClipe || lrc ? lrc : null);
+    return lrc ? { ...lrc, ajustar: false } : null;
   };
   const peloLrclib = async () => { const lrc = await comAudio(await buscarLrc()); return lrc ? usarLrc(lrc) : null; };
   if (!pelaIA && (!refazer || soLrclib || !servidorIA().url)) {

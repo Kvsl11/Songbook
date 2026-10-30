@@ -37,7 +37,12 @@ export function escolherAudio(videos, { titulo = '', artista = '', duracao = 0, 
     // Para durações confiáveis, mantém a correspondência estreita com a gravação.
     const tolerancia = Math.max(8, duracao * 0.025);
     if (!v?.id || v.id === evitar || !(v.segundos > 0)) continue;
-    if (duracaoSuspeita ? (v.segundos < 120 || v.segundos > 7 * 60) : (!(duracao > 0) || Math.abs(v.segundos - duracao) > tolerancia)) continue;
+    const semDuracao = !(duracao > 0);
+    // Sem LRCLIB, a faixa ainda pode ser identificada pelo título, artista e type=music.
+    // Não aceitar clipes longos nem vídeos muito curtos como áudio musical.
+    if (duracaoSuspeita ? (v.segundos < 120 || v.segundos > 7 * 60)
+      : semDuracao ? (v.segundos < 120 || v.segundos > 8 * 60)
+        : Math.abs(v.segundos - duracao) > Math.max(12, duracao * 0.04)) continue;
     const nome = normal(v.titulo);
     if (!` ${nome} `.includes(` ${t} `) || CLIPE.test(nome) || (OUTRA_GRAVACAO.test(nome) && !OUTRA_GRAVACAO.test(t))) continue;
     // (a instrumental tem a mesma duração da gravação: só o nome diz que ela não tem a voz)
@@ -53,7 +58,7 @@ export function escolherAudio(videos, { titulo = '', artista = '', duracao = 0, 
     if (/\b(lyrics?|letra|lyric video)\b/.test(nome)) n -= 2;
     // Sem duração confiável, favorece uma faixa normal (perto de 4 min), sem descartar
     // gravações legítimas mais curtas ou mais longas dentro da faixa permitida.
-    n -= duracaoSuspeita ? Math.abs(v.segundos - 240) / 90 : Math.abs(v.segundos - duracao) / 2;
+    n -= duracaoSuspeita || semDuracao ? Math.abs(v.segundos - 210) / 90 : Math.abs(v.segundos - duracao) / 2;
     if (n > nota) { nota = n; melhor = v; }
   }
   return melhor;
