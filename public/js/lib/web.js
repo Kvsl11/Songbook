@@ -636,7 +636,7 @@ export async function buscarYoutube(termo, { fetchImpl, instancias = PIPED, filt
 // o som de um vídeo do YouTube (o arquivo do áudio de menor qualidade, que basta para casar as duas versões da música),
 // pelo Piped, que entrega o áudio pelo proxy dele (com CORS); null se nenhuma instância entregar
 export async function audioDoVideo(id, { fetchImpl, instancias = PIPED } = {}) {
-  if (!/^[\\w-]{11}$/.test(id || '')) return null;
+  if (!/^[\w-]{11}$/.test(id || '')) return null;
   // Consulta as instâncias em paralelo: algumas ficam lentas ou fora do ar. O áudio em si é baixado
   // de uma fonte por vez, para não multiplicar o consumo de dados no celular.
   const fontes = await Promise.all(instancias.map(async (base) => {
