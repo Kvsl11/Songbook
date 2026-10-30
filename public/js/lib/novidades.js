@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 357, data: '2026-10-30', titulo: 'Fila de reprodução reorganizável',
+    itens: [
+      { tipo: 'melhoria', texto: 'O aleatório agora embaralha a ordem real da fila, que também pode ser reorganizada arrastando as músicas com o dedo ou o mouse. A seleção por teclado também permite mover faixas.' },
+      { tipo: 'melhoria', texto: 'A fila mostra a duração de cada música quando disponível e busca a duração que estiver faltando para guardá-la na biblioteca.' },
+    ],
+  },
+  {
     versao: 356, data: '2026-10-30', titulo: 'Sincronização online mais resistente',
     itens: [
       { tipo: 'melhoria', texto: 'O Songbook consegue comparar o áudio da faixa com o áudio extraído do videoclipe online, sem baixar a imagem do vídeo. A consulta às fontes de áudio fica mais rápida e, se um formato falhar, tenta outras faixas de áudio e instâncias antes de desistir.' },
@@ -56,12 +63,6 @@ export const NOVIDADES = [
     versao: 348, data: '2026-10-30', titulo: 'Sincronização confirmada antes de abrir a música',
     itens: [
       { tipo: 'correcao', texto: 'A busca agora identifica primeiro a gravação de áudio e só depois consulta o LRCLIB com a duração correta. A música só abre quando o videoclipe e a letra sincronizada são confirmados; tentativas sem correspondência podem ser refeitas.' },
-    ],
-  },
-  {
-    versao: 347, data: '2026-10-30', titulo: 'Correção no download de vídeos do YouTube',
-    itens: [
-      { tipo: 'correcao', texto: 'Corrigida a validação do identificador do YouTube: ela estava rejeitando IDs válidos de 11 caracteres, mesmo quando o vídeo era reproduzido normalmente no player.' },
     ],
   },
 

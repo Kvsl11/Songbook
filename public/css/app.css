@@ -1948,6 +1948,24 @@ dialog.lista-fila .fila-eq i:nth-child(3) { animation-delay: -0.6s; }
 dialog.lista-fila .lista-op[aria-selected="true"] .lista-txt b { color: var(--accent); }
 dialog.lista-fila .lista-txt b { font-size: 16px; }
 dialog.lista-fila .lista-txt small { font-size: 13.5px; }
+dialog.lista-fila { max-width: 560px; }
+dialog.lista-fila .lista-cab { gap: 8px; }
+dialog.lista-fila .lista-cab h3 { flex: 1; min-width: 0; }
+dialog.lista-fila .lista-opcoes { max-height: min(68dvh, 680px); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+dialog.lista-fila .fila-item { min-height: 68px; user-select: none; -webkit-user-select: none; }
+dialog.lista-fila .fila-item.atual { background: var(--accent-soft); }
+dialog.lista-fila .fila-item.indisponivel { opacity: .48; }
+dialog.lista-fila .fila-item.arrastando { opacity: .35; background: var(--surface-3); }
+dialog.lista-fila .fila-arrastar { all: unset; display: grid; place-items: center; width: 28px; height: 42px; flex: none; color: var(--muted); cursor: grab; touch-action: none; border-radius: 7px; }
+dialog.lista-fila .fila-arrastar:active { cursor: grabbing; color: var(--text); background: var(--surface-3); }
+dialog.lista-fila .fila-arrastar:disabled { visibility: hidden; }
+dialog.lista-fila .fila-aleatorio.ligado { color: var(--accent-ink); background: var(--accent-soft); }
+dialog.lista-fila .fila-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (max-width: 699px) {
+  dialog.lista-fila .lista-op { padding: 8px 8px; gap: 9px; }
+  dialog.lista-fila .fila-capa { width: 46px; height: 46px; }
+  dialog.lista-fila .fila-arrastar { width: 24px; }
+}
 .lista-txt b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lista-txt small { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lista-ok { color: var(--accent-ink); flex: none; }
