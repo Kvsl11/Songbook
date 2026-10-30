@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 338, data: '2026-10-30', titulo: 'Mantém a sincronia LRCLIB com áudio e videoclipe separados',
+    itens: [
+      { tipo: 'correcao', texto: 'A letra sincronizada pelo LRCLIB volta a ser procurada também quando o player está mostrando o videoclipe e a música já tem uma faixa de áudio separada. A letra fica vinculada à gravação musical correta, sem alterar a separação entre Música e Vídeo.' },
+    ],
+  },
+  {
     versao: 337, data: '2026-10-30', titulo: 'Busca a gravação musical ao abrir a música',
     itens: [
       { tipo: 'correcao', texto: 'A procura da faixa separada agora começa assim que a música é aberta, sem depender de apertar Play ou de encontrar uma letra sincronizada. Se uma instância do Piped não oferecer a busca do YouTube Music, o app tenta também a busca pública do YouTube.' },
@@ -58,12 +64,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'melhoria', texto: 'Ao buscar uma música, o Songbook procura automaticamente a gravação cantada para acompanhar a letra e o videoclipe. A troca entre as versões mantém a posição da música.' },
       { tipo: 'correcao', texto: 'A versão musical não precisa mais ser escolhida manualmente no menu.' },
-    ],
-  },
-  {
-    versao: 328, data: '2026-10-30', titulo: 'As notificações de volta na barra do celular',
-    itens: [
-      { tipo: 'correcao', texto: 'Instalando o app de novo, o Android zera a permissão das notificações, mas o app não pedia de novo e o sininho voltava. Agora ele pede outra vez (no primeiro toque na tela) e o sininho fica escondido enquanto isso; ele só aparece se as notificações estiverem bloqueadas, para os avisos não se perderem.' },
     ],
   },
 
