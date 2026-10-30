@@ -10997,21 +10997,34 @@ async function procurarAudio(song, duracao) {
   const titulo = tituloLimpo(song.title);
   const termo = `${titulo} ${song.artist || ''}`.trim();
   let respondeu = false;
-  // primeiro no YouTube Music (as faixas dos álbuns, o áudio puro do canal do artista); depois nos vídeos
-  for (const [q, filtro] of [[termo, 'music_songs'], [`${termo} audio`, 'videos'], [termo, 'videos']]) {
-    const lista = await buscarYoutube(q, { filtro }).catch(() => null);
-    if (lista) respondeu = true;
-    const achado = escolherAudio(lista || [], { titulo, artista: song.artist || '', duracao, evitar: song.youtube });
-    if (achado) { buscaDeAudioFalhou.delete(song.id); return achado; }
-  }
+  // Busca em paralelo nas faixas do YouTube Music e nos vídeos. Usa os mesmos resultados
+  // do seletor antigo, mas escolhe automaticamente a gravação cantada mais provável.
+  const consultas = [[termo, 'music_songs'], [`${termo} audio`, 'videos'], [termo, 'videos']];
+  const listas = await Promise.all(consultas.map(async ([q, filtro]) => {
+    try {
+      const lista = await buscarYoutube(q, { filtro });
+      respondeu = true;
+      return lista || [];
+    } catch { return []; }
+  }));
+  const vistos = new Set([song.youtube]);
+  const candidatos = listas.flat().filter((v) => {
+    if (!v?.id || vistos.has(v.id)) return false;
+    vistos.add(v.id);
+    return true;
+  });
+  const achado = escolherAudio(candidatos, { titulo, artista: song.artist || '', duracao, evitar: song.youtube });
+  if (achado) { buscaDeAudioFalhou.delete(song.id); return achado; }
   if (!respondeu) buscaDeAudioFalhou.add(song.id);
   return null;
 }
-// Escolher à mão a versão só música (quando a do app não é a gravação cantada, ou não achou): os vídeos da busca com o
-// nome da música, os de duração parecida com a da gravação primeiro; os sem voz (instrumental, base, karaokê) avisam.
-// Escolhida, a letra sincroniza de novo nela e o clipe é casado com ela pelo som
-async function escolherVersaoMusica(song) {
-  conegundo plano: ela ouve o áudio oficial e o clipe e casa os dois pelo próprio som (como o
+// as duas versões da música (o clipe e o áudio oficial) ficam guardadas nela; o player passa a usá-las na hora
+function guardarVersoes(song, versoes) {
+  song.versoes = versoes;
+  if (song.id === 'previa') { if (preview) preview.versoes = versoes; } else if (db.song(song.id)) db.updateSong(song.id, { versoes });
+  player.versoes(song);
+}
+// com a IA do servidor, em segundo plano: ela ouve o áudio oficial e o clipe e casa os dois pelo próprio som (como o
 // YouTube Music), ponto a ponto: a troca entre a música e o vídeo cai no mesmo ponto, com cena antes, no meio ou no fim
 // do clipe. Sem dar certo (não parecem a mesma gravação), fica a estimativa pela letra (lrc) ou pela duração
 // Sem o servidor (ou sem ele dar certo), o próprio aparelho casa as duas pelo som (lib/casamento.js, a mesma conta do
