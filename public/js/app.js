@@ -251,6 +251,9 @@ async function compartilhar(dados) {
 // Compatibilidade com chamadas antigas: notificações locais e do sistema estão desativadas.
 function notificar() {}
 async function notificarSistema() { return false; }
+const podeNotificarNoSistema = () => false;
+try { localStorage.removeItem('songbook.notificacoes'); } catch { /* armazenamento indisponível */ }
+if ('serviceWorker' in navigator) navigator.serviceWorker.ready.then((reg) => reg.getNotifications().then((ns) => ns.forEach((n) => n.close()))).catch(() => {});
 
 function setHeader(title, { back = null, actions = [], eyebrow = '' } = {}) {
   titleEl.textContent = title;
@@ -8433,6 +8436,8 @@ function viewSong(id, ctx = {}) {
   // vídeo desta música, a linha cantada acende e a letra rola até ela; tocar numa linha leva o vídeo para ali
   // (com as duas versões, a letra acompanha o áudio oficial: no clipe ela fica parada)
   const sincronia = () => (midiaDe(song) && song.sincronia?.fonte === 'lrclib' && song.sincronia.video === videoDaLetra(song) && song.sincronia.tempos?.length ? song.sincronia : null);
+  // Consulta o LRCLIB automaticamente ao abrir a música, em qualquer tamanho de tela.
+  if (midiaDe(song)) sincronizarAoTocar();
   // Consulta o LRCLIB automaticamente ao abrir a música, em qualquer tamanho de tela.
   if (midiaDe(song)) sincronizarAoTocar();
   const linhasNaTela = () => [...songEl.querySelectorAll('.line:not(.chords-only)')].filter((l) => linhaSemCifra([...l.querySelectorAll('.lyric')].map((x) => x.textContent).join('')));
