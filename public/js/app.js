@@ -224,6 +224,7 @@ function toast(msg, opcoes = {}) {
 }
 // o aviso rápido na tela (some sozinho em 3 s, como o do Spotify)
 let avisoTempo = 0;
+const ICONE_AVISO = { sucesso: 'check', erro: 'alerta', ia: 'sparkles', info: 'info', atualizacao: 'download' };
 function avisoRapido(texto, tipo = 'info') {
   let el = $('#aviso-rapido');
   if (!el) {
@@ -1809,7 +1810,7 @@ const semLinhasDeAcordes = (sinc) => {
     $('.pl-tom', el).innerHTML = `<small>Tom</small>${esc(r.key || (transpose ? (transpose > 0 ? '+' : '') + transpose : '—'))}`;
     $('.pl-capo', el).innerHTML = `<small>Capo</small>${capo || '—'}`;
     // com a letra sincronizada, a linha cantada acende também na cifra
-    const sinc = song.sincronia?.video === atual?.youtube ? song.sincronia : null;
+    const sinc = song.sincronia?.fonte === 'lrclib' && song.sincronia.video === atual?.youtube ? song.sincronia : null;
     if (sinc) {
       const linhasTela = [...box.querySelectorAll('.line:not(.chords-only)')];
       const textos = linhasTela.map((l) => [...l.querySelectorAll('.lyric')].map((x) => x.textContent).join(''));
