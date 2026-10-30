@@ -65,12 +65,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'A busca agora identifica primeiro a gravação de áudio e só depois consulta o LRCLIB com a duração correta. A música só abre quando o videoclipe e a letra sincronizada são confirmados; tentativas sem correspondência podem ser refeitas.' },
     ],
   },
-  {
-    versao: 347, data: '2026-10-30', titulo: 'Correção no download de vídeos do YouTube',
-    itens: [
-      { tipo: 'correcao', texto: 'Corrigida a validação do identificador do YouTube: ela estava rejeitando IDs válidos de 11 caracteres, mesmo quando o vídeo era reproduzido normalmente no player.' },
-    ],
-  },
 
 ];
 
