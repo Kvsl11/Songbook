@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 328, data: '2026-10-30', titulo: 'As notificações de volta na barra do celular',
+    itens: [
+      { tipo: 'correcao', texto: 'Instalando o app de novo, o Android zera a permissão das notificações, mas o app não pedia de novo e o sininho voltava. Agora ele pede outra vez (no primeiro toque na tela) e o sininho fica escondido enquanto isso; ele só aparece se as notificações estiverem bloqueadas, para os avisos não se perderem.' },
+    ],
+  },
+  {
     versao: 327, data: '2026-10-30', titulo: 'Thriller no ponto certo e a frase que passa como no Spotify',
     itens: [
       { tipo: 'melhoria', texto: 'Clipes com a música editada, como Thriller (com a música em outra ordem, partes a mais e a menos e cenas de filme no meio), agora trocam entre a música e o vídeo no ponto certo: cada trecho da música é procurado sozinho no clipe. As músicas que tinham sido recusadas como “outra gravação” são conferidas de novo.' },
@@ -87,13 +93,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'Colar o link do QR code do servidor nos Ajustes funciona: o app tira dele o endereço do servidor e confere antes de usar.' },
       { tipo: 'correcao', texto: 'A tela de downloads não pisca mais enquanto baixa, e o armazenamento não mostra mais os “10,7 GB livres” que o navegador inventa.' },
       { tipo: 'correcao', texto: 'Tablet: o Tocando agora na tela toda com o fundo inteiro (antes metade ficava preta) e os ícones do menu de baixo centralizados no nome.' },
-    ],
-  },
-  {
-    versao: 318, data: '2026-10-29', titulo: 'Música e vídeo casados pelo som',
-    itens: [
-      { tipo: 'melhoria', texto: 'Com o servidor ligado, o áudio oficial e o videoclipe são casados pelo próprio som, como no YouTube Music: trocar entre a música e o vídeo cai na mesma parte cantada, mesmo com cena antes, no meio ou no fim do clipe.' },
-      { tipo: 'correcao', texto: 'Na troca entre música e vídeo, a barra do tempo vai direto para o ponto certo, sem voltar ao começo e pular de volta.' },
     ],
   },
 ];
