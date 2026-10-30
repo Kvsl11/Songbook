@@ -2623,6 +2623,7 @@ const semLinhasDeAcordes = (sinc) => {
       const assinatura = base.join('|');
       if (filaOrdemChave !== chave || filaOrdemBase !== assinatura) {
         filaOrdemChave = chave; filaOrdemBase = assinatura; filaOrdem = base.map((_, i) => i);
+        if (aleatorio) filaOrdem = embaralharIndices(filaOrdem, atual.index);
       }
       const i = filaOrdem.indexOf(atual.index);
       return { set, ids: filaOrdem.map((j) => base[j]), indices: [...filaOrdem], i };
@@ -2631,10 +2632,11 @@ const semLinhasDeAcordes = (sinc) => {
     const base = db.songs().filter((x) => midiaDe(x)).map((x) => x.id);
     const chave = 'biblioteca';
     const assinatura = base.join('|');
+    const original = base.indexOf(atual.songId);
     if (filaOrdemChave !== chave || filaOrdemBase !== assinatura) {
       filaOrdemChave = chave; filaOrdemBase = assinatura; filaOrdem = base.map((_, i) => i);
+      if (aleatorio) filaOrdem = embaralharIndices(filaOrdem, original);
     }
-    const original = base.indexOf(atual.songId);
     return { set: null, ids: filaOrdem.map((j) => base[j]), indices: [...filaOrdem], i: filaOrdem.indexOf(original) };
   };
   const temVideo = (f, i) => Boolean(midiaDe(db.song(f.ids[i])));
