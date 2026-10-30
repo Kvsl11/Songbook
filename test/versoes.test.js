@@ -139,7 +139,7 @@ test('avisos de sincronização não são exibidos, mas downloads notificam no c
   assert.match(sw, /badge-96\.png/);
 });
 
-test('ao abrir uma música, prepara a faixa e o LRCLIB em paralelo antes de entrar', async () => {
+test('ao abrir uma música, confirma a faixa e o LRCLIB antes de entrar', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   const abrir = app.indexOf('async function abrirPrevia(');
   const rota = app.indexOf("if (jaNaPrevia) route(); else location.hash = '#/musica/previa';", abrir);
@@ -147,10 +147,13 @@ test('ao abrir uma música, prepara a faixa e o LRCLIB em paralelo antes de entr
   assert.ok(preparo > abrir && preparo < rota, 'a tela só navega depois de iniciar e concluir o preparo da música');
   assert.match(app, /await prepararMusicaAoAbrir\(novo\)/, 'a tela só abre depois de áudio e LRCLIB terminarem');
   assert.doesNotMatch(app, /Promise\.race\(\[preparo, new Promise\(\(ok\) => setTimeout\(ok, 1100\)\)\]\)/, 'não deve abrir antes da preparação terminar');
-  const helper = app.slice(app.indexOf('function prepararMusicaAoAbrir(song)'), app.indexOf('function guardarSincronia(song, sinc)'));
+  const helper = app.slice(app.indexOf('function prepararMusicaAoAbrir(song)'), app.indexOf('// o áudio oficial da gravação'));
   assert.match(helper, /descobrirVersoes\(song\)/);
   assert.match(helper, /sincronizarMusica\(song, \{ audioPromise \}\)/);
-  assert.match(helper, /tentouSincronizar/);
+  assert.match(helper, /tentouSincronizar\.delete\(chave\)/);
+  const rotinaSync = app.slice(app.indexOf('async function sincronizarMusica(song'), app.indexOf('// A preparação começa no clique/entrada da música'));
+  assert.ok(rotinaSync.indexOf('await descoberta.catch') < rotinaSync.indexOf('letraSincronizada('),
+    'a gravação de áudio precisa ser identificada antes da consulta ao LRCLIB');
 });
 
 test('a consulta LRCLIB faz as buscas exata e ampla em paralelo com limite configurável', async () => {
@@ -163,4 +166,16 @@ test('a consulta LRCLIB faz as buscas exata e ampla em paralelo com limite confi
   assert.match(rotina, /tentativas = 4/);
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   assert.match(app, /OPÇÕES_LRCLIB_RÁPIDAS = \{ espera: 250, timeout: 4500, tentativas: 2 \}/);
+});
+
+test('a busca não entra na música sem videoclipe e letra sincronizada confirmada no LRCLIB', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const abrir = app.indexOf('async function abrirPrevia(');
+  const preparar = app.indexOf('const preparo = await prepararMusicaAoAbrir(novo);', abrir);
+  const bloquear = app.indexOf("if (preparo !== 'ok' || !sincValida)", preparar);
+  const navegar = app.indexOf("location.hash = '#/musica/previa'", bloquear);
+  assert.ok(preparar > abrir && bloquear > preparar && navegar > bloquear);
+  assert.match(app.slice(bloquear, navegar), /openDialog/);
+  assert.match(app.slice(bloquear, navegar), /novo\.sincronia\?\.fonte === 'lrclib'/);
+  assert.match(app, /if \(r !== 'ok'\) tentouSincronizar\.delete\(chaveSync\)/);
 });
