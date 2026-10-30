@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { escolherAudio, paresDasSincronias, paresPelaDuracao, tempoNoAudio, tempoNoVideo } from '../public/js/lib/versoes.js';
+import { escolherAudio, mesmaSincronia, paresDasSincronias, paresPelaDuracao, tempoNoAudio, tempoNoVideo } from '../public/js/lib/versoes.js';
 
 const v = (id, titulo, canal, segundos) => ({ id, titulo, canal, segundos });
 
@@ -47,4 +47,13 @@ test('os pares pelas duas sincronias, ou pela duração', () => {
   assert.equal(paresDasSincronias([{ inicio: 1 }], [{ inicio: 1 }, { inicio: 2 }]), null);
   assert.deepEqual(paresPelaDuracao(194, 175), [[0, 19]]);
   assert.deepEqual(paresPelaDuracao(170, 175), [[0, 0]]);
+});
+
+
+test('só compartilha o mesmo vídeo entre Música e Vídeo quando a sincronia é idêntica', () => {
+  assert.equal(mesmaSincronia([[0, 0], [10, 10.2], [40, 40.1]]), true);
+  assert.equal(mesmaSincronia([[0, 18], [10, 28], [40, 58]]), false); // introdução
+  assert.equal(mesmaSincronia([[0, 0], [10, 10], [40, 55]]), false); // corte no meio
+  assert.equal(mesmaSincronia([]), false);
+  assert.equal(mesmaSincronia(null), false);
 });

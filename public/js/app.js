@@ -22,7 +22,7 @@ import { NOVIDADES, novidadesNaoVistas } from './lib/novidades.js';
 import { baseDoServidor, cabecalhos, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, dataDaPergunta, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { apagarAudio, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } from './audios.js';
-import { escolherAudio, paresDasSincronias, paresPelaDuracao, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
+import { escolherAudio, mesmaSincronia, paresDasSincronias, paresPelaDuracao, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
 import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { audioDbDoArtista, audioDoVideo, buscarYoutube, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
@@ -133,7 +133,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-334';
+export const APP_VERSAO = '2026.10.30-335';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -2497,8 +2497,8 @@ const semLinhasDeAcordes = (sinc) => {
     comCapa = !comCapa;
     db.setPref('playerCapa', comCapa);
     if (atual?.audio && atual.video && !atual.semVideo) {
-      if (comCapa && atual.youtube === atual.video) trocarVersao(atual.audio, tempoNoAudio(atual.pares, api.tempoAgora));
-      else if (!comCapa && atual.youtube === atual.audio) { trocarVersao(atual.video, tempoNoVideo(atual.pares, api.tempoAgora)); foiProClipe = performance.now(); }
+      if (comCapa && atual.youtube === atual.video && atual.youtube !== atual.audio) trocarVersao(atual.audio, tempoNoAudio(atual.pares, api.tempoAgora));
+      else if (!comCapa && atual.youtube === atual.audio && atual.youtube !== atual.video) { trocarVersao(atual.video, tempoNoVideo(atual.pares, api.tempoAgora)); foiProClipe = performance.now(); }
       // ainda sem as duas casadas pelo som (só a estimativa pela duração, que erra nos clipes com cena antes e depois
       // da música, como Espresso ou Speed Demon): o servidor ouve as duas agora; quando ele responder, o clipe vai
       // sozinho para o ponto certo (veja versoes)
@@ -2617,7 +2617,7 @@ const semLinhasDeAcordes = (sinc) => {
       if (vs.diferentes && atual.youtube === vs.video) { trocarVersao(vs.audio, tempoNoAudio(vs.pares, api.tempoAgora)); return; }
       // (outra versão só música no lugar da que tocava: a mesma gravação, no mesmo ponto)
       if (audioAntes && audioAntes !== vs.audio && atual.youtube === audioAntes) trocarVersao(vs.audio, api.tempoAgora);
-      else if (comCapa && atual.youtube === vs.video) trocarVersao(vs.audio, tempoNoAudio(vs.pares, api.tempoAgora));
+      else if (comCapa && atual.youtube === vs.video && atual.youtube !== vs.audio) trocarVersao(vs.audio, tempoNoAudio(vs.pares, api.tempoAgora));
       else if (!comCapa && estado === 'tocando' && atual.youtube === vs.video && vs.casadas && antes && performance.now() - foiProClipe < 90e3) {
         // acabou de trocar para o clipe pela estimativa e chegou o casamento pelo som: o clipe vai para o mesmo ponto
         // cantado (o ponto do áudio pela estimativa de antes, no clipe pelo casamento novo)
@@ -11150,6 +11150,12 @@ async function acertarVersoes(song, lrc = null, { pedido = false } = {}) {
       return;
     }
     const agora = song.id === 'previa' ? preview : db.song(song.id);
+    if (pares?.length && agora && versoesDe(agora)?.video === vs.video && mesmaSincronia(pares)) {
+      // O clipe e a faixa são literalmente a mesma linha do tempo: usa o próprio clipe nos dois modos.
+      // Se houver qualquer deslocamento relevante, mantém as duas fontes separadas.
+      guardarVersoes(agora, { ...versoesDe(agora), audio: vs.video, pares: [[0, 0]], casadas: true, casamento: CASAMENTO });
+      return;
+    }
     if (pares?.length && agora && versoesDe(agora)?.video === vs.video) {
       if (ehArquivo(vs.audio)) {
         db.updateSong(agora.id, { audioProprio: { ...agora.audioProprio, pares, casadas: true, casamento: CASAMENTO } });

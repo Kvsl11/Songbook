@@ -4,6 +4,13 @@
 // cantado está em cada uma (o clipe tem cenas antes da música ou no meio dela, e o áudio não).
 
 const normal = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+// Só é a mesma versão nos dois modos quando todos os trechos casam no mesmo instante.
+// Se houver introdução, corte ou deslocamento, o áudio e o videoclipe continuam separados.
+export function mesmaSincronia(pares, tolerancia = 0.8) {
+  return Boolean(pares?.length) && pares.every(([audio, video]) =>
+    Number.isFinite(audio) && Number.isFinite(video) && Math.abs(audio - video) <= tolerancia);
+}
 // outra gravação da mesma música (o tempo do LRCLIB não vale) ou outra edição dela
 const OUTRA_GRAVACAO = /\b(live|ao vivo|en vivo|cover|karaoke|instrumental|remix|sped up|slowed|nightcore|acustic[oa]|acoustic|reverb|8d|playback|versao|version|edit)\b/;
 // sem a voz (o modo música é a gravação cantada, para a letra acompanhar): a base, o instrumental, o karaokê, os

@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 335, data: '2026-10-30', titulo: 'Videoclipe só fica nos dois modos quando a sincronia é igual',
+    itens: [
+      { tipo: 'correcao', texto: 'Quando o áudio e o videoclipe têm a mesma linha do tempo, o Songbook mantém o próprio clipe nos modos Música e Vídeo. Se houver introdução, cortes ou deslocamentos, mantém a faixa musical separada no modo Música.' },
+    ],
+  },
+  {
     versao: 334, data: '2026-10-30', titulo: 'Busca separa a faixa musical do videoclipe',
     itens: [
       { tipo: 'correcao', texto: 'A busca preserva o tipo original do YouTube: no modo Áudio, a faixa do YouTube Music (music) tem prioridade sobre resultados de vídeo (stream), mesmo quando título e duração são iguais. O modo Vídeo continua usando o videoclipe.' },
@@ -63,15 +69,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: '“Ver álbum” e “Ver artista” não deixam mais a tela preta: a página abre na hora, com “Procurando…”, e o álbum aparece logo depois. E os álbuns de artistas com aspas no nome de algum disco (como Ariana Grande) voltaram a ser achados.' },
       { tipo: 'correcao', texto: 'A capa animada não mostra mais as faixas pretas dos clipes de cinema (como Love Me Harder): elas ficam de fora, e o vídeo vai até o topo e se mistura no degradê embaixo, sem emenda. Vale também para as músicas já baixadas.' },
       { tipo: 'melhoria', texto: 'Biblioteca mais limpa: sem o cartão grande em cima, e os filtros e a busca ficam presos no topo ao rolar a lista.' },
-    ],
-  },
-  {
-    versao: 325, data: '2026-10-30', titulo: 'Tablet sem piscar, capa sem emenda e mais músicas no tempo certo',
-    itens: [
-      { tipo: 'correcao', texto: 'Tablet: a tela não pisca mais nem some com a barra e os botões. As máscaras de esmaecido, o desfoque atrás do menu e as animações de enfeite que faziam o tablet redesenhar a tela a cada quadro saíram.' },
-      { tipo: 'correcao', texto: 'A capa animada termina num degradê na cor do fundo, sem o traço seco perto da letra (como em Love Me Harder).' },
-      { tipo: 'correcao', texto: 'O ícone de baixada aparece na biblioteca na hora, sem precisar abrir de novo (e fica apagado enquanto baixa).' },
-      { tipo: 'melhoria', texto: 'Mais músicas trocam no ponto certo entre a música e o vídeo, mesmo com clipe longo e cenas de filme no meio (como Thriller): ao trocar, o servidor, quando há um, casa as duas versões pelo som, e no aparelho a conta pesa muito menos.' },
     ],
   },
  ];
