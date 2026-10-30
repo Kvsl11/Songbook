@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 337, data: '2026-10-30', titulo: 'Busca a gravação musical ao abrir a música',
+    itens: [
+      { tipo: 'correcao', texto: 'A procura da faixa separada agora começa assim que a música é aberta, sem depender de apertar Play ou de encontrar uma letra sincronizada. Se uma instância do Piped não oferecer a busca do YouTube Music, o app tenta também a busca pública do YouTube.' },
+    ],
+  },
+  {
     versao: 336, data: '2026-10-30', titulo: 'Busca a faixa de áudio mesmo sem letra sincronizada',
     itens: [
       { tipo: 'correcao', texto: 'A procura da gravação musical não depende mais de o LRCLIB fornecer uma letra com duração. O Songbook tenta encontrar a faixa oficial pelo título, artista e resultados do YouTube Music; o videoclipe continua separado no modo Vídeo.' },
@@ -58,14 +64,6 @@ export const NOVIDADES = [
     versao: 328, data: '2026-10-30', titulo: 'As notificações de volta na barra do celular',
     itens: [
       { tipo: 'correcao', texto: 'Instalando o app de novo, o Android zera a permissão das notificações, mas o app não pedia de novo e o sininho voltava. Agora ele pede outra vez (no primeiro toque na tela) e o sininho fica escondido enquanto isso; ele só aparece se as notificações estiverem bloqueadas, para os avisos não se perderem.' },
-    ],
-  },
-  {
-    versao: 327, data: '2026-10-30', titulo: 'Thriller no ponto certo e a frase que passa como no Spotify',
-    itens: [
-      { tipo: 'melhoria', texto: 'Clipes com a música editada, como Thriller (com a música em outra ordem, partes a mais e a menos e cenas de filme no meio), agora trocam entre a música e o vídeo no ponto certo: cada trecho da música é procurado sozinho no clipe. As músicas que tinham sido recusadas como “outra gravação” são conferidas de novo.' },
-      { tipo: 'novo', texto: 'A frase cantada acima do nome passa como no Spotify: a de antes sobe e some, e a nova sobe no lugar dela.' },
-      { tipo: 'correcao', texto: 'A sincronização automática da letra dizia “sincronizada”, mas a letra não andava (ela ia para a outra versão da música). Agora ela vai para a versão que está tocando e acompanha na hora.' },
     ],
   },
 

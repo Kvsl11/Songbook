@@ -610,8 +610,10 @@ export async function buscarYoutube(termo, { fetchImpl, instancias = PIPED, filt
   try {
     return await Promise.any(instancias.map(uma));
   } catch {
-    if (respondeu) return [];
-    // nenhuma instância do Piped respondeu: a página de busca do YouTube
+    // O filtro music_songs nem sempre é implementado pelas instâncias Piped. Mesmo que elas respondam
+    // sem faixas, tentamos a busca pública do YouTube para não perder a gravação oficial.
+    if (respondeu && filtro !== 'music_songs') return [];
+    // nenhuma instância do Piped respondeu (ou não trouxe faixas musicais): a página de busca do YouTube
     const daPagina = await buscarNaPaginaDoYoutube(q, { fetchImpl }).catch(() => null);
     if (daPagina?.length) return daPagina;
     throw new Error('Busca de vídeos indisponível agora');

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { videosDaPaginaDoYoutube } from '../public/js/lib/web.js';
+import { buscarYoutube, videosDaPaginaDoYoutube } from '../public/js/lib/web.js';
 import { escolherAudio } from '../public/js/lib/versoes.js';
 
 // um pedaço da busca do YouTube como o Jina Reader devolve (o formato de cada vídeo: miniatura com a duração, título, canal)
@@ -60,4 +60,20 @@ test('quando o LRCLIB devolve os 9 min do videoclipe, escolhe a gravação music
   ];
   const achado = escolherAudio(lista, { titulo: 'Remember the Time', artista: 'Michael Jackson', duracao: 555, evitar: 'clipe1234567' });
   assert.equal(achado?.id, 'audio1234567');
+});
+
+test('busca musical usa a página do YouTube quando Piped não implementa music_songs', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('/search?filter=music_songs')) {
+      return { ok: true, status: 200, json: async () => ({ items: [] }) };
+    }
+    if (url.includes('r.jina.ai/https://www.youtube.com/results')) {
+      return { ok: true, status: 200, text: async () => PAGINA };
+    }
+    throw new Error('URL inesperada: ' + url);
+  };
+  const lista = await buscarYoutube('Espresso Sabrina Carpenter', {
+    fetchImpl, instancias: ['https://piped.example'], filtro: 'music_songs',
+  });
+  assert.ok(lista.some((v) => v.id === '51zjlMhdSTE'));
 });

@@ -133,7 +133,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-336';
+export const APP_VERSAO = '2026.10.30-337';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -8253,6 +8253,9 @@ function viewSong(id, ctx = {}) {
     const r = renderSong(song.content);
     song = { ...song, title: r.meta.title || 'Canto', artist: r.meta.artist || r.meta.subtitle || '', youtube: youtubeId(r.meta.youtube) || '', cover: r.meta.cover || '', pdf: r.meta.pdf || '', key: r.key, composer: r.meta.composer || r.meta.lyricist || '' };
   } else db.touchRecent(song.id);
+  // A faixa musical é descoberta ao abrir a música, sem depender de tocar ou de sincronizar a letra.
+  // A busca roda em segundo plano: a página abre na hora e o player recebe a versão assim que ela for encontrada.
+  if (song.youtube && !song.audioProprio && !versoesDe(song)?.audio) void descobrirVersoes(song);
   setTab(ctx.set ? 'biblioteca' : isPreview ? (song.back?.startsWith('#/buscar') ? 'buscar' : 'liturgia') : 'biblioteca');
   if (midiaDe(song) && player.desta(midiaDe(song))) player.atualizar({ titulo: song.title, artista: song.artist || '' });
   corDaMusicaNaTela(song);
@@ -11105,6 +11108,41 @@ async function procurarAudio(song, duracao) {
   if (achado) { buscaDeAudioFalhou.delete(song.id); return achado; }
   if (!respondeu) buscaDeAudioFalhou.add(song.id);
   return null;
+}
+// Descobre a gravação de áudio assim que a música é aberta. Não depende de LRCLIB, de letra sincronizada,
+// nem de o usuário apertar Play. Se a busca não achar nada, uma próxima abertura pode tentar novamente.
+const descobrindoVersoes = new Map();
+async function descobrirVersoes(song) {
+  const video = song?.youtube;
+  if (!song?.id || !video || song.audioProprio || versoesDe(song)?.audio) return null;
+  const chave = `${song.id}|${video}`;
+  if (descobrindoVersoes.has(chave)) return descobrindoVersoes.get(chave);
+  const previaOriginal = song.id === 'previa' ? preview : null;
+  const tarefa = (async () => {
+    try {
+      const duracao = Number(song.sincronia?.duracao) || Number(song.versoes?.duracao) || 0;
+      const achado = await procurarAudio(song, duracao);
+      if (!achado || achado.id === video) return null;
+      let atual;
+      if (song.id === 'previa') {
+        if (preview !== previaOriginal) return null; // a pessoa já abriu outra música
+        atual = { ...preview, title: song.title, artist: song.artist, youtube: video };
+      } else atual = db.song(song.id);
+      if (!atual || atual.youtube !== video || versoesDe(atual)?.audio) return null;
+      const durClipe = (player.atual?.youtube === video && player.duracao)
+        || await duracaoDaMusica(atual).catch(() => 0);
+      guardarVersoes(atual, {
+        video, audio: achado.id, duracao: achado.segundos,
+        pares: paresPelaDuracao(durClipe, achado.segundos),
+      });
+      // Se já houver letra sincronizada, a IA pode casar os pontos exatos entre a faixa e o videoclipe.
+      void acertarVersoes(atual, atual.sincronia?.fonte === 'lrclib' ? atual.sincronia : null);
+      return achado;
+    } catch { return null; }
+    finally { descobrindoVersoes.delete(chave); }
+  })();
+  descobrindoVersoes.set(chave, tarefa);
+  return tarefa;
 }
 // as duas versões da música (o clipe e o áudio oficial) ficam guardadas nela; o player passa a usá-las na hora
 function guardarVersoes(song, versoes) {

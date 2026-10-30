@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { escolherAudio, mesmaSincronia, paresDasSincronias, paresPelaDuracao, tempoNoAudio, tempoNoVideo } from '../public/js/lib/versoes.js';
 
 const v = (id, titulo, canal, segundos) => ({ id, titulo, canal, segundos });
@@ -24,11 +25,11 @@ test('acha o áudio oficial da gravação (e não o clipe, o ao vivo ou outra du
   assert.equal(escolherAudio(achados, { titulo: 'Espresso', duracao: 0 })?.id, 'topic000001');
   // Sem LRCLIB, o resultado type=music ainda deve ser encontrado pelo título e artista.
   const semLrc = [
-    { ...v('yummyclip01', 'Justin Bieber - Yummy (Official Music Video)', 'Justin Bieber', 230), tipo: 'stream' },
-    { ...v('yummyaudio1', 'Yummy', 'Justin Bieber - Topic', 210), tipo: 'music' },
+    { ...v('8EJ3zbKTWQ8', 'Justin Bieber - Yummy (Official Video)', 'Justin Bieber', 230), tipo: 'stream' },
+    { ...v('IBIxNypW6qM', 'Yummy', 'Justin Bieber', 210), tipo: 'music' },
   ];
-  assert.equal(escolherAudio(semLrc, { titulo: 'Yummy', artista: 'Justin Bieber', duracao: 0 })?.id, 'yummyaudio1');
-  assert.equal(escolherAudio(semLrc, { titulo: 'Yummy', artista: 'Justin Bieber', duracao: 0, evitar: 'yummyaudio1' }), null);
+  assert.equal(escolherAudio(semLrc, { titulo: 'Yummy', artista: 'Justin Bieber', duracao: 0 })?.id, 'IBIxNypW6qM');
+  assert.equal(escolherAudio(semLrc, { titulo: 'Yummy', artista: 'Justin Bieber', duracao: 0, evitar: 'IBIxNypW6qM' }), null);
   // A diferença de alguns segundos entre LRCLIB e YouTube não deve impedir o áudio oficial.
   const thriller = [
     v('thrillerclip1', 'Michael Jackson - Thriller (Official Music Video)', 'Michael Jackson', 858),
@@ -63,4 +64,17 @@ test('só compartilha o mesmo vídeo entre Música e Vídeo quando a sincronia �
   assert.equal(mesmaSincronia([[0, 0], [10, 10], [40, 55]]), false); // corte no meio
   assert.equal(mesmaSincronia([]), false);
   assert.equal(mesmaSincronia(null), false);
+});
+
+test('ao abrir uma música, a faixa separada é procurada sem depender de sincronizar a letra ou apertar Play', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const abrir = app.indexOf('function viewSong(');
+  const chamar = app.indexOf('descobrirVersoes(song)', abrir);
+  const funcao = app.indexOf('async function descobrirVersoes(song)');
+  assert.ok(abrir >= 0 && chamar > abrir && chamar < abrir + 9000, 'viewSong deve iniciar a descoberta ao abrir a música');
+  assert.ok(funcao > 0, 'a descoberta da faixa deve existir como fluxo independente');
+  const fim = app.indexOf('// as duas versões da música (o clipe e o áudio oficial)', funcao);
+  const corpo = app.slice(funcao, fim);
+  assert.match(corpo, /procurarAudio\(song/);
+  assert.doesNotMatch(corpo, /sincronizarMusica|letraSincronizada/);
 });
