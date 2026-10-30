@@ -133,7 +133,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-327';
+export const APP_VERSAO = '2026.10.30-328';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -272,8 +272,9 @@ sino.className = 'icon-btn sino';
 sino.setAttribute('aria-label', 'Notificações');
 sino.title = 'Notificações';
 function desenharSino() {
-  // (com as notificações no sistema, o sininho sai; o que ficou nele de antes some junto)
-  sino.classList.toggle('no-sistema', podeNotificarNoSistema());
+  // (com as notificações no sistema, o sininho sai; o que ficou nele de antes some junto. Ainda sem resposta ao pedido
+  // da permissão, também: ele só aparece com ela negada ou sem notificações no aparelho, para os avisos não se perderem)
+  sino.classList.toggle('no-sistema', podeNotificarNoSistema() || (typeof Notification !== 'undefined' && Notification.permission === 'default'));
   const n = notificacoes.filter((x) => !x.lida).length;
   sino.innerHTML = `${icon('bell', 18)}${n ? `<b class="sino-n">${n > 9 ? '9+' : n}</b>` : ''}`;
   sino.setAttribute('aria-label', n ? `Notificações: ${n} novas` : 'Notificações');
@@ -295,14 +296,17 @@ async function notificarSistema({ titulo, texto = '', tag = '', href = '', silen
     return true;
   } catch { return false; }
 }
-// pede a permissão uma vez, no primeiro toque na tela (o Android só mostra o pedido depois de um toque)
-if (typeof Notification !== 'undefined' && Notification.permission === 'default' && !localStorage.getItem('songbook.pediuNotificacao')) {
+// pede a permissão no primeiro toque na tela (o Android só mostra o pedido depois de um toque), sempre que ela estiver
+// sem resposta: antes era uma vez só, e ao instalar o app de novo (o Android zera a permissão, mas o app lembrava que
+// já tinha pedido) ela nunca mais era pedida e o sininho voltava
+if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
   document.addEventListener('pointerup', function pedir() {
     document.removeEventListener('pointerup', pedir);
-    try { localStorage.setItem('songbook.pediuNotificacao', '1'); } catch { /* sem armazenamento */ }
     Notification.requestPermission().then(() => desenharSino()).catch(() => {});
   });
 }
+// (a permissão mudada nos ajustes do Android ou do navegador: o sininho acompanha)
+navigator.permissions?.query({ name: 'notifications' }).then((st) => { st.onchange = () => desenharSino(); }).catch(() => {});
 function notificar(texto, { tipo = 'info', href = '', titulo = '' } = {}) {
   if (podeNotificarNoSistema()) { notificarSistema({ titulo, texto, href, tag: tipo === 'atualizacao' ? 'atualizacao' : '' }); return; }
   notificacoes.unshift({ id: Date.now() + Math.random(), t: Date.now(), texto, titulo, tipo, href, lida: false });
