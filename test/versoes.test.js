@@ -166,16 +166,29 @@ test('cada prévia da busca tem seu próprio bloqueio de sincronização LRCLIB'
   assert.match(rotina, /sincronizando\.delete\(chaveSincronizacao\)/);
 });
 
-test('a consulta LRCLIB faz as buscas exata e ampla em paralelo com limite configurável', async () => {
+test('a consulta LRCLIB é sequencial para evitar limite de requisições e tem tentativas configuráveis', async () => {
   const web = await readFile(new URL('../public/js/lib/web.js', import.meta.url), 'utf8');
   const inicio = web.indexOf('export async function letraSincronizada(');
   const fim = web.indexOf('// A gravação oficial entre as letras', inicio);
   const rotina = web.slice(inicio, fim);
-  assert.match(rotina, /Promise\.all\(consultas\.map/);
+  assert.match(rotina, /for \\(let i = 0; i < consultas\\.length; i\\+\\+\\)/);
+  assert.match(rotina, /setTimeout\\(ok, 350\\)/);
+  assert.doesNotMatch(rotina, /Promise\\.all\\(consultas\\.map/);
   assert.match(rotina, /timeout = 10000/);
   assert.match(rotina, /tentativas = 4/);
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
-  assert.match(app, /OPÇÕES_LRCLIB_RÁPIDAS = \{ espera: 1000, timeout: 10000, tentativas: 4 \}/);
+  assert.match(app, /OPÇÕES_LRCLIB_RÁPIDAS = \\{ espera: 1000, timeout: 10000, tentativas: 4 \\}/);
+});
+
+test('se o LRCLIB encontrar duração diferente, refaz a busca do áudio mesmo quando já existe uma versão associada', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const inicio = app.indexOf('async function sincronizarMusica(song');
+  const fim = app.indexOf('// A preparação começa no clique/entrada da música', inicio);
+  const rotina = app.slice(inicio, fim);
+  assert.match(rotina, /if \\(lrc\\.ajustar && song\\.youtube && !ehArquivo\\(yt\\)\\)/);
+  assert.match(rotina, /procurarAudio\\(song, Number\\(lrc\\.duracao\\) \\|\\| 0\\)/);
+  assert.match(rotina, /guardarVersoes\\(song, \\{/);
+  assert.doesNotMatch(rotina, /lrc\\.ajustar && !vs\\?\\.audio/);
 });
 
 test('a busca não entra na música sem videoclipe e letra sincronizada confirmada no LRCLIB', async () => {
