@@ -20,7 +20,7 @@ test('download: áudio e vídeo avançam em paralelo e o progresso inclui a tran
   const youtube = await readFile(new URL('../servidor-ia/youtube.py', import.meta.url), 'utf8');
   assert.match(app, /await Promise\.all\(lista\.map\(async/);
   assert.match(app, /resp\.body\?\.getReader/);
-  assert.match(app, /Baixando \\?\$\{pct\}%/);
+  assert.ok(app.includes('texto: `Baixando ${pct}%`'));
   assert.match(app, /void guardarImagensDaMusica\(song\)\.catch/);
   assert.match(youtube, /"concurrent_fragment_downloads": 4/);
   assert.match(youtube, /if not pede_login\(e\) or indice == 5/);
