@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 350, data: '2026-10-30', titulo: 'Estado de download imediato',
+    itens: [
+      { tipo: 'correcao', texto: 'Ao tocar em Baixar, o ícone da música entra imediatamente em modo de download. O app também avisa quando o servidor não está conectado e envia notificações de início, progresso, conclusão ou falha.' },
+    ],
+  },
+  {
     versao: 349, data: '2026-10-30', titulo: 'Busca LRCLIB mais resistente a variações',
     itens: [
       { tipo: 'correcao', texto: 'A consulta de letras sincronizadas ganhou mais tempo e novas tentativas. Se a busca exata não localizar a gravação, o Songbook procura pelo título e confirma o artista antes de aceitar a letra.' },
