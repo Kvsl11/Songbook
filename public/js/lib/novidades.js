@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 355, data: '2026-10-30', titulo: 'Troca entre música e videoclipe com alinhamento preciso',
+    itens: [
+      { tipo: 'correcao', texto: 'O casamento sonoro agora procura trechos ao longo de todo o videoclipe, inclusive depois de introduções longas, cenas inseridas e partes editadas. A conversão preserva cenas em que o vídeo avança enquanto a música fica no mesmo ponto e corrige pequenas diferenças de velocidade entre as gravações.' },
+      { tipo: 'correcao', texto: 'Mapas antigos são recalibrados com o novo algoritmo. Se uma comparação falhar temporariamente, trocar de modo permite tentar novamente em vez de bloquear novas tentativas.' },
+    ],
+  },
+  {
     versao: 354, data: '2026-10-30', titulo: 'Capa original carregada ao abrir a música',
     itens: [
       { tipo: 'correcao', texto: 'A busca pela capa oficial do álbum ou single agora começa junto com a preparação do áudio e da letra, sem depender da sincronização LRCLIB. Quando a imagem chega depois da abertura, a capa da tela e do player é atualizada sem reiniciar a música. Falhas temporárias na busca não ficam guardadas como ausência definitiva de capa.' },
@@ -56,12 +63,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'O botão Limpar cache agora remove também as respostas guardadas em localStorage, informa quantos itens foram removidos e atualiza os números sem piscar a tela. Os downloads, a biblioteca e o pacote do aplicativo são preservados.' },
       { tipo: 'melhoria', texto: 'O armazenamento mostra o tamanho dos arquivos de download realmente presentes no aparelho e o uso total informado pelo navegador para o Songbook. O espaço livre total do celular não é disponibilizado a aplicativos web.' },
-    ],
-  },
-  {
-    versao: 345, data: '2026-10-30', titulo: 'Correção do download do videoclipe',
-    itens: [
-      { tipo: 'correcao', texto: 'O videoclipe não é mais descartado apenas porque a faixa de áudio oficial é outra gravação. O servidor também identifica o arquivo MP4 final depois de juntar imagem e som, sem confundir fragmentos temporários com o vídeo completo.' },
     ],
   },
 
