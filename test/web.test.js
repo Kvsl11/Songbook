@@ -396,6 +396,26 @@ test('letra sincronizada do LRCLIB: LRC -> linhas e tempos da sincronia', async 
   assert.equal(await letraSincronizada({ titulo: 'Noites Traiçoeiras', artista: 'Padre Marcelo Rossi' }, async () => resp([{ ...lista[2], syncedLyrics: null }])), null);
 });
 
+test('LRCLIB: procura pelo título quando as buscas exata e ampla não localizam os créditos do artista', async () => {
+  const lrc = '[00:04.91] I need the tears\\n[00:08.18] to fall';
+  const pedidos = [];
+  const fetchImpl = async (url) => {
+    pedidos.push(url);
+    if (url.includes('track_name=Tears&artist_name=')) return { ok: true, status: 200, json: async () => [] };
+    if (url.includes('q=Tears')) return { ok: true, status: 200, json: async () => [] };
+    return { ok: true, status: 200, json: async () => [
+      { id: 10, trackName: 'Tears', artistName: 'Sabrina Carpenter', duration: 160, syncedLyrics: lrc },
+      { id: 11, trackName: 'Tears', artistName: 'Another Artist', duration: 160, syncedLyrics: lrc },
+    ] };
+  };
+  const r = await letraSincronizada({ titulo: 'Tears', artista: 'Sabrina Carpenter', duracao: 304 }, fetchImpl);
+  assert.equal(r.id, 10);
+  assert.equal(r.ajustar, true);
+  assert.equal(r.duracao, 160);
+  assert.equal(pedidos.length, 3);
+  assert.ok(pedidos[2].includes('track_name=Tears'));
+});
+
 test('letra sincronizada: o LRCLIB ocupado (503) tenta de novo; sem resposta nenhuma, é erro', async () => {
   const lrc = '[00:10.00] Eu preciso tanto\n[00:14.00] do teu colo de mãe';
   const ok = { ok: true, status: 200, json: async () => [{ id: 5, trackName: 'Colo de Mãe (Ao Vivo)', artistName: 'Frei Gilson', duration: 265, syncedLyrics: lrc }] };
