@@ -423,7 +423,7 @@ test('letra sincronizada: o LRCLIB ocupado (503) tenta de novo; sem resposta nen
   let n = 0;
   const r = await letraSincronizada({ titulo: 'Colo de Mãe', artista: 'Frei Gilson', duracao: 263 }, async () => (++n < 3 ? ocupado : ok), { espera: 1 });
   assert.equal(r.id, 5);
-  assert.equal(n, 4); // duas consultas paralelas, cada uma recebe um 503 e depois uma resposta válida
+  assert.equal(n, 3); // consulta sequencial: dois 503 e depois a resposta válida
   await assert.rejects(letraSincronizada({ titulo: 'Colo de Mãe', artista: 'Frei Gilson' }, async () => ocupado, { espera: 1 }), /não respondeu|ocupado/);
 });
 
