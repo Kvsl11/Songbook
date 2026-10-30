@@ -78,13 +78,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'A capa animada passa 4 trechinhos do clipe em loop, como o Canvas do Spotify, em vez do clipe inteiro.' },
     ],
   },
-  {
-    versao: 323, data: '2026-10-30', titulo: 'Música e letra certas no tablet, sem piscar',
-    itens: [
-      { tipo: 'correcao', texto: 'Quando a busca do áudio oficial não respondia, a música ficava só com o clipe e a letra fora do tempo, para sempre. Agora o app tenta de novo (daqui a um minuto e na próxima vez que ela tocar) e, com a busca de vídeos fora do ar, procura direto na página do YouTube.' },
-      { tipo: 'correcao', texto: 'O Tocando agora não pisca mais: o botão de trocar, o nome, os controles e o aviso da letra eram reescritos 4 vezes por segundo, mesmo sem mudar nada.' },
-    ],
-  },
  ];
 
 // as versões que a pessoa ainda não viu (mais nova primeiro); sem nenhuma vista ainda, só a atual
