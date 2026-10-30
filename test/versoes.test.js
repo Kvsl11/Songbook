@@ -78,3 +78,9 @@ test('ao abrir uma música, a faixa separada é procurada sem depender de sincro
   assert.match(corpo, /procurarAudio\(song/);
   assert.doesNotMatch(corpo, /sincronizarMusica|letraSincronizada/);
 });
+
+
+test('LRCLIB também sincroniza quando o player está no videoclipe e existe áudio separado', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  assert.match(app, /!atual\.semVideo && \(!noClipe\(\) \|\| Boolean\(atual\.audio\)\) && !lrclibTentado\.has\(atual\.youtube\)/);
+});
