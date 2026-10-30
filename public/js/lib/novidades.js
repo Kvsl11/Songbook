@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 344, data: '2026-10-30', titulo: 'Downloads mais rápidos e progresso detalhado',
+    itens: [
+      { tipo: 'melhoria', texto: 'Áudio e videoclipe agora são baixados em paralelo. O progresso da notificação avança de 1% em 1%, incluindo a transferência do arquivo para o celular. Capas, fotos e informações adicionais do artista são guardadas em segundo plano para não atrasar a conclusão do download.' },
+      { tipo: 'melhoria', texto: 'O servidor baixa fragmentos em paralelo e evita repetir tentativas de conexão que não resolvem falhas comuns de rede.' },
+    ],
+  },
+  {
     versao: 343, data: '2026-10-30', titulo: 'Música carrega tudo antes de abrir',
     itens: [
       { tipo: 'correcao', texto: 'Ao tocar numa música da busca, o Songbook aguarda localizar o videoclipe, encontrar a gravação de áudio e consultar a sincronia da letra no LRCLIB antes de abrir a música.' },
@@ -55,12 +62,6 @@ export const NOVIDADES = [
     versao: 335, data: '2026-10-30', titulo: 'Videoclipe só fica nos dois modos quando a sincronia é igual',
     itens: [
       { tipo: 'correcao', texto: 'Quando o áudio e o videoclipe têm a mesma linha do tempo, o Songbook mantém o próprio clipe nos modos Música e Vídeo. Se houver introdução, cortes ou deslocamentos, mantém a faixa musical separada no modo Música.' },
-    ],
-  },
-  {
-    versao: 334, data: '2026-10-30', titulo: 'Busca separa a faixa musical do videoclipe',
-    itens: [
-      { tipo: 'correcao', texto: 'A busca preserva o tipo original do YouTube: no modo Áudio, a faixa do YouTube Music (music) tem prioridade sobre resultados de vídeo (stream), mesmo quando título e duração são iguais. O modo Vídeo continua usando o videoclipe.' },
     ],
   },
 ];
