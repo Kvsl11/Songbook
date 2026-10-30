@@ -177,7 +177,7 @@ test('a consulta LRCLIB é sequencial para evitar limite de requisições e tem 
   assert.match(rotina, /timeout = 10000/);
   assert.match(rotina, /tentativas = 4/);
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
-  assert.match(app, /OPÇÕES_LRCLIB_RÁPIDAS = \\{ espera: 1000, timeout: 10000, tentativas: 4 \\}/);
+  assert.ok(app.includes('OPÇÕES_LRCLIB_RÁPIDAS = { espera: 1000, timeout: 10000, tentativas: 4 }'));
 });
 
 test('se o LRCLIB encontrar duração diferente, refaz a busca do áudio mesmo quando já existe uma versão associada', async () => {
