@@ -77,6 +77,15 @@ test('a busca só abre a música depois de localizar o videoclipe e concluir áu
   assert.ok(metadados > buscarVideo && preparar > metadados, 'preenche os metadados antes de preparar áudio e letra');
   assert.ok(entrar > preparar, 'só navega para a música depois que a preparação termina');
   assert.doesNotMatch(app.slice(abrir, entrar), /Promise\.race|setTimeout/);
+  const buscarCapa = app.indexOf('const buscaCapaDaPrevia =', metadados);
+  const aplicarCapa = app.indexOf('const aplicarCapaDaPrevia =', buscarCapa);
+  assert.ok(buscarCapa > metadados && aplicarCapa > buscarCapa && aplicarCapa < preparar,
+    'a capa original deve começar a ser buscada em paralelo antes de aguardar áudio e LRCLIB');
+  assert.match(app.slice(buscarCapa, preparar), /capaOficial\(novo\.title, novo\.artist\)/);
+  assert.match(app.slice(buscarCapa, preparar), /novo\.content = definirMeta\(novo\.content, 'cover', url\)/);
+  const cacheCapa = app.slice(app.indexOf('function capaOficial('), app.indexOf('async function fotoDeezer'));
+  assert.match(cacheCapa, /if \(!url\) capasOficiais\.delete\(k\)/,
+    'uma falha temporária não pode manter a busca de capa bloqueada para sempre');
   const funcao = app.indexOf('async function descobrirVersoes(song)');
   assert.ok(funcao > 0, 'a descoberta da faixa de áudio deve existir');
   const fim = app.indexOf('// as duas versões da música (o clipe e o áudio oficial)', funcao);
