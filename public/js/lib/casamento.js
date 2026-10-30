@@ -87,8 +87,9 @@ export function croma(amostras, taxa = TAXA) {
 
 // o caminho de menor custo do áudio (a) dentro do clipe (v): [[quadro do áudio, quadro do clipe], …] em ordem e a
 // parecença média nele (1 = iguais). Passos: os dois andam juntos (sem custo a mais), só o clipe anda (uma cena no
-// meio dele) ou só o áudio anda (+0,3 cada)
-export function caminho(a, v) {
+// meio dele) ou só o áudio anda (+0,3 cada). perto: entre os fins quase tão bons quanto o melhor (um refrão que se
+// repete), o mais perto deste quadro do clipe
+export function caminho(a, v, { perto = null } = {}) {
   const N = a.quadros;
   const M = v.quadros;
   const custo = (i, j) => {
@@ -119,6 +120,10 @@ export function caminho(a, v) {
   }
   let j = 0;
   for (let k = 1; k < M; k++) if (ant[k] < ant[j]) j = k;
+  if (perto !== null) {
+    const limite = ant[j] + 0.04 * N;
+    for (let k = 0; k < M; k++) if (ant[k] <= limite && Math.abs(k - perto) < Math.abs(j - perto)) j = k;
+  }
   const wp = [];
   let i = N - 1;
   let total = 0;
@@ -152,14 +157,47 @@ export function paresDoCaminho(wp, duracaoAudio, { cada = 1, folga = 0.4 } = {})
   return pares;
 }
 
+// Os clipes que têm a música editada (como Thriller: 13 min, com a música em outra ordem, partes a mais e a menos
+// e cenas de filme no meio) não cabem num caminho só, que anda sempre para a frente. Aí cada trecho do áudio (10 s, de
+// 5 em 5 s) é procurado sozinho no clipe; entre fins quase iguais (o refrão que se repete), o que continua o trecho de
+// antes. Os pares saem dos trechos achados; os não achados (a parte que o clipe não tem) seguem o par de antes.
+// { pares, cobertura } (cobertura: a parte dos trechos com som que foi achada)
+export const TRECHO = 50; // quadros (10 s)
+export const PARECENCA_TRECHO = 0.62;
+export function casarPorTrechos(a, v) {
+  const pares = [];
+  let comSom = 0;
+  let achados = 0;
+  let desloc = null; // (o último deslocamento achado, em quadros: o clipe à frente do áudio)
+  for (let i0 = 0; i0 + TRECHO <= a.quadros; i0 += TRECHO / 2) {
+    const dados = a.dados.subarray(i0 * 12, (i0 + TRECHO) * 12);
+    let som = 0;
+    for (let q = 0; q < TRECHO; q++) if (dados.subarray(q * 12, q * 12 + 12).some(Boolean)) som++;
+    if (som < TRECHO * 0.6) continue; // (silêncio: não diz onde está)
+    comSom++;
+    const { wp, parecenca } = caminho({ dados, quadros: TRECHO }, v, { perto: desloc === null ? null : i0 + desloc + TRECHO - 1 });
+    if (!(parecenca >= PARECENCA_TRECHO)) continue;
+    achados++;
+    const d = wp.map(([i, j]) => j - (i0 + i)).sort((x, y) => x - y)[Math.floor(wp.length / 2)]; // (a mediana)
+    if (desloc === null || Math.abs(d - desloc) * PASSO > 0.4) pares.push([Math.round(i0 * PASSO * 100) / 100, Math.round((i0 + d) * PASSO * 100) / 100]);
+    desloc = d;
+  }
+  return { pares, cobertura: comSom ? achados / comSom : 0 };
+}
+
 // { pares, confianca, mesma } (mesma: false, sem os pares, se não parecem a mesma gravação), ou null sem som bastante.
-// As amostras: mono, na TAXA
+// As amostras: mono, na TAXA. Com o caminho inteiro bem parecido, ele vale; senão, os trechos (a música editada no
+// clipe); sem a metade dos trechos achados, também não, é outra gravação
 export function casar(audio, video, taxa = TAXA) {
   const a = croma(audio, taxa);
   const v = croma(video, taxa);
   if (a.quadros < 10 || v.quadros < 10) return null;
   const { wp, parecenca } = caminho(a, v);
+  const confianca = Math.round(parecenca * 100) / 100;
+  if (parecenca >= 0.7) return { pares: paresDoCaminho(wp, audio.length / taxa), confianca, mesma: true };
+  const t = a.quadros >= TRECHO ? casarPorTrechos(a, v) : null;
+  if (t && t.cobertura >= 0.5 && t.pares.length) return { pares: t.pares, confianca: Math.round(t.cobertura * 100) / 100, mesma: true, trechos: true };
   // (não parecem a mesma gravação: o vídeo é outra apresentação, como um ao vivo, e não o clipe da gravação)
-  if (!(parecenca >= CONFIANCA_MINIMA)) return { pares: null, confianca: Math.round(parecenca * 100) / 100, mesma: false };
-  return { pares: paresDoCaminho(wp, audio.length / taxa), confianca: Math.round(parecenca * 100) / 100, mesma: true };
+  if (!(parecenca >= CONFIANCA_MINIMA)) return { pares: null, confianca, mesma: false };
+  return { pares: paresDoCaminho(wp, audio.length / taxa), confianca, mesma: true };
 }

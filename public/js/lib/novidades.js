@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 327, data: '2026-10-30', titulo: 'Thriller no ponto certo e a frase que passa como no Spotify',
+    itens: [
+      { tipo: 'melhoria', texto: 'Clipes com a música editada, como Thriller (com a música em outra ordem, partes a mais e a menos e cenas de filme no meio), agora trocam entre a música e o vídeo no ponto certo: cada trecho da música é procurado sozinho no clipe. As músicas que tinham sido recusadas como “outra gravação” são conferidas de novo.' },
+      { tipo: 'novo', texto: 'A frase cantada acima do nome passa como no Spotify: a de antes sobe e some, e a nova sobe no lugar dela.' },
+      { tipo: 'correcao', texto: 'A sincronização automática da letra dizia “sincronizada”, mas a letra não andava (ela ia para a outra versão da música). Agora ela vai para a versão que está tocando e acompanha na hora.' },
+    ],
+  },
+  {
     versao: 326, data: '2026-10-30', titulo: 'Trocar o vídeo na hora, álbum e artista sem tela preta',
     itens: [
       { tipo: 'correcao', texto: 'Trocar o vídeo (no ⋯ da música ou do Tocando agora) troca na hora: o vídeo novo já toca, no mesmo ponto da música, sem precisar sair da página e voltar. No modo música, a música continua e o novo passa a ser o clipe dela.' },
@@ -86,12 +94,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'melhoria', texto: 'Com o servidor ligado, o áudio oficial e o videoclipe são casados pelo próprio som, como no YouTube Music: trocar entre a música e o vídeo cai na mesma parte cantada, mesmo com cena antes, no meio ou no fim do clipe.' },
       { tipo: 'correcao', texto: 'Na troca entre música e vídeo, a barra do tempo vai direto para o ponto certo, sem voltar ao começo e pular de volta.' },
-    ],
-  },
-  {
-    versao: 317, data: '2026-10-29', titulo: 'O + do Tocando agora salva de novo',
-    itens: [
-      { tipo: 'correcao', texto: 'O botão + do Tocando agora (salvar na biblioteca) não fazia nada no modo música das músicas que têm áudio oficial e clipe: agora salva na hora.' },
     ],
   },
 ];
