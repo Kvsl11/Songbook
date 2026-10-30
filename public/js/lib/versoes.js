@@ -19,14 +19,18 @@ const CLIPE = /\b(official (music )?video|music video|videoclipe|clipe oficial|c
 export function escolherAudio(videos, { titulo = '', artista = '', duracao = 0, evitar = '' } = {}) {
   const t = normal(titulo).replace(/\b(feat|ft)\b.*$/, '').trim();
   const a = normal(artista);
-  if (!t || !(duracao > 0)) return null;
+  if (!t) return null;
   let melhor = null;
   let nota = -Infinity;
+  // Quando o LRCLIB devolve a duração do curta/clipe (ex.: Remember the Time, 9:15),
+  // a faixa musical correta é descartada pelo filtro estrito. Nessa situação fazemos
+  // uma segunda seleção por identidade/título, sem aceitar vídeos longos como áudio.
+  const duracaoSuspeita = duracao >= 7 * 60;
   for (const v of videos || []) {
-    // LRCLIB e YouTube podem arredondar/cortar silêncios de formas diferentes.
-    // A tolerância proporcional evita descartar faixas longas como Thriller por poucos segundos.
+    // Para durações confiáveis, mantém a correspondência estreita com a gravação.
     const tolerancia = Math.max(8, duracao * 0.025);
-    if (!v?.id || v.id === evitar || !(v.segundos > 0) || Math.abs(v.segundos - duracao) > tolerancia) continue;
+    if (!v?.id || v.id === evitar || !(v.segundos > 0)) continue;
+    if (duracaoSuspeita ? (v.segundos < 120 || v.segundos > 7 * 60) : (!(duracao > 0) || Math.abs(v.segundos - duracao) > tolerancia)) continue;
     const nome = normal(v.titulo);
     if (!` ${nome} `.includes(` ${t} `) || CLIPE.test(nome) || (OUTRA_GRAVACAO.test(nome) && !OUTRA_GRAVACAO.test(t))) continue;
     // (a instrumental tem a mesma duração da gravação: só o nome diz que ela não tem a voz)
@@ -37,7 +41,9 @@ export function escolherAudio(videos, { titulo = '', artista = '', duracao = 0, 
     if (a && (canal === a || canal.startsWith(`${a} `) || ` ${a} `.includes(` ${canal} `))) n += 3;
     if (/\b(audio|official audio|audio oficial)\b/.test(nome)) n += 3;
     if (/\b(lyrics?|letra|lyric video)\b/.test(nome)) n -= 2;
-    n -= Math.abs(v.segundos - duracao) / 2;
+    // Sem duração confiável, favorece uma faixa normal (perto de 4 min), sem descartar
+    // gravações legítimas mais curtas ou mais longas dentro da faixa permitida.
+    n -= duracaoSuspeita ? Math.abs(v.segundos - 240) / 90 : Math.abs(v.segundos - duracao) / 2;
     if (n > nota) { nota = n; melhor = v; }
   }
   return melhor;

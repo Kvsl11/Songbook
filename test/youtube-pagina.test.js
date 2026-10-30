@@ -51,3 +51,13 @@ test('o áudio oficial nunca é a versão sem voz (instrumental, base, karaokê,
   // (a música que se chama "Base" ou é de um pianista continua valendo)
   assert.equal(escolherAudio([v('fffffffffff', 'Base', 'Fulano', 200)], { titulo: 'Base', artista: 'Fulano', duracao: 200 })?.id, 'fffffffffff');
 });
+
+
+test('quando o LRCLIB devolve os 9 min do videoclipe, escolhe a gravação musical de 4 min', () => {
+  const lista = [
+    { id: 'clipe1234567', titulo: 'Michael Jackson - Remember the Time (Official Video)', canal: 'Michael Jackson', segundos: 555 },
+    { id: 'audio1234567', titulo: 'Michael Jackson - Remember the Time (Official Audio)', canal: 'Michael Jackson - Topic', segundos: 240 },
+  ];
+  const achado = escolherAudio(lista, { titulo: 'Remember the Time', artista: 'Michael Jackson', duracao: 555, evitar: 'clipe1234567' });
+  assert.equal(achado?.id, 'audio1234567');
+});
