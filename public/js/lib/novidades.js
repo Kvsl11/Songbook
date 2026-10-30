@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 329, data: '2026-10-30', titulo: 'Versão cantada e clipe escolhidos automaticamente',
+    itens: [
+      { tipo: 'melhoria', texto: 'Ao buscar uma música, o Songbook procura automaticamente a gravação cantada para acompanhar a letra e o videoclipe. A troca entre as versões mantém a posição da música.' },
+      { tipo: 'correcao', texto: 'A versão musical não precisa mais ser escolhida manualmente no menu.' },
+    ],
+  },
+  {
     versao: 328, data: '2026-10-30', titulo: 'As notificações de volta na barra do celular',
     itens: [
       { tipo: 'correcao', texto: 'Instalando o app de novo, o Android zera a permissão das notificações, mas o app não pedia de novo e o sininho voltava. Agora ele pede outra vez (no primeiro toque na tela) e o sininho fica escondido enquanto isso; ele só aparece se as notificações estiverem bloqueadas, para os avisos não se perderem.' },
