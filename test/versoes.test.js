@@ -103,14 +103,20 @@ test('abrir ou tocar música não procura o servidor de IA', async () => {
   assert.match(app, /await carregarServidor\(\)/);
 });
 
-test('o app não cria avisos nem notificações internas ou do sistema', async () => {
+test('avisos de sincronização não são exibidos, mas downloads notificam no celular', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   const css = await readFile(new URL('../public/css/app.css', import.meta.url), 'utf8');
   const sw = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
   assert.match(app, /function toast\(\) \{\}/);
-  assert.doesNotMatch(app, /avisoRapido|aviso-rapido|Notification\.requestPermission|showNotification|getNotifications|notificarSistema|podeNotificarNoSistema/);
+  assert.match(app, /async function notificarSistema\(/);
+  assert.match(app, /Notification\.requestPermission/);
+  assert.match(app, /Baixando \\?\$\{pct\}%/);
+  assert.match(app, /Download concluído/);
+  assert.match(app, /Não deu para baixar/);
+  assert.doesNotMatch(app, /avisoRapido|aviso-rapido|notificarSistema\([^)]*(?:LRCLIB|sincroniza)/i);
   assert.doesNotMatch(css, /aviso-rapido/);
-  assert.doesNotMatch(sw, /notificationclick|addEventListener.*push/);
+  assert.match(sw, /notificationclick/);
+  assert.match(sw, /badge-96\.png/);
 });
 
 test('ao abrir uma música, prepara a faixa e o LRCLIB em paralelo antes de entrar', async () => {
