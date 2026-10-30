@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 347, data: '2026-10-30', titulo: 'Correção no download de vídeos do YouTube',
+    itens: [
+      { tipo: 'correcao', texto: 'Corrigida a validação do identificador do YouTube: ela estava rejeitando IDs válidos de 11 caracteres, mesmo quando o vídeo era reproduzido normalmente no player.' },
+    ],
+  },
+  {
     versao: 346, data: '2026-10-30', titulo: 'Limpeza de cache e armazenamento medido no aparelho',
     itens: [
       { tipo: 'correcao', texto: 'O botão Limpar cache agora remove também as respostas guardadas em localStorage, informa quantos itens foram removidos e atualiza os números sem piscar a tela. Os downloads, a biblioteca e o pacote do aplicativo são preservados.' },
@@ -59,12 +65,7 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'A letra sincronizada pelo LRCLIB também é procurada quando o player está mostrando o videoclipe e a música já tem uma faixa de áudio separada. A letra fica vinculada à gravação musical correta, sem alterar a separação entre Música e Vídeo.' },
     ],
   },
-  {
-    versao: 337, data: '2026-10-30', titulo: 'Busca a gravação musical ao abrir a música',
-    itens: [
-      { tipo: 'correcao', texto: 'A procura da faixa separada agora começa assim que a música é aberta, sem depender de apertar Play ou de encontrar uma letra sincronizada. Se uma instância do Piped não oferecer a busca do YouTube Music, o app tenta também a busca pública do YouTube.' },
-    ],
-  },
+
 
 ];
 
