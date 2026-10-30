@@ -149,16 +149,19 @@ export function paresDoCaminho(wp, duracaoAudio, { cada = 1 } = {}) {
     if (!faixa) limites.set(i, [j, j]);
     else { faixa[0] = Math.min(faixa[0], j); faixa[1] = Math.max(faixa[1], j); }
   }
+  const tempos = new Set();
+  for (let t = 0; t < duracaoAudio; t += cada) tempos.add(Math.round(t * 100) / 100);
+  // Não deixe uma cena curta escapar entre duas amostras de 1 s: toda faixa com avanço só no vídeo vira âncora.
+  for (const [i, faixa] of limites) if (faixa[1] > faixa[0]) tempos.add(Math.round(i * PASSO * 100) / 100);
   const pares = [];
-  for (let t = 0; t < duracaoAudio; t += cada) {
-    const faixa = limites.get(Math.round(t / PASSO));
+  for (const ta of [...tempos].sort((x, y) => x - y)) {
+    const faixa = limites.get(Math.round(ta / PASSO));
     if (!faixa) continue;
-    const ta = Math.round(t * 100) / 100;
     const primeiro = Math.round(faixa[0] * PASSO * 100) / 100;
     const ultimo = Math.round(faixa[1] * PASSO * 100) / 100;
     pares.push([ta, primeiro]);
     // Dois pares com o mesmo tempo de áudio descrevem o começo e o fim da cena no videoclipe.
-    if (faixa[1] - faixa[0] >= 2) pares.push([ta, ultimo]);
+    if (faixa[1] > faixa[0]) pares.push([ta, ultimo]);
   }
   return pares;
 }
