@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 345, data: '2026-10-30', titulo: 'Correção do download do videoclipe',
+    itens: [
+      { tipo: 'correcao', texto: 'O videoclipe não é mais descartado apenas porque a faixa de áudio oficial é outra gravação. O servidor também identifica o arquivo MP4 final depois de juntar imagem e som, sem confundir fragmentos temporários com o vídeo completo.' },
+    ],
+  },
+  {
     versao: 344, data: '2026-10-30', titulo: 'Downloads mais rápidos e progresso detalhado',
     itens: [
       { tipo: 'melhoria', texto: 'Áudio e videoclipe agora são baixados em paralelo. O progresso da notificação avança de 1% em 1%, incluindo a transferência do arquivo para o celular. Capas, fotos e informações adicionais do artista são guardadas em segundo plano para não atrasar a conclusão do download.' },
@@ -56,12 +62,6 @@ export const NOVIDADES = [
     versao: 336, data: '2026-10-30', titulo: 'Busca a faixa de áudio mesmo sem letra sincronizada',
     itens: [
       { tipo: 'correcao', texto: 'A procura da gravação musical não depende mais de o LRCLIB fornecer uma letra com duração. O Songbook tenta encontrar a faixa oficial pelo título, artista e resultados do YouTube Music; o videoclipe continua separado no modo Vídeo.' },
-    ],
-  },
-  {
-    versao: 335, data: '2026-10-30', titulo: 'Videoclipe só fica nos dois modos quando a sincronia é igual',
-    itens: [
-      { tipo: 'correcao', texto: 'Quando o áudio e o videoclipe têm a mesma linha do tempo, o Songbook mantém o próprio clipe nos modos Música e Vídeo. Se houver introdução, cortes ou deslocamentos, mantém a faixa musical separada no modo Música.' },
     ],
   },
 ];
