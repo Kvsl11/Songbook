@@ -212,12 +212,12 @@ def baixar_midia(video: str, pasta: str, progresso=lambda p: None, com_video: bo
         ext = os.path.splitext(nome)[1].lower()
         if not nome.startswith("audio.") or ext not in extensoes:
             continue
-        if re.search(r"\.f\\d+\\.", nome) or nome.endswith((".part", ".ytdl")):
+        if re.search(r"\.f\d+\.", nome) or nome.endswith((".part", ".ytdl")):
             continue
         if arquivo not in arquivos:
             arquivos.append(arquivo)
     # Arquivo final (audio.mp4) tem prioridade sobre componentes separados (audio.f137.mp4).
-    arquivos.sort(key=lambda f: (bool(re.search(r"\.f\\d+\\.", os.path.basename(f))), -os.path.getsize(f)))
+    arquivos.sort(key=lambda f: (bool(re.search(r"\.f\d+\.", os.path.basename(f))), -os.path.getsize(f)))
     caminho = arquivos[0] if arquivos else None
     if not caminho or not os.path.isfile(caminho):
         raise ValueError("o YouTube não entregou um arquivo de mídia válido")
