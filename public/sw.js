@@ -117,13 +117,3 @@ self.addEventListener('fetch', (e) => {
   }
 });
 
-// tocar numa notificação (na barra do celular) abre o app no lugar dela (a música baixada, as novidades…)
-self.addEventListener('notificationclick', (e) => {
-  e.notification.close();
-  const destino = e.notification.data?.href || self.registration.scope;
-  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((janelas) => {
-    const aberta = janelas.find((j) => j.url.startsWith(self.registration.scope));
-    if (aberta) return aberta.focus().then((j) => (j && 'navigate' in j ? j.navigate(destino).catch(() => j) : j));
-    return self.clients.openWindow(destino);
-  }));
-});
