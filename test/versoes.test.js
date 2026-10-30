@@ -69,7 +69,7 @@ test('só compartilha o mesmo vídeo entre Música e Vídeo quando a sincronia �
 test('ao abrir uma música, a faixa separada é procurada sem depender de sincronizar a letra ou apertar Play', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   const abrir = app.indexOf('function viewSong(');
-  const chamar = app.indexOf('descobrirVersoes(song)', abrir);
+  const chamar = app.indexOf('prepararMusicaAoAbrir(song)', abrir);
   const funcao = app.indexOf('async function descobrirVersoes(song)');
   assert.ok(abrir >= 0 && chamar > abrir && chamar < abrir + 9000, 'viewSong deve iniciar a descoberta ao abrir a música');
   assert.ok(funcao > 0, 'a descoberta da faixa deve existir como fluxo independente');
@@ -103,12 +103,46 @@ test('abrir ou tocar música não procura o servidor de IA', async () => {
   assert.match(app, /await carregarServidor\(\)/);
 });
 
-test('o app não cria avisos nem notificações internas ou do sistema', async () => {
+test('avisos de sincronização não são exibidos, mas downloads notificam no celular', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   const css = await readFile(new URL('../public/css/app.css', import.meta.url), 'utf8');
   const sw = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
   assert.match(app, /function toast\(\) \{\}/);
-  assert.doesNotMatch(app, /avisoRapido|aviso-rapido|Notification\.requestPermission|showNotification|getNotifications|notificarSistema|podeNotificarNoSistema/);
+  assert.match(app, /async function notificarSistema\(/);
+  assert.match(app, /Notification\.requestPermission/);
+  assert.ok(app.includes('Baixando ${pct}%'));
+  const inicioSync = app.indexOf('async function sincronizarMusica(song');
+  const fimSync = app.indexOf('// o áudio oficial da gravação no YouTube:', inicioSync);
+  assert.doesNotMatch(app.slice(inicioSync, fimSync), /notificarSistema|Notification/);
+  assert.match(app, /Download concluído/);
+  assert.match(app, /Não deu para baixar/);
+  assert.doesNotMatch(app, /avisoRapido|aviso-rapido|notificarSistema\([^)]*(?:LRCLIB|sincroniza)/i);
   assert.doesNotMatch(css, /aviso-rapido/);
-  assert.doesNotMatch(sw, /notificationclick|addEventListener.*push/);
+  assert.match(sw, /notificationclick/);
+  assert.match(sw, /badge-96\.png/);
+});
+
+test('ao abrir uma música, prepara a faixa e o LRCLIB em paralelo antes de entrar', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const abrir = app.indexOf('async function abrirPrevia(');
+  const rota = app.indexOf("if (jaNaPrevia) route(); else location.hash = '#/musica/previa';", abrir);
+  const preparo = app.indexOf('const preparo = prepararMusicaAoAbrir(novo);', abrir);
+  assert.ok(preparo > abrir && preparo < rota, 'o preparo deve começar antes de navegar para a música');
+  assert.match(app, /await Promise\.race\(\[preparo, new Promise\(\(ok\) => setTimeout\(ok, 1100\)\)\]\)/);
+  const helper = app.slice(app.indexOf('function prepararMusicaAoAbrir(song)'), app.indexOf('function guardarSincronia(song, sinc)'));
+  assert.match(helper, /descobrirVersoes\(song\)/);
+  assert.match(helper, /sincronizarMusica\(song, \{ audioPromise \}\)/);
+  assert.match(helper, /tentouSincronizar/);
+});
+
+test('a consulta LRCLIB faz as buscas exata e ampla em paralelo com limite configurável', async () => {
+  const web = await readFile(new URL('../public/js/lib/web.js', import.meta.url), 'utf8');
+  const inicio = web.indexOf('export async function letraSincronizada(');
+  const fim = web.indexOf('// A gravação oficial entre as letras', inicio);
+  const rotina = web.slice(inicio, fim);
+  assert.match(rotina, /Promise\.all\(consultas\.map/);
+  assert.match(rotina, /timeout = 10000/);
+  assert.match(rotina, /tentativas = 4/);
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  assert.match(app, /OPÇÕES_LRCLIB_RÁPIDAS = \{ espera: 250, timeout: 4500, tentativas: 2 \}/);
 });
