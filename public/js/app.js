@@ -23,6 +23,7 @@ import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hife
 import { apagarAudio, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } from './audios.js';
 import { escolherAudio, mesmaSincronia, paresPelaDuracao, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
 import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
+import { embaralharIndices, moverIndice } from './lib/fila.js';
 import { audioDbDoArtista, audioDoVideo, buscarYoutube, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -2611,14 +2612,30 @@ const semLinhasDeAcordes = (sinc) => {
   };
   // a música que toca (a da biblioteca ou a prévia aberta da busca, ainda não salva)
   const musicaTocando = () => (atual?.songId === 'previa' && preview ? preview : atual?.songId && db.song(atual.songId)) || null;
-  // a fila: as músicas do repertório de onde veio a música; fora de um repertório, as da biblioteca (na ordem da lista
-  // Músicas). i = a posição da música que toca. Música que não está na biblioteca (a prévia de uma busca): sem fila
+  // A ordem da fila é independente da ordem salva no repertório/biblioteca: pode ser embaralhada e reorganizada
+  // sem alterar a lista original. Guardamos os índices originais para não perder partes nem músicas repetidas.
+  let filaOrdemChave = '', filaOrdemBase = '', filaOrdem = [];
   const fila = () => {
     const set = atual?.setId && db.set(atual.setId);
-    if (set) return { set, ids: set.items.map((it) => it.songId), i: atual.index };
+    if (set) {
+      const base = set.items.map((it) => it.songId);
+      const chave = `set:${set.id}`;
+      const assinatura = base.join('|');
+      if (filaOrdemChave !== chave || filaOrdemBase !== assinatura) {
+        filaOrdemChave = chave; filaOrdemBase = assinatura; filaOrdem = base.map((_, i) => i);
+      }
+      const i = filaOrdem.indexOf(atual.index);
+      return { set, ids: filaOrdem.map((j) => base[j]), indices: [...filaOrdem], i };
+    }
     if (!atual?.songId || !db.song(atual.songId)) return null;
-    const ids = db.songs().filter((x) => midiaDe(x)).map((x) => x.id);
-    return { set: null, ids, i: ids.indexOf(atual.songId) };
+    const base = db.songs().filter((x) => midiaDe(x)).map((x) => x.id);
+    const chave = 'biblioteca';
+    const assinatura = base.join('|');
+    if (filaOrdemChave !== chave || filaOrdemBase !== assinatura) {
+      filaOrdemChave = chave; filaOrdemBase = assinatura; filaOrdem = base.map((_, i) => i);
+    }
+    const original = base.indexOf(atual.songId);
+    return { set: null, ids: filaOrdem.map((j) => base[j]), indices: [...filaOrdem], i: filaOrdem.indexOf(original) };
   };
   const temVideo = (f, i) => Boolean(midiaDe(db.song(f.ids[i])));
   // ao terminar, segue para a próxima música da fila que tiver vídeo; a música com vídeo antes/depois desta (ou -1)
@@ -2638,14 +2655,14 @@ const semLinhasDeAcordes = (sinc) => {
   const proximoIndice = () => {
     const f = fila();
     if (!f || f.i < 0) return -1;
+    const i = vizinha(1); // o aleatório já embaralha a ordem visível; a reprodução segue essa mesma ordem
+    if (i >= 0 || repetir !== 'todas') return i;
     if (aleatorio) {
-      const outras = comVideo(f).filter((i) => i !== f.i);
-      let livres = outras.filter((i) => !tocadas.has(i));
-      if (!livres.length && repetir === 'todas') { tocadas = new Set([f.i]); livres = outras; }
-      return livres.length ? livres[Math.floor(Math.random() * livres.length)] : -1;
+      filaOrdem = embaralharIndices(filaOrdem, f.indices[f.i]);
+      historico = [];
+      return vizinha(1);
     }
-    const i = vizinha(1);
-    return i >= 0 || repetir !== 'todas' ? i : comVideo(f)[0] ?? -1; // no fim, repetindo a fila: volta à primeira
+    return comVideo(f)[0] ?? -1;
   };
   const anteriorIndice = () => (aleatorio && historico.length ? historico[historico.length - 1] : vizinha(-1));
   const pular = (lado) => {
@@ -2655,8 +2672,9 @@ const semLinhasDeAcordes = (sinc) => {
     if (lado > 0) historico.push(f.i); else if (aleatorio && historico.length) historico.pop();
     tocadas.add(i);
     const s = db.song(f.ids[i]);
+    const indiceOriginal = f.indices[i];
     const mesmoVideo = s.youtube === atual.youtube;
-    api.tocar(itemDoPlayer(s, f.set, f.set ? i : -1));
+    api.tocar(itemDoPlayer(s, f.set, f.set ? indiceOriginal : -1));
     if (mesmoVideo) api.irPara(0); // outra música da fila com o mesmo vídeo: começa do início
     toast(`Tocando: ${s.title}`);
     return true;
@@ -2780,22 +2798,111 @@ const semLinhasDeAcordes = (sinc) => {
       if (antes !== estado) avisar();
     } catch { /* mensagem de outro formato */ }
   });
-  // a fila (o repertório ou a biblioteca): tocar numa música toca ela
-  const abrirFila = async () => {
+  // Fila interativa: tocar, embaralhar e reorganizar com arrastar (mouse ou dedo).
+  const duracoesDaFila = new Map();
+  const abrirFila = () => {
+    if (!fila()) { toast('Esta música não está numa fila: salve-a na biblioteca ou toque de um repertório'); return; }
+    const dlg = document.createElement('dialog');
+    dlg.className = 'lista-dlg lista-fila';
+    const titulo = () => { const f = fila(); return f?.set ? `Fila · ${f.set.name}` : 'Fila · Biblioteca'; };
+    dlg.innerHTML = `<div class="lista-cab"><h3>${esc(titulo())}</h3>
+      <button class="icon-btn fila-aleatorio${aleatorio ? ' ligado' : ''}" data-fila-aleatorio aria-label="Embaralhar fila" aria-pressed="${aleatorio}" title="Embaralhar fila">${icon('shuffle',18)}</button>
+      <button class="icon-btn" data-fechar aria-label="Fechar">${icon('x',20)}</button></div>
+      <div class="lista-opcoes" role="listbox" aria-label="Músicas na fila"></div>`;
+    const lista = $('.lista-opcoes', dlg);
+    const desenharLista = () => {
+      const f = fila();
+      if (!f) { dlg.close(); return; }
+      lista.innerHTML = f.ids.map((id, pos) => {
+        const s = db.song(id) || {};
+        const tocando = pos === f.i;
+        const original = f.indices[pos];
+        const duracao = Number(s.duracao || s.audioProprio?.duracao) || 0;
+        const parte = f.set?.items[original]?.label || '';
+        const reproduzivel = Boolean(midiaDe(s));
+        return `<div class="lista-op fila-item${tocando ? ' atual' : ''}${!reproduzivel ? ' indisponivel' : ''}" role="option" tabindex="${reproduzivel ? 0 : -1}" aria-selected="${tocando}" data-fila-pos="${pos}" data-original="${original}">
+          <button class="fila-arrastar" data-arrastar aria-label="Arrastar ${esc(s.title || 'música')}" title="Segure e arraste para mudar a ordem" ${!reproduzivel ? 'disabled' : ''}>${icon('grip-vertical',18)}</button>
+          <span class="fila-capa${tocando ? ' tocando' : ''}">${capa(s)}${tocando ? '<span class="fila-eq" aria-hidden="true"><i></i><i></i><i></i></span>' : ''}</span>
+          <span class="lista-txt"><b>${esc(s.title || 'Música')}</b><small>${esc([parte, s.artist].filter(Boolean).join(' · '))}</small></span>
+          <span class="lista-dir">${duracao ? fmtTempo(duracao) : '—:—'}</span>
+        </div>`;
+      }).join('');
+      const b = $('[data-fila-aleatorio]', dlg);
+      b.classList.toggle('ligado', aleatorio);
+      b.setAttribute('aria-pressed', String(aleatorio));
+      b.title = aleatorio ? 'Desligar aleatório' : 'Embaralhar fila';
+    };
+    let arrastando = null;
+    dlg.addEventListener('pointerdown', (e) => {
+      const pega = e.target.closest('[data-arrastar]');
+      if (!pega || pega.disabled) return;
+      e.preventDefault();
+      const linha = pega.closest('[data-fila-pos]');
+      arrastando = { linha, id: e.pointerId };
+      linha.classList.add('arrastando');
+      pega.setPointerCapture?.(e.pointerId);
+    });
+    dlg.addEventListener('pointermove', (e) => {
+      if (!arrastando || arrastando.id !== e.pointerId) return;
+      const alvo = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('[data-fila-pos]');
+      if (!alvo || alvo === arrastando.linha || !lista.contains(alvo)) return;
+      const antes = e.clientY < alvo.getBoundingClientRect().top + alvo.offsetHeight / 2;
+      lista.insertBefore(arrastando.linha, antes ? alvo : alvo.nextSibling);
+    });
+    const terminarArrasto = () => {
+      if (!arrastando) return;
+      arrastando.linha.classList.remove('arrastando');
+      const nova = [...lista.querySelectorAll('[data-original]')].map((x) => Number(x.dataset.original));
+      if (nova.length) { filaOrdem = nova; historico = []; }
+      arrastando = null;
+      desenharLista();
+    };
+    dlg.addEventListener('pointerup', terminarArrasto);
+    dlg.addEventListener('pointercancel', terminarArrasto);
+    dlg.addEventListener('click', (e) => {
+      if (e.target === dlg || e.target.closest('[data-fechar]')) { dlg.close(); return; }
+      if (e.target.closest('[data-fila-aleatorio]')) {
+        const f = fila();
+        aleatorio = !aleatorio;
+        db.setPref('aleatorio', aleatorio);
+        filaOrdem = aleatorio ? embaralharIndices(filaOrdem, f?.indices[f.i]) : filaOrdem.map((_, i) => i);
+        historico = [];
+        desenharLista();
+        desenharModos();
+        return;
+      }
+      if (e.target.closest('[data-arrastar]')) return;
+      const linha = e.target.closest('[data-fila-pos]');
+      if (!linha || !midiaDe(db.song(fila().ids[Number(linha.dataset.filaPos)]))) return;
+      const f = fila();
+      const pos = Number(linha.dataset.filaPos);
+      if (pos === f.i || !atual) return;
+      historico.push(f.i);
+      const s = db.song(f.ids[pos]);
+      api.tocar(itemDoPlayer(s, f.set, f.set ? f.indices[pos] : -1));
+    });
+    lista.addEventListener('keydown', (e) => {
+      const linha = e.target.closest('[data-fila-pos]');
+      if (!linha || !['Enter', ' '].includes(e.key)) return;
+      e.preventDefault();
+      linha.click();
+    });
+    dlg.addEventListener('close', () => dlg.remove());
+    document.body.append(dlg);
+    dlg.showModal();
+    desenharLista();
+    // Duração: usa o valor já salvo; se faltar, consulta o YouTube/Piped uma vez e guarda no cadastro da música.
     const f = fila();
-    if (!f) { toast('Esta música não está numa fila: salve-a na biblioteca ou toque de um repertório'); return; }
-    // como a fila do Spotify: a capa de cada música (na que toca, as barrinhas por cima), o nome, a parte da missa e o
-    // artista, e a duração à direita
-    const opcoes = f.ids.map((id, i) => ({ i, s: db.song(id) })).filter(({ s }) => midiaDe(s)).map(({ i, s }) => ({
-      valor: i, rotulo: s.title, sub: [f.set?.items[i]?.label, s.artist].filter(Boolean).join(' · '),
-      capa: `<span class="fila-capa${i === f.i ? ' tocando' : ''}">${capa(s)}${i === f.i ? `<span class="fila-eq" aria-hidden="true"><i></i><i></i><i></i></span>` : ''}</span>`,
-      dir: s.duracao > 0 ? fmtTempo(s.duracao) : '',
-    }));
-    const i = await escolherNaLista({ titulo: f.set ? `Fila · ${f.set.name}` : 'Fila · Biblioteca', opcoes, atual: f.i, cls: 'lista-fila' });
-    if (i === undefined || i === f.i || !atual) return;
-    historico.push(f.i);
-    tocadas.add(i);
-    api.tocar(itemDoPlayer(db.song(f.ids[i]), f.set, f.set ? i : -1));
+    const faltantes = f.ids.map((id) => db.song(id)).filter((s) => s && !Number(s.duracao || s.audioProprio?.duracao) && youtubeId(s.youtube));
+    for (const s of faltantes) {
+      if (duracoesDaFila.has(s.id)) continue;
+      const pedido = duracaoDoVideo(youtubeId(s.youtube)).then((d) => {
+        if (d > 0) { const atualizada = db.song(s.id); if (atualizada) db.saveSong({ ...atualizada, duracao: d }); }
+        return d;
+      }).catch(() => 0);
+      duracoesDaFila.set(s.id, pedido);
+    }
+    if (faltantes.length) Promise.all(faltantes.map((s) => duracoesDaFila.get(s.id))).then(() => { if (dlg.open) desenharLista(); });
   };
   // "Conectar" (como no Spotify): onde está tocando — este aparelho, com a música — e as saídas de som que o navegador
   // conhece (fones Bluetooth, caixas). Embaixo: levar para a TV (o YouTube transmite para TV e Chromecast) e procurar
