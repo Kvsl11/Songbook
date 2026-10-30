@@ -202,7 +202,7 @@ def baixar_midia(video: str, pasta: str, progresso=lambda p: None, com_video: bo
                     if f.startswith("audio.") and not f.endswith((".part", ".ytdl"))]
         extensoes = {".mp4", ".webm", ".mkv", ".mov"} if com_video else {".m4a", ".mp3", ".opus", ".ogg", ".aac", ".webm"}
         arquivos = [f for f in arquivos if os.path.splitext(f)[1].lower() in extensoes]
-        arquivos.sort(key=lambda f: (not re.search(r"\\.f\\d+\\.", os.path.basename(f)), os.path.getsize(f)), reverse=True)
+        arquivos.sort(key=lambda f: (not re.search(r"\.f\d+\.", os.path.basename(f)), os.path.getsize(f)), reverse=True)
         caminho = arquivos[0] if arquivos else None
     if not caminho or not os.path.isfile(caminho):
         raise ValueError("o YouTube não entregou um arquivo de mídia válido")
