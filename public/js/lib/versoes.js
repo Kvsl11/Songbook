@@ -38,6 +38,9 @@ export function escolherAudio(videos, { titulo = '', artista = '', duracao = 0, 
     const canal = normal(v.canal);
     if (CANAL_SEM_VOZ.test(canal) && !CANAL_SEM_VOZ.test(a)) continue;
     let n = 0;
+    // O filtro music_songs do YouTube Music retorna type=music. Esse sinal é mais confiável
+    // que o título: um stream pode ser o videoclipe mesmo quando o nome parece uma faixa.
+    if (v.tipo === 'music') n += 12;
     if (a && (canal === a || canal.startsWith(`${a} `) || ` ${a} `.includes(` ${canal} `))) n += 3;
     if (/\b(audio|official audio|audio oficial)\b/.test(nome)) n += 3;
     if (/\b(lyrics?|letra|lyric video)\b/.test(nome)) n -= 2;

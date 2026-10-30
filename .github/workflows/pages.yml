@@ -7,6 +7,8 @@ name: Publicar no GitHub Pages
 on:
   push:
     branches: [main, master, ccr-59dd75f2-oirnca]
+  pull_request:
+    branches: [main, master, ccr-59dd75f2-oirnca]
   workflow_dispatch:
   workflow_run: # depois de publicar o servidor da IA: grava o endereço dele no app
     workflows: [Publicar o servidor da IA]
@@ -39,6 +41,7 @@ jobs:
       - run: npm test
 
   publicar:
+    if: github.event_name != 'pull_request'
     needs: testes
     runs-on: ubuntu-latest
     environment:

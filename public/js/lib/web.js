@@ -550,6 +550,7 @@ export function videosDoPiped(json) {
       const id = /[?&]v=([\w-]{11})/.exec(v.url)[1];
       return {
         id,
+        tipo: v.type, // preserva a diferença entre faixa do YouTube Music (music) e vídeo comum (stream)
         titulo: v.title || '',
         canal: (v.uploaderName || '').replace(/\s*-\s*Topic$/, ''),
         duracao: v.duration > 0 ? `${Math.floor(v.duration / 60)}:${String(v.duration % 60).padStart(2, '0')}` : '',

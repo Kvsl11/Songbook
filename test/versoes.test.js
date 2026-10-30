@@ -14,6 +14,12 @@ test('acha o áudio oficial da gravação (e não o clipe, o ao vivo ou outra du
   ];
   const a = escolherAudio(achados, { titulo: 'Espresso', artista: 'Sabrina Carpenter', duracao: 175, evitar: 'clipe000001' });
   assert.equal(a.id, 'topic000001');
+  // Mesmo título, artista e duração: a faixa type=music deve ganhar do stream que representa o clipe.
+  const tipos = [
+    { ...v('streamclip01', 'Espresso', 'Sabrina Carpenter - Topic', 175), tipo: 'stream' },
+    { ...v('musictrack01', 'Espresso', 'Sabrina Carpenter', 175), tipo: 'music' },
+  ];
+  assert.equal(escolherAudio(tipos, { titulo: 'Espresso', artista: 'Sabrina Carpenter', duracao: 175 })?.id, 'musictrack01');
   assert.equal(escolherAudio(achados, { titulo: 'Espresso', artista: 'X', duracao: 300 }), null);
   assert.equal(escolherAudio(achados, { titulo: 'Espresso', duracao: 0 }), null);
   // A diferença de alguns segundos entre LRCLIB e YouTube não deve impedir o áudio oficial.
