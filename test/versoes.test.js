@@ -110,7 +110,10 @@ test('avisos de sincronização não são exibidos, mas downloads notificam no c
   assert.match(app, /function toast\(\) \{\}/);
   assert.match(app, /async function notificarSistema\(/);
   assert.match(app, /Notification\.requestPermission/);
-  assert.match(app, /Baixando \\?\$\{pct\}%/);
+  assert.ok(app.includes('Baixando ${pct}%'));
+  const inicioSync = app.indexOf('async function sincronizarMusica(song');
+  const fimSync = app.indexOf('// o áudio oficial da gravação no YouTube:', inicioSync);
+  assert.doesNotMatch(app.slice(inicioSync, fimSync), /notificarSistema|Notification/);
   assert.match(app, /Download concluído/);
   assert.match(app, /Não deu para baixar/);
   assert.doesNotMatch(app, /avisoRapido|aviso-rapido|notificarSistema\([^)]*(?:LRCLIB|sincroniza)/i);
