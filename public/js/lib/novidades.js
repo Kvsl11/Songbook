@@ -16,6 +16,12 @@ export const NOVIDADES = [
     ],
   },
   {
+    versao: 338, data: '2026-10-30', titulo: 'Mantém a sincronia LRCLIB com áudio e videoclipe separados',
+    itens: [
+      { tipo: 'correcao', texto: 'A letra sincronizada pelo LRCLIB também é procurada quando o player está mostrando o videoclipe e a música tem uma faixa de áudio separada. A letra fica vinculada à gravação musical correta.' },
+    ],
+  },
+  {
     versao: 337, data: '2026-10-30', titulo: 'Busca a gravação musical ao abrir a música',
     itens: [
       { tipo: 'correcao', texto: 'A procura da faixa separada agora começa assim que a música é aberta, sem depender de apertar Play ou de encontrar uma letra sincronizada. Se uma instância do Piped não oferecer a busca do YouTube Music, o app tenta também a busca pública do YouTube.' },
@@ -57,12 +63,6 @@ export const NOVIDADES = [
     versao: 331, data: '2026-10-30', titulo: 'Capa animada sem flash na troca dos trechos',
     itens: [
       { tipo: 'correcao', texto: 'A capa animada prepara e decodifica o próximo trecho antes da troca. O vídeo atual continua visível até o novo estar pronto, e os dois se cruzam suavemente, sem mostrar quadro congelado ou tela escura.' },
-    ],
-  },
-  {
-    versao: 330, data: '2026-10-30', titulo: 'Versão música com a duração da gravação',
-    itens: [
-      { tipo: 'correcao', texto: 'O Songbook procura a gravação cantada pela duração própria da música mesmo quando a letra sincronizada já parece combinar com o videoclipe. O modo música usa a gravação curta e o modo vídeo mantém o clipe completo.' },
     ],
   },
 
