@@ -8057,7 +8057,7 @@ function viewSong(id, ctx = {}) {
     song = { ...song, title: r.meta.title || 'Canto', artist: r.meta.artist || r.meta.subtitle || '', youtube: youtubeId(r.meta.youtube) || '', cover: r.meta.cover || '', pdf: r.meta.pdf || '', key: r.key, composer: r.meta.composer || r.meta.lyricist || '' };
   } else db.touchRecent(song.id);
   // Ao entrar na música, áudio e letra LRCLIB começam a ser preparados juntos.
-  // A abertura espera no máximo 1,1 s; o que faltar termina em segundo plano.
+  // A Busca já aguardou a preparação antes de navegar; aqui a entrada normal só inicia a preparação em segundo plano.
   if (midiaDe(song)) void prepararMusicaAoAbrir(song);
   setTab(ctx.set ? 'biblioteca' : isPreview ? (song.back?.startsWith('#/buscar') ? 'buscar' : 'liturgia') : 'biblioteca');
   if (midiaDe(song) && player.desta(midiaDe(song))) player.atualizar({ titulo: song.title, artista: song.artist || '' });
@@ -10757,7 +10757,9 @@ function prepararMusicaAoAbrir(song) {
   }
   if (tentouSincronizar.has(chave)) return audioPromise;
   tentouSincronizar.add(chave);
-  return sincronizarMusica(song, { audioPromise }).then((resultado) => {
+  // Mesmo quando o LRCLIB não encontra letra (ou falha), a Busca precisa aguardar a descoberta do áudio.
+  const sincroniaPromise = sincronizarMusica(song, { audioPromise });
+  return Promise.all([audioPromise, sincroniaPromise]).then(([, resultado]) => {
     if (resultado === 'erro') tentouSincronizar.delete(chave);
     return resultado;
   });
