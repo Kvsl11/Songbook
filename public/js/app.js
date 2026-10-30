@@ -134,7 +134,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-340';
+export const APP_VERSAO = '2026.10.30-341';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4241,6 +4241,11 @@ async function abrirPrevia(content, source, back, videoJa = null, { espera = 300
   }
   const jaNaPrevia = location.hash === '#/musica/previa';
   preview = novo;
+  // Prepara áudio e LRCLIB em paralelo antes de mostrar a página. Espera só um instante;
+  // se a rede estiver lenta, a tela abre e as tarefas terminam em segundo plano.
+  const preparo = prepararMusicaAoAbrir(novo);
+  await Promise.race([preparo, new Promise((ok) => setTimeout(ok, 1100))]);
+  if (preview !== novo) return; // outro resultado foi aberto enquanto este era preparado
   if (jaNaPrevia) route(); else location.hash = '#/musica/previa';
 }
 
@@ -7979,9 +7984,9 @@ function viewSong(id, ctx = {}) {
     const r = renderSong(song.content);
     song = { ...song, title: r.meta.title || 'Canto', artist: r.meta.artist || r.meta.subtitle || '', youtube: youtubeId(r.meta.youtube) || '', cover: r.meta.cover || '', pdf: r.meta.pdf || '', key: r.key, composer: r.meta.composer || r.meta.lyricist || '' };
   } else db.touchRecent(song.id);
-  // A faixa musical é descoberta ao abrir a música, sem depender de tocar ou de sincronizar a letra.
-  // A busca roda em segundo plano: a página abre na hora e o player recebe a versão assim que ela for encontrada.
-  if (song.youtube && !song.audioProprio && !versoesDe(song)?.audio) void descobrirVersoes(song);
+  // Ao entrar na música, áudio e letra LRCLIB começam a ser preparados juntos.
+  // A abertura espera no máximo 1,1 s; o que faltar termina em segundo plano.
+  if (midiaDe(song)) void prepararMusicaAoAbrir(song);
   setTab(ctx.set ? 'biblioteca' : isPreview ? (song.back?.startsWith('#/buscar') ? 'buscar' : 'liturgia') : 'biblioteca');
   if (midiaDe(song) && player.desta(midiaDe(song))) player.atualizar({ titulo: song.title, artista: song.artist || '' });
   corDaMusicaNaTela(song);
@@ -10594,25 +10599,52 @@ const tentouSincronizar = new Set();
 // A sincronia é automática e usa somente o LRCLIB. Se não houver letra sincronizada correspondente,
 // a música permanece sem sincronia; nenhum áudio é enviado a servidor de IA.
 const sincronizando = new Set();
-async function sincronizarMusica(song, { noVideo = '' } = {}) {
+const OPÇÕES_LRCLIB_RÁPIDAS = { espera: 250, timeout: 4500, tentativas: 2 };
+async function sincronizarMusica(song, { noVideo = '', audioPromise = null } = {}) {
+  const previaOriginal = song?.id === 'previa' ? preview : null;
   song = (song?.id === 'previa' ? { ...preview, ...song } : db.song(song?.id)) || song;
   if (!song?.id || sincronizando.has(song.id)) return undefined;
   sincronizando.add(song.id);
   try {
-    const vs = versoesDe(song);
+    let vs = versoesDe(song);
     let yt = noVideo && (noVideo === vs?.audio || ehArquivo(noVideo)) ? noVideo : videoDaLetra(song);
     if (!yt) return 'nada';
     let duracao = (player.atual?.youtube === yt && player.duracao)
       || (vs?.audio === yt ? Number(vs.duracao) || 0 : 0)
       || (ehArquivo(yt) ? Number(song.audioProprio?.duracao) || 0 : 0)
       || await duracaoDaMusica(song).catch(() => 0);
-    let lrc = await letraSincronizada({ titulo: tituloLimpo(song.title), artista: song.artist || '', duracao });
+    let lrc = await letraSincronizada(
+      { titulo: tituloLimpo(song.title), artista: song.artist || '', duracao },
+      undefined, OPÇÕES_LRCLIB_RÁPIDAS,
+    );
     if (!lrc?.linhas?.length || !lrc?.tempos?.length) return 'nada';
 
-    // Se o LRCLIB identifica a gravação musical, mas o YouTube aponta para um clipe mais longo,
-    // procura a faixa de áudio separada e associa a letra à gravação correta.
-    if (lrc.ajustar && !vs?.audio && song.youtube && !ehArquivo(yt)) {
-      const achado = await procurarAudio(song, Number(lrc.duracao) || 0).catch(() => null);
+    // A descoberta da faixa e a consulta LRCLIB rodam juntas. Quando ambas respondem,
+    // a letra é vinculada à gravação musical (não ao clipe), se a faixa separada existir.
+    if (audioPromise) {
+      await audioPromise.catch(() => null);
+      if (previaOriginal && preview !== previaOriginal) return 'nada';
+      song = (song.id === 'previa' ? { ...preview, ...song } : db.song(song.id)) || song;
+      vs = versoesDe(song);
+      if (vs?.audio && yt !== vs.audio) {
+        yt = vs.audio;
+        const duracaoAudio = Number(vs.duracao) || 0;
+        if (duracaoAudio > 0 && lrc.duracao > 0 && Math.abs(lrc.duracao - duracaoAudio) > 4) {
+          duracao = duracaoAudio;
+          lrc = await letraSincronizada(
+            { titulo: tituloLimpo(song.title), artista: song.artist || '', duracao },
+            undefined, OPÇÕES_LRCLIB_RÁPIDAS,
+          );
+        }
+      }
+    }
+
+    // Se o LRCLIB identifica a gravação musical, mas só há um clipe mais longo,
+    // usa a mesma descoberta paralela antes de desistir da sincronização.
+    if (lrc?.ajustar && !vs?.audio && song.youtube && !ehArquivo(yt)) {
+      const achado = audioPromise
+        ? await audioPromise.catch(() => null)
+        : await procurarAudio(song, Number(lrc.duracao) || 0).catch(() => null);
       if (!achado || achado.id === song.youtube) return 'nada';
       const durClipe = (player.atual?.youtube === song.youtube && player.duracao)
         || await duracaoDaMusica(song).catch(() => 0);
@@ -10622,7 +10654,10 @@ async function sincronizarMusica(song, { noVideo = '' } = {}) {
       });
       yt = achado.id;
       duracao = achado.segundos || 0;
-      lrc = await letraSincronizada({ titulo: tituloLimpo(song.title), artista: song.artist || '', duracao });
+      lrc = await letraSincronizada(
+        { titulo: tituloLimpo(song.title), artista: song.artist || '', duracao },
+        undefined, OPÇÕES_LRCLIB_RÁPIDAS,
+      );
     }
     if (!lrc?.linhas?.length || !lrc?.tempos?.length || lrc.ajustar) return 'nada';
     guardarSincronia(song, {
@@ -10635,6 +10670,25 @@ async function sincronizarMusica(song, { noVideo = '' } = {}) {
   } finally {
     sincronizando.delete(song.id);
   }
+}
+
+// A preparação começa no clique/entrada da música: descoberta do áudio e LRCLIB em paralelo.
+// A chave evita uma segunda consulta quando o player termina de montar a tela.
+function prepararMusicaAoAbrir(song) {
+  const chave = midiaDe(song);
+  if (!chave) return Promise.resolve(null);
+  const audioPromise = song.youtube && !song.audioProprio && !versoesDe(song)?.audio
+    ? descobrirVersoes(song)
+    : Promise.resolve(versoesDe(song));
+  if (song.sincronia?.fonte === 'lrclib' && song.sincronia.video === videoDaLetra(song) && song.sincronia.tempos?.length) {
+    return audioPromise;
+  }
+  if (tentouSincronizar.has(chave)) return audioPromise;
+  tentouSincronizar.add(chave);
+  return sincronizarMusica(song, { audioPromise }).then((resultado) => {
+    if (resultado === 'erro') tentouSincronizar.delete(chave);
+    return resultado;
+  });
 }
 // o áudio oficial da gravação no YouTube: o mesmo título, a duração da gravação do LRCLIB e, de preferência, do canal do
 // artista (os "- Topic", do YouTube Music); null se não achar
