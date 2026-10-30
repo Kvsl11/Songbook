@@ -90,6 +90,8 @@ test('lê vídeos do YouTube (Piped), limpa o título e monta o proxy', () => {
   const v = videosDoPiped({ items: [{ type: 'channel', url: '/channel/x' }, { type: 'stream', url: '/watch?v=xV7ZzeBR3oc', title: 'Noites Traiçoeiras (Vídeo Oficial)', uploaderName: 'Padre Marcelo Rossi - Topic', duration: 245 }, { type: 'music', url: '/watch?v=abcDEF12345', title: 'Remember the Time', uploaderName: 'Michael Jackson - Topic', duration: 254 }] });
   assert.equal(v.length, 1);
   assert.deepEqual([v[0].id, v[0].canal, v[0].duracao, v[0].url], ['xV7ZzeBR3oc', 'Padre Marcelo Rossi', '4:05', 'https://www.youtube.com/watch?v=xV7ZzeBR3oc']);
+  const musica = videosDoPiped({ items: [{ type: 'music', url: '/watch?v=abcDEF12345', title: 'Remember the Time', uploaderName: 'Michael Jackson - Topic', duration: 254 }] });
+  assert.deepEqual([musica[0].id, musica[0].canal, musica[0].segundos], ['abcDEF12345', 'Michael Jackson', 254]);
   assert.equal(tituloDoVideo('Padre Marcelo Rossi - Noites Traiçoeiras (Vídeo Oficial) [4K] | Canal'), 'Padre Marcelo Rossi - Noites Traiçoeiras');
   assert.equal(viaProxy('https://p.dev/?url={url}', 'https://a.b/c d'), 'https://p.dev/?url=https%3A%2F%2Fa.b%2Fc%20d');
   assert.equal(viaProxy('https://r.jina.ai/{raw}', 'https://a.b/c/'), 'https://r.jina.ai/https://a.b/c/');
