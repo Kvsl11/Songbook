@@ -469,8 +469,8 @@ export async function letraSincronizada(
       try {
         const res = await buscar(`https://lrclib.net/api/search?${params}`, { fetchImpl, timeout });
         if (res.ok) {
-          respondeu = true;
           const j = await res.json();
+          respondeu = true;
           return Array.isArray(j) ? j : [];
         }
         if (![429, 500, 502, 503, 504].includes(res.status)) throw new Error(`LRCLIB respondeu ${res.status}`);
