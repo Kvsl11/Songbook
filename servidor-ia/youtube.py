@@ -241,7 +241,9 @@ def _baixar(video: str, pasta: str, progresso, formato: str, pos: list, juntar: 
 
     opcoes = {
         "progress_hooks": [andamento],
-        # sem resposta do YouTube por 20 s: desiste dessa conexão e tenta de novo (antes podia ficar parado para sempre)
+        # Baixa fragmentos DASH/HLS em paralelo quando o YouTube oferece esse formato.
+        "concurrent_fragment_downloads": 4,
+        # sem resposta do YouTube por 20 s: desiste dessa conexão e tenta de novo
         "socket_timeout": 20,
         "retries": 3,
         "fragment_retries": 3,
@@ -265,7 +267,7 @@ def _baixar(video: str, pasta: str, progresso, formato: str, pos: list, juntar: 
     # o YouTube pede login ("confirme que não é um robô") a quem baixa de servidor na nuvem; alguns aparelhos (a TV,
     # o Safari, o celular, os óculos de realidade virtual) ainda passam sem login: tenta um por um até um baixar
     info, erros = None, []
-    for clientes in (None, ["tv"], ["web_safari"], ["android_vr"], ["mweb"], ["tv_embedded"]):
+    for indice, clientes in enumerate((None, ["tv"], ["web_safari"], ["android_vr"], ["mweb"], ["tv_embedded"])):
         tentativa = dict(opcoes)
         if clientes:
             tentativa["extractor_args"] = {"youtube": {"player_client": clientes}}
@@ -276,9 +278,19 @@ def _baixar(video: str, pasta: str, progresso, formato: str, pos: list, juntar: 
             break
         except yt_dlp.utils.DownloadError as e:
             erros.append(e)
-            ultimo[0] = -1  # o próximo aparelho começa do 0%
-            for f in os.listdir(pasta):  # o pedaço baixado pela metade não fica para a próxima tentativa
-                os.remove(os.path.join(pasta, f))
+            # Só troca o cliente do YouTube quando o erro realmente pede login.
+            # Falhas de rede/formato/arquivo não melhoram repetindo seis consultas
+            # de extração: devolve o erro imediatamente e deixa o usuário tentar de novo.
+            if not pede_login(e) or indice == 5:
+                break
+            ultimo[0] = -1  # o próximo cliente começa do 0%
+            for f in os.listdir(pasta):
+                caminho = os.path.join(pasta, f)
+                if os.path.isfile(caminho):
+                    os.remove(caminho)
+                elif os.path.isdir(caminho):
+                    import shutil
+                    shutil.rmtree(caminho, ignore_errors=True)
     if cookies:
         guardar_cookies_renovados(cookies, antes)
     if erros:
