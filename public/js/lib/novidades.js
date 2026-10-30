@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 330, data: '2026-10-30', titulo: 'Versão música com a duração da gravação',
+    itens: [
+      { tipo: 'correcao', texto: 'O Songbook procura a gravação cantada pela duração própria da música mesmo quando a letra sincronizada já parece combinar com o videoclipe. O modo música usa a gravação curta e o modo vídeo mantém o clipe completo.' },
+    ],
+  },
+  {
     versao: 329, data: '2026-10-30', titulo: 'Versão cantada e clipe escolhidos automaticamente',
     itens: [
       { tipo: 'melhoria', texto: 'Ao buscar uma música, o Songbook procura automaticamente a gravação cantada para acompanhar a letra e o videoclipe. A troca entre as versões mantém a posição da música.' },
@@ -74,16 +80,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'No modo música, sem a música baixada, aparece a capa oficial grande, como no Spotify. Com a música baixada com o vídeo, trechos do clipe passam atrás, sem som e sem os botões do YouTube por cima.' },
       { tipo: 'correcao', texto: 'O artista sem foto no Deezer não aparece mais com a imagem cinza genérica: fica o desenho da pessoa com a nota.' },
       { tipo: 'melhoria', texto: 'Sem os avisos rápidos na tela (“Salvo na biblioteca” e os outros): só o de erro continua, para o toque não ficar sem resposta.' },
-    ],
-  },
-  {
-    versao: 320, data: '2026-10-30', titulo: 'A capa de verdade e notificações mais caprichadas',
-    itens: [
-      { tipo: 'melhoria', texto: 'Notificações mais bonitas: o ícone do app certinho na barra, a capa da música, o nome dela no título e “Baixando 80%” / “Download concluído” embaixo. Os avisos de quando você está usando o app aparecem rapidinho na tela, sem encher a barra do celular.' },
-      { tipo: 'novo', texto: 'A capa de verdade da música (a do álbum ou do single, pelo Deezer ou pelo iTunes), no lugar do quadro do vídeo. Fica guardada na música e aparece também na biblioteca.' },
-      { tipo: 'melhoria', texto: 'A capinha ao lado do nome aparece também no modo música, no mesmo lugar do modo vídeo.' },
-      { tipo: 'correcao', texto: 'O vídeo em tela cheia não sai mais sozinho ao virar o celular (antes ele girava, saía e voltava ao normal).' },
-      { tipo: 'correcao', texto: 'Na barrinha de baixo, o vídeo pequeno não fica mais coberto pelo botão de tela cheia: ele só aparece com o vídeo grande.' },
     ],
   },
 
