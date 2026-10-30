@@ -117,7 +117,9 @@ async function acompanharTarefa(cfg, base, id, { sinal, limite, aoEtapa }) {
       semResposta = 0;
     } catch (e) {
       if (e.name === 'AbortError' || sinal?.aborted) throw new Error('Cancelado');
-      if (e.status) throw e;
+      // Gateways/túneis podem devolver 502/503/504 durante um despertar ou oscilação breve.
+      // Repetimos somente esses erros temporários; 401/403/404 e erros da tarefa continuam imediatos.
+      if (e.status && ![502, 503, 504].includes(e.status)) throw e;
       if (++semResposta >= 40) throw new Error('O servidor parou de responder no meio. Ele está ligado? Tente de novo');
     }
     if (estado) {
@@ -126,7 +128,7 @@ async function acompanharTarefa(cfg, base, id, { sinal, limite, aoEtapa }) {
       if (estado.erro) throw Object.assign(new Error(estado.erro), { status: estado.status || 500 });
       if ('resultado' in estado) return estado.resultado;
     }
-    await esperar(1500, sinal);
+    await esperar(semResposta ? Math.min(5000, 1000 + semResposta * 500) : 1800, sinal);
   }
 }
 
