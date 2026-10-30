@@ -8438,8 +8438,6 @@ function viewSong(id, ctx = {}) {
   const sincronia = () => (midiaDe(song) && song.sincronia?.fonte === 'lrclib' && song.sincronia.video === videoDaLetra(song) && song.sincronia.tempos?.length ? song.sincronia : null);
   // Consulta o LRCLIB automaticamente ao abrir a música, em qualquer tamanho de tela.
   if (midiaDe(song)) sincronizarAoTocar();
-  // Consulta o LRCLIB automaticamente ao abrir a música, em qualquer tamanho de tela.
-  if (midiaDe(song)) sincronizarAoTocar();
   const linhasNaTela = () => [...songEl.querySelectorAll('.line:not(.chords-only)')].filter((l) => linhaSemCifra([...l.querySelectorAll('.lyric')].map((x) => x.textContent).join('')));
   let mapa = null; // linha cantada → linha da tela (refeito quando a letra é desenhada de novo)
   let telaDoMapa = null;
