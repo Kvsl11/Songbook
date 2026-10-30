@@ -156,6 +156,16 @@ test('ao abrir uma música, confirma a faixa e o LRCLIB antes de entrar', async 
     'a gravação de áudio precisa ser identificada antes da consulta ao LRCLIB');
 });
 
+test('cada prévia da busca tem seu próprio bloqueio de sincronização LRCLIB', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const inicio = app.indexOf('async function sincronizarMusica(song');
+  const fim = app.indexOf('// A preparação começa no clique/entrada da música', inicio);
+  const rotina = app.slice(inicio, fim);
+  assert.match(rotina, /const chaveSincronizacao = previaOriginal \|\| song\.id/);
+  assert.match(rotina, /sincronizando\.has\(chaveSincronizacao\)/);
+  assert.match(rotina, /sincronizando\.delete\(chaveSincronizacao\)/);
+});
+
 test('a consulta LRCLIB faz as buscas exata e ampla em paralelo com limite configurável', async () => {
   const web = await readFile(new URL('../public/js/lib/web.js', import.meta.url), 'utf8');
   const inicio = web.indexOf('export async function letraSincronizada(');
