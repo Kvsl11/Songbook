@@ -1101,7 +1101,7 @@ const player = (() => {
       <button class="icon-btn" data-pl="compartilhar" aria-label="Compartilhar" title="Compartilhar">${icon('share', 20)}</button>
       <button class="icon-btn" data-pl="fila" aria-label="Fila" title="Fila">${icon('queue', 20)}</button>
     </div>
-    <section class="pl-letra" hidden><div class="pl-letra-topo"><button class="icon-btn" data-pl="letra-fechar" aria-label="Fechar a letra" title="Fechar">${icon('down', 24)}</button><span class="pl-letra-nome"><b></b><small></small></span><span class="pl-letra-dir"><button class="icon-btn pl-leitura" data-pl="leitura" aria-pressed="false" aria-label="Só a letra, para ler" title="Só a letra (tira o resto da tela)">${icon('eye', 18)}</button><button class="pl-ver-cifra" data-pl="ver-cifra" aria-pressed="false" aria-label="Mostrar os acordes" title="Mostrar os acordes">${icon('chord', 15)}<span>Cifra</span></button></span></div><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-sinc" hidden aria-live="polite"></div><div class="pl-ferr">
+    <section class="pl-letra" hidden><div class="pl-letra-topo"><button class="icon-btn" data-pl="letra-fechar" aria-label="Fechar a letra" title="Fechar">${icon('down', 24)}</button><span class="pl-letra-nome"><b></b><small></small></span><span class="pl-letra-dir"><button class="icon-btn pl-leitura" data-pl="leitura" aria-pressed="false" aria-label="Só a letra, para ler" title="Só a letra (tira o resto da tela)">${icon('eye', 18)}</button><button class="pl-ver-cifra" data-pl="ver-cifra" aria-pressed="false" aria-label="Mostrar os acordes" title="Mostrar os acordes">${icon('chord', 15)}<span>Cifra</span></button></span></div><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-ferr">
       <span class="pl-ferr-g so-cifra"><button data-pl="tom-" aria-label="Baixar meio tom" title="Baixar meio tom">−</button><b class="pl-tom"></b><button data-pl="tom+" aria-label="Subir meio tom" title="Subir meio tom">+</button></span>
       <span class="pl-ferr-g so-cifra"><button data-pl="capo-" aria-label="Capotraste uma casa abaixo" title="Capotraste: uma casa abaixo">−</button><b class="pl-capo"></b><button data-pl="capo+" aria-label="Capotraste uma casa acima" title="Capotraste: uma casa acima">+</button></span>
       <span class="pl-ferr-g"><button data-pl="fonte-" aria-label="Letra menor" title="Letra menor">A−</button><button data-pl="fonte+" aria-label="Letra maior" title="Letra maior">A+</button></span>
@@ -1733,71 +1733,6 @@ const semLinhasDeAcordes = (sinc) => {
       }
     }
   };
-  // ---- o aviso da sincronia, em cima da letra (no cartão e na tela toda), e a sincronia à mão
-  const sincEstado = new Map(); // vídeo -> { tipo: buscando | servidor | ok | ajustar | falhou | erro, texto, visto }
-  let ajustando = false; // tocar numa frase, no momento em que ela é cantada, acerta o tempo da letra inteira
-  let ajustandoVideo = '';
-  let marcando = null; // a sincronia à mão: { video, linhas, tempos }, tocando em "Agora" no começo de cada frase
-  let someAviso = 0;
-  const botaoSinc = (pl, txt, forte = false) => `<button class="${forte ? 'forte' : ''}" data-pl="${pl}">${txt}</button>`;
-  const mostrarSinc = () => {
-    const box = $('.pl-sinc', el);
-    if (!box) return;
-    clearTimeout(someAviso);
-    const yt = atual?.youtube;
-    const e = yt && !atual.semVideo ? sincEstado.get(yt) : null;
-    let html = '';
-    if (marcando) {
-      const n = marcando.tempos.length;
-      html = `<span class="pl-sinc-txt">${n ? `Frase ${n} de ${marcando.linhas.length}. ` : ''}Toque em <b>Agora</b> quando cada frase começar</span>
-        ${n ? botaoSinc('sinc-desfazer', 'Desfazer') : ''}${botaoSinc('sinc-cancelar', 'Cancelar')}${botaoSinc('sinc-agora', 'Agora', true)}`;
-    } else if (ajustando || e?.tipo === 'ajustar') {
-      html = `<span class="pl-sinc-ic">${icon('info', 15)}</span><span class="pl-sinc-txt">${ajustando ? 'Toque na frase no momento em que ela for cantada' : 'O vídeo tem uma parte antes da música: acerte o começo da letra'}</span>
-        ${ajustando ? botaoSinc('sinc-pronto', 'Pronto') : botaoSinc('sinc-ajustar', 'Acertar', true)}`;
-    } else if (e?.tipo === 'buscando' || e?.tipo === 'servidor') {
-      html = `<span class="pl-sinc-eq" aria-hidden="true"><i></i><i></i><i></i></span><span class="pl-sinc-txt">${esc(e.texto || 'Sincronizando a letra…')}</span>`;
-    } else if (e?.tipo === 'ok' && !e.visto) {
-      html = `<span class="pl-sinc-ic ok">${icon('check', 15)}</span><span class="pl-sinc-txt">${esc(e.texto || 'Letra sincronizada')}</span>${botaoSinc('sinc-ajustar', 'Ajustar')}`;
-      // some sozinho 2 s depois de aparecer (o prazo fica no aviso: o painel redesenha várias vezes e, contando de novo a
-      // cada vez, ele nunca sumia)
-      e.ate ||= Date.now() + 2000;
-      someAviso = setTimeout(() => { e.visto = true; mostrarSinc(); }, Math.max(0, e.ate - Date.now()));
-    } else if (e?.tipo === 'falhou' || e?.tipo === 'erro') {
-      html = `<span class="pl-sinc-ic erro">${icon('alerta', 15)}</span><span class="pl-sinc-txt">${esc(e.texto || 'Não sincronizou')}</span>
-        ${e.deNovo ? botaoSinc('sinc-tentar', 'Tentar de novo', true) : ''}${botaoSinc('sinc-marcar', 'Sincronizar à mão', !e.deNovo)}${servidorIA().url ? botaoSinc('sinc-servidor', 'Ouvir o vídeo') : ''}`;
-    }
-    porHtml(box, html); // (só quando muda: reescrito a cada desenho, ele piscava em cima da letra)
-    if (box.hidden !== !html) box.hidden = !html;
-  };
-  // acerta o tempo da letra inteira pela frase tocada agora (o vídeo com uma parte antes da música, ou fora do tempo)
-  const ajustarPelaFrase = (k) => {
-    const song = musicaTocando();
-    const sinc = song?.sincronia;
-    if (!sinc?.tempos?.[k]) return;
-    const d = api.tempoAgora - sinc.tempos[k].inicio;
-    const novo = { ...sinc, tempos: sinc.tempos.map((x) => ({ inicio: Math.max(0, Math.round((x.inicio + d) * 100) / 100), fim: Math.max(0, Math.round((x.fim + d) * 100) / 100) })) };
-    delete novo.ajustar;
-    ajustando = false;
-    sincEstado.set(atual.youtube, { tipo: 'ok', texto: 'Tempo da letra acertado' });
-    guardarSincronia(alvoDaMusica(song), novo);
-  };
-  const marcarFrase = () => {
-    if (!marcando) return;
-    const t = api.tempoAgora;
-    const n = marcando.tempos.length;
-    if (n) marcando.tempos[n - 1].fim = Math.max(marcando.tempos[n - 1].inicio + 0.2, t);
-    marcando.tempos.push({ inicio: t, fim: t + 5 });
-    const caixa = $('.pl-linhas', el);
-    caixa.querySelectorAll('p[data-k]').forEach((p) => { const i = Number(p.dataset.k); p.classList.toggle('agora', i === n); p.classList.toggle('cantada', i < n); });
-    rolarLetra();
-    if (marcando.tempos.length < marcando.linhas.length) { mostrarSinc(); return; }
-    // última frase: guarda
-    const { video, linhas, tempos: ts } = marcando;
-    marcando = null;
-    sincEstado.set(video, { tipo: 'ok', texto: 'Letra sincronizada à mão' });
-    letraDe = '';
-    guardarSincronia(alvoDaMusica(musicaTocando()), { video, linhas, tempos: ts.map((x) => ({ inicio: Math.round(x.inicio * 100) / 100, fim: Math.round(x.fim * 100) / 100 })), fonte: 'manual' });
-  };
   // só as partes longas só de instrumentos (introdução, solo, final) ganham as notinhas: as pausas curtas entre as
   // estrofes não
   const PAUSA_MUSICA = 10;
@@ -1816,8 +1751,6 @@ const semLinhasDeAcordes = (sinc) => {
     const palavras = String(ls[k] || '').split(/\s+/).filter(Boolean).length;
     return Math.min(fim, inicio + Math.max(3, Math.min(9, 1.5 + 0.55 * palavras)));
   };
-  const lrclibTentado = new Set();
-  const lrclibDeNovo = new Set(); // (os vídeos que já tentaram o LRCLIB de novo, depois de ele não responder)
   // a música para sincronizar: a salva, ou a prévia da busca com os dados que a página da música calcula
   const alvoDaMusica = (song) => {
     if (song !== preview) return song;
@@ -8500,6 +8433,8 @@ function viewSong(id, ctx = {}) {
   // vídeo desta música, a linha cantada acende e a letra rola até ela; tocar numa linha leva o vídeo para ali
   // (com as duas versões, a letra acompanha o áudio oficial: no clipe ela fica parada)
   const sincronia = () => (midiaDe(song) && song.sincronia?.fonte === 'lrclib' && song.sincronia.video === videoDaLetra(song) && song.sincronia.tempos?.length ? song.sincronia : null);
+  // Consulta o LRCLIB automaticamente ao abrir a música, em qualquer tamanho de tela.
+  if (midiaDe(song)) sincronizarAoTocar();
   const linhasNaTela = () => [...songEl.querySelectorAll('.line:not(.chords-only)')].filter((l) => linhaSemCifra([...l.querySelectorAll('.lyric')].map((x) => x.textContent).join('')));
   let mapa = null; // linha cantada → linha da tela (refeito quando a letra é desenhada de novo)
   let telaDoMapa = null;
@@ -10678,8 +10613,6 @@ function viewConectarYoutube() {
       desenharArquivo();
       toast('YouTube conectado: agora a partitura e a letra baixam sozinhas', { tipo: 'sucesso' });
       
-      guardarNotificacoes();
-      desenharSino();
       tentouSincronizar.clear();
       verEstado();
     } catch (e) { toast(e.message, { tipo: 'erro' }); } finally { b.disabled = false; }
@@ -10799,7 +10732,7 @@ async function descobrirVersoes(song) {
         video, audio: achado.id, duracao: achado.segundos,
         pares: paresPelaDuracao(durClipe, achado.segundos),
       });
-      // Se já houver letra sincronizada, a IA pode casar os pontos exatos entre a faixa e o videoclipe.
+      // Se já houver letra sincronizada, o aparelho pode casar os pontos entre a faixa e o videoclipe.
       void acertarVersoes(atual, atual.sincronia?.fonte === 'lrclib' ? atual.sincronia : null);
       return achado;
     } catch { return null; }
@@ -10870,20 +10803,6 @@ async function casarNoAparelho(audioId, videoId) {
     w.onerror = () => fim(null);
     w.postMessage({ audio, video }, [audio.buffer, video.buffer]);
   });
-}
-// com a IA do servidor, em segundo plano: ela ouve o clipe e diz onde cada linha da letra está nele; a troca entre o
-// áudio e o clipe passa a cair no mesmo ponto cantado, trecho por trecho (mesmo com uma cena no meio do clipe)
-const acertandoClipe = new Set();
-async function acertarClipe(song, lrc) {
-  const vs = versoesDe(song);
-  if (!vs || acertandoClipe.has(vs.video)) return;
-  acertandoClipe.add(vs.video);
-  try {
-    const r = await chamarComEtapas(servidorIA(), '/letra', { json: { url: `https://youtu.be/${vs.video}`, linhas: lrc.linhas, referencia: lrc.tempos } }, () => {});
-    const pares = paresDasSincronias(lrc.tempos, r.linhas);
-    const agora = song.id === 'previa' ? preview : db.song(song.id);
-    if (pares && agora && versoesDe(agora)?.video === vs.video) guardarVersoes(agora, { ...versoesDe(agora), pares });
-  } catch { /* fica a estimativa pela duração */ } finally { acertandoClipe.delete(vs.video); }
 }
 // guarda a sincronia na música (a salva ou a prévia da busca) e o Tocando agora passa a acompanhar
 function guardarSincronia(song, sinc) {
