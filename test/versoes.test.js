@@ -81,6 +81,11 @@ test('a busca só abre a música depois de localizar o videoclipe e concluir áu
   assert.ok(funcao > 0, 'a descoberta da faixa de áudio deve existir');
   const fim = app.indexOf('// as duas versões da música (o clipe e o áudio oficial)', funcao);
   assert.match(app.slice(funcao, fim), /procurarAudio\(song/);
+  const prepararMusica = app.indexOf('function prepararMusicaAoAbrir(song)');
+  const fimPreparar = app.indexOf('// o áudio oficial da gravação', prepararMusica);
+  assert.ok(prepararMusica > 0 && fimPreparar > prepararMusica, 'a preparação da música deve existir');
+  assert.match(app.slice(prepararMusica, fimPreparar), /Promise\.all\(\[audioPromise,\s*sincroniaPromise\]\)/,
+    'a preparação deve aguardar áudio e LRCLIB mesmo quando o LRCLIB não encontra letra');
 });
 
 test('um download parcial pode ser retomado e o áudio não precisa ser baixado novamente', async () => {
