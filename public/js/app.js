@@ -10602,7 +10602,7 @@ const sincronizando = new Set();
 const OPÇÕES_LRCLIB_RÁPIDAS = { espera: 250, timeout: 4500, tentativas: 2 };
 async function sincronizarMusica(song, { noVideo = '', audioPromise = null } = {}) {
   const previaOriginal = song?.id === 'previa' ? preview : null;
-  song = (song?.id === 'previa' ? { ...preview, ...song } : db.song(song?.id)) || song;
+  song = (song?.id === 'previa' ? { ...song, ...preview } : db.song(song?.id)) || song;
   if (!song?.id || sincronizando.has(song.id)) return undefined;
   sincronizando.add(song.id);
   try {
@@ -10624,12 +10624,12 @@ async function sincronizarMusica(song, { noVideo = '', audioPromise = null } = {
     if (audioPromise) {
       await audioPromise.catch(() => null);
       if (previaOriginal && preview !== previaOriginal) return 'nada';
-      song = (song.id === 'previa' ? { ...preview, ...song } : db.song(song.id)) || song;
+      song = (song.id === 'previa' ? { ...song, ...preview } : db.song(song.id)) || song;
       vs = versoesDe(song);
       if (vs?.audio && yt !== vs.audio) {
         yt = vs.audio;
         const duracaoAudio = Number(vs.duracao) || 0;
-        if (duracaoAudio > 0 && lrc.duracao > 0 && Math.abs(lrc.duracao - duracaoAudio) > 4) {
+        if (duracaoAudio > 0 && lrc.duracao > 0 && (lrc.ajustar || Math.abs(lrc.duracao - duracaoAudio) > 4)) {
           duracao = duracaoAudio;
           lrc = await letraSincronizada(
             { titulo: tituloLimpo(song.title), artista: song.artist || '', duracao },
