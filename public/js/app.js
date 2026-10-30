@@ -215,8 +215,47 @@ function irParaMusica(id) {
 
 // ------------------------------------------------------------------ util
 
-// Avisos e notificações foram removidos conforme a configuração do app.
+// Mensagens comuns não aparecem sobre a tela. Somente eventos de download usam
+// notificações do Android/sistema, sem criar avisos internos no aplicativo.
 function toast() {}
+const podeNotificarNoSistema = () =>
+  typeof Notification !== 'undefined' &&
+  Notification.permission === 'granted' &&
+  'serviceWorker' in navigator;
+
+async function notificarSistema({ titulo, texto = '', tag = '', href = '', silenciosa = false, renovar = false, imagem = '' }) {
+  if (!podeNotificarNoSistema()) return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification(titulo || 'Songbook', {
+      body: texto,
+      tag: tag || undefined,
+      renotify: Boolean(tag && renovar),
+      silent: silenciosa,
+      timestamp: Date.now(),
+      icon: imagem || new URL('icon-192-v7.png', document.baseURI).href,
+      badge: new URL('badge-96.png', document.baseURI).href,
+      data: { href: href ? new URL(href, location.href).href : location.href.split('#')[0] },
+    });
+    return true;
+  } catch { return false; }
+}
+
+// O Android só apresenta o pedido de permissão após uma interação do usuário.
+if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+  document.addEventListener('pointerup', function pedirPermissaoNotificacoes() {
+    document.removeEventListener('pointerup', pedirPermissaoNotificacoes);
+    Notification.requestPermission().catch(() => {});
+  }, { once: true });
+}
+
+// Capa usada nas notificações de download, quando disponível.
+const capaDaNotificacao = (song) =>
+  song?.cover && /^https?:/.test(song.cover)
+    ? song.cover
+    : song?.youtube
+      ? `https://i.ytimg.com/vi/${song.youtube}/hqdefault.jpg`
+      : '';
 // compartilhar pelo sistema (WhatsApp, e-mail…); sem isso, copia o texto
 async function compartilhar(dados) {
   if (navigator.share) {
@@ -685,7 +724,13 @@ async function baixarMusica(song, { perguntou = false } = {}) {
     while (filaBaixar.length) {
       const id = filaBaixar.shift();
       try { await baixarAgora(id); } catch (e) {
-        toast(`Não baixou “${db.song(id)?.title || 'a música'}”: ${erroExplicado(e)}`, 5000);
+        const song = db.song(id);
+        void notificarSistema({
+          titulo: song?.title || 'Download',
+          texto: `Não deu para baixar · ${erroExplicado(e)}`,
+          tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}`,
+          imagem: capaDaNotificacao(song),
+        });
       }
       baixando.delete(id);
       avisarDownloads();
@@ -709,6 +754,15 @@ async function baixarAgora(id) {
       const antes = baixando.get(id)?.pct ?? -100;
       baixando.set(id, { pct });
       avisarDownloads();
+      // Atualiza a notificação do sistema a cada 10%, sem som.
+      if (Math.floor(pct / 10) !== Math.floor(antes / 10)) {
+        void notificarSistema({
+          titulo: song.title,
+          texto: `${song.artist ? `${song.artist} · ` : ''}Baixando ${pct}%`,
+          tag: `baixar-${id}`, silenciosa: true, href: `#/musica/${id}`,
+          imagem: capaDaNotificacao(song),
+        });
+      }
     };
     try {
       if (!/^[\w-]{11}$/.test(yt || '')) throw new Error('o vídeo desta versão não é do YouTube');
@@ -739,7 +793,12 @@ async function baixarAgora(id) {
   await guardarImagensDaMusica(song);
   if (!db.song(id)) return; // saiu da biblioteca enquanto baixava
   db.updateSong(id, { baixado: { arquivos, tamanho: Object.values(arquivos).reduce((a, x) => a + (x.tamanho || 0), 0), em: Date.now() } });
-  toast(avisoClipe ? `Baixada só a música: ${song.title} (${avisoClipe})` : `Baixada: ${song.title}`);
+  void notificarSistema({
+    titulo: song.title,
+    texto: `${avisoClipe ? 'Baixada só a música' : 'Download concluído'}${song.artist ? ` · ${song.artist}` : ''} · ${fmtBytes(db.song(id)?.baixado?.tamanho || 0)}`,
+    tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}`,
+    imagem: capaDaNotificacao(song),
+  });
 }
 // as capas e a partitura da música no cache dos downloads (o service worker usa sem internet)
 async function guardarImagensDaMusica(song) {
