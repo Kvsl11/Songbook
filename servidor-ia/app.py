@@ -249,7 +249,7 @@ if os.environ.get("IA_AQUECER") == "1" or os.environ.get("CODESPACE_NAME"):
 
 @app.get("/saude")
 def saude():
-    return {
+    response = {
         "ok": True,
         "separacao": transcricao.tem_separacao(),
         "youtube": shutil.which("ffmpeg") is not None,
@@ -260,6 +260,7 @@ def saude():
         "chave": bool(os.environ.get("IA_CHAVE")),
         "maxSegundos": transcricao.MAX_SEGUNDOS,
     }
+    return response
 
 
 @app.post("/transcrever", dependencies=[Depends(conferir_chave)])
@@ -527,14 +528,24 @@ def baixar_para_o_app(pedido: PedidoBaixar, etapas: bool = Query(False), tarefa:
     return com_etapas(trabalho, etapas, None, tarefa)
 
 
+def _finalizar_entrega(numero: str, pasta: str) -> None:
+    # Só invalida o identificador depois que o envio do FileResponse termina.
+    # Se a conexão cair durante a transferência, o app pode repetir o GET com o mesmo número.
+    with _prontos_trava:
+        atual = _prontos.get(numero)
+        if atual and atual.get("pasta") == pasta:
+            _prontos.pop(numero, None)
+    shutil.rmtree(pasta, ignore_errors=True)
+
+
 @app.get("/baixar/{numero}", dependencies=[Depends(conferir_chave)])
 def entregar_baixado(numero: str):
     with _prontos_trava:
-        pronto = _prontos.pop(numero, None)
+        pronto = _prontos.get(numero)
     if not pronto or not os.path.isfile(pronto["caminho"]):
         raise HTTPException(404, "o arquivo não está mais no servidor: baixe de novo")
     return FileResponse(pronto["caminho"], media_type=pronto["tipo"],
-                        background=BackgroundTask(shutil.rmtree, pronto["pasta"], ignore_errors=True))
+                        background=BackgroundTask(_finalizar_entrega, numero, pronto["pasta"]))
 
 
 class PedidoDuvida(BaseModel):
