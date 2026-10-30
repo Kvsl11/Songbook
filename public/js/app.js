@@ -4288,33 +4288,36 @@ async function videoDaMusica(titulo, artista, source) {
   return vs.find((v) => videoCombina(v.titulo, titulo)) || null;
 }
 
-async function abrirPrevia(content, source, back, videoJa = null, { espera = 3000 } = {}) {
+async function abrirPrevia(content, source, back, videoJa = null) {
   const novo = { id: 'previa', content, source, transpose: 0, capo: capoDaCifra(content), back }; // capo da cifra (Cifra Club)
-  const m = renderSong(content).meta;
+  let m = renderSong(novo.content).meta;
   if (!youtubeId(m.youtube) && !String(source || '').startsWith('cnbb:')) {
-    // a busca que veio junto não achou: procura de novo pelo título e o artista da música
-    const busca = (videoJa ? videoJa.then((vs) => vs[0] || videoDaMusica(m.title, m.artist, source)) : videoDaMusica(m.title, m.artist, source)).catch(() => null);
-    const v = await Promise.race([busca, new Promise((r) => setTimeout(() => r(undefined), espera))]);
-    if (v) novo.content = definirMeta(content, 'youtube', v.url);
-    else if (v === null) novo.semVideo = true; // procurou e não achou
-    novo.videoProcurado = v !== undefined;
-    if (v === undefined) {
-      // demorou: segue procurando com a página aberta
-      novo.videoProcurado = true;
-      busca.then((vv) => {
-        if (preview !== novo) return;
-        if (vv) { novo.content = definirMeta(novo.content, 'youtube', vv.url); toast('Vídeo do YouTube encontrado'); } else novo.semVideo = true;
-        if (location.hash === '#/musica/previa') route();
-      });
-    }
+    // Aguarda o videoclipe da busca; se ela não encontrou, tenta pelo título e artista.
+    const busca = (videoJa
+      ? videoJa.then((vs) => vs?.[0] || videoDaMusica(m.title, m.artist, source))
+      : videoDaMusica(m.title, m.artist, source)).catch(() => null);
+    const v = await busca;
+    if (v?.url) novo.content = definirMeta(novo.content, 'youtube', v.url);
+    else novo.semVideo = true;
+    novo.videoProcurado = true;
   }
+
+  // A prévia também precisa ter os metadados explícitos: sem title/artist/youtube,
+  // a descoberta da faixa de áudio e a consulta ao LRCLIB não conseguem identificar a música.
+  m = renderSong(novo.content).meta;
+  Object.assign(novo, {
+    title: m.title || 'Canto',
+    artist: m.artist || m.subtitle || '',
+    youtube: youtubeId(m.youtube) || '',
+    cover: m.cover || '',
+  });
+
   const jaNaPrevia = location.hash === '#/musica/previa';
   preview = novo;
-  // Prepara áudio e LRCLIB em paralelo antes de mostrar a página. Espera só um instante;
-  // se a rede estiver lenta, a tela abre e as tarefas terminam em segundo plano.
-  const preparo = prepararMusicaAoAbrir(novo);
-  await Promise.race([preparo, new Promise((ok) => setTimeout(ok, 1100))]);
-  if (preview !== novo) return; // outro resultado foi aberto enquanto este era preparado
+  // Só abre a tela da música quando terminar a busca do áudio oficial e a sincronização LRCLIB.
+  // prepararMusicaAoAbrir coordena as duas tarefas em paralelo e guarda os resultados na prévia.
+  await prepararMusicaAoAbrir(novo);
+  if (preview !== novo) return;
   if (jaNaPrevia) route(); else location.hash = '#/musica/previa';
 }
 
