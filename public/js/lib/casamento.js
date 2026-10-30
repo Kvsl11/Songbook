@@ -150,12 +150,14 @@ export function paresDoCaminho(wp, duracaoAudio, { cada = 1, folga = 0.4 } = {})
   return pares;
 }
 
-// { pares, confianca } ou null se não parecem a mesma gravação. As amostras: mono, na TAXA
+// { pares, confianca, mesma } (mesma: false, sem os pares, se não parecem a mesma gravação), ou null sem som bastante.
+// As amostras: mono, na TAXA
 export function casar(audio, video, taxa = TAXA) {
   const a = croma(audio, taxa);
   const v = croma(video, taxa);
   if (a.quadros < 10 || v.quadros < 10) return null;
   const { wp, parecenca } = caminho(a, v);
-  if (!(parecenca >= CONFIANCA_MINIMA)) return null;
-  return { pares: paresDoCaminho(wp, audio.length / taxa), confianca: Math.round(parecenca * 100) / 100 };
+  // (não parecem a mesma gravação: o vídeo é outra apresentação, como um ao vivo, e não o clipe da gravação)
+  if (!(parecenca >= CONFIANCA_MINIMA)) return { pares: null, confianca: Math.round(parecenca * 100) / 100, mesma: false };
+  return { pares: paresDoCaminho(wp, audio.length / taxa), confianca: Math.round(parecenca * 100) / 100, mesma: true };
 }

@@ -34,5 +34,7 @@ test('casar acha a cena antes e no meio do clipe (como Espresso, com a música c
 });
 
 test('casar recusa duas gravações diferentes', () => {
-  assert.equal(casar(musica(30, 1), musica(35, 99)), null);
+  const r = casar(musica(30, 1), musica(35, 99));
+  assert.equal(r.mesma, false);
+  assert.equal(r.pares, null);
 });

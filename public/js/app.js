@@ -131,7 +131,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-323';
+export const APP_VERSAO = '2026.10.30-324';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -728,7 +728,8 @@ function itemDoPlayer(song, set = null, index = -1) {
   // com as duas versões, o modo música toca o áudio oficial e o modo vídeo, o clipe
   const vs = versoesDe(song);
   return {
-    youtube: vs && (player.modoMusica || !vs.video) ? vs.audio : song.youtube, ...(vs ? { video: vs.video, audio: vs.audio, pares: vs.pares } : {}), titulo: song.title, artista: song.artist || '', capa: song.cover || '', songId: song.id, cor: corDe(song),
+    // (soMusica: o vídeo é outra gravação, na música sem clipe: ela toca sempre a música, sem o "Mudar para vídeo")
+    youtube: vs && (player.modoMusica || !vs.video || vs.diferentes) ? vs.audio : song.youtube, ...(vs ? { video: vs.video, audio: vs.audio, pares: vs.pares, ...(vs.diferentes ? { soMusica: true } : {}) } : {}), titulo: song.title, artista: song.artist || '', capa: song.cover || '', songId: song.id, cor: corDe(song),
     href: set ? `#/repertorio/${set.id}/${index}` : song.id && song.id !== 'previa' ? `#/musica/${song.id}` : location.hash,
     parte: set ? set.items[index]?.label || '' : '', setId: set?.id || '', index,
   };
@@ -773,7 +774,8 @@ function arquivosParaBaixar(song) {
   const vs = versoesDe(song);
   const audio = vs && !ehArquivo(vs.audio) ? vs.audio : '';
   const lista = audio ? [{ yt: audio, video: false }] : [];
-  if (song.youtube && (comVideo || (!audio && !song.audioProprio))) lista.push({ yt: song.youtube, video: comVideo });
+  // (o vídeo que é outra gravação, como um ao vivo no lugar do clipe que a música não tem, não vai: só a música)
+  if (song.youtube && (comVideo || (!audio && !song.audioProprio)) && !(audio && vs?.diferentes)) lista.push({ yt: song.youtube, video: comVideo });
   return lista;
 }
 // a qualidade dos downloads, como no Spotify (Ajustes → Economia de dados e offline): normal, alta ou muito alta, uma
@@ -820,6 +822,9 @@ async function baixarAgora(id) {
   if (!song) return;
   const lista = arquivosParaBaixar(song);
   const arquivos = {};
+  // (cada arquivo por si: o vídeo que não baixa — "vídeo inválido", fora do ar, bloqueado — não derruba a música, que
+  // fica baixada só com o áudio)
+  const falhas = [];
   for (const [n, { yt, video }] of lista.entries()) {
     const ja = baixadoDe(yt);
     if (ja && (!video || String(ja.tipo).startsWith('video'))) { arquivos[yt] = ja; continue; }
@@ -831,22 +836,38 @@ async function baixarAgora(id) {
       // na barra de notificações, como o Spotify: "Baixando… 40%" (a cada 10%, sem som), trocada pela de pronta no fim
       if (Math.floor(pct / 10) !== Math.floor(antes / 10)) notificarSistema({ titulo: song.title, texto: `${song.artist ? `${song.artist} · ` : ''}Baixando ${pct}%`, tag: `baixar-${id}`, silenciosa: true, href: `#/musica/${id}`, imagem: capaDaNotificacao(song) });
     };
-    const r = await chamarComEtapas(servidorIA(), '/baixar', { json: { url: `https://youtu.be/${yt}`, video, qualidade: qualidadeDoDownload(video) } }, (etapa, p) => { if (etapa === 'baixando' && p !== null) andou(p * 0.8); });
-    andou(0.85);
-    const base = baseDoServidor(servidorIA().url);
-    const resp = await fetch(`${base}/baixar/${r.arquivo}`, { headers: cabecalhos(base, servidorIA().chave) });
-    if (!resp.ok) throw new Error('o arquivo não chegou do servidor: tente de novo');
-    const blob = await resp.blob();
-    await guardarAudio(chaveBaixada(yt), blob);
-    arquivos[yt] = { tipo: r.tipo || blob.type, tamanho: blob.size, ...(r.qualidade ? { qualidade: r.qualidade } : {}), ...(r.altura ? { altura: r.altura } : {}) };
+    try {
+      if (!/^[\w-]{11}$/.test(yt || '')) throw new Error('o vídeo desta versão não é do YouTube');
+      const r = await chamarComEtapas(servidorIA(), '/baixar', { json: { url: `https://youtu.be/${yt}`, video, qualidade: qualidadeDoDownload(video) } }, (etapa, p) => { if (etapa === 'baixando' && p !== null) andou(p * 0.8); });
+      andou(0.85);
+      const base = baseDoServidor(servidorIA().url);
+      const resp = await fetch(`${base}/baixar/${r.arquivo}`, { headers: cabecalhos(base, servidorIA().chave) });
+      if (!resp.ok) throw new Error('o arquivo não chegou do servidor: tente de novo');
+      const blob = await resp.blob();
+      await guardarAudio(chaveBaixada(yt), blob);
+      arquivos[yt] = { tipo: r.tipo || blob.type, tamanho: blob.size, ...(r.qualidade ? { qualidade: r.qualidade } : {}), ...(r.altura ? { altura: r.altura } : {}) };
+    } catch (e) { falhas.push({ yt, video, e }); }
     andou(1);
+  }
+  if (!Object.keys(arquivos).length) throw falhas[0]?.e || new Error('nada para baixar');
+  // com a música e o vídeo no aparelho: os dois são casados pelo som; se o vídeo é outra gravação (um ao vivo, outra
+  // apresentação, na música que não tem clipe), ele sai e fica só a música
+  let avisoClipe = falhas.some((f) => f.yt === song.youtube) ? 'o vídeo não deu para baixar' : '';
+  const vsAqui = versoesDe(db.song(id) || song);
+  if (vsAqui?.audio && arquivos[vsAqui.audio] && arquivos[vsAqui.video] && !vsAqui.casadas && !vsAqui.diferentes) {
+    await acertarVersoes(db.song(id) || song).catch(() => {});
+    if (versoesDe(db.song(id))?.diferentes && !db.songs().some((x) => x.id !== id && x.baixado?.arquivos?.[vsAqui.video])) {
+      await apagarAudio(chaveBaixada(vsAqui.video)).catch(() => {});
+      delete arquivos[vsAqui.video];
+      avisoClipe = 'o vídeo é outra gravação';
+    }
   }
   await guardarImagensDaMusica(song);
   if (!db.song(id)) return; // saiu da biblioteca enquanto baixava
   db.updateSong(id, { baixado: { arquivos, tamanho: Object.values(arquivos).reduce((a, x) => a + (x.tamanho || 0), 0), em: Date.now() } });
   // (com a notificação na barra, ela já diz; o aviso fica para quem não deu a permissão)
-  if (!podeNotificarNoSistema()) toast(`Baixada: ${song.title}`);
-  notificarSistema({ titulo: song.title, texto: `Download concluído${song.artist ? ` · ${song.artist}` : ''} · ${fmtBytes(db.song(id)?.baixado?.tamanho || 0)}`, tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}`, imagem: capaDaNotificacao(song) });
+  if (!podeNotificarNoSistema()) toast(avisoClipe ? `Baixada só a música: ${song.title} (${avisoClipe})` : `Baixada: ${song.title}`);
+  notificarSistema({ titulo: song.title, texto: `${avisoClipe ? 'Baixada só a música' : 'Download concluído'}${song.artist ? ` · ${song.artist}` : ''} · ${fmtBytes(db.song(id)?.baixado?.tamanho || 0)}`, tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}`, imagem: capaDaNotificacao(song) });
 }
 // as capas e a partitura da música no cache dos downloads (o service worker usa sem internet)
 async function guardarImagensDaMusica(song) {
@@ -1185,10 +1206,10 @@ const player = (() => {
   };
   // tablet, como o "Mudar para vídeo" do Spotify: a capa no lugar do vídeo (o vídeo continua tocando, só não aparece)
   let comCapa = Boolean(db.prefs().playerCapa);
-  const modoCapa = () => comCapa && document.documentElement.classList.contains('pp');
+  const modoCapa = () => (comCapa || Boolean(atual?.soMusica)) && document.documentElement.classList.contains('pp');
   // celular e computador, na barra embaixo (fora da tela toda): no modo música, a capa no lugar do vídeo, como no tablet
   // (antes a barra mostrava sempre o vídeo, mesmo com "Mudar para música")
-  const capaNaBarra = () => comCapa && !document.documentElement.classList.contains('pp') && !atual?.semVideo && !el.classList.contains('grande');
+  const capaNaBarra = () => (comCapa || Boolean(atual?.soMusica)) && !document.documentElement.classList.contains('pp') && !atual?.semVideo && !el.classList.contains('grande');
   // a música tocando é esta?
   // (com as duas versões, as duas são desta música)
   const desta = (id) => Boolean(atual && id && (atual.youtube === id || atual.video === id || atual.audio === id));
@@ -1356,12 +1377,12 @@ const player = (() => {
     let relogio = 0;
     let url = '';
     let montagem = 0;
-    const noClipeAgora = () => {
-      // o tempo do clipe que corresponde ao que toca agora
-      if (!atual) return 0;
-      if (atual.youtube === de) return api.tempoAgora;
-      return atual.pares && atual.youtube === atual.audio ? tempoNoVideo(atual.pares, api.tempoAgora) : api.tempoAgora;
-    };
+    // os trechinhos em loop, como o Canvas do Spotify (não o clipe inteiro): 4 de 4 s, do meio do clipe (o começo e o
+    // fim costumam ser cena sem música, letreiro ou créditos)
+    const PONTOS = [0.2, 0.38, 0.56, 0.74];
+    const DURA = 4;
+    let trechos = [];
+    let k = 0;
     const tirar = () => {
       clearInterval(relogio);
       relogio = 0;
@@ -1369,16 +1390,23 @@ const player = (() => {
       caixa = null;
       if (url) { URL.revokeObjectURL(url); url = ''; }
       de = '';
+      trechos = [];
     };
-    // a cada segundo: anda e para junto com a música e, se escorregar mais de 1,5 s, volta ao ponto
+    const irAoTrecho = (n) => {
+      if (!caixa || !trechos.length) return;
+      k = n % trechos.length;
+      // (passa de um trecho para o outro esmaecendo, sem o corte seco)
+      caixa.classList.add('pulando');
+      setTimeout(() => { if (!caixa) return; try { caixa.currentTime = trechos[k]; } catch { /* ainda abrindo */ } setTimeout(() => caixa?.classList.remove('pulando'), 120); }, 180);
+    };
+    // anda (só com a música tocando e o fundo à vista) e, no fim de cada trecho, vai para o próximo
     const acompanhar = () => {
       if (!caixa || !atual) return;
       const visivel = !fundo.hidden && !el.hidden && !el.classList.contains('letra-cheia') && fundo.getClientRects().length > 0;
       const tocar = visivel && estado === 'tocando';
-      const alvo = noClipeAgora();
       if (tocar && caixa.paused) caixa.play().catch(() => {});
       if (!tocar && !caixa.paused) caixa.pause();
-      if (Math.abs(caixa.currentTime - alvo) > 1.5 && alvo < (caixa.duration || Infinity)) caixa.currentTime = alvo;
+      if (trechos.length && !caixa.classList.contains('pulando') && (caixa.currentTime >= trechos[k] + DURA || caixa.currentTime < trechos[k] - 0.5)) irAoTrecho(k + 1);
     };
     return {
       async montar(q) {
@@ -1399,14 +1427,21 @@ const player = (() => {
             Object.assign(caixa, { muted: true, defaultMuted: true, playsInline: true, loop: true, preload: 'auto', src: url });
             caixa.setAttribute('playsinline', '');
             caixa.className = 'pl-canvas';
+            caixa.loop = false;
             caixa.addEventListener('playing', () => caixa?.classList.add('pronto'), { once: true });
-            caixa.addEventListener('loadedmetadata', () => { if (caixa) caixa.currentTime = noClipeAgora(); }, { once: true });
+            caixa.addEventListener('loadedmetadata', () => {
+              if (!caixa) return;
+              const d = caixa.duration;
+              trechos = Number.isFinite(d) && d > 20 ? PONTOS.map((f) => Math.max(0, Math.min(d - DURA, f * d))) : [0];
+              k = 0;
+              caixa.currentTime = trechos[0];
+            }, { once: true });
           }
         }
         // (sem o arquivo, nada: o player do YouTube mudo mostrava os botões dele por cima ao pausar)
         if (!caixa) { de = ''; return; }
         fundo.append(caixa);
-        relogio = setInterval(acompanhar, 1000);
+        relogio = setInterval(acompanhar, 250);
       },
       tirar,
     };
@@ -1480,7 +1515,7 @@ const player = (() => {
     capinha.classList.toggle('capa-yt', capaYt);
     capinha.hidden = !url;
     const b = $('.pl-troca', el);
-    b.hidden = ehArquivo(atual?.youtube) && !atual?.video; // (só o áudio da pessoa, sem clipe: não há para onde trocar)
+    b.hidden = (ehArquivo(atual?.youtube) && !atual?.video) || Boolean(atual?.soMusica); // (só o áudio da pessoa, sem clipe, ou a música sem clipe de verdade: não há para onde trocar)
     porHtml(b, atual?.semVideo ? `${icon('youtube', 18)}<span>Escolher um vídeo</span>`
       : `${icon(capa ? 'video' : 'music', 18)}<span>${capa ? 'Mudar para vídeo' : 'Mudar para música'}</span>`);
   };
@@ -1631,7 +1666,7 @@ const semLinhasDeAcordes = (sinc) => {
       lrclibTentado.add(yt);
       sincEstado.set(yt, { tipo: 'buscando', texto: 'Sincronizando a letra…' });
       mostrarSinc();
-      sincronizarMusica(alvoDaMusica(song), { soLrclib: true, sozinho: true }).then((r) => {
+      sincronizarMusica(alvoDaMusica(song), { soLrclib: true, sozinho: true, noVideo: yt }).then((r) => {
         if (r === 'ok') sincEstado.set(yt, { tipo: 'ok', texto: 'Letra sincronizada' });
         else if (r === 'ajustar') sincEstado.set(yt, { tipo: 'ajustar' });
         else if (r === 'nada') sincEstado.set(yt, { tipo: 'falhou', texto: 'Não achei a letra sincronizada desta música' });
@@ -2033,7 +2068,7 @@ const semLinhasDeAcordes = (sinc) => {
   // A troca entre as duas versões baixadas sem engasgo: a de agora continua tocando enquanto a outra vai ao ponto e
   // começa sem volume; quando ela já toca (e no ponto), as duas se cruzam em 0,2 s e a de antes para. Antes a de agora
   // parava primeiro, e o som sumia enquanto a outra ia ao ponto e começava (0,1 a 0,4 s de silêncio)
-  const cruzarLocal = (velho, novo, alvoAgora) => {
+  const cruzarLocal = (velho, novo, alvoAgora, jaNoPonto = false) => {
     novo.volume = 0;
     let feito = false;
     const subir = () => {
@@ -2044,10 +2079,11 @@ const semLinhasDeAcordes = (sinc) => {
         velho.volume = Math.max(0, 1 - k / 8);
         if (k < 8) return;
         clearInterval(passo);
-        if (som !== velho) velho.pause();
-        velho.volume = 1;
+        // (a de antes vira a sombra: continua tocando sem volume, pronta para a próxima troca; no iPhone, para)
+        if (som !== velho && !sombraTocando()) { velho.pause(); velho.volume = 1; }
       }, 25);
     };
+    if (jaNoPonto) { feito = true; subir(); return; }
     const comecou = () => {
       if (feito) return;
       feito = true;
@@ -2063,6 +2099,19 @@ const semLinhasDeAcordes = (sinc) => {
     novo.addEventListener('playing', comecou, { once: true });
     setTimeout(comecou, 1500);
   };
+  // a sombra dos arquivos: a outra versão baixada toca junto, sem volume, no mesmo ponto (como a do YouTube)
+  setInterval(() => {
+    if (!local || !som || !atual || !sombraTocando()) return;
+    const outra = outraVersao();
+    const l2 = outra && localDe(outra, outra === atual.audio);
+    if (!l2) return;
+    const m2 = elementoDe(l2);
+    if (m2 === som) return;
+    if (m2.dataset.de !== l2.chave || estado !== 'tocando' || som.paused) { if (!m2.paused && m2.volume < 0.05) m2.pause(); return; }
+    const alvo = noOutroLado(som.currentTime);
+    if (m2.paused) { m2.volume = 0; try { m2.currentTime = alvo; } catch { /* ainda abrindo */ } m2.play().catch(() => {}); return; }
+    if (m2.volume < 0.05 && Math.abs(m2.currentTime - alvo) > 0.3) { try { m2.currentTime = alvo + 0.05; } catch { /* ainda abrindo */ } }
+  }, 1000);
   // o arquivo da outra versão já aberto, para a troca não esperar (o vídeo baixado tem centenas de MB)
   const prepararLocalOutra = () => {
     const outra = outraVersao();
@@ -2105,9 +2154,11 @@ const semLinhasDeAcordes = (sinc) => {
     if (m.duration > 0 && Number.isFinite(m.duration)) duracao = m.duration; // (já aberto: a duração não muda de novo)
     // (o ponto anda enquanto o arquivo abria: com a outra versão tocando por baixo, o ponto é o de agora)
     const alvoAgora = () => t + (velho ? (performance.now() - desde) / 1000 : 0);
+    // (a outra versão já tocando junto, sem volume, no ponto: só cruzar)
+    const jaNoPonto = Boolean(velho) && !m.paused && Math.abs(m.currentTime - alvoAgora()) < 0.3;
     const ir = () => { try { m.currentTime = alvoAgora() + (velho ? 0.06 : 0); } catch { /* ainda abrindo */ } };
-    if (m.readyState >= 1) ir(); else m.addEventListener('loadedmetadata', ir, { once: true });
-    if (velho) cruzarLocal(velho, m, alvoAgora);
+    if (!jaNoPonto) { if (m.readyState >= 1) ir(); else m.addEventListener('loadedmetadata', ir, { once: true }); }
+    if (velho) cruzarLocal(velho, m, alvoAgora, jaNoPonto);
     else m.volume = 1;
     if (tocar) m.play().catch(() => { velho?.pause(); estado = 'pausado'; desenhar(); avisar(); });
     else m.pause();
@@ -2116,6 +2167,8 @@ const semLinhasDeAcordes = (sinc) => {
   // volta ao YouTube: o arquivo do aparelho para e o vídeo embutido aparece de novo
   const pararLocal = () => {
     som?.pause();
+    // (e a sombra do arquivo, se tocava junto)
+    [somAudio, somVideo].forEach((m) => { if (m && m !== som && !m.paused) m.pause(); });
     if (somVideo) somVideo.style.display = 'none';
     tela.classList.remove('com-local');
     local = null;
@@ -2152,33 +2205,62 @@ const semLinhasDeAcordes = (sinc) => {
     f.tabIndex = -1;
     f.setAttribute('aria-hidden', 'true');
     f.addEventListener('load', () => f.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 2 }), '*'));
+    rs = { estado: -1, tempo: 0, em: 0 };
     tela.append(f);
   };
-  // (ela está pronta quando o player dela responde)
+  // (ela está pronta quando o player dela responde; o estado e o tempo dela, para tocar junto)
+  let rs = { estado: -1, tempo: 0, em: 0 };
+  const rsAgora = () => rs.tempo + (rs.estado === 1 ? (performance.now() - rs.em) / 1000 : 0);
   window.addEventListener('message', (e) => {
     const r = reservaDe();
-    if (r && e.source === r.contentWindow) r.dataset.pronto = '1';
+    if (!r || e.source !== r.contentWindow) return;
+    r.dataset.pronto = '1';
+    try {
+      const info = (typeof e.data === 'string' ? JSON.parse(e.data) : e.data)?.info;
+      if (typeof info?.playerState === 'number') rs.estado = info.playerState;
+      if (typeof info?.currentTime === 'number') { rs.tempo = info.currentTime; rs.em = performance.now(); }
+    } catch { /* outra mensagem */ }
   });
+  // A outra versão toca junto, sem volume, no mesmo ponto da música (a sombra): a troca é só cruzar os volumes, sem
+  // esperar ela carregar nem começar (era nessa espera que o som engasgava). No iPhone o volume não muda pelo app (ela
+  // seria ouvida): lá ela fica parada até a troca
+  const sombraTocando = () => !ehIOS() && !db.prefs().economiaDados;
+  const noOutroLado = (t) => (atual.youtube === atual.audio ? tempoNoVideo(atual.pares, t) : tempoNoAudio(atual.pares, t));
+  setInterval(() => {
+    const r = reservaDe();
+    if (!r || r.dataset.pronto !== '1' || trocando || local || !atual || r.dataset.yt !== outraVersao() || !sombraTocando()) return;
+    if (estado !== 'tocando' || estadoYt !== 1) { if (rs.estado === 1 || rs.estado === 3) cmdEm(r, 'pauseVideo'); return; }
+    const alvo = noOutroLado(api.tempoAgora);
+    if (rs.estado !== 1 && rs.estado !== 3) { cmdEm(r, 'setVolume', [0]); cmdEm(r, 'seekTo', [alvo, true]); cmdEm(r, 'playVideo'); return; }
+    if (rs.estado === 1 && Math.abs(rsAgora() - alvo) > 0.3) cmdEm(r, 'seekTo', [alvo + 0.05, true]);
+  }, 1000);
   const trocaSuave = (antigo, id, t) => {
     const novo = reservaDe();
     const velho = iframeAtual();
     if (!novo || novo.dataset.yt !== id || novo.dataset.pronto !== '1' || !velho || trocando) return false;
     const desde = performance.now();
     const alvoAgora = () => t + (performance.now() - desde) / 1000;
+    // a sombra já toca no ponto: só cruzar os volumes
+    const jaNoPonto = sombraTocando() && rs.estado === 1 && Math.abs(rsAgora() - t) < 0.35;
+    const tempoVelho = api.tempoAgora;
     // os papéis já trocam: os avisos (o tempo, o estado) passam a vir da nova; a velha continua tocando por baixo
     novo.classList.remove('pl-reserva');
     velho.classList.add('pl-reserva');
     velho.dataset.yt = antigo;
     delete velho.dataset.pronto;
-    cmdEm(novo, 'setVolume', [0]);
-    cmdEm(novo, 'seekTo', [t + 0.2, true]);
-    cmdEm(novo, 'playVideo');
-    estadoYt = -1;
+    rs = { estado: 1, tempo: tempoVelho, em: performance.now() }; // (a sombra agora é a de antes, tocando)
     pendente = null;
     trocando = { novo, velho };
     // (no iPhone o volume não muda pelo app: aí a de antes só para no instante em que a nova toca)
     const semVolume = ehIOS();
+    if (!jaNoPonto) {
+      cmdEm(novo, 'setVolume', [0]);
+      cmdEm(novo, 'seekTo', [t + 0.2, true]);
+      cmdEm(novo, 'playVideo');
+      estadoYt = -1;
+    } else estadoYt = 1;
     let acertou = 0;
+    let vigia = 0;
     const cruzar = () => {
       clearInterval(vigia);
       let k = 0;
@@ -2188,13 +2270,14 @@ const semLinhasDeAcordes = (sinc) => {
         cmdEm(velho, 'setVolume', [Math.max(0, 100 - k * 12.5)]);
         if (k < 8) return;
         clearInterval(passo);
-        cmdEm(velho, 'pauseVideo');
-        cmdEm(velho, 'setVolume', [100]);
+        // (a de antes vira a sombra: continua tocando sem volume, pronta para a próxima troca; no iPhone, para)
+        if (!sombraTocando()) { cmdEm(velho, 'pauseVideo'); cmdEm(velho, 'setVolume', [100]); }
         velho.dataset.pronto = '1';
         trocando = null;
       }, 30);
     };
-    const vigia = setInterval(() => {
+    if (jaNoPonto) { cruzar(); return true; }
+    vigia = setInterval(() => {
       const passou = performance.now() - desde;
       if (estadoYt === 1 && passou - acertou > 300) {
         // tocando: se ficou longe do ponto (o tempo que levou para começar), acerta uma vez, ainda sem volume
@@ -2238,6 +2321,7 @@ const semLinhasDeAcordes = (sinc) => {
   // o modo música (a capa) ou vídeo; com as duas versões, troca também o que toca, no mesmo ponto da música (e o
   // download só do áudio toca no modo música, no lugar do YouTube)
   const mudarModo = () => {
+    if (atual?.soMusica) return; // (só música: não há outro vídeo da mesma gravação)
     comCapa = !comCapa;
     db.setPref('playerCapa', comCapa);
     if (atual?.audio && atual.video && !atual.semVideo) {
@@ -2260,7 +2344,7 @@ const semLinhasDeAcordes = (sinc) => {
   const noClipe = () => Boolean(atual?.audio && atual.youtube === atual.video);
   let foiProClipe = -Infinity; // quando trocou para o clipe pela última vez (performance.now)
   // o modo vídeo (o "Mudar para vídeo"): o clipe das duas versões ou, com um vídeo só, o vídeo no lugar da capa
-  const emVideo = () => noClipe() || Boolean(atual?.youtube && !comCapa && !atual.semVideo && !(ehArquivo(atual.youtube) && !atual.video));
+  const emVideo = () => !atual?.soMusica && (noClipe() || Boolean(atual?.youtube && !comCapa && !atual.semVideo && !(ehArquivo(atual.youtube) && !atual.video)));
   const api = {
     get atual() { return atual; },
     get estado() { return estado; },
@@ -2327,10 +2411,24 @@ const semLinhasDeAcordes = (sinc) => {
     // as duas versões da música tocando chegaram (o áudio oficial foi achado): no modo música, já passa para ele
     versoes(song) {
       const vs = versoesDe(song);
-      if (!atual || !vs || !(atual.songId === song.id || desta(vs.video))) return;
+      if (!atual) return;
+      if (!vs) {
+        // a versão só música saiu (escolhida à mão: "Sem a versão só música"): volta para o vídeo
+        if (atual.songId !== song.id || !atual.audio) return;
+        const { audio, pares } = atual;
+        atual = { ...atual, audio: undefined, pares: undefined };
+        if (atual.youtube === audio && atual.video) trocarVersao(atual.video, tempoNoVideo(pares, api.tempoAgora)); else desenhar();
+        return;
+      }
+      if (!(atual.songId === song.id || desta(vs.video))) return;
       const antes = atual.pares;
-      atual = { ...atual, video: vs.video, audio: vs.audio, pares: vs.pares };
-      if (comCapa && atual.youtube === vs.video) trocarVersao(vs.audio, tempoNoAudio(vs.pares, api.tempoAgora));
+      const audioAntes = atual.audio;
+      atual = { ...atual, video: vs.video, audio: vs.audio, pares: vs.pares, soMusica: Boolean(vs.diferentes) };
+      // (o vídeo é outra gravação: fica só a música, mesmo no modo vídeo)
+      if (vs.diferentes && atual.youtube === vs.video) { trocarVersao(vs.audio, tempoNoAudio(vs.pares, api.tempoAgora)); return; }
+      // (outra versão só música no lugar da que tocava: a mesma gravação, no mesmo ponto)
+      if (audioAntes && audioAntes !== vs.audio && atual.youtube === audioAntes) trocarVersao(vs.audio, api.tempoAgora);
+      else if (comCapa && atual.youtube === vs.video) trocarVersao(vs.audio, tempoNoAudio(vs.pares, api.tempoAgora));
       else if (!comCapa && estado === 'tocando' && atual.youtube === vs.video && vs.casadas && antes && performance.now() - foiProClipe < 90e3) {
         // acabou de trocar para o clipe pela estimativa e chegou o casamento pelo som: o clipe vai para o mesmo ponto
         // cantado (o ponto do áudio pela estimativa de antes, no clipe pelo casamento novo)
@@ -2671,7 +2769,9 @@ const semLinhasDeAcordes = (sinc) => {
       !naLetra && atual.songId && { valor: 'partitura', rotulo: temPartituraMusica(song) ? 'Ver partitura' : 'Criar partitura', ic: temPartituraMusica(song) ? 'score' : 'sparkles' },
       naLetra && song && atual.youtube && !atual.semVideo && !noClipe() && { valor: 'sincronizar', rotulo: sincronizada ? 'Sincronizar a letra de novo' : 'Sincronizar a letra', ic: 'sparkles' },
       (salva || (preview && (atual.songId === 'previa' || atual.href === '#/musica/previa'))) && { valor: 'trocar', rotulo: atual.semVideo ? 'Escolher um vídeo' : 'Trocar o vídeo', ic: atual.semVideo ? 'youtube' : 'refresh' },
-      !naLetra && !atual.semVideo && !(ehArquivo(atual.youtube) && !atual.video) && { valor: 'troca', rotulo: modoCapa() ? 'Mudar para vídeo' : 'Mudar para música', ic: modoCapa() ? 'video' : 'music' },
+      // a versão só música (a gravação cantada, em que a letra acompanha) escolhida à mão, quando a do app não é a certa
+      !naLetra && song && !atual.semVideo && song.youtube && !song.audioProprio && { valor: 'versao-musica', rotulo: 'Escolher a versão só música', ic: 'music' },
+      !naLetra && !atual.semVideo && !atual.soMusica && !(ehArquivo(atual.youtube) && !atual.video) && { valor: 'troca', rotulo: modoCapa() ? 'Mudar para vídeo' : 'Mudar para música', ic: modoCapa() ? 'video' : 'music' },
       (atual.artista || ehCifraClub(song?.source || '')) && { valor: 'album', rotulo: 'Ver álbum', ic: 'disc' },
       { valor: 'compartilhar', rotulo: 'Compartilhar', ic: 'share' },
       ytAgora() && { valor: 'youtube', rotulo: 'Abrir no YouTube', ic: 'youtube' },
@@ -2683,6 +2783,7 @@ const semLinhasDeAcordes = (sinc) => {
     if (!v || !atual) return;
     if (v === 'youtube') { window.open(`https://www.youtube.com/watch?v=${ytAgora()}&t=${Math.floor(api.tempoAgora)}s`, '_blank', 'noopener'); return; }
     if (v === 'sincronizar') { sincronizarDoPlayer(song, sincronizada); return; }
+    if (v === 'versao-musica') { escolherVersaoMusica(alvoDaMusica(song)); return; }
     // o álbum abre como página: o Tocando agora na tela toda fecha antes (no tablet, o painel continua ao lado)
     if (v === 'album') { if (document.body.classList.contains('painel-cheio')) painelCheio(false, { semVoltar: true }); irParaAlbum({ titulo: song?.title || atual.titulo, artista: song?.artist || atual.artista, fonte: song?.source }); return; }
     // as outras opções fazem o mesmo que os botões do painel
@@ -2702,7 +2803,7 @@ const semLinhasDeAcordes = (sinc) => {
       sincEstado.set(yt, { tipo: tipo === 'carregando' ? 'servidor' : tipo === 'ok' ? 'ok' : 'erro', texto });
       mostrarSinc();
     };
-    sincronizarMusica(alvo, { refazer, status }).then((r) => {
+    sincronizarMusica(alvo, { refazer, status, noVideo: yt }).then((r) => {
       if (r === 'ajustar') { sincEstado.set(yt, { tipo: 'ajustar' }); mostrarSinc(); }
       if (r === 'erro' || r === 'nada') { sincEstado.set(yt, { ...(sincEstado.get(yt) || {}), tipo: 'falhou', deNovo: r === 'erro' }); mostrarSinc(); }
     });
@@ -2857,6 +2958,11 @@ const semLinhasDeAcordes = (sinc) => {
     // salva a prévia na biblioteca e o player passa a ser da música salva
     const salvarDaPrevia = () => {
       const ja = db.songBySource(preview.source);
+      // (já na biblioteca: ela fica com o que a busca de agora achou — as duas versões e a letra sincronizada nelas.
+      // Antes ficava a de antes, e a letra e o "Sincronizar" seguiam presos à versão antiga, até a instrumental)
+      if (ja && (preview.versoes || preview.sincronia)) {
+        db.updateSong(ja.id, { ...(preview.versoes ? { versoes: preview.versoes, versoesConferidas: true } : {}), ...(preview.sincronia ? { sincronia: preview.sincronia } : {}) });
+      }
       const salva = ja || db.saveSong({ content: preview.content, source: preview.source, transpose: preview.transpose || 0, capo: preview.capo || 0, ...(preview.sincronia ? { sincronia: preview.sincronia } : {}), ...(preview.versoes ? { versoes: preview.versoes } : {}) });
       api.atualizar({ songId: salva.id, href: `#/musica/${salva.id}` });
       toast(ja ? 'Já estava na biblioteca' : 'Salva na biblioteca');
@@ -2871,7 +2977,9 @@ const semLinhasDeAcordes = (sinc) => {
       const reps = db.sets().filter((st) => st.items.some((it) => it.songId === s.id));
       if (reps.length && !(await ask({ title: 'Tirar da biblioteca?', text: `“${s.title}” está em ${reps.length > 1 ? `${reps.length} repertórios` : `“${reps[0].name}”`} e sai de lá também.`, ok: 'Tirar', danger: true }))) return;
       const naPagina = location.hash === `#/musica/${s.id}`;
-      preview = { id: 'previa', content: s.content, source: s.source, transpose: s.transpose || 0, capo: s.capo || 0, back: '#/biblioteca/musicas' };
+      // (com as duas versões e a letra sincronizada: tocando como prévia, a troca e a letra continuam)
+      preview = { id: 'previa', content: s.content, source: s.source, transpose: s.transpose || 0, capo: s.capo || 0, back: '#/biblioteca/musicas',
+        ...(s.versoes ? { versoes: s.versoes } : {}), ...(s.sincronia ? { sincronia: s.sincronia } : {}) };
       guardarPrevia();
       db.deleteSong(s.id);
       api.atualizar({ songId: 'previa', href: '#/musica/previa' });
@@ -3348,7 +3456,9 @@ function indicadores(s) {
   const tem = (ic, t) => `<span class="ind-i" title="${t}" aria-label="${t}">${icon(ic, 11)}</span>`;
   // baixada (toca sem internet): a setinha verde, como no Spotify
   const baixada = s.baixado ? `<span class="ind-i ind-baixada" title="Baixada" aria-label="Baixada">${icon('baixada', 12)}</span>` : '';
-  return c || s.youtube || baixada ? `<span class="ind">${baixada}${c ? tem('chord', 'Tem cifra') : ''}${s.youtube ? tem('youtube', 'Tem vídeo') : ''}</span>` : '';
+  // (o vídeo que é outra gravação, na música sem clipe, não conta: ela é só música)
+  const video = s.youtube && !versoesDe(s)?.diferentes;
+  return c || video || baixada ? `<span class="ind">${baixada}${c ? tem('chord', 'Tem cifra') : ''}${video ? tem('youtube', 'Tem vídeo') : ''}</span>` : '';
 }
 
 const linhaMusica = (s, extra = '') => `
@@ -3634,7 +3744,7 @@ async function menuDaMusica(song, { set = null, i = -1 } = {}) {
     set && { valor: 'parte', rotulo: set.items[i]?.label ? `Parte da missa: ${set.items[i].label}` : 'Definir a parte da missa', ic: 'list' },
     song.youtube && { valor: 'tocar', rotulo: player.tocandoAgora(song.youtube) ? 'Pausar' : 'Tocar a referência', ic: player.tocandoAgora(song.youtube) ? 'pause' : 'play' },
     { valor: 'video', rotulo: song.youtube ? 'Trocar o vídeo' : 'Escolher um vídeo', ic: song.youtube ? 'refresh' : 'youtube' },
-    song.youtube && { valor: 'modo', rotulo: player.modoMusica ? 'Mudar para vídeo' : 'Mudar para música', ic: player.modoMusica ? 'video' : 'music' },
+    song.youtube && !versoesDe(song)?.diferentes && { valor: 'modo', rotulo: player.modoMusica ? 'Mudar para vídeo' : 'Mudar para música', ic: player.modoMusica ? 'video' : 'music' },
     { valor: 'abrir', rotulo: 'Abrir a cifra', ic: 'music' },
     { valor: 'editar', rotulo: 'Editar a cifra', ic: 'edit' },
     slug && song.artist && { valor: 'artista', rotulo: 'Ir para o artista', ic: 'pessoa' },
@@ -4736,7 +4846,10 @@ document.addEventListener('click', async (e) => {
 // (os sinais dizem o que vem junto: cifra, letra e vídeo; o vídeo sozinho abre como música, com a cifra e a letra)
 const indicadoresWeb = (r) => {
   const tem = (ic, t) => `<span class="ind-i" title="${t}" aria-label="${t}">${icon(ic, 11)}</span>`;
-  const sinais = (r.cifra ? tem('chord', 'Tem cifra') : '') + (r.cifra || r.letra ? tem('text', 'Tem letra') : '') + (r.video ? tem('youtube', 'Tem vídeo') : '');
+  // (já na biblioteca e sem clipe de verdade, o vídeo achado é outra gravação: não conta)
+  const salva = r.cifra && db.songBySource(r.cifra);
+  const video = r.video && !(salva && versoesDe(salva)?.diferentes);
+  const sinais = (r.cifra ? tem('chord', 'Tem cifra') : '') + (r.cifra || r.letra ? tem('text', 'Tem letra') : '') + (video ? tem('youtube', 'Tem vídeo') : '');
   return sinais ? `<span class="ind">${sinais}</span>` : '';
 };
 const linhaMusicaWeb = (r, i, extra = '') => `
@@ -10595,7 +10708,7 @@ const sincronizando = new Set();
 // com o servidor no computador de quem usa (ou no GitHub Codespaces, de graça), a sincronia é sempre pela IA dele, que
 // ouve o próprio vídeo (acerta a introdução e as partes diferentes da gravação); o LRCLIB fica de reserva
 const sincPelaIA = () => Boolean(SERVIDOR_IA.pc && SERVIDOR_IA.url);
-async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrclib = false, status = () => {} } = {}) {
+async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrclib = false, status = () => {}, noVideo = '' } = {}) {
   if (sincronizando.has(song.id)) return undefined;
   const pelaIA = sincPelaIA();
   if (pelaIA) soLrclib = false; // a busca automática (ao tocar) também vai para a IA do servidor
@@ -10606,8 +10719,11 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
   const isPreview = song.id === 'previa';
   const aqui = isPreview ? '' : `#/musica/${song.id}`;
   const guardar = (sinc) => guardarSincronia(song, sinc);
-  // o vídeo em que a letra vai acompanhar: o áudio oficial, quando a música tem as duas versões
-  let yt = videoDaLetra(song);
+  // o vídeo em que a letra vai acompanhar: o áudio oficial, quando a música tem as duas versões; pelo player, o que está
+  // tocando no modo música (noVideo: antes ia para a versão guardada na música, que podia ser outra, e a letra ficava
+  // sincronizada na versão que não tocava)
+  const vsAgora = versoesDe(song);
+  let yt = noVideo && (!vsAgora || noVideo === vsAgora.audio || noVideo !== vsAgora.video) ? noVideo : videoDaLetra(song);
   // primeiro, sem servidor: a letra já sincronizada do LRCLIB (na hora), se for da mesma música e tiver a duração do
   // vídeo. O "Refazer" (sincronia errada) e as músicas que não estão lá vão para o servidor, que ouve o áudio
   // (sem servidor, o "de novo" também tenta o LRCLIB: senão daria erro na certa)
@@ -10757,6 +10873,46 @@ async function procurarAudio(song, duracao) {
   if (!respondeu) buscaDeAudioFalhou.add(song.id);
   return null;
 }
+// Escolher à mão a versão só música (quando a do app não é a gravação cantada, ou não achou): os vídeos da busca com o
+// nome da música, os de duração parecida com a da gravação primeiro; os sem voz (instrumental, base, karaokê) avisam.
+// Escolhida, a letra sincroniza de novo nela e o clipe é casado com ela pelo som
+async function escolherVersaoMusica(song) {
+  const titulo = tituloLimpo(song.title);
+  const termo = `${titulo} ${song.artist || ''}`.trim();
+  const vs = versoesDe(song);
+  toast('Procurando as versões da música…');
+  const listas = await Promise.all([[termo, 'music_songs'], [`${termo} audio`, 'videos'], [termo, 'videos']].map(([q, filtro]) => buscarYoutube(q, { filtro }).catch(() => [])));
+  const vistos = new Set([song.youtube]);
+  const nome = normalizar(titulo);
+  const achados = listas.flat().filter((v) => v.id && v.segundos > 0 && !vistos.has(v.id) && vistos.add(v.id) && ` ${normalizar(v.titulo)} `.includes(` ${nome} `));
+  const ref = vs?.duracao || 0;
+  if (ref) achados.sort((a, b) => Math.abs(a.segundos - ref) - Math.abs(b.segundos - ref));
+  if (!achados.length) { toast('Não achei outras versões desta música agora'); return; }
+  const semVoz = /\b(instrumental|karaoke|playback|base|backing|sem voz|no vocals?|minus one|multitrack)/i;
+  const opcoes = [
+    ...achados.slice(0, 12).map((v) => ({ valor: v.id, rotulo: v.titulo, sub: [v.canal, fmtTempo(v.segundos), semVoz.test(normalizar(`${v.titulo} ${v.canal}`)) ? 'sem voz' : ''].filter(Boolean).join(' · '),
+      capa: `<span class="fila-capa"><img src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt="" loading="lazy"></span>` })),
+    vs && { valor: '-', rotulo: 'Sem a versão só música', sub: 'Toca só o vídeo da música', ic: 'video' },
+  ].filter(Boolean);
+  const id = await escolherNaLista({ titulo: 'Versão só música', opcoes, atual: vs?.audio, cls: 'lista-fila' });
+  if (!id || id === vs?.audio) return;
+  const agora = song.id === 'previa' ? preview : db.song(song.id);
+  if (!agora) return;
+  if (id === '-') {
+    guardarVersoes(agora, null);
+    if (agora.id !== 'previa') db.updateSong(agora.id, { versoesConferidas: true });
+    toast('A música toca só pelo vídeo');
+    return;
+  }
+  const v = achados.find((x) => x.id === id);
+  const durClipe = (player.atual?.youtube === agora.youtube && player.duracao) || agora.duracao || 0;
+  // (a letra sincronizada da versão de antes sai: a desta é feita de novo ao tocar)
+  if (agora.sincronia && agora.sincronia.video !== agora.youtube) guardarSincronia(agora, null);
+  guardarVersoes(agora, { video: agora.youtube, audio: id, duracao: v.segundos, pares: paresPelaDuracao(durClipe, v.segundos) });
+  if (agora.id !== 'previa') db.updateSong(agora.id, { versoesConferidas: true });
+  toast('Versão só música trocada');
+  acertarVersoes(agora);
+}
 // as duas versões da música (o clipe e o áudio oficial) ficam guardadas nela; o player passa a usá-las na hora
 function guardarVersoes(song, versoes) {
   song.versoes = versoes;
@@ -10772,12 +10928,24 @@ const casandoVersoes = new Set();
 const casamentoFalhou = new Set(); // (uma vez por par enquanto o app está aberto: sem o som, não adianta insistir)
 async function acertarVersoes(song, lrc = null) {
   const vs = versoesDe(song);
-  if (!vs?.audio || !vs.video || vs.casadas || casandoVersoes.has(vs.video) || casamentoFalhou.has(`${vs.audio}|${vs.video}`)) return;
+  if (!vs?.audio || !vs.video || vs.casadas || vs.diferentes || casandoVersoes.has(vs.video) || casamentoFalhou.has(`${vs.audio}|${vs.video}`)) return;
   casandoVersoes.add(vs.video);
   try {
     let pares = null;
-    if (sincPelaIA() && !ehArquivo(vs.audio)) pares = (await chamarComEtapas(servidorIA(), '/versoes', { json: { audio: vs.audio, video: vs.video } }, () => {}).catch(() => null))?.pares;
-    if (!pares?.length) pares = (await casarNoAparelho(vs.audio, vs.video).catch(() => null))?.pares;
+    let diferentes = false; // o vídeo não é a mesma gravação (um ao vivo, outra apresentação): o download não leva ele
+    if (sincPelaIA() && !ehArquivo(vs.audio)) {
+      pares = (await chamarComEtapas(servidorIA(), '/versoes', { json: { audio: vs.audio, video: vs.video } }, () => {}).catch((e) => { if (e?.status === 422) diferentes = true; return null; }))?.pares;
+    }
+    if (!pares?.length && !diferentes) {
+      const r = await casarNoAparelho(vs.audio, vs.video).catch(() => null);
+      pares = r?.pares;
+      if (r?.mesma === false) diferentes = true;
+    }
+    if (diferentes) {
+      const agora = song.id === 'previa' ? preview : db.song(song.id);
+      if (agora && versoesDe(agora)?.video === vs.video && !ehArquivo(vs.audio)) guardarVersoes(agora, { ...versoesDe(agora), diferentes: true });
+      return;
+    }
     const agora = song.id === 'previa' ? preview : db.song(song.id);
     if (pares?.length && agora && versoesDe(agora)?.video === vs.video) {
       if (ehArquivo(vs.audio)) {
@@ -10794,7 +10962,7 @@ async function acertarVersoes(song, lrc = null) {
 async function amostrasDe(id) {
   let blob = null;
   if (ehArquivo(id)) blob = await lerAudio(id.slice(ARQ.length)).catch(() => null);
-  else if (baixadoDe(id)) blob = await lerAudio(chaveBaixada(id)).catch(() => null);
+  else blob = await lerAudio(chaveBaixada(id)).catch(() => null); // (o download, até o que acabou de chegar)
   if (!blob && !ehArquivo(id) && navigator.onLine && !db.prefs().economiaDados) blob = await audioDoVideo(id).catch(() => null);
   if (!blob) return null;
   const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;

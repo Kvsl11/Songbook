@@ -6,6 +6,10 @@
 const normal = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 // outra gravação da mesma música (o tempo do LRCLIB não vale) ou outra edição dela
 const OUTRA_GRAVACAO = /\b(live|ao vivo|en vivo|cover|karaoke|instrumental|remix|sped up|slowed|nightcore|acustic[oa]|acoustic|reverb|8d|playback|versao|version|edit)\b/;
+// sem a voz (o modo música é a gravação cantada, para a letra acompanhar): a base, o instrumental, o karaokê, os
+// multitracks e as versões só num instrumento; no título ou no nome do canal
+const SEM_VOZ = /\b(instrumentals?|instrumentais|karaoke|playback|pb|base|bases|backing( track)?|minus one|sem voz|no vocals?|without vocals?|off vocal|vocal removed|fundo musical|multitracks?|stems?|beat|type beat|piano|violao|guitarra|guitar|teclado|sax|saxofone|flauta|violino|cello|8 ?bit|music box|lofi|lo fi)\b/;
+const CANAL_SEM_VOZ = /\b(karaoke|instrumentals?|backing|playback|minus one|sing king|bases?|multitracks?|piano|beats?|lofi)\b/;
 // o próprio clipe (o modo música quer o áudio, não outro vídeo com cenas)
 const CLIPE = /\b(official (music )?video|music video|videoclipe|clipe oficial|clipe)\b/;
 
@@ -22,7 +26,10 @@ export function escolherAudio(videos, { titulo = '', artista = '', duracao = 0, 
     if (!v?.id || v.id === evitar || !(v.segundos > 0) || Math.abs(v.segundos - duracao) > 2) continue;
     const nome = normal(v.titulo);
     if (!` ${nome} `.includes(` ${t} `) || (OUTRA_GRAVACAO.test(nome) && !OUTRA_GRAVACAO.test(t))) continue;
+    // (a instrumental tem a mesma duração da gravação: só o nome diz que ela não tem a voz)
+    if (SEM_VOZ.test(nome) && !SEM_VOZ.test(t)) continue;
     const canal = normal(v.canal);
+    if (CANAL_SEM_VOZ.test(canal) && !CANAL_SEM_VOZ.test(a)) continue;
     let n = 0;
     if (a && (canal === a || canal.startsWith(`${a} `) || ` ${a} `.includes(` ${canal} `))) n += 3;
     if (/\b(audio|official audio|audio oficial)\b/.test(nome)) n += 2;
