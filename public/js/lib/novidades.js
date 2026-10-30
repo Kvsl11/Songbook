@@ -7,6 +7,7 @@ export const NOVIDADES = [
     versao: 321, data: '2026-10-30', titulo: 'Troca sem engasgo e capa mais bonita',
     itens: [
       { tipo: 'melhoria', texto: 'Trocar entre a música e o vídeo não engasga mais o som: a outra versão já fica carregada e as duas se cruzam suavemente no mesmo ponto.' },
+      { tipo: 'melhoria', texto: 'A capa oficial da música aparece em todo lugar: na página inicial, na biblioteca, nas listas e nos repertórios (as músicas já salvas ganham ela sozinhas, aos poucos). A capa que você escolheu continua.' },
       { tipo: 'melhoria', texto: 'No modo música, sem a música baixada, aparece a capa oficial grande, como no Spotify. Com a música baixada com o vídeo, trechos do clipe passam atrás, sem som e sem os botões do YouTube por cima.' },
       { tipo: 'correcao', texto: 'O artista sem foto no Deezer não aparece mais com a imagem cinza genérica: fica o desenho da pessoa com a nota.' },
       { tipo: 'melhoria', texto: 'Sem os avisos rápidos na tela (“Salvo na biblioteca” e os outros): só o de erro continua, para o toque não ficar sem resposta.' },

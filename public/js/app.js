@@ -557,6 +557,50 @@ function capa(item = {}, { ic = 'music', cls = '' } = {}) {
   if (src) return `<div class="cover ${cls}"><img src="${esc(src)}" alt="${esc(titulo)}" loading="lazy"></div>`;
   return `<div class="cover gen ${cls}" style="--h:${hue(titulo)}">${icon(ic, 24)}</div>`;
 }
+// A capa que a capa oficial (a do álbum, capaOficial) substitui: nenhuma, o quadro do vídeo do YouTube ou a foto do
+// artista que vem com a cifra (Cifra Club, Letras). A escolhida pela pessoa (uma foto do aparelho, outro endereço) fica
+const capaTrocavel = (u) => !u || /(^https?:\/\/(i\d?\.ytimg\.com|img\.youtube\.com)\/)|sscdn\.co\/letras\/[^/]+\/fotos\//.test(u);
+// Todas as músicas da biblioteca ganham a capa oficial, aos poucos e em segundo plano (ao abrir o app e ao salvar uma
+// música nova): a página inicial, a biblioteca, as listas e os repertórios passam a mostrar a mesma capa do player.
+// A que não tem capa em lugar nenhum é tentada de novo depois de uma semana
+const CHAVE_SEM_CAPA = 'songbook.semCapaOficial';
+let trocandoCapas = null;
+function atualizarCapasOficiais(ids = null) {
+  if (trocandoCapas) return trocandoCapas;
+  trocandoCapas = (async () => {
+    let tentadas = {};
+    try { tentadas = JSON.parse(localStorage.getItem(CHAVE_SEM_CAPA) || '{}'); } catch { /* sem armazenamento */ }
+    const semana = 7 * 864e5;
+    let semLugar = false; // alguma capa nova sem a antiga na tela para trocar (ela não tinha carregado)
+    const fila = db.songs().filter((x) => (!ids || ids.includes(x.id)) && x.title && x.artist && capaTrocavel(x.cover) && !(tentadas[x.id] > Date.now() - semana));
+    for (const x of fila) {
+      if (!navigator.onLine) break;
+      const u = await capaOficial(x.title, x.artist).catch(() => '');
+      const agora = db.song(x.id);
+      if (!agora) continue;
+      if (u && capaTrocavel(agora.cover) && agora.cover !== u) {
+        const antes = capa(agora).match(/src="([^"]+)"/)?.[1] || '';
+        db.saveSong({ ...agora, content: definirMeta(agora.content, 'cover', u) });
+        delete tentadas[x.id];
+        if (!trocarCapaNaTela(antes, u)) semLugar = true;
+      } else if (!u) tentadas[x.id] = Date.now();
+      await new Promise((ok) => setTimeout(ok, 250)); // (devagar: o Deezer e o iTunes limitam os pedidos)
+    }
+    try { localStorage.setItem(CHAVE_SEM_CAPA, JSON.stringify(tentadas)); } catch { /* sem armazenamento */ }
+    // (uma vez no fim, só na página inicial e na biblioteca, e sem ninguém digitando)
+    if (semLugar && /^(#\/?|#\/biblioteca(\/.*)?)?$/.test(location.hash) && !document.activeElement?.matches?.('input, textarea')) route();
+  })().finally(() => { trocandoCapas = null; });
+  return trocandoCapas;
+}
+// a capa nova entra na hora onde a antiga aparece (sem desenhar a tela de novo, que voltava ao topo)
+function trocarCapaNaTela(antes, depois) {
+  let achou = 0;
+  if (antes) document.querySelectorAll('.cover img').forEach((img) => { if (img.getAttribute('src') === antes.replace(/&amp;/g, '&')) { img.src = depois; achou++; } });
+  desenharLateral();
+  return achou > 0;
+}
+setTimeout(() => atualizarCapasOficiais(), 5000);
+window.addEventListener('songbook:nova-musica', (e) => setTimeout(() => atualizarCapasOficiais([e.detail.id]), 3000));
 function capaRepertorio(set, cls = '') {
   if (set.capa) return `<div class="cover ${cls}"><img src="${esc(set.capa)}" alt="${esc(set.name)}"></div>`;
   const songs = set.items.map((it) => db.song(it.songId)).filter(Boolean);
@@ -1367,14 +1411,18 @@ const player = (() => {
   // que não tinha capa (a biblioteca também passa a mostrar ela)
   const buscarCapaOficial = () => {
     const a = atual;
-    if (!a || a.capaOficial !== undefined || (a.capa && /^(https?:|data:)/.test(a.capa)) || !a.titulo || !a.artista) return;
+    if (!a || a.capaOficial !== undefined || !capaTrocavel(a.capa) || !a.titulo || !a.artista) return;
     a.capaOficial = '';
     capaOficial(a.titulo, a.artista).then((u) => {
       if (!u) return;
       a.capaOficial = u;
       if (atual && atual.songId === a.songId && atual.titulo === a.titulo) { atual.capaOficial = u; mini.dataset.conteudo = ''; desenharCapa(); }
       const s = a.songId && a.songId !== 'previa' && db.song(a.songId);
-      if (s && !s.cover) db.saveSong({ ...s, content: definirMeta(s.content, 'cover', u) });
+      if (s && capaTrocavel(s.cover) && s.cover !== u) {
+        const antes = capa(s).match(/src="([^"]+)"/)?.[1] || '';
+        db.saveSong({ ...s, content: definirMeta(s.content, 'cover', u) });
+        trocarCapaNaTela(antes, u);
+      }
     });
   };
   // a capa (no modo capa): a da música ou o quadro do vídeo; o botão de trocar diz para o que vai
@@ -1385,7 +1433,7 @@ const player = (() => {
     const doYt = ytDaCapa();
     // sem a capa na música, a capa de verdade (do álbum), quando chegar; até lá (ou sem achar), o quadro do vídeo
     buscarCapaOficial();
-    const propria = atual?.capa && /^(https?:|data:)/.test(atual.capa) ? atual.capa : atual?.capaOficial || '';
+    const propria = atual?.capaOficial || (atual?.capa && /^(https?:|data:)/.test(atual.capa) ? atual.capa : '');
     const url = propria || (doYt ? `https://i.ytimg.com/vi/${doYt}/hqdefault.jpg` : '');
     const capaYt = !propria;
     // sem capa nem vídeo: a cor da música com uma nota no meio. Com vídeo, no modo música, a capa tem movimento: os
