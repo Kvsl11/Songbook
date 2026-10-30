@@ -134,7 +134,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-349';
+export const APP_VERSAO = '2026.10.30-350';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -721,28 +721,48 @@ const podeBaixarAgora = async () => navigator.connection?.type !== 'cellular' ||
 async function baixarMusica(song, { perguntou = false } = {}) {
   const s = song?.id && db.song(song.id);
   if (!s || !precisaBaixar(s) || baixando.has(s.id)) return;
-  if (arquivosParaBaixar(s).length && !servidorIA().url) {
-    toast('Para baixar o áudio e o vídeo, ligue o servidor no seu computador (Ajustes → Avançado)');
-    return;
-  }
-  if (!perguntou && !(await podeBaixarAgora())) return;
-  baixando.set(s.id, { pct: 0 });
-  filaBaixar.push(s.id);
+
+  // O estado visual começa no clique, antes de consultar o servidor ou pedir confirmação
+  // de dados móveis. Assim o ícone não fica parado enquanto o app verifica as condições.
+  baixando.set(s.id, { pct: 0, preparando: true });
   avisarDownloads();
+
+  filaBaixar.push(s.id);
   andandoFila ||= (async () => {
     while (filaBaixar.length) {
       const id = filaBaixar.shift();
-      try { await baixarAgora(id); } catch (e) {
-        const song = db.song(id);
+      let cancelado = false;
+      try {
+        const atual = db.song(id);
+        if (!atual) throw new Error('a música não está mais na biblioteca');
+        if (arquivosParaBaixar(atual).length && !servidorIA().url) {
+          throw new Error('servidor de download não conectado. Confira Ajustes → Avançado no computador');
+        }
+        if (!perguntou && !(await podeBaixarAgora())) {
+          cancelado = true;
+          continue;
+        }
+        baixando.set(id, { pct: 0 });
+        avisarDownloads();
         void notificarSistema({
-          titulo: song?.title || 'Download',
-          texto: `Não deu para baixar · ${erroExplicado(e)}`,
-          tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}`,
-          imagem: capaDaNotificacao(song),
+          titulo: atual.title || 'Download',
+          texto: 'Download iniciado · preparando áudio e videoclipe',
+          tag: 'baixar-' + id, silenciosa: true, href: '#/musica/' + id,
+          imagem: capaDaNotificacao(atual),
         });
+        await baixarAgora(id);
+      } catch (e) {
+        const atual = db.song(id);
+        void notificarSistema({
+          titulo: atual?.title || 'Download',
+          texto: 'Não deu para baixar · ' + erroExplicado(e),
+          tag: 'baixar-' + id, renovar: true, href: '#/musica/' + id,
+          imagem: capaDaNotificacao(atual),
+        });
+      } finally {
+        baixando.delete(id);
+        avisarDownloads();
       }
-      baixando.delete(id);
-      avisarDownloads();
     }
     andandoFila = null;
   })();
