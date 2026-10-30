@@ -196,14 +196,29 @@ def baixar_midia(video: str, pasta: str, progresso=lambda p: None, com_video: bo
                    juntar="mp4" if com_video else None)
     # Prefere o caminho final informado pelo yt-dlp (após juntar imagem e som). Se a versão instalada
     # não preencher filepath, escolhe o arquivo final, nunca um fragmento .f137.mp4/.f140.m4a.
-    caminho = info.get("filepath")
-    if not caminho or not os.path.isfile(caminho):
-        arquivos = [os.path.join(pasta, f) for f in os.listdir(pasta)
-                    if f.startswith("audio.") and not f.endswith((".part", ".ytdl"))]
-        extensoes = {".mp4", ".webm", ".mkv", ".mov"} if com_video else {".m4a", ".mp3", ".opus", ".ogg", ".aac", ".webm"}
-        arquivos = [f for f in arquivos if os.path.splitext(f)[1].lower() in extensoes]
-        arquivos.sort(key=lambda f: (not re.search(r"\.f\d+\.", os.path.basename(f)), os.path.getsize(f)), reverse=True)
-        caminho = arquivos[0] if arquivos else None
+    extensoes = {".mp4", ".webm", ".mkv", ".mov"} if com_video else {".m4a", ".mp3", ".opus", ".ogg", ".aac", ".webm"}
+    # O yt-dlp pode informar o arquivo final em filepath, requested_downloads ou _filename,
+    # dependendo da versão e de ter juntado vídeo+áudio. Prioriza sempre o arquivo já mesclado.
+    candidatos = [info.get("filepath"), info.get("_filename")]
+    candidatos.extend(x.get("filepath") for x in (info.get("requested_downloads") or []) if isinstance(x, dict))
+    candidatos.extend(os.path.join(pasta, f) for f in os.listdir(pasta))
+    arquivos = []
+    for arquivo in candidatos:
+        if not arquivo or not os.path.isfile(arquivo):
+            continue
+        if os.path.dirname(os.path.abspath(arquivo)) != os.path.abspath(pasta):
+            continue
+        nome = os.path.basename(arquivo)
+        ext = os.path.splitext(nome)[1].lower()
+        if not nome.startswith("audio.") or ext not in extensoes:
+            continue
+        if re.search(r"\.f\\d+\\.", nome) or nome.endswith((".part", ".ytdl")):
+            continue
+        if arquivo not in arquivos:
+            arquivos.append(arquivo)
+    # Arquivo final (audio.mp4) tem prioridade sobre componentes separados (audio.f137.mp4).
+    arquivos.sort(key=lambda f: (bool(re.search(r"\.f\\d+\\.", os.path.basename(f))), -os.path.getsize(f)))
+    caminho = arquivos[0] if arquivos else None
     if not caminho or not os.path.isfile(caminho):
         raise ValueError("o YouTube não entregou um arquivo de mídia válido")
     ext = os.path.splitext(caminho)[1].lower()
