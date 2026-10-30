@@ -726,20 +726,25 @@ async function baixarMusica(song, { perguntou = false } = {}) {
   // de dados móveis. Assim o ícone não fica parado enquanto o app verifica as condições.
   baixando.set(s.id, { pct: 0, preparando: true });
   avisarDownloads();
+  void notificarSistema({
+    titulo: s.title || 'Download',
+    texto: 'Preparando download…',
+    tag: 'baixar-' + s.id, silenciosa: true, href: '#/musica/' + s.id,
+    imagem: capaDaNotificacao(s),
+  });
 
-  filaBaixar.push(s.id);
+  filaBaixar.push({ id: s.id, perguntou });
   andandoFila ||= (async () => {
     while (filaBaixar.length) {
-      const id = filaBaixar.shift();
-      let cancelado = false;
+      const pedido = filaBaixar.shift();
+      const id = pedido.id;
       try {
         const atual = db.song(id);
         if (!atual) throw new Error('a música não está mais na biblioteca');
         if (arquivosParaBaixar(atual).length && !servidorIA().url) {
           throw new Error('servidor de download não conectado. Confira Ajustes → Avançado no computador');
         }
-        if (!perguntou && !(await podeBaixarAgora())) {
-          cancelado = true;
+        if (!pedido.perguntou && !(await podeBaixarAgora())) {
           continue;
         }
         baixando.set(id, { pct: 0 });
