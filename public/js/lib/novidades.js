@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 348, data: '2026-10-30', titulo: 'Sincronização confirmada antes de abrir a música',
+    itens: [
+      { tipo: 'correcao', texto: 'A busca agora identifica primeiro a gravação de áudio e só depois consulta o LRCLIB com a duração correta. A música só abre quando o videoclipe e a letra sincronizada são confirmados; tentativas sem correspondência podem ser refeitas.' },
+    ],
+  },
+  {
     versao: 347, data: '2026-10-30', titulo: 'Correção no download de vídeos do YouTube',
     itens: [
       { tipo: 'correcao', texto: 'Corrigida a validação do identificador do YouTube: ela estava rejeitando IDs válidos de 11 caracteres, mesmo quando o vídeo era reproduzido normalmente no player.' },
@@ -57,12 +63,6 @@ export const NOVIDADES = [
     versao: 339, data: '2026-10-30', titulo: 'Sincronia automática somente pelo LRCLIB',
     itens: [
       { tipo: 'correcao', texto: 'A sincronia de letras usa exclusivamente o LRCLIB. A sincronização por IA do servidor e os comandos manuais foram removidos. Se o LRCLIB não encontrar a gravação correspondente, a música permanece sem sincronia. Foram removidas as notificações do sininho e do sistema.' },
-    ],
-  },
-  {
-    versao: 338, data: '2026-10-30', titulo: 'Mantém a sincronia LRCLIB com áudio e videoclipe separados',
-    itens: [
-      { tipo: 'correcao', texto: 'A letra sincronizada pelo LRCLIB também é procurada quando o player está mostrando o videoclipe e a música já tem uma faixa de áudio separada. A letra fica vinculada à gravação musical correta, sem alterar a separação entre Música e Vídeo.' },
     ],
   },
 
