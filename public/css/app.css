@@ -4041,17 +4041,6 @@ html.tablet .aj-pagina { font-size: 30px; }
 .sa-sem-foto { background: #3d444d !important; color: #a7adb4 !important; }
 html.pp #player .pl-artista-foto span.sem-foto-artista, html.pp #player .pl-artista-foto > span { color: rgb(255 255 255 / 0.7); }
 
-/* o aviso rápido na tela (com as notificações na barra do celular): uma pílula escura em cima do menu, que some sozinha */
-#aviso-rapido { position: fixed; z-index: 90; left: 50%; width: max-content; hyphens: manual; text-wrap: pretty; bottom: calc(var(--nav-h, 64px) + 86px + env(safe-area-inset-bottom)); max-width: min(92vw, 520px);
-  display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 12px; background: #2a2a2a; color: #fff;
-  font-size: 14px; font-weight: 600; line-height: 1.35; box-shadow: 0 10px 30px rgb(0 0 0 / 0.45); pointer-events: none;
-  opacity: 0; transform: translate(-50%, 12px); transition: opacity 0.2s ease, transform 0.2s ease; }
-#aviso-rapido.aparece { opacity: 1; transform: translate(-50%, 0); }
-#aviso-rapido svg { flex: none; color: var(--accent); }
-#aviso-rapido[data-tipo="erro"] svg { color: var(--danger); }
-#aviso-rapido span { min-width: 0; }
-html.tablet #aviso-rapido { bottom: calc(var(--nav-alt, 84px) + var(--nav-pe, 16px) + 16px + env(safe-area-inset-bottom)); font-size: 15px; }
-
 /* ---------------------------------------------------------------- tablet: sem as camadas que piscam
    No tablet (Android), um vídeo tocando, ou imagens animando, dentro de uma camada com máscara de esmaecido
    (mask-image) ou atrás de um desfoque (backdrop-filter) faz o navegador redesenhar a tela inteira a cada quadro: a
