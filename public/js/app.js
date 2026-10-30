@@ -2876,8 +2876,6 @@ const semLinhasDeAcordes = (sinc) => {
       !naLetra && atual.songId && { valor: 'partitura', rotulo: temPartituraMusica(song) ? 'Ver partitura' : 'Criar partitura', ic: temPartituraMusica(song) ? 'score' : 'sparkles' },
       naLetra && song && atual.youtube && !atual.semVideo && !noClipe() && { valor: 'sincronizar', rotulo: sincronizada ? 'Sincronizar a letra de novo' : 'Sincronizar a letra', ic: 'sparkles' },
       (salva || (preview && (atual.songId === 'previa' || atual.href === '#/musica/previa'))) && { valor: 'trocar', rotulo: atual.semVideo ? 'Escolher um vídeo' : 'Trocar o vídeo', ic: atual.semVideo ? 'youtube' : 'refresh' },
-      // a versão só música (a gravação cantada, em que a letra acompanha) escolhida à mão, quando a do app não é a certa
-      !naLetra && song && !atual.semVideo && song.youtube && !song.audioProprio && { valor: 'versao-musica', rotulo: 'Escolher a versão só música', ic: 'music' },
       !naLetra && !atual.semVideo && !atual.soMusica && !(ehArquivo(atual.youtube) && !atual.video) && { valor: 'troca', rotulo: modoCapa() ? 'Mudar para vídeo' : 'Mudar para música', ic: modoCapa() ? 'video' : 'music' },
       (atual.artista || ehCifraClub(song?.source || '')) && { valor: 'album', rotulo: 'Ver álbum', ic: 'disc' },
       { valor: 'compartilhar', rotulo: 'Compartilhar', ic: 'share' },
@@ -2890,7 +2888,6 @@ const semLinhasDeAcordes = (sinc) => {
     if (!v || !atual) return;
     if (v === 'youtube') { window.open(`https://www.youtube.com/watch?v=${ytAgora()}&t=${Math.floor(api.tempoAgora)}s`, '_blank', 'noopener'); return; }
     if (v === 'sincronizar') { sincronizarDoPlayer(song, sincronizada); return; }
-    if (v === 'versao-musica') { escolherVersaoMusica(alvoDaMusica(song)); return; }
     // o álbum abre como página, já com o "Procurando o álbum…": o Tocando agora na tela toda fecha com a troca (no
     // tablet, o painel continua ao lado)
     if (v === 'album') { irParaAlbum({ titulo: song?.title || atual.titulo, artista: song?.artist || atual.artista, fonte: song?.source }); return; }
@@ -11014,49 +11011,7 @@ async function procurarAudio(song, duracao) {
 // nome da música, os de duração parecida com a da gravação primeiro; os sem voz (instrumental, base, karaokê) avisam.
 // Escolhida, a letra sincroniza de novo nela e o clipe é casado com ela pelo som
 async function escolherVersaoMusica(song) {
-  const titulo = tituloLimpo(song.title);
-  const termo = `${titulo} ${song.artist || ''}`.trim();
-  const vs = versoesDe(song);
-  toast('Procurando as versões da música…');
-  const listas = await Promise.all([[termo, 'music_songs'], [`${termo} audio`, 'videos'], [termo, 'videos']].map(([q, filtro]) => buscarYoutube(q, { filtro }).catch(() => [])));
-  const vistos = new Set([song.youtube]);
-  const nome = normalizar(titulo);
-  const achados = listas.flat().filter((v) => v.id && v.segundos > 0 && !vistos.has(v.id) && vistos.add(v.id) && ` ${normalizar(v.titulo)} `.includes(` ${nome} `));
-  const ref = vs?.duracao || 0;
-  if (ref) achados.sort((a, b) => Math.abs(a.segundos - ref) - Math.abs(b.segundos - ref));
-  if (!achados.length) { toast('Não achei outras versões desta música agora'); return; }
-  const semVoz = /\b(instrumental|karaoke|playback|base|backing|sem voz|no vocals?|minus one|multitrack)/i;
-  const opcoes = [
-    ...achados.slice(0, 12).map((v) => ({ valor: v.id, rotulo: v.titulo, sub: [v.canal, fmtTempo(v.segundos), semVoz.test(normalizar(`${v.titulo} ${v.canal}`)) ? 'sem voz' : ''].filter(Boolean).join(' · '),
-      capa: `<span class="fila-capa"><img src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt="" loading="lazy"></span>` })),
-    vs && { valor: '-', rotulo: 'Sem a versão só música', sub: 'Toca só o vídeo da música', ic: 'video' },
-  ].filter(Boolean);
-  const id = await escolherNaLista({ titulo: 'Versão só música', opcoes, atual: vs?.audio, cls: 'lista-fila' });
-  if (!id || id === vs?.audio) return;
-  const agora = song.id === 'previa' ? preview : db.song(song.id);
-  if (!agora) return;
-  if (id === '-') {
-    guardarVersoes(agora, null);
-    if (agora.id !== 'previa') db.updateSong(agora.id, { versoesConferidas: true });
-    toast('A música toca só pelo vídeo');
-    return;
-  }
-  const v = achados.find((x) => x.id === id);
-  const durClipe = (player.atual?.youtube === agora.youtube && player.duracao) || agora.duracao || 0;
-  // (a letra sincronizada da versão de antes sai: a desta é feita de novo ao tocar)
-  if (agora.sincronia && agora.sincronia.video !== agora.youtube) guardarSincronia(agora, null);
-  guardarVersoes(agora, { video: agora.youtube, audio: id, duracao: v.segundos, pares: paresPelaDuracao(durClipe, v.segundos) });
-  if (agora.id !== 'previa') db.updateSong(agora.id, { versoesConferidas: true });
-  toast('Versão só música trocada');
-  acertarVersoes(agora);
-}
-// as duas versões da música (o clipe e o áudio oficial) ficam guardadas nela; o player passa a usá-las na hora
-function guardarVersoes(song, versoes) {
-  song.versoes = versoes;
-  if (song.id === 'previa') { if (preview) preview.versoes = versoes; } else if (db.song(song.id)) db.updateSong(song.id, { versoes });
-  player.versoes(song);
-}
-// com a IA do servidor, em segundo plano: ela ouve o áudio oficial e o clipe e casa os dois pelo próprio som (como o
+  conegundo plano: ela ouve o áudio oficial e o clipe e casa os dois pelo próprio som (como o
 // YouTube Music), ponto a ponto: a troca entre a música e o vídeo cai no mesmo ponto, com cena antes, no meio ou no fim
 // do clipe. Sem dar certo (não parecem a mesma gravação), fica a estimativa pela letra (lrc) ou pela duração
 // Sem o servidor (ou sem ele dar certo), o próprio aparelho casa as duas pelo som (lib/casamento.js, a mesma conta do
