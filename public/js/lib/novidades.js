@@ -16,12 +16,6 @@ export const NOVIDADES = [
     ],
   },
   {
-    versao: 338, data: '2026-10-30', titulo: 'Mantém a sincronia LRCLIB com áudio e videoclipe separados',
-    itens: [
-      { tipo: 'correcao', texto: 'A letra sincronizada pelo LRCLIB também é procurada quando o player está mostrando o videoclipe e a música tem uma faixa de áudio separada. A letra fica vinculada à gravação musical correta.' },
-    ],
-  },
-  {
     versao: 337, data: '2026-10-30', titulo: 'Busca a gravação musical ao abrir a música',
     itens: [
       { tipo: 'correcao', texto: 'A procura da faixa separada agora começa assim que a música é aberta, sem depender de apertar Play ou de encontrar uma letra sincronizada. Se uma instância do Piped não oferecer a busca do YouTube Music, o app tenta também a busca pública do YouTube.' },
