@@ -2421,7 +2421,7 @@ const semLinhasDeAcordes = (sinc) => {
       if (comCapa && atual.youtube === atual.video && atual.youtube !== atual.audio) trocarVersao(atual.audio, tempoNoAudio(atual.pares, api.tempoAgora));
       else if (!comCapa && atual.youtube === atual.audio && atual.youtube !== atual.video) { trocarVersao(atual.video, tempoNoVideo(atual.pares, api.tempoAgora)); foiProClipe = performance.now(); }
       // ainda sem as duas casadas pelo som (só a estimativa pela duração, que erra nos clipes com cena antes e depois
-      // da música, como Espresso ou Speed Demon): o servidor ouve as duas agora; quando ele responder, o clipe vai
+      // da música, como Espresso ou Speed Demon): a comparação sonora local é refeita; quando terminar, o clipe vai
       // sozinho para o ponto certo (veja versoes)
       const s = musicaTocando();
       const vsSalvas = s && versoesDe(s);
