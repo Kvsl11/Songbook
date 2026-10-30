@@ -2623,6 +2623,7 @@ const semLinhasDeAcordes = (sinc) => {
       const assinatura = base.join('|');
       if (filaOrdemChave !== chave || filaOrdemBase !== assinatura) {
         filaOrdemChave = chave; filaOrdemBase = assinatura; filaOrdem = base.map((_, i) => i);
+        historico = [];
         if (aleatorio) filaOrdem = embaralharIndices(filaOrdem, atual.index);
       }
       const i = filaOrdem.indexOf(atual.index);
@@ -2635,6 +2636,7 @@ const semLinhasDeAcordes = (sinc) => {
     const original = base.indexOf(atual.songId);
     if (filaOrdemChave !== chave || filaOrdemBase !== assinatura) {
       filaOrdemChave = chave; filaOrdemBase = assinatura; filaOrdem = base.map((_, i) => i);
+      historico = [];
       if (aleatorio) filaOrdem = embaralharIndices(filaOrdem, original);
     }
     return { set: null, ids: filaOrdem.map((j) => base[j]), indices: [...filaOrdem], i: filaOrdem.indexOf(original) };
@@ -2855,7 +2857,7 @@ const semLinhasDeAcordes = (sinc) => {
       if (!arrastando) return;
       arrastando.linha.classList.remove('arrastando');
       const nova = [...lista.querySelectorAll('[data-original]')].map((x) => Number(x.dataset.original));
-      if (nova.length) { filaOrdem = nova; historico = []; }
+      if (nova.length) { filaOrdem = nova; historico = []; desenhar(); }
       arrastando = null;
       desenharLista();
     };
@@ -2869,6 +2871,7 @@ const semLinhasDeAcordes = (sinc) => {
         db.setPref('aleatorio', aleatorio);
         filaOrdem = aleatorio ? embaralharIndices(filaOrdem, f?.indices[f.i]) : filaOrdem.map((_, i) => i);
         historico = [];
+        desenhar();
         desenharLista();
         desenharModos();
         return;
@@ -2882,6 +2885,7 @@ const semLinhasDeAcordes = (sinc) => {
       historico.push(f.i);
       const s = db.song(f.ids[pos]);
       api.tocar(itemDoPlayer(s, f.set, f.set ? f.indices[pos] : -1));
+      dlg.close();
     });
     lista.addEventListener('keydown', (e) => {
       const linha = e.target.closest('[data-fila-pos]');
@@ -2893,6 +2897,7 @@ const semLinhasDeAcordes = (sinc) => {
         if (destino < 0 || destino >= filaOrdem.length) return;
         filaOrdem = moverIndice(filaOrdem, pos, destino);
         historico = [];
+        desenhar();
         desenharLista();
         lista.querySelector(`[data-fila-pos="${destino}"]`)?.focus();
         return;
