@@ -259,9 +259,11 @@ def _baixar(video: str, pasta: str, progresso, formato: str, pos: list, juntar: 
         # Baixa fragmentos DASH/HLS em paralelo quando o YouTube oferece esse formato.
         "concurrent_fragment_downloads": 4,
         # sem resposta do YouTube por 20 s: desiste dessa conexão e tenta de novo
-        "socket_timeout": 20,
-        "retries": 3,
-        "fragment_retries": 3,
+        "socket_timeout": 30,
+        "retries": 6,
+        "fragment_retries": 6,
+        "extractor_retries": 5,
+        "file_access_retries": 3,
         "format": formato,
         "outtmpl": os.path.join(pasta, "audio.%(ext)s"),
         "noplaylist": True,
