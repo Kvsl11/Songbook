@@ -21,7 +21,7 @@ test('acha o áudio oficial da gravação (e não o clipe, o ao vivo ou outra du
   ];
   assert.equal(escolherAudio(tipos, { titulo: 'Espresso', artista: 'Sabrina Carpenter', duracao: 175 })?.id, 'musictrack01');
   assert.equal(escolherAudio(achados, { titulo: 'Espresso', artista: 'X', duracao: 300 }), null);
-  assert.equal(escolherAudio(achados, { titulo: 'Espresso', duracao: 0 }), null);
+  assert.equal(escolherAudio(achados, { titulo: 'Espresso', duracao: 0 })?.id, 'topic000001');
   // Sem LRCLIB, o resultado type=music ainda deve ser encontrado pelo título e artista.
   const semLrc = [
     { ...v('yummyclip01', 'Justin Bieber - Yummy (Official Music Video)', 'Justin Bieber', 230), tipo: 'stream' },

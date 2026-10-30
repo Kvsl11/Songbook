@@ -68,15 +68,7 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'A sincronização automática da letra dizia “sincronizada”, mas a letra não andava (ela ia para a outra versão da música). Agora ela vai para a versão que está tocando e acompanha na hora.' },
     ],
   },
-  {
-    versao: 326, data: '2026-10-30', titulo: 'Trocar o vídeo na hora, álbum e artista sem tela preta',
-    itens: [
-      { tipo: 'correcao', texto: 'Trocar o vídeo (no ⋯ da música ou do Tocando agora) troca na hora: o vídeo novo já toca, no mesmo ponto da música, sem precisar sair da página e voltar. No modo música, a música continua e o novo passa a ser o clipe dela.' },
-      { tipo: 'correcao', texto: '“Ver álbum” e “Ver artista” não deixam mais a tela preta: a página abre na hora, com “Procurando…”, e o álbum aparece logo depois. E os álbuns de artistas com aspas no nome de algum disco (como Ariana Grande) voltaram a ser achados.' },
-      { tipo: 'correcao', texto: 'A capa animada não mostra mais as faixas pretas dos clipes de cinema (como Love Me Harder): elas ficam de fora, e o vídeo vai até o topo e se mistura no degradê embaixo, sem emenda. Vale também para as músicas já baixadas.' },
-      { tipo: 'melhoria', texto: 'Biblioteca mais limpa: sem o cartão grande em cima, e os filtros e a busca ficam presos no topo ao rolar a lista.' },
-    ],
-  },
+
  ];
 
 // as versões que a pessoa ainda não viu (mais nova primeiro); sem nenhuma vista ainda, só a atual
