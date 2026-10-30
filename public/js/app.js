@@ -134,7 +134,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-348';
+export const APP_VERSAO = '2026.10.30-349';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -10727,7 +10727,7 @@ const tentouSincronizar = new Set();
 // A sincronia é automática e usa somente o LRCLIB. Se não houver letra sincronizada correspondente,
 // a música permanece sem sincronia; nenhum áudio é enviado a servidor de IA.
 const sincronizando = new Set();
-const OPÇÕES_LRCLIB_RÁPIDAS = { espera: 250, timeout: 4500, tentativas: 2 };
+const OPÇÕES_LRCLIB_RÁPIDAS = { espera: 1000, timeout: 10000, tentativas: 4 };
 async function sincronizarMusica(song, { noVideo = '', audioPromise = null } = {}) {
   const previaOriginal = song?.id === 'previa' ? preview : null;
   song = (song?.id === 'previa' ? { ...song, ...preview } : db.song(song?.id)) || song;
