@@ -133,7 +133,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-326';
+export const APP_VERSAO = '2026.10.30-327';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -745,7 +745,7 @@ const ehArquivo = (id) => String(id || '').startsWith(ARQ);
 // o que toca a música: o vídeo ou, sem ele, o áudio da pessoa ('' se nenhum)
 const midiaDe = (song) => song?.youtube || (song?.audioProprio && song.id ? ARQ + song.id : '');
 const versoesDe = (song) => {
-  if (song?.audioProprio && song.id) return { video: song.youtube || '', audio: ARQ + song.id, duracao: song.audioProprio.duracao, pares: song.audioProprio.pares || [[0, 0]], ...(song.audioProprio.casadas ? { casadas: true } : {}) };
+  if (song?.audioProprio && song.id) return { video: song.youtube || '', audio: ARQ + song.id, duracao: song.audioProprio.duracao, pares: song.audioProprio.pares || [[0, 0]], ...(song.audioProprio.casadas ? { casadas: true, casamento: song.audioProprio.casamento } : {}) };
   return song?.versoes?.audio && song.versoes.video === song.youtube ? song.versoes : null;
 };
 // o vídeo em que a letra sincronizada acompanha: o áudio oficial, quando a música tem as duas versões
@@ -1672,6 +1672,24 @@ const semLinhasDeAcordes = (sinc) => {
   let tempos = null;
   let fins = null; // o fim de cada frase cantada, para achar as partes só de música (fimCantado)
   let linhasDaLetra = [];
+  // a frase cantada acima do nome passa como no Spotify: a de antes sobe e some, e a nova sobe de baixo no lugar dela
+  // (só o movimento e a transparência: o resto da tela não é redesenhado)
+  const trocarFrase = (texto) => {
+    const box = $('.pl-frase', el);
+    if (box.dataset.texto === texto) return;
+    box.dataset.texto = texto;
+    box.querySelectorAll('.saindo').forEach((x) => x.remove());
+    const velha = box.querySelector('span');
+    const nova = document.createElement('span');
+    nova.textContent = texto;
+    if (!velha || box.hidden) { box.replaceChildren(nova); return; }
+    nova.className = 'entrando';
+    box.append(nova);
+    velha.className = 'saindo';
+    setTimeout(() => velha.remove(), 450);
+    void nova.offsetWidth; // (começa embaixo e só então sobe)
+    nova.className = '';
+  };
   const desenharLetra = () => {
     if (!document.documentElement.classList.contains('pp')) return;
     const song = musicaTocando();
@@ -1979,7 +1997,7 @@ const semLinhasDeAcordes = (sinc) => {
     acesaChave = chave;
     linhaAcesa = k;
     // a frase cantada agora, acima do nome (como no Spotify); entre uma frase e outra, a notinha
-    $('.pl-frase', el).textContent = (pausa === null && k >= 0 && linhasDaLetra[k]) || '♪';
+    trocarFrase((pausa === null && k >= 0 && linhasDaLetra[k]) || '♪');
     caixa.querySelectorAll('p[data-k]').forEach((p) => {
       const i = Number(p.dataset.k);
       p.classList.toggle('agora', pausa === null && i === k);
@@ -10819,6 +10837,11 @@ const sincronizando = new Set();
 // ouve o próprio vídeo (acerta a introdução e as partes diferentes da gravação); o LRCLIB fica de reserva
 const sincPelaIA = () => Boolean(SERVIDOR_IA.pc && SERVIDOR_IA.url);
 async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrclib = false, status = () => {}, noVideo = '' } = {}) {
+  // a música como está agora (a da página podia ser a de antes das duas versões chegarem) e, tocando no modo música,
+  // a versão que o player toca: a automática (ao abrir a música) gravava a letra na outra, dizia "sincronizada" e a
+  // letra não andava, até sincronizar de novo pelo ⋯ do Tocando agora
+  song = (song.id === 'previa' ? preview : db.song(song.id)) || song;
+  if (!noVideo && player.atual?.songId === song.id && player.modoMusica && !player.atual.semVideo && [song.youtube, versoesDe(song)?.audio].includes(player.atual.youtube)) noVideo = player.atual.youtube;
   if (sincronizando.has(song.id)) return undefined;
   const pelaIA = sincPelaIA();
   if (pelaIA) soLrclib = false; // a busca automática (ao tocar) também vai para a IA do servidor
@@ -11039,9 +11062,13 @@ const casamentoFalhou = new Set(); // (uma vez por par enquanto o app está aber
 // pedido: a pessoa trocou para o vídeo (ou baixou a música): aí vale também o servidor da nuvem, e tenta de novo mesmo
 // se o casamento já falhou nesta vez que o app está aberto (sem o som das duas, sobrava a estimativa pela duração, que
 // erra nos clipes com cenas de filme antes e no meio da música, como Thriller)
+// (CASAMENTO: a versão da conta. As casadas ou recusadas por uma conta antiga são casadas de novo uma vez: a 2 acha a
+// música editada no clipe, como em Thriller, que a 1 recusava como outra gravação)
+const CASAMENTO = 2;
 async function acertarVersoes(song, lrc = null, { pedido = false } = {}) {
   const vs = versoesDe(song);
-  if (!vs?.audio || !vs.video || vs.casadas || vs.diferentes || casandoVersoes.has(vs.video) || (!pedido && casamentoFalhou.has(`${vs.audio}|${vs.video}`))) return;
+  const resolvida = (vs?.casadas || vs?.diferentes) && (vs.casamento || 1) >= CASAMENTO;
+  if (!vs?.audio || !vs.video || resolvida || casandoVersoes.has(vs.video) || (!pedido && casamentoFalhou.has(`${vs.audio}|${vs.video}`))) return;
   casandoVersoes.add(vs.video);
   try {
     let pares = null;
@@ -11049,22 +11076,27 @@ async function acertarVersoes(song, lrc = null, { pedido = false } = {}) {
     if ((sincPelaIA() || (pedido && servidorIA().url)) && !ehArquivo(vs.audio)) {
       pares = (await chamarComEtapas(servidorIA(), '/versoes', { json: { audio: vs.audio, video: vs.video } }, () => {}).catch((e) => { if (e?.status === 422) diferentes = true; return null; }))?.pares;
     }
-    if (!pares?.length && !diferentes) {
+    // (o servidor recusou: o aparelho confere pelos trechos, que acham a música editada no clipe)
+    if (!pares?.length) {
       const r = await casarNoAparelho(vs.audio, vs.video).catch(() => null);
       pares = r?.pares;
       if (r?.mesma === false) diferentes = true;
+      else if (r?.mesma) diferentes = false;
     }
     if (diferentes) {
       const agora = song.id === 'previa' ? preview : db.song(song.id);
-      if (agora && versoesDe(agora)?.video === vs.video && !ehArquivo(vs.audio)) guardarVersoes(agora, { ...versoesDe(agora), diferentes: true });
+      if (agora && versoesDe(agora)?.video === vs.video && !ehArquivo(vs.audio)) guardarVersoes(agora, { ...versoesDe(agora), diferentes: true, casamento: CASAMENTO });
       return;
     }
     const agora = song.id === 'previa' ? preview : db.song(song.id);
     if (pares?.length && agora && versoesDe(agora)?.video === vs.video) {
       if (ehArquivo(vs.audio)) {
-        db.updateSong(agora.id, { audioProprio: { ...agora.audioProprio, pares, casadas: true } });
+        db.updateSong(agora.id, { audioProprio: { ...agora.audioProprio, pares, casadas: true, casamento: CASAMENTO } });
         player.versoes(db.song(agora.id));
-      } else guardarVersoes(agora, { ...versoesDe(agora), pares, casadas: true });
+      } else {
+        const { diferentes: _, ...semRecusa } = versoesDe(agora);
+        guardarVersoes(agora, { ...semRecusa, pares, casadas: true, casamento: CASAMENTO });
+      }
     } else {
       casamentoFalhou.add(`${vs.audio}|${vs.video}`);
       if (lrc && sincPelaIA()) acertarClipe(song, lrc);

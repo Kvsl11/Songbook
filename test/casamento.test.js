@@ -38,3 +38,16 @@ test('casar recusa duas gravações diferentes', () => {
   assert.equal(r.mesma, false);
   assert.equal(r.pares, null);
 });
+
+test('casar acha a música editada no clipe, em outra ordem e com uma parte a menos (como Thriller)', () => {
+  const m = musica(60, 7);
+  const parte = (de, ate) => m.subarray(de * TAXA, ate * TAXA);
+  // o clipe: cena, a 2ª parte, cena, a 1ª, a 4ª (sem a 3ª) e o fim
+  const clipe = juntar(ruido(30), parte(15, 30), ruido(20), parte(0, 15), parte(45, 60), ruido(10));
+  const r = casar(m, clipe);
+  assert.ok(r?.mesma, JSON.stringify(r));
+  const noClipe = (t) => { const ordem = [...r.pares].sort((x, y) => x[0] - y[0]); let p = ordem[0]; for (const q of ordem) if (q[0] <= t + 0.01) p = q; return t + p[1] - p[0]; };
+  assert.ok(Math.abs(noClipe(5) - 70) < 1, `5 s → ${noClipe(5)} (${JSON.stringify(r.pares)})`);
+  assert.ok(Math.abs(noClipe(20) - 35) < 1, `20 s → ${noClipe(20)}`);
+  assert.ok(Math.abs(noClipe(52) - 87) < 1, `52 s → ${noClipe(52)}`);
+});

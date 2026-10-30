@@ -60,12 +60,62 @@ def pares_do_caminho(wp: np.ndarray, duracao_audio: float, cada: float = 1.0, fo
     return pares
 
 
+TRECHO = 50  # quadros (10 s)
+PARECENCA_TRECHO = 0.62
+
+
+def casar_por_trechos(a: np.ndarray, v: np.ndarray) -> tuple[list[list[float]], float]:
+    """Os clipes com a música editada (como Thriller: em outra ordem, com partes a mais e a menos e cenas de filme no
+    meio) não cabem num caminho só. Cada trecho do áudio (10 s, de 5 em 5 s) é procurado sozinho no clipe; entre fins
+    quase iguais (o refrão que se repete), o que continua o trecho de antes. Devolve os pares e a cobertura (a parte
+    dos trechos com som que foi achada). É a mesma conta do app (public/js/lib/casamento.js)."""
+    import librosa
+
+    pares: list[list[float]] = []
+    com_som = achados = 0
+    desloc = None
+    for i0 in range(0, len(a) - TRECHO + 1, TRECHO // 2):
+        t = a[i0:i0 + TRECHO]
+        if (t.any(axis=1)).sum() < TRECHO * 0.6:
+            continue  # (silêncio: não diz onde está)
+        com_som += 1
+        custo = 1.0 - t @ v.T
+        d_acum = librosa.sequence.dtw(C=custo, subseq=True, step_sizes_sigma=np.array([[1, 1], [0, 1], [1, 0]]),
+                                     weights_add=np.array([0, 0.3, 0.3]), backtrack=False)
+        fim = d_acum[-1]
+        j = int(fim.argmin())
+        if desloc is not None:
+            perto = i0 + desloc + TRECHO - 1
+            bons = np.flatnonzero(fim <= fim[j] + 0.04 * TRECHO)
+            j = int(bons[np.abs(bons - perto).argmin()])
+        _, wp = librosa.sequence.dtw(C=custo[:, : j + 1], subseq=True, step_sizes_sigma=np.array([[1, 1], [0, 1], [1, 0]]),
+                                     weights_add=np.array([0, 0.3, 0.3]))
+        wp = wp[wp[:, 1] <= j]
+        parecenca = float(1.0 - custo[wp[:, 0], wp[:, 1]].mean())
+        if parecenca < PARECENCA_TRECHO:
+            continue
+        achados += 1
+        d = int(np.median(wp[:, 1] - (i0 + wp[:, 0])))
+        if desloc is None or abs(d - desloc) * PASSO > 0.4:
+            pares.append([round(i0 * PASSO, 2), round((i0 + d) * PASSO, 2)])
+        desloc = d
+    return pares, (achados / com_som if com_som else 0.0)
+
+
 def alinhar(y_audio: np.ndarray, y_video: np.ndarray, sr: int) -> dict | None:
-    """{"pares": [[áudio, clipe], …], "confianca": 0–1} ou None se não parecem a mesma gravação."""
+    """{"pares": [[áudio, clipe], …], "confianca": 0–1} ou None se não parecem a mesma gravação. Com o caminho inteiro
+    bem parecido, ele vale; senão, os trechos (a música editada no clipe); sem a metade deles achados, só o caminho
+    inteiro com a parecença mínima."""
     a, v = croma(y_audio, sr), croma(y_video, sr)
     if len(a) < 10 or len(v) < 10:
         return None
     wp, parecenca = caminho(a, v)
+    if parecenca >= 0.7:
+        return {"pares": pares_do_caminho(wp, len(y_audio) / sr), "confianca": round(parecenca, 2)}
+    if len(a) >= TRECHO:
+        pares, cobertura = casar_por_trechos(a, v)
+        if cobertura >= 0.5 and pares:
+            return {"pares": pares, "confianca": round(cobertura, 2), "trechos": True}
     if parecenca < CONFIANCA_MINIMA:
         return None
     return {"pares": pares_do_caminho(wp, len(y_audio) / sr), "confianca": round(parecenca, 2)}
