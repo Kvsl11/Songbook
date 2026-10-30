@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 352, data: '2026-10-30', titulo: 'Download de áudio e videoclipe sem cortes',
+    itens: [
+      { tipo: 'correcao', texto: 'Com “Áudio e vídeo” ativado, o Songbook mantém o videoclipe mesmo quando ele é uma gravação diferente do áudio oficial. Se um dos arquivos falhar, o download fica parcial e informa qual arquivo faltou, permitindo completar depois.' },
+    ],
+  },
+  {
     versao: 351, data: '2026-10-30', titulo: 'Conexão mais estável com o servidor e YouTube',
     itens: [
       { tipo: 'correcao', texto: 'A descoberta do servidor é revalidada e pode se recuperar de falhas temporárias. O acompanhamento de tarefas tolera oscilações de gateway, e transferências interrompidas podem ser retomadas. O yt-dlp ganhou mais tentativas para falhas temporárias do YouTube.' },
