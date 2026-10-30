@@ -194,14 +194,24 @@ def baixar_midia(video: str, pasta: str, progresso=lambda p: None, com_video: bo
     duração e a altura do vídeo."""
     info = _baixar(video, pasta, progresso, formato_video(qualidade) if com_video else formato_audio(qualidade), [],
                    juntar="mp4" if com_video else None)
-    arquivos = [f for f in os.listdir(pasta) if f.startswith("audio.") and not f.endswith((".part", ".ytdl"))]
-    if not arquivos:
-        raise ValueError("vídeo longo demais (mais de %d min) ou sem áudio" % (MAX_VIDEO // 60))
-    caminho = os.path.join(pasta, arquivos[0])
+    # Prefere o caminho final informado pelo yt-dlp (após juntar imagem e som). Se a versão instalada
+    # não preencher filepath, escolhe o arquivo final, nunca um fragmento .f137.mp4/.f140.m4a.
+    caminho = info.get("filepath")
+    if not caminho or not os.path.isfile(caminho):
+        arquivos = [os.path.join(pasta, f) for f in os.listdir(pasta)
+                    if f.startswith("audio.") and not f.endswith((".part", ".ytdl"))]
+        extensoes = {".mp4", ".webm", ".mkv", ".mov"} if com_video else {".m4a", ".mp3", ".opus", ".ogg", ".aac", ".webm"}
+        arquivos = [f for f in arquivos if os.path.splitext(f)[1].lower() in extensoes]
+        arquivos.sort(key=lambda f: (not re.search(r"\.f\d+\.", os.path.basename(f)), os.path.getsize(f)), reverse=True)
+        caminho = arquivos[0] if arquivos else None
+    if not caminho or not os.path.isfile(caminho):
+        raise ValueError("o YouTube não entregou um arquivo de mídia válido")
     ext = os.path.splitext(caminho)[1].lower()
     tipo = TIPOS.get(ext, "video/mp4" if com_video else "audio/mp4")
     if ext == ".webm" and not com_video:
         tipo = "audio/webm"
+    if com_video and not tipo.startswith("video/"):
+        raise ValueError("o servidor recebeu somente áudio, não o videoclipe; tente novamente")
     return {"caminho": caminho, "tipo": tipo, "titulo": info.get("title") or "", "duracao": info.get("duration"),
             "altura": info.get("height")}
 

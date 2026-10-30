@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 342, data: '2026-10-30', titulo: 'Download retoma o arquivo que faltou',
+    itens: [
+      { tipo: 'correcao', texto: 'Se o áudio baixar, mas o videoclipe falhar, o Songbook não considera o download completo. Agora é possível tentar novamente e baixar só o arquivo que faltou; mudar de “Só o áudio” para “Áudio e vídeo” também completa o download sem repetir o áudio.' },
+    ],
+  },
+  {
     versao: 341, data: '2026-10-30', titulo: 'Música preparada antes de abrir e notificações de download restauradas',
     itens: [
       { tipo: 'melhoria', texto: 'Ao entrar numa música, a busca da faixa de áudio e a consulta ao LRCLIB começam em paralelo. A tela espera no máximo 1,1 segundo; se a rede demorar, abre sem travar e termina o preparo em segundo plano. As duas buscas do LRCLIB também são feitas em paralelo, com limite curto de tempo. As notificações de progresso, conclusão e falha dos downloads voltaram à barra do celular; notificações de sincronização continuam desativadas.' },
@@ -55,13 +61,6 @@ export const NOVIDADES = [
     versao: 333, data: '2026-10-30', titulo: 'Busca correta da gravação musical no YouTube Music',
     itens: [
       { tipo: 'correcao', texto: 'A busca agora reconhece também os resultados musicais do YouTube Music e faz buscas específicas por áudio oficial e canal Topic. O modo Áudio procura a gravação cantada curta; o modo Vídeo mantém o videoclipe.' },
-      { tipo: 'correcao', texto: 'A capa animada prepara e decodifica o próximo trecho antes da troca, mantendo o trecho atual visível até a transição.' },
-    ],
-  },
-  {
-    versao: 332, data: '2026-10-30', titulo: 'Áudio musical separado do videoclipe longo',
-    itens: [
-      { tipo: 'correcao', texto: 'Quando a duração da letra sincronizada corresponde ao videoclipe longo, o Songbook ainda procura a gravação musical curta para o modo Áudio; o modo Vídeo mantém o videoclipe completo.' },
       { tipo: 'correcao', texto: 'A capa animada prepara e decodifica o próximo trecho antes da troca, mantendo o trecho atual visível até a transição.' },
     ],
   },
