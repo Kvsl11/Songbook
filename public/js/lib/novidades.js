@@ -4,9 +4,9 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
-    versao: 332, data: '2026-10-30', titulo: 'Áudio musical separado do videoclipe longo',
+    versao: 333, data: '2026-10-30', titulo: 'Busca correta da gravação musical no YouTube Music',
     itens: [
-      { tipo: 'correcao', texto: 'Quando a duração da letra sincronizada corresponde ao videoclipe longo, o Songbook ainda procura a gravação musical curta para o modo Áudio; o modo Vídeo mantém o videoclipe completo.' },
+      { tipo: 'correcao', texto: 'A busca agora reconhece também os resultados musicais do YouTube Music e faz buscas específicas por áudio oficial e canal Topic. O modo Áudio procura a gravação cantada curta; o modo Vídeo mantém o videoclipe.' },
       { tipo: 'correcao', texto: 'A capa animada prepara e decodifica o próximo trecho antes da troca, mantendo o trecho atual visível até a transição.' },
     ],
   },
