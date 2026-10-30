@@ -3057,10 +3057,10 @@ html.pp #player .pl-meio { order: 4; display: flex; align-items: center; gap: 12
 html.pp #player .pl-info { flex: 1; min-width: 0; padding: 0 2px; margin: 0; }
 /* no modo vídeo, a capa pequena ao lado do nome, como no Spotify (no modo música a capa grande já está em cima) */
 #player .pl-capinha { display: none; }
-html.pp #player:not(.modo-capa) .pl-capinha { display: block; flex: none; width: 56px; height: 56px; border-radius: 6px; background: #000 center / cover no-repeat;
+html.pp #player .pl-capinha { display: block; flex: none; width: 56px; height: 56px; border-radius: 6px; background: #000 center / cover no-repeat;
   box-shadow: 0 4px 12px rgb(0 0 0 / 0.35); animation: pop 0.3s both; }
-html.pp #player:not(.modo-capa) .pl-capinha.capa-yt { background-size: auto 134%; }
-html.pp #player:not(.modo-capa) .pl-capinha[hidden] { display: none; }
+html.pp #player .pl-capinha.capa-yt { background-size: auto 134%; }
+html.pp #player .pl-capinha[hidden] { display: none; }
 html.pp #player .pl-salva { display: inline-grid; width: 34px; height: 34px; border-color: rgb(255 255 255 / 0.85); color: #fff; }
 html.pp #player .pl-salva.salva { border-color: var(--accent); color: var(--on-accent); }
 html.pp #player .pl-txt b { font-size: 22px; letter-spacing: -0.01em; white-space: normal; }
