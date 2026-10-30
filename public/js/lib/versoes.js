@@ -79,10 +79,30 @@ export const paresPelaDuracao = (durVideo, durAudio) => [[0, durVideo > durAudio
 // em diante; antes do primeiro par, vale o deslocamento dele)
 function converter(pares, t, de, para) {
   if (!pares?.length) return Math.max(0, t);
-  const ordem = [...pares].sort((x, y) => x[de] - y[de]);
-  let p = ordem[0];
-  for (const q of ordem) { if (q[de] <= t + 0.01) p = q; else break; }
-  return Math.max(0, t + p[para] - p[de]);
+  const ordem = pares
+    .filter((p) => Number.isFinite(p?.[de]) && Number.isFinite(p?.[para]))
+    .map((p) => [p[0], p[1]])
+    .sort((x, y) => x[de] - y[de] || x[para] - y[para]);
+  if (!ordem.length) return Math.max(0, t);
+  const primeiro = ordem[0];
+  if (t < primeiro[de]) return Math.max(0, t + primeiro[para] - primeiro[de]);
+  let i = 0;
+  // Em âncoras com o mesmo instante de origem, a última é o ponto depois da cena/corte.
+  while (i + 1 < ordem.length && ordem[i + 1][de] <= t + 0.01) i++;
+  const p = ordem[i];
+  const q = ordem[i + 1];
+  if (!q || q[de] <= p[de] + 0.01) return Math.max(0, t + p[para] - p[de]);
+  // Cena inserida no vídeo: o vídeo avança, mas o áudio fica parado no mesmo instante.
+  if (Math.abs(q[para] - p[para]) <= 0.05) return Math.max(0, p[para]);
+  const deslocamentoP = p[para] - p[de];
+  const deslocamentoQ = q[para] - q[de];
+  // Pequenas diferenças de relógio/velocidade são corrigidas gradualmente entre âncoras.
+  if (Math.abs(deslocamentoQ - deslocamentoP) <= 2) {
+    const fracao = (t - p[de]) / (q[de] - p[de]);
+    return Math.max(0, p[para] + fracao * (q[para] - p[para]));
+  }
+  // Corte ou cena: não inventa uma transição gradual pelo trecho que não corresponde à música.
+  return Math.max(0, t + deslocamentoP);
 }
 export const tempoNoVideo = (pares, tAudio) => converter(pares, tAudio, 0, 1);
 export const tempoNoAudio = (pares, tVideo) => converter(pares, tVideo, 1, 0);

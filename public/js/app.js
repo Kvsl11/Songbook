@@ -144,7 +144,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-354';
+export const APP_VERSAO = '2026.10.30-355';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -2421,10 +2421,12 @@ const semLinhasDeAcordes = (sinc) => {
       if (comCapa && atual.youtube === atual.video && atual.youtube !== atual.audio) trocarVersao(atual.audio, tempoNoAudio(atual.pares, api.tempoAgora));
       else if (!comCapa && atual.youtube === atual.audio && atual.youtube !== atual.video) { trocarVersao(atual.video, tempoNoVideo(atual.pares, api.tempoAgora)); foiProClipe = performance.now(); }
       // ainda sem as duas casadas pelo som (só a estimativa pela duração, que erra nos clipes com cena antes e depois
-      // da música, como Espresso ou Speed Demon): o servidor ouve as duas agora; quando ele responder, o clipe vai
+      // da música, como Espresso ou Speed Demon): a comparação sonora local é refeita; quando terminar, o clipe vai
       // sozinho para o ponto certo (veja versoes)
       const s = musicaTocando();
-      if (s && !versoesDe(s)?.casadas) acertarVersoes(s, null, { pedido: true });
+      const vsSalvas = s && versoesDe(s);
+      if (s && vsSalvas && (!vsSalvas.casadas || (vsSalvas.casamento || 1) < CASAMENTO))
+        void acertarVersoes(s, null, { pedido: true });
     }
     if (atual && !atual.semVideo && (localDe(atual.youtube)?.chave || '') !== (local?.chave || '')) trocarVersao(atual.youtube, api.tempoAgora, true);
     // foi para o clipe com a letra na tela toda aberta: ela fecha (no clipe não há letra) e o vídeo aparece
@@ -8591,6 +8593,10 @@ function viewSong(id, ctx = {}) {
   const sincronia = () => (midiaDe(song) && song.sincronia?.fonte === 'lrclib' && song.sincronia.video === videoDaLetra(song) && song.sincronia.tempos?.length ? song.sincronia : null);
   // Consulta o LRCLIB automaticamente ao abrir a música, em qualquer tamanho de tela.
   if (midiaDe(song)) sincronizarAoTocar();
+  // Recalibra mapas antigos em segundo plano ao abrir a música; não espera o usuário alternar os modos.
+  const vsSalvasAoAbrir = versoesDe(song);
+  if (vsSalvasAoAbrir?.audio && (!vsSalvasAoAbrir.casadas || (vsSalvasAoAbrir.casamento || 1) < CASAMENTO))
+    void acertarVersoes(song);
   const linhasNaTela = () => [...songEl.querySelectorAll('.line:not(.chords-only)')].filter((l) => linhaSemCifra([...l.querySelectorAll('.lyric')].map((x) => x.textContent).join('')));
   let mapa = null; // linha cantada → linha da tela (refeito quando a letra é desenhada de novo)
   let telaDoMapa = null;
@@ -10960,11 +10966,14 @@ function guardarVersoes(song, versoes) {
 // O alinhamento entre a faixa e o videoclipe é calculado localmente no aparelho; não usa IA/servidor.
 const casandoVersoes = new Set();
 const casamentoFalhou = new Set();
-const CASAMENTO = 2;
-async function acertarVersoes(song) {
+const CASAMENTO = 3;
+async function acertarVersoes(song, _sincronia = null, { pedido = false } = {}) {
   const vs = versoesDe(song);
+  const chave = vs?.audio && vs?.video ? `${vs.audio}|${vs.video}` : '';
   if (!vs?.audio || !vs.video || (vs.casadas || vs.diferentes) && (vs.casamento || 1) >= CASAMENTO
-    || casandoVersoes.has(vs.video) || casamentoFalhou.has(`${vs.audio}|${vs.video}`)) return;
+    || casandoVersoes.has(vs.video) || (!pedido && casamentoFalhou.has(chave))) return;
+  // Uma troca explícita de modo é uma nova oportunidade: falhas de leitura/download podem ter sido temporárias.
+  if (pedido) casamentoFalhou.delete(chave);
   casandoVersoes.add(vs.video);
   try {
     const r = await casarNoAparelho(vs.audio, vs.video).catch(() => null);

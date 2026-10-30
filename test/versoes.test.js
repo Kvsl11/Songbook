@@ -58,6 +58,27 @@ test('os pares pelas duas sincronias, ou pela duração', () => {
 });
 
 
+test('a conversão fica parada durante uma cena curta detectada entre âncoras', () => {
+  const pares = [[0, 3], [9.8, 12.8], [9.8, 17.8], [10, 18]];
+  assert.ok(Math.abs(tempoNoAudio(pares, 15) - 9.8) < 0.01);
+  assert.equal(tempoNoVideo(pares, 9.8), 17.8);
+});
+
+test('a conversão preserva cenas inseridas e corrige pequenas diferenças de relógio', () => {
+  const pares = [[0, 10], [20, 30], [20, 38], [40, 58]];
+  // Durante a cena extra, o vídeo avança, mas a música fica parada no segundo 20.
+  assert.equal(tempoNoAudio(pares, 34), 20);
+  assert.equal(tempoNoAudio(pares, 38), 20);
+  // Ao sair da cena, o áudio volta a avançar; na ida, o segundo 20 aponta para o trecho depois da cena.
+  assert.equal(tempoNoVideo(pares, 20), 38);
+  assert.equal(tempoNoVideo(pares, 30), 48);
+  // Pequena deriva entre as gravações é distribuída, em vez de acumular um salto no fim.
+  assert.equal(tempoNoVideo([[0, 10], [100, 111]], 50), 60.5);
+  // Uma edição grande continua sendo um corte, não uma interpolação que atravessa a cena.
+  assert.equal(tempoNoVideo([[0, 10], [50, 60], [50, 90], [100, 140]], 49), 59);
+  assert.equal(tempoNoVideo([[0, 10], [50, 60], [50, 90], [100, 140]], 50), 90);
+});
+
 test('só compartilha o mesmo vídeo entre Música e Vídeo quando a sincronia é idêntica', () => {
   assert.equal(mesmaSincronia([[0, 0], [10, 10.2], [40, 40.1]]), true);
   assert.equal(mesmaSincronia([[0, 18], [10, 28], [40, 58]]), false); // introdução
@@ -105,6 +126,16 @@ test('um download parcial pode ser retomado e o áudio não precisa ser baixado 
   assert.match(app, /const faltam = ss\.filter\(\(s\) => precisaBaixar\(s\)/);
 });
 
+
+test('o casamento sonoro recalibra mapas antigos e permite nova tentativa após falha temporária', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  assert.match(app, /const CASAMENTO = 3;/);
+  assert.match(app, /async function acertarVersoes\(song, _sincronia = null, \{ pedido = false \} = \{\}\)/);
+  assert.match(app, /\(!pedido && casamentoFalhou\.has\(chave\)\)/);
+  assert.match(app, /if \(pedido\) casamentoFalhou\.delete\(chave\)/);
+  assert.match(app, /vsSalvasAoAbrir\.casamento \|\| 1\) < CASAMENTO/);
+  assert.match(app, /vsSalvas\.casamento \|\| 1\) < CASAMENTO/);
+});
 
 test('a sincronia automática consulta somente o LRCLIB e nunca chama o servidor de IA', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
