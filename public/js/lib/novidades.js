@@ -65,12 +65,7 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'O servidor baixa fragmentos em paralelo e evita repetir tentativas de conexão que não resolvem falhas comuns de rede.' },
     ],
   },
-  {
-    versao: 343, data: '2026-10-30', titulo: 'Música carrega tudo antes de abrir',
-    itens: [
-      { tipo: 'correcao', texto: 'Ao tocar numa música da busca, o Songbook aguarda localizar o videoclipe, encontrar a gravação de áudio e consultar a sincronia da letra no LRCLIB antes de abrir a música.' },
-    ],
-  },
+
 
 
 
