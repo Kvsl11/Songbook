@@ -492,3 +492,40 @@ test('letra sincronizada: a gravação oficial é a duração que mais aparece, 
   // empate: a de estúdio (e a da duração do vídeo) ganha da ao vivo
   assert.equal(gravacaoOficial([r(7, 300, { trackName: 'Tears (Ao Vivo)' }), r(8, 241)], 243).id, 8);
 });
+
+test('audioDoVideo: encontra uma faixa de áudio online mesmo se uma instância e os primeiros formatos falharem', async () => {
+  const { audioDoVideo } = await import('../public/js/lib/web.js');
+  const pedidos = [];
+  const fetchImpl = async (url) => {
+    pedidos.push(url);
+    if (url === 'https://piped-a/streams/abcdefghijk') return { ok: false, status: 502 };
+    if (url === 'https://piped-b/streams/abcdefghijk') return {
+      ok: true,
+      json: async () => ({ audioStreams: [
+        { url: 'https://cdn/video-only', bitrate: 1000, videoOnly: true },
+        { url: 'https://cdn/audio-baixo', bitrate: 32000 },
+        { url: 'https://cdn/audio-medio', bitrate: 64000 },
+        { url: 'https://cdn/audio-alto', bitrate: 96000 },
+      ] }),
+    };
+    if (url === 'https://cdn/audio-baixo') return { ok: true, blob: async () => new Blob([new Uint8Array(100)]) };
+    if (url === 'https://cdn/audio-medio') return { ok: false, status: 403 };
+    if (url === 'https://cdn/audio-alto') return { ok: true, blob: async () => new Blob([new Uint8Array(12001)]) };
+    throw new Error('pedido inesperado: ' + url);
+  };
+  const blob = await audioDoVideo('abcdefghijk', { fetchImpl, instancias: ['https://piped-a', 'https://piped-b'] });
+  assert.equal(blob.size, 12001);
+  assert.ok(pedidos.includes('https://piped-a/streams/abcdefghijk'));
+  assert.ok(pedidos.includes('https://piped-b/streams/abcdefghijk'));
+  assert.ok(!pedidos.includes('https://cdn/video-only'), 'não deve baixar o fluxo de vídeo');
+  assert.ok(pedidos.includes('https://cdn/audio-alto'), 'deve tentar outras faixas de áudio');
+});
+
+test('audioDoVideo: ignora identificadores inválidos sem consultar a rede', async () => {
+  const { audioDoVideo } = await import('../public/js/lib/web.js');
+  let chamadas = 0;
+  const blob = await audioDoVideo('não-é-id', { fetchImpl: async () => { chamadas++; } });
+  assert.equal(blob, null);
+  assert.equal(chamadas, 0);
+});
+
