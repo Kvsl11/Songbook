@@ -1524,6 +1524,10 @@ const player = (() => {
       anterior.classList.remove('pronto');
       caixa = seguinte;
       reserva = anterior;
+      // A antiga camada ativa agora precisa ser preparada para outro ponto; ela não conserva
+      // o marcador de quadro pronto do trecho que acabou de sair.
+      reserva.dataset.pronto = '';
+      reserva.dataset.preparando = '';
       troca = false;
       preparar((k + 1) % trechos.length);
     };
