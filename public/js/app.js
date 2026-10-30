@@ -113,7 +113,9 @@ $('#btn-side').addEventListener('click', () => {
   document.documentElement.classList.toggle('side-collapsed', v);
   $('#btn-side').setAttribute('aria-label', v ? 'Expandir menu' : 'Recolher menu');
 });
-view.addEventListener('scroll', () => topbar.classList.toggle('scrolled', view.scrollTop > 120), { passive: true });
+// (na biblioteca, os filtros e a busca ficam presos no topo: o topo ganha a cor logo que a lista começa a rolar, e os dois
+// formam uma faixa só)
+view.addEventListener('scroll', () => topbar.classList.toggle('scrolled', view.scrollTop > (view.querySelector('.bib-fixo') ? 4 : 120)), { passive: true });
 // a linha do andamento da música, no pé da faixa do topo (na página da música, ao rolar)
 const topoProg = document.createElement('i');
 topoProg.className = 'topo-prog';
@@ -131,7 +133,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-325';
+export const APP_VERSAO = '2026.10.30-326';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1044,6 +1046,34 @@ const linhaVideo = (v, i, extra = '') => `
 
 // Escolhe o vídeo do YouTube de uma música: busca aqui dentro ou link colado.
 // Devolve o link, '' para remover, ou null se cancelou.
+// "Trocar o vídeo" (no ⋯ da música e no do Tocando agora): o vídeo novo fica na música e, se ela está tocando, já toca
+// na hora, no mesmo ponto (antes o player seguia no de antes até sair da página e voltar). A versão só música, quando
+// há, continua: ela é a gravação, e o vídeo novo vira o clipe dela (onde a música está nele pela diferença de duração,
+// até o casamento pelo som chegar). Nada se desenha de novo além da capa (antes a tela toda era refeita e piscava)
+const duracoesDaBusca = new Map(); // id do vídeo → segundos (dos vídeos que a escolha mostrou)
+function trocarVideoDaMusica(song, url) {
+  const s = db.song(song.id);
+  if (!s) return null;
+  const novo = url ? youtubeId(url) : '';
+  const vs = versoesDe(s);
+  const capaAntes = capa(s).match(/src="([^"]+)"/)?.[1] || '';
+  const mud = { ...s, content: definirMeta(s.content, 'youtube', url) };
+  if (s.audioProprio) mud.audioProprio = { ...s.audioProprio, pares: [[0, 0]], casadas: false };
+  else if (vs && novo && vs.audio !== novo) {
+    const dur = duracoesDaBusca.get(novo) || 0;
+    mud.versoes = { video: novo, audio: vs.audio, duracao: vs.duracao, pares: dur ? paresPelaDuracao(dur, vs.duracao) : [[0, 0]] };
+  } else delete mud.versoes;
+  const salva = db.saveSong(mud);
+  player.trocouVideo(salva);
+  acertarVersoes(salva, null, { pedido: true });
+  // (a capa pelo quadro do vídeo, nas músicas sem capa: a nova, nas listas à vista)
+  const capaDepois = capa(salva).match(/src="([^"]+)"/)?.[1] || '';
+  if (capaAntes && capaDepois && capaAntes !== capaDepois) trocarCapaNaTela(capaAntes, capaDepois.replace(/&amp;/g, '&'));
+  // na página desta música à vista (no computador), ela mostra o vídeo novo
+  if (location.hash === `#/musica/${salva.id}` && !document.body.classList.contains('musica-na-letra')) route();
+  toast(url ? 'Vídeo trocado' : 'Vídeo removido');
+  return salva;
+}
 function escolherVideo(song) {
   const termo = [song.title, song.artist].filter(Boolean).join(' ');
   return openDialog(`
@@ -1064,6 +1094,7 @@ function escolherVideo(song) {
       ul.innerHTML = '<li class="loading-note"><span class="spin"></span>Buscando vídeos…</li>';
       try {
         achados = await buscarYoutube(q);
+        for (const v of achados) if (v.id && v.segundos > 0) duracoesDaBusca.set(v.id, v.segundos);
         ul.innerHTML = achados.map((v, i) => linhaVideo(v, i, `<button class="btn small" data-escolher>Escolher</button>`)).join('') || '<li class="muted" style="padding:12px">Nenhum vídeo encontrado</li>';
       } catch {
         ul.innerHTML = `<li class="muted" style="padding:12px">A busca de vídeos não respondeu agora. <a href="${esc(ytBusca(q))}" target="_blank" rel="noopener">Procure no YouTube</a>, copie o link e use “Tenho o link do vídeo”.</li>`;
@@ -1392,6 +1423,30 @@ const player = (() => {
     const DURA = 4;
     let trechos = [];
     let k = 0;
+    // as faixas pretas do próprio clipe: os de cinema (como Love Me Harder) vêm com elas em cima e embaixo do quadro e,
+    // com o quadro na altura toda, elas apareciam como um traço seco onde o vídeo começa e acaba. Medidas nos quadros
+    // (a menor de todas: uma cena escura perto delas parece faixa), saem com um zoom a mais
+    let faixa = null;
+    let medidor = null;
+    const medirFaixas = () => {
+      if (!caixa || caixa.readyState < 2 || !caixa.videoWidth) return;
+      const w = 96;
+      const h = Math.max(12, Math.round((w * caixa.videoHeight) / caixa.videoWidth));
+      medidor = medidor || document.createElement('canvas');
+      medidor.width = w;
+      medidor.height = h;
+      const ctx = medidor.getContext('2d', { willReadFrequently: true });
+      let px;
+      try { ctx.drawImage(caixa, 0, 0, w, h); px = ctx.getImageData(0, 0, w, h).data; } catch { return; }
+      const escura = (y) => { for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; if (px[i] * 0.3 + px[i + 1] * 0.59 + px[i + 2] * 0.11 > 28) return false; } return true; };
+      let cima = 0;
+      while (cima < h && escura(cima)) cima++;
+      if (cima >= h) return; // (o quadro todo escuro não diz nada)
+      let baixo = 0;
+      while (baixo < h && escura(h - 1 - baixo)) baixo++;
+      faixa = Math.min(faixa ?? 1, Math.min(cima, baixo) / h, 0.2);
+      caixa.style.setProperty('--zoom', faixa > 0.02 ? Math.max(1.18, 1.03 / (1 - 2 * faixa)).toFixed(3) : '');
+    };
     const tirar = () => {
       clearInterval(relogio);
       relogio = 0;
@@ -1400,6 +1455,7 @@ const player = (() => {
       if (url) { URL.revokeObjectURL(url); url = ''; }
       de = '';
       trechos = [];
+      faixa = null;
     };
     const irAoTrecho = (n) => {
       if (!caixa || !trechos.length) return;
@@ -1437,7 +1493,8 @@ const player = (() => {
             caixa.setAttribute('playsinline', '');
             caixa.className = 'pl-canvas';
             caixa.loop = false;
-            caixa.addEventListener('playing', () => caixa?.classList.add('pronto'), { once: true });
+            caixa.addEventListener('playing', () => { caixa?.classList.add('pronto'); medirFaixas(); }, { once: true });
+            caixa.addEventListener('seeked', medirFaixas); // (a cada trecho: antes do primeiro aparecer e nos outros)
             caixa.addEventListener('loadedmetadata', () => {
               if (!caixa) return;
               const d = caixa.duration;
@@ -1560,7 +1617,7 @@ const player = (() => {
     // créditos como o SongDNA do Spotify: as pessoas com a foto e o "Explorar"; embaixo, a lista (com a foto pequena)
     // (a capa: a da música ou, sem ela, a miniatura do vídeo; aberta a página de um artista, o Tocando agora fecha)
     const capaCreditos = (song && capaDaMusica(song)) || (ytDaCapa() ? `https://i.ytimg.com/vi/${ytDaCapa()}/hqdefault.jpg` : '');
-    dadosCreditos = { titulo: titulo || 'Música', artista, capa: capaCreditos, cor: atual?.cor || '', pessoas, detalhes, aoIrParaArtista: () => painelCheio(false, { semVoltar: true }) };
+    dadosCreditos = { titulo: titulo || 'Música', artista, capa: capaCreditos, cor: atual?.cor || '', pessoas, detalhes };
     if (pessoas.length) cartoes.push(cartaoPessoas({ titulo: titulo || 'Música', pessoas, explorar: 'data-pl="explorar-creditos"', classe: 'pl-cartao ref-pessoas pl-pessoas' }));
     if (pessoas.length || detalhes.length) {
       cartoes.push(`<section class="pl-cartao"><h4>Créditos</h4>
@@ -2419,6 +2476,23 @@ const semLinhasDeAcordes = (sinc) => {
     reavaliarFonte() {
       if (atual && !atual.semVideo && (localDe(atual.youtube)?.chave || '') !== (local?.chave || '')) trocarVersao(atual.youtube, api.tempoAgora, true);
     },
+    // o vídeo da música tocando foi trocado ("Trocar o vídeo"): o novo toca na hora, no mesmo ponto da música. Com a
+    // versão só música tocando (o modo música), ela continua (é a mesma gravação) e o novo passa a ser o clipe dela
+    trocouVideo(song) {
+      if (!atual || atual.songId !== song.id) return;
+      const set = atual.setId ? db.set(atual.setId) : null;
+      const item = itemDoPlayer(song, set, set ? atual.index : -1);
+      if (atual.semVideo) { if (item.youtube) api.tocar(item); return; }
+      if (!item.youtube) { api.fechar(); return; }
+      const era = atual.youtube;
+      // (o ponto da música: no áudio, quando há as duas versões)
+      const tMusica = atual.audio && era === atual.video ? tempoNoAudio(atual.pares, api.tempoAgora) : api.tempoAgora;
+      atual = { ...atual, video: item.video, audio: item.audio, pares: item.pares, soMusica: item.soMusica };
+      if (item.youtube === era) { letraDe = ''; desenhar(); return; }
+      const noClipeNovo = Boolean(item.audio && item.youtube === item.video);
+      if (noClipeNovo) foiProClipe = performance.now();
+      trocarVersao(item.youtube, noClipeNovo ? tempoNoVideo(item.pares, tMusica) : tMusica);
+    },
     // as duas versões da música tocando chegaram (o áudio oficial foi achado): no modo música, já passa para ele
     versoes(song) {
       const vs = versoesDe(song);
@@ -2795,8 +2869,9 @@ const semLinhasDeAcordes = (sinc) => {
     if (v === 'youtube') { window.open(`https://www.youtube.com/watch?v=${ytAgora()}&t=${Math.floor(api.tempoAgora)}s`, '_blank', 'noopener'); return; }
     if (v === 'sincronizar') { sincronizarDoPlayer(song, sincronizada); return; }
     if (v === 'versao-musica') { escolherVersaoMusica(alvoDaMusica(song)); return; }
-    // o álbum abre como página: o Tocando agora na tela toda fecha antes (no tablet, o painel continua ao lado)
-    if (v === 'album') { if (document.body.classList.contains('painel-cheio')) painelCheio(false, { semVoltar: true }); irParaAlbum({ titulo: song?.title || atual.titulo, artista: song?.artist || atual.artista, fonte: song?.source }); return; }
+    // o álbum abre como página, já com o "Procurando o álbum…": o Tocando agora na tela toda fecha com a troca (no
+    // tablet, o painel continua ao lado)
+    if (v === 'album') { irParaAlbum({ titulo: song?.title || atual.titulo, artista: song?.artist || atual.artista, fonte: song?.source }); return; }
     // as outras opções fazem o mesmo que os botões do painel
     const alvoBt = document.createElement('button');
     alvoBt.dataset.pl = v;
@@ -3056,7 +3131,7 @@ const semLinhasDeAcordes = (sinc) => {
     if (b.dataset.pl === 'fonte+') { mudarFonte(0.1); return; }
     if (b.dataset.pl === 'rolar') { rolar(); return; }
     if (b.dataset.pl === 'explorar-creditos' && dadosCreditos) { explorarCreditos(dadosCreditos); return; }
-    if (b.dataset.pl === 'artista' && dadosCreditos?.pessoas[b.dataset.i]) { painelCheio(false, { semVoltar: true }); irParaArtista(dadosCreditos.pessoas[b.dataset.i].nome); return; }
+    if (b.dataset.pl === 'artista' && dadosCreditos?.pessoas[b.dataset.i]) { irParaArtista(dadosCreditos.pessoas[b.dataset.i].nome); return; }
     if (b.dataset.pl === 'leitura') { definirLeitura(!el.classList.contains('so-letra')); return; }
     if (b.dataset.pl === 'editar' && atual?.songId && db.song(atual.songId)) { location.hash = '#/editar/' + atual.songId; return; }
     if (b.dataset.pl === 'partitura' && atual?.songId) {
@@ -3127,7 +3202,7 @@ const semLinhasDeAcordes = (sinc) => {
       // (a música da busca, ainda não salva, é salva antes, para guardar o vídeo nela)
       const s = db.song(atual?.songId) || (daPrevia() ? salvarDaPrevia() : null);
       if (!s) { toast('Salve a música na biblioteca para trocar o vídeo'); return; }
-      escolherVideo(s).then((url) => { if (!url) return; db.saveSong({ ...db.song(s.id), content: definirMeta(db.song(s.id).content, 'youtube', url) }); api.tocar({ ...atual, semVideo: false, youtube: youtubeId(url) }); route(); });
+      escolherVideo(s).then((url) => { if (url !== null) trocarVideoDaMusica(s, url); });
     }
     if (b.dataset.pl === 'ampliar') { el.classList.toggle('grande'); b.innerHTML = icon(el.classList.contains('grande') ? 'shrink' : 'expand', 18); }
     // abrir a música (o nome no player): a página dela (o expandir da letra abre a letra na tela toda, aqui mesmo)
@@ -3775,12 +3850,7 @@ async function menuDaMusica(song, { set = null, i = -1 } = {}) {
   if (v === 'modo') { player.trocarModo(); toast(player.modoMusica ? 'O player mostra a capa (música)' : 'O player mostra o vídeo'); }
   if (v === 'video') {
     const url = await escolherVideo(song);
-    if (url !== null) {
-      const s = db.song(song.id);
-      db.saveSong({ ...s, content: definirMeta(s.content, 'youtube', url) });
-      toast(url ? 'Vídeo trocado' : 'Vídeo removido');
-      route();
-    }
+    if (url !== null) trocarVideoDaMusica(song, url);
   }
   if (v === 'abrir') abrirCifra(set ? `#/repertorio/${set.id}/${i}` : `#/musica/${song.id}`);
   if (v === 'editar') location.hash = `#/editar/${song.id}`;
@@ -4511,12 +4581,8 @@ const cartaoPessoas = ({ titulo, pessoas, explorar, classe = 'ref-cartao ref-pes
   <p>Conheça quem está por trás da música.</p></section>`;
 // tocar numa pessoa dos créditos abre a página dela (as músicas, os álbuns), pelo Cifra Club; sem página lá, procura
 // o nome na Busca
-async function irParaArtista(nome) {
-  const achado = await buscarArtistasCifraClub(nome).then((l) => artistaCerto(l, nome)).catch(() => null);
-  if (achado?.slug) { location.hash = `#/artista/${encodeURIComponent(achado.slug)}/${encodeURIComponent(achado.nome || nome)}`; return; }
-  sessionStorage.setItem('busca', nome);
-  sessionStorage.setItem('buscaFiltro', 'tudo');
-  location.hash = '#/buscar';
+function irParaArtista(nome) {
+  irParaPagina(`#/artista-pelo-nome/${encodeURIComponent(nome)}`);
 }
 // o detalhe (tela toda): a música em cima e todas as pessoas, cada uma com a foto, o nome e todos os papéis; embaixo
 // os detalhes (álbum, ano, tom, de onde veio)
@@ -5158,37 +5224,76 @@ async function viewArtista(slug, nome) {
 // faixa pelo título. Saindo em vários (o álbum, o ao vivo, as coletâneas de sucessos), vale o lançamento original: o
 // mais antigo que não é coletânea (no mesmo ano, o álbum antes do single)
 const COLETANEA = /\b(hits|sele[cç][aã]o|essencial|grandes sucessos|colet[aâ]nea|o melhor|the best|greatest|melhores|sucessos|momentos)\b/i;
-async function irParaAlbum({ titulo = '', artista = '', fonte = '' } = {}) {
-  const t = toast('Procurando o álbum…');
-  try {
-    const m = /cifraclub\.com\.br\/([a-z0-9-]+)\/([a-z0-9-]+)/.exec(fonte || '');
-    let slug = m?.[1] || '';
-    let nome = artista;
-    if (!slug) {
-      if (!artista) throw new Error('sem artista');
-      const a = artistaCerto(await buscarArtistasCifraClub(artista).catch(() => []), artista);
-      if (!a?.slug) throw new Error('artista não encontrado');
-      slug = a.slug;
-      nome = a.nome || artista;
-    }
-    const dados = carregarArtista(slug, nome);
-    nome = (await dados.principal.catch(() => null))?.nome || nome;
-    const disc = await dados.disc;
-    const faixa = m?.[2] ? `/${slug}/${m[2]}/` : '';
-    const mesmoTitulo = (f) => normalizar(tituloLimpo(f.titulo)) === normalizar(tituloLimpo(titulo));
-    const tem = (al) => al.faixas.find((f) => (faixa && f.url?.endsWith(faixa)) || mesmoTitulo(f));
-    const candidatos = disc.filter(tem).sort((x, y) => (COLETANEA.test(x.titulo) - COLETANEA.test(y.titulo))
-      || ((Number(x.ano) || 9999) - (Number(y.ano) || 9999)) || ((x.tipo === 'single') - (y.tipo === 'single')));
-    const al = candidatos[0];
-    if (!al) throw new Error('álbum não encontrado');
-    // a faixa da música fica destacada na lista do álbum
-    try { sessionStorage.setItem('albumFaixa', tem(al).titulo); } catch { /* sem armazenamento */ }
-    t?.remove?.();
-    location.hash = `#/artista/${encodeURIComponent(slug)}/${encodeURIComponent(nome)}/album/${encodeURIComponent(al.url)}`;
-  } catch {
-    t?.remove?.();
-    toast('Não achei o álbum desta música no Cifra Club');
+// A página abre na hora (com o "Procurando o álbum…") e troca pela do álbum quando ele aparece: antes o Tocando agora
+// fechava primeiro e, enquanto o álbum era procurado, ficava a tela preta da música embaixo dele
+function irParaAlbum({ titulo = '', artista = '', fonte = '' } = {}) {
+  const cc = ehCifraClub(fonte || '') ? fonte : '';
+  irParaPagina(`#/album-da-musica/${encodeURIComponent(titulo || '-')}/${encodeURIComponent(artista || '-')}${cc ? `/${encodeURIComponent(cc)}` : ''}`);
+}
+// abre uma página saindo do Tocando agora na tela toda: no lugar dele no histórico (o voltar leva para onde ele foi
+// aberto, sem passar por ele de novo); o próprio Tocando agora fecha com a troca de página
+function irParaPagina(hash) {
+  if (history.state?.tocandoAgora) location.replace(hash); else location.hash = hash;
+}
+async function acharAlbum({ titulo = '', artista = '', fonte = '' }) {
+  const m = /cifraclub\.com\.br\/([a-z0-9-]+)\/([a-z0-9-]+)/.exec(fonte || '');
+  let slug = m?.[1] || '';
+  let nome = artista;
+  if (!slug) {
+    if (!artista) return null;
+    const a = artistaCerto(await buscarArtistasCifraClub(artista).catch(() => []), artista);
+    if (!a?.slug) return null;
+    slug = a.slug;
+    nome = a.nome || artista;
   }
+  const dados = carregarArtista(slug, nome);
+  nome = (await dados.principal.catch(() => null))?.nome || nome;
+  const disc = await dados.disc;
+  // (a discografia não abriu: na próxima vez, procura de novo)
+  if (!disc.length) dadosArtista.delete(slug);
+  const faixa = m?.[2] ? `/${slug}/${m[2]}/` : '';
+  const mesmoTitulo = (f) => normalizar(tituloLimpo(f.titulo)) === normalizar(tituloLimpo(titulo));
+  const tem = (al) => al.faixas.find((f) => (faixa && f.url?.endsWith(faixa)) || mesmoTitulo(f));
+  const candidatos = disc.filter(tem).sort((x, y) => (COLETANEA.test(x.titulo) - COLETANEA.test(y.titulo))
+    || ((Number(x.ano) || 9999) - (Number(y.ano) || 9999)) || ((x.tipo === 'single') - (y.tipo === 'single')));
+  const al = candidatos[0];
+  return { slug, nome, al, faixa: al ? tem(al).titulo : '' };
+}
+async function viewAlbumDaMusica(titulo, artista, fonte = '') {
+  titulo = titulo === '-' ? '' : titulo;
+  artista = artista === '-' ? '' : artista;
+  const aqui = location.hash;
+  setTab('buscar');
+  setTint('#2f3a4f');
+  setHeader('Álbum', { back: () => history.back(), eyebrow: artista });
+  view.innerHTML = '<div class="loading-note"><span class="spin"></span>Procurando o álbum…</div>';
+  const achado = await acharAlbum({ titulo, artista, fonte }).catch(() => null);
+  if (location.hash !== aqui) return;
+  if (achado?.al) {
+    // a faixa da música fica destacada na lista do álbum
+    try { sessionStorage.setItem('albumFaixa', achado.faixa); } catch { /* sem armazenamento */ }
+    location.replace(`#/artista/${encodeURIComponent(achado.slug)}/${encodeURIComponent(achado.nome)}/album/${encodeURIComponent(achado.al.url)}`);
+    return;
+  }
+  const artistaHash = achado?.slug ? `#/artista/${encodeURIComponent(achado.slug)}/${encodeURIComponent(achado.nome || artista)}` : '';
+  view.innerHTML = `<div class="empty"><div class="bubble">${icon('disc', 32)}</div><h3>Não achei o álbum</h3>
+    <p>${titulo ? `“${esc(titulo)}” não aparece` : 'Esta música não aparece'} na discografia ${artista ? `de ${esc(artista)} ` : ''}no Cifra Club.</p>
+    ${artistaHash ? `<a class="btn primary" href="${artistaHash}">${icon('pessoa', 18)}Ver o artista</a>` : ''}</div>`;
+}
+// tocar numa pessoa dos créditos abre a página dela na hora (com o "Procurando…") e troca pela do artista no Cifra
+// Club; sem página lá, procura o nome na Busca
+async function viewArtistaPeloNome(nome) {
+  const aqui = location.hash;
+  setTab('buscar');
+  setTint('#3a2f4f');
+  setHeader(nome || 'Artista', { back: () => history.back(), eyebrow: 'Artista' });
+  view.innerHTML = '<div class="loading-note"><span class="spin"></span>Procurando o artista…</div>';
+  const achado = await buscarArtistasCifraClub(nome).then((l) => artistaCerto(l, nome)).catch(() => null);
+  if (location.hash !== aqui) return;
+  if (achado?.slug) { location.replace(`#/artista/${encodeURIComponent(achado.slug)}/${encodeURIComponent(achado.nome || nome)}`); return; }
+  sessionStorage.setItem('busca', nome);
+  sessionStorage.setItem('buscaFiltro', 'tudo');
+  location.replace('#/buscar');
 }
 const TIPO_ALBUM = { album: 'Álbum', single: 'Single', ep: 'EP' };
 async function viewAlbum(slug, nome, albumUrl) {
@@ -5669,20 +5774,13 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
   const nPl = FILTROS[2][2];
   const acao = ehPl ? ['lib-nova-pl', 'disc', 'Nova playlist'] : ehRep ? ['lib-novo-rep', 'plus', 'Novo repertório'] : ['lib-nova-mus', 'edit', 'Criar música'];
   const busca = sessionStorage.getItem('buscaBib') || '';
-  // o topo mostra as capas das últimas músicas salvas, com a cor da mais recente
-  const recentes = db.recentSongs(4);
-  const ultima = recentes[0];
   view.innerHTML = `
-    <section class="bib-hero" style="--cor:${ultima ? corDe(ultima) : 'var(--tint)'}">
-      <div class="bib-hero-txt"><div class="kind">Sua biblioteca</div><h2>Suas músicas e repertórios</h2>
-        ${ultima ? `<a class="bib-ultima" href="#/musica/${ultima.id}"><small>Salva por último</small><b>${esc(ultima.title)}</b>${ultima.artist ? `<span>${esc(ultima.artist)}</span>` : ''}</a>`
-          : '<p class="bib-hero-dica">Salve cantos da busca ou da liturgia e eles aparecem aqui.</p>'}
-        <div class="part-numeros"><span><b>${todas.length}</b> música${todas.length === 1 ? '' : 's'}</span><span><b>${nRep}</b> repertório${nRep === 1 ? '' : 's'}</span><span><b>${nPl}</b> playlist${nPl === 1 ? '' : 's'}</span></div></div>
-      ${recentes.length ? `<div class="bib-capas n${recentes.length}" aria-hidden="true">${recentes.map((x, i) => `<span style="--i:${i}">${capa(x)}</span>`).join('')}</div>` : ''}
-    </section>
-    <nav class="bib-filtros chips" aria-label="Filtrar a biblioteca">${FILTROS.map(([k, n, c]) => `<a class="chip" href="#/biblioteca/${k}" aria-pressed="${k === filtro}">${n}<b>${c}</b></a>`).join('')}</nav>
+    <h2 class="bib-titulo">Sua biblioteca</h2>
+    <div class="bib-fixo">
+      <nav class="bib-filtros chips" aria-label="Filtrar a biblioteca">${FILTROS.map(([k, n, c]) => `<a class="chip" href="#/biblioteca/${k}" aria-pressed="${k === filtro}">${n}<b>${c}</b></a>`).join('')}</nav>
+      ${itens.length ? `<label class="field bib-busca">${icon('search', 18)}<input class="search" id="bib-busca" type="search" placeholder="Buscar ${ehRep ? (ehPl ? 'nas playlists' : 'nos repertórios') : 'nas músicas'}" value="${esc(busca)}" autocomplete="off"></label>` : ''}
+    </div>
     <div class="bib-barra">
-      ${itens.length ? `<label class="field bib-busca">${icon('search', 18)}<input class="search" id="bib-busca" type="search" placeholder="Buscar ${ehRep ? (ehPl ? 'nas playlists' : 'nos repertórios') : 'nas músicas'}" value="${esc(busca)}" autocomplete="off"></label>` : '<span class="spacer"></span>'}
       <div class="bib-acoes">
         <button class="btn small primary" id="${acao[0]}">${icon(acao[1], 15)} ${acao[2]}</button>
         ${ehRep ? '' : `<button class="btn small" id="lib-importar" title="Importar arquivos ChordPro, PDF, texto">${icon('upload', 15)} Importar</button>`}
@@ -11744,6 +11842,8 @@ function route() {
     case undefined: return viewHome();
     case 'buscar': return b === 'categoria' ? viewCategoria(c, d || 'Seção') : viewSearch();
     case 'artista': return d === 'album' ? viewAlbum(b, c, e) : viewArtista(b, c);
+    case 'album-da-musica': return viewAlbumDaMusica(b, c, d);
+    case 'artista-pelo-nome': return viewArtistaPeloNome(b);
     case 'biblioteca': return viewLibrary(b);
     case 'repertorios': return viewLibrary('repertorios');
     case 'musica': return c === 'partitura' ? viewPartitura(b) : c === 'compor' ? viewCompor(b, d) : viewSong(b, { tocar: c === 'tocar' });
