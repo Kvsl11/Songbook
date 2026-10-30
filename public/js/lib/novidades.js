@@ -4,11 +4,17 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 320, data: '2026-10-30', titulo: 'A capa de verdade da música',
+    itens: [
+      { tipo: 'novo', texto: 'A capa de verdade da música (a do álbum ou do single, pelo Deezer ou pelo iTunes), no lugar do quadro do vídeo. Fica guardada na música e aparece também na biblioteca.' },
+      { tipo: 'melhoria', texto: 'A capinha ao lado do nome aparece também no modo música, no mesmo lugar do modo vídeo.' },
+    ],
+  },
+  {
     versao: 319, data: '2026-10-30', titulo: 'Música e vídeo no ponto certo, Canvas e downloads',
     itens: [
       { tipo: 'melhoria', texto: 'Trocar entre a música e o vídeo cai no mesmo ponto cantado também sem o servidor: o próprio aparelho casa o áudio oficial e o clipe pelo som (como o Spotify), mesmo com cena antes da música, como em Espresso e Speed Demon.' },
       { tipo: 'novo', texto: 'Capa animada como o Canvas do Spotify: trechos do próprio clipe passam atrás da música, sem som, junto com ela. E a frase cantada aparece acima do “Mudar para vídeo”.' },
-      { tipo: 'novo', texto: 'A capa de verdade da música (a do álbum ou do single, pelo Deezer ou pelo iTunes), no lugar do quadro do vídeo, e a capinha ao lado do nome também no modo música.' },
       { tipo: 'correcao', texto: 'No modo vídeo não aparece mais a letra (ela fica só no modo música), também quando o vídeo é a própria gravação.' },
       { tipo: 'novo', texto: 'Qualidade de mídia, como no Spotify: escolha a qualidade do download do áudio e do vídeo (normal, alta ou muito alta, até 1080p). Vale para todos os downloads, e “Atualizar os downloads” baixa de novo os que estão em outra.' },
       { tipo: 'novo', texto: 'Baixar pelo ⋯ da música, e salvar na biblioteca já baixa a música (dá para desligar). O vídeo baixado ganhou o botão de tela inteira.' },
@@ -75,13 +81,6 @@ export const NOVIDADES = [
       { tipo: 'novo', texto: 'No ⋯ da música, “Criar partitura”: a IA do servidor ouve o áudio da música, escreve a partitura e ela já abre para você ver. Depois de criada, a opção vira “Ver partitura”.' },
       { tipo: 'melhoria', texto: 'Gerar a partitura com IA começa sozinho pelo áudio da música (o vídeo ou o seu áudio), sem escolher arquivo nem colar link. Só se não der certo é que aparece a opção de importar o áudio.' },
       { tipo: 'melhoria', texto: 'A tela de criar a partitura ficou mais clara: a automática, com IA, em destaque em cima; a manual, nota por nota, embaixo.' },
-    ],
-  },
-  {
-    versao: 310, data: '2026-10-29', titulo: 'Toque o seu próprio áudio',
-    itens: [
-      { tipo: 'novo', texto: 'Use um áudio seu na música (a gravação do ensaio, um MP3): no ⋯ da música, “Usar um áudio seu”. Ele fica guardado no aparelho e toca no modo música; o clipe continua no modo vídeo.' },
-      { tipo: 'novo', texto: 'A letra sincroniza sozinha com o seu áudio: pelo banco de letras, se for a mesma gravação, ou pela IA do servidor, que ouve o áudio e encaixa a letra. Sem servidor, dá para sincronizar à mão.' },
     ],
   },
 ];
