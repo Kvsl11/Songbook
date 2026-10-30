@@ -47,3 +47,15 @@ test('download: IDs válidos de vídeos do YouTube passam pela validação', asy
   assert.ok(app.includes("if (!/^[\\w-]{11}$/.test(yt || ''))"), 'a validação deve aceitar os 11 caracteres de um ID do YouTube');
   assert.ok(!app.includes("if (!/^[\\\\w-]{11}$/.test(yt || ''))"), 'não pode procurar uma barra invertida literal ou apenas a letra w');
 });
+
+test('download: o ícone entra em andamento imediatamente, antes da verificação do servidor', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const inicio = app.indexOf('async function baixarMusica(song');
+  const fim = app.indexOf('async function baixarAgora(id)', inicio);
+  const rotina = app.slice(inicio, fim);
+  assert.ok(rotina.indexOf('baixando.set(s.id, { pct: 0, preparando: true })') < rotina.indexOf('!servidorIA().url'));
+  assert.ok(rotina.indexOf('baixando.set(s.id, { pct: 0, preparando: true })') < rotina.indexOf('avisarDownloads()'));
+  assert.match(rotina, /texto: 'Download iniciado · preparando áudio e videoclipe'/);
+  assert.match(rotina, /Não deu para baixar/);
+  assert.match(rotina, /finally[\\s\\S]*baixando\\.delete\\(id\\)/);
+});
