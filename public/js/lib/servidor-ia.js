@@ -9,6 +9,10 @@ export function baseDoServidor(texto) {
   if (!/^https?:\/\//i.test(t)) t = (/^(localhost|127\.|192\.168\.|10\.)/.test(t) ? 'http://' : 'https://') + t;
   try {
     const u = new URL(t);
+    // o link do QR code é o do próprio app com o endereço do servidor em ?ia= (colado no campo dos Ajustes, antes
+    // ficava guardado o endereço do app, e o servidor nunca respondia)
+    const ia = u.searchParams.get('ia');
+    if (ia && ia.trim() && ia.trim() !== texto) return baseDoServidor(ia);
     return (u.origin + u.pathname).replace(/\/+$/, '');
   } catch { return ''; }
 }

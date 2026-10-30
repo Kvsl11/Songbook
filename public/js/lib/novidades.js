@@ -4,6 +4,22 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 319, data: '2026-10-30', titulo: 'Música e vídeo no ponto certo, Canvas e downloads',
+    itens: [
+      { tipo: 'melhoria', texto: 'Trocar entre a música e o vídeo cai no mesmo ponto cantado também sem o servidor: o próprio aparelho casa o áudio oficial e o clipe pelo som (como o Spotify), mesmo com cena antes da música, como em Espresso e Speed Demon.' },
+      { tipo: 'novo', texto: 'Capa animada como o Canvas do Spotify: trechos do próprio clipe passam atrás da música, sem som, junto com ela. E a frase cantada aparece acima do “Mudar para vídeo”.' },
+      { tipo: 'correcao', texto: 'No modo vídeo não aparece mais a letra (ela fica só no modo música), também quando o vídeo é a própria gravação.' },
+      { tipo: 'novo', texto: 'Qualidade de mídia, como no Spotify: escolha a qualidade do download do áudio e do vídeo (normal, alta ou muito alta, até 1080p). Vale para todos os downloads, e “Atualizar os downloads” baixa de novo os que estão em outra.' },
+      { tipo: 'novo', texto: 'Baixar pelo ⋯ da música, e salvar na biblioteca já baixa a música (dá para desligar). O vídeo baixado ganhou o botão de tela inteira.' },
+      { tipo: 'melhoria', texto: 'Ajustes organizados por tópicos, cada um na sua página.' },
+      { tipo: 'novo', texto: 'As notificações aparecem na barra de notificações do celular (com a permissão), e o download mostra ali o andamento e quando termina. Com elas, o sininho do app sai.' },
+      { tipo: 'novo', texto: 'O “Sobre o artista” vem junto no download: a apresentação, as fotos, os seguidores e os fãs ficam no aparelho. Com internet os números se atualizam; sem internet aparece o último valor.' },
+      { tipo: 'correcao', texto: 'Colar o link do QR code do servidor nos Ajustes funciona: o app tira dele o endereço do servidor e confere antes de usar.' },
+      { tipo: 'correcao', texto: 'A tela de downloads não pisca mais enquanto baixa, e o armazenamento não mostra mais os “10,7 GB livres” que o navegador inventa.' },
+      { tipo: 'correcao', texto: 'Tablet: o Tocando agora na tela toda com o fundo inteiro (antes metade ficava preta) e os ícones do menu de baixo centralizados no nome.' },
+    ],
+  },
+  {
     versao: 318, data: '2026-10-29', titulo: 'Música e vídeo casados pelo som',
     itens: [
       { tipo: 'melhoria', texto: 'Com o servidor ligado, o áudio oficial e o videoclipe são casados pelo próprio som, como no YouTube Music: trocar entre a música e o vídeo cai na mesma parte cantada, mesmo com cena antes, no meio ou no fim do clipe.' },
@@ -65,13 +81,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'novo', texto: 'Use um áudio seu na música (a gravação do ensaio, um MP3): no ⋯ da música, “Usar um áudio seu”. Ele fica guardado no aparelho e toca no modo música; o clipe continua no modo vídeo.' },
       { tipo: 'novo', texto: 'A letra sincroniza sozinha com o seu áudio: pelo banco de letras, se for a mesma gravação, ou pela IA do servidor, que ouve o áudio e encaixa a letra. Sem servidor, dá para sincronizar à mão.' },
-    ],
-  },
-  {
-    versao: 309, data: '2026-10-29', titulo: 'Música e vídeo, como no Spotify',
-    itens: [
-      { tipo: 'novo', texto: 'Música com videoclipe (com cenas antes ou no meio da música) ganha duas versões: no modo música toca o áudio oficial da gravação, com a letra sincronizada certinha; no modo vídeo, o clipe, sem a letra acompanhando.' },
-      { tipo: 'novo', texto: 'Trocar entre música e vídeo continua no mesmo ponto da música, nos dois sentidos. Com a IA do servidor ligada, ela ouve o clipe e acerta esse ponto trecho por trecho.' },
     ],
   },
 ];

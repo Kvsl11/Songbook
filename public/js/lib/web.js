@@ -580,6 +580,27 @@ export async function buscarYoutube(termo, { fetchImpl, instancias = PIPED, filt
   }
 }
 
+// o som de um vídeo do YouTube (o arquivo do áudio de menor qualidade, que basta para casar as duas versões da música),
+// pelo Piped, que entrega o áudio pelo proxy dele (com CORS); null se nenhuma instância entregar
+export async function audioDoVideo(id, { fetchImpl, instancias = PIPED } = {}) {
+  if (!/^[\w-]{11}$/.test(id || '')) return null;
+  for (const base of instancias) {
+    try {
+      const res = await buscar(`${base}/streams/${id}`, { fetchImpl, timeout: 12000 });
+      if (!res.ok) continue;
+      const json = await res.json();
+      const fluxos = (json?.audioStreams || []).filter((f) => f?.url && !f.videoOnly).sort((a, b) => (a.bitrate || 0) - (b.bitrate || 0));
+      for (const f of fluxos.slice(0, 2)) {
+        try {
+          const r = await buscar(f.url, { fetchImpl, timeout: 90000 });
+          if (r.ok) { const blob = await r.blob(); if (blob.size > 10000) return blob; }
+        } catch { /* o próximo */ }
+      }
+    } catch { /* a próxima instância */ }
+  }
+  return null;
+}
+
 // confere um link colado (título e canal), sem login, pelo oEmbed do YouTube
 // duração do vídeo (em segundos), pelo Piped: a busca pelo código do vídeo traz a duração (a página do vídeo,
 // /streams/ID, às vezes é barrada pelo YouTube); 0 se nada responder

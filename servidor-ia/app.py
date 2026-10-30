@@ -322,12 +322,14 @@ class PedidoYoutube(BaseModel):
     separar: bool = True
 
 
-def baixar(video: str, pasta: str, etapa=lambda nome, progresso=None: None, midia: str | None = None) -> dict:
+def baixar(video: str, pasta: str, etapa=lambda nome, progresso=None: None, midia: str | None = None,
+           qualidade: str = "alta") -> dict:
     """O áudio do vídeo na pasta (temporária, de quem chama), ou o erro em português. O andamento do download vai
     para a tela (etapa "baixando" com o progresso de 0 a 1)"""
     try:
         if midia:  # o arquivo como vem (o áudio em M4A ou o vídeo em MP4), para o app guardar no aparelho
-            return youtube.baixar_midia(video, pasta, progresso=lambda p: etapa("baixando", p), com_video=midia == "video")
+            return youtube.baixar_midia(video, pasta, progresso=lambda p: etapa("baixando", p), com_video=midia == "video",
+                                        qualidade=qualidade)
         return youtube.baixar_audio(video, pasta, progresso=lambda p: etapa("baixando", p))
     except ValueError as e:
         raise HTTPException(422, str(e))
@@ -481,6 +483,7 @@ def letra_do_arquivo(arquivo: UploadFile = File(...), linhas: str = Form(...), r
 class PedidoBaixar(BaseModel):
     url: str
     video: bool = False  # o vídeo (MP4, com o som); sem ele, só o áudio (M4A)
+    qualidade: str = "alta"  # normal | alta | muito-alta (Ajustes → Economia de dados e offline, no app)
 
 
 # os arquivos baixados à espera do app (o número → o arquivo): ele busca em GET /baixar/{número} e o arquivo sai do
@@ -509,7 +512,7 @@ def baixar_para_o_app(pedido: PedidoBaixar, etapas: bool = Query(False), tarefa:
     def trabalho(etapa):
         etapa("baixando", 0)
         try:
-            r = baixar(video, pasta, etapa, midia="video" if pedido.video else "audio")
+            r = baixar(video, pasta, etapa, midia="video" if pedido.video else "audio", qualidade=pedido.qualidade)
         except Exception:
             shutil.rmtree(pasta, ignore_errors=True)
             raise
@@ -517,6 +520,7 @@ def baixar_para_o_app(pedido: PedidoBaixar, etapas: bool = Query(False), tarefa:
         with _prontos_trava:
             _prontos[numero] = {"caminho": r["caminho"], "pasta": pasta, "tipo": r["tipo"], "criado": time.time()}
         return {"arquivo": numero, "tipo": r["tipo"], "tamanho": os.path.getsize(r["caminho"]), "video": video,
+                "qualidade": pedido.qualidade, "altura": r.get("altura"),
                 "titulo": r.get("titulo") or "", "duracao": r.get("duracao")}
 
     # (a pasta fica até o app buscar o arquivo)
