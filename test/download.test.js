@@ -41,3 +41,9 @@ test('download de vídeo prioriza o arquivo final mesclado e ignora fragmentos',
   assert.match(youtube, /re\.search\(r"\\\.f\\d\+\\\."/);
   assert.match(youtube, /arquivos\.sort\(key=lambda f: \(bool\(re\.search/);
 });
+
+test('download: IDs válidos de vídeos do YouTube passam pela validação', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  assert.ok(app.includes("if (!/^[\\w-]{11}$/.test(yt || ''))"), 'a validação deve aceitar os 11 caracteres de um ID do YouTube');
+  assert.ok(!app.includes("if (!/^[\\\\w-]{11}$/.test(yt || ''))"), 'não pode procurar uma barra invertida literal ou apenas a letra w');
+});
