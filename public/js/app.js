@@ -23,7 +23,8 @@ import { baseDoServidor, cabecalhos, casarLinhas, chamar, chamarComEtapas, erroE
 import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, dataDaPergunta, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { apagarAudio, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } from './audios.js';
 import { escolherAudio, paresDasSincronias, paresPelaDuracao, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
-import { audioDbDoArtista, buscarYoutube, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
+import { audioDbDoArtista, audioDoVideo, buscarYoutube, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -129,7 +130,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.29-318';
+export const APP_VERSAO = '2026.10.30-319';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -643,7 +644,7 @@ const ehArquivo = (id) => String(id || '').startsWith(ARQ);
 // o que toca a música: o vídeo ou, sem ele, o áudio da pessoa ('' se nenhum)
 const midiaDe = (song) => song?.youtube || (song?.audioProprio && song.id ? ARQ + song.id : '');
 const versoesDe = (song) => {
-  if (song?.audioProprio && song.id) return { video: song.youtube || '', audio: ARQ + song.id, duracao: song.audioProprio.duracao, pares: song.audioProprio.pares || [[0, 0]] };
+  if (song?.audioProprio && song.id) return { video: song.youtube || '', audio: ARQ + song.id, duracao: song.audioProprio.duracao, pares: song.audioProprio.pares || [[0, 0]], ...(song.audioProprio.casadas ? { casadas: true } : {}) };
   return song?.versoes?.audio && song.versoes.video === song.youtube ? song.versoes : null;
 };
 // o vídeo em que a letra sincronizada acompanha: o áudio oficial, quando a música tem as duas versões
@@ -676,6 +677,16 @@ function arquivosParaBaixar(song) {
   const lista = audio ? [{ yt: audio, video: false }] : [];
   if (song.youtube && (comVideo || (!audio && !song.audioProprio))) lista.push({ yt: song.youtube, video: comVideo });
   return lista;
+}
+// a qualidade dos downloads, como no Spotify (Ajustes → Economia de dados e offline): normal, alta ou muito alta, uma
+// para o áudio e outra para o vídeo; vale para todos os downloads dali em diante. Sem escolher, a muito alta (o vídeo
+// em até 1080p). No iPhone o áudio fica no máximo na alta: o muito alto vem em Opus, que o Safari não toca
+const QUALIDADES = [['normal', 'Normal'], ['alta', 'Alta'], ['muito-alta', 'Muito alta']];
+const QUALIDADE_DESC = { audio: { normal: '48 kb/s, gasta pouco espaço', alta: '128 kb/s', 'muito-alta': 'a melhor do YouTube (até 160 kb/s)' }, video: { normal: 'até 480p', alta: 'até 720p (HD)', 'muito-alta': 'até 1080p (Full HD)' } };
+function qualidadeDoDownload(video) {
+  const q = db.prefs()[video ? 'qualidadeVideo' : 'qualidadeAudio'];
+  const v = QUALIDADES.some(([k]) => k === q) ? q : 'muito-alta';
+  return !video && v === 'muito-alta' && ehIOS() ? 'alta' : v;
 }
 // sem Wi-Fi (no Android o navegador diz): pergunta antes, como no Spotify (uma vez, ao baixar várias)
 const podeBaixarAgora = async () => navigator.connection?.type !== 'cellular' || db.prefs().baixarDadosMoveis
@@ -710,14 +721,14 @@ async function baixarAgora(id) {
     const ja = baixadoDe(yt);
     if (ja && (!video || String(ja.tipo).startsWith('video'))) { arquivos[yt] = ja; continue; }
     const andou = (p) => { baixando.set(id, { pct: Math.round(((n + p) / lista.length) * 100) }); avisarDownloads(); };
-    const r = await chamarComEtapas(servidorIA(), '/baixar', { json: { url: `https://youtu.be/${yt}`, video } }, (etapa, p) => { if (etapa === 'baixando' && p !== null) andou(p * 0.8); });
+    const r = await chamarComEtapas(servidorIA(), '/baixar', { json: { url: `https://youtu.be/${yt}`, video, qualidade: qualidadeDoDownload(video) } }, (etapa, p) => { if (etapa === 'baixando' && p !== null) andou(p * 0.8); });
     andou(0.85);
     const base = baseDoServidor(servidorIA().url);
     const resp = await fetch(`${base}/baixar/${r.arquivo}`, { headers: cabecalhos(base, servidorIA().chave) });
     if (!resp.ok) throw new Error('o arquivo não chegou do servidor: tente de novo');
     const blob = await resp.blob();
     await guardarAudio(chaveBaixada(yt), blob);
-    arquivos[yt] = { tipo: r.tipo || blob.type, tamanho: blob.size };
+    arquivos[yt] = { tipo: r.tipo || blob.type, tamanho: blob.size, ...(r.qualidade ? { qualidade: r.qualidade } : {}), ...(r.altura ? { altura: r.altura } : {}) };
     andou(1);
   }
   await guardarImagensDaMusica(song);
@@ -809,6 +820,24 @@ document.addEventListener('click', async (e) => {
     return;
   }
   baixarMusica(s);
+});
+// salvar na biblioteca já baixa a música (como o "Baixar" ligado numa playlist do Spotify), com o servidor ligado, no
+// Wi-Fi (ou com os dados móveis liberados) e com "Baixar ao salvar" ligado. Várias de uma vez (importar um backup) não:
+// essas ficam para o "Baixar as músicas salvas"
+let novasSalvas = [];
+let novasTempo = 0;
+window.addEventListener('songbook:nova-musica', (e) => {
+  novasSalvas.push(e.detail.id);
+  clearTimeout(novasTempo);
+  // (um pouco depois: a música recém-salva ainda ganha o vídeo e o áudio oficial)
+  novasTempo = setTimeout(() => {
+    const ids = novasSalvas;
+    novasSalvas = [];
+    const p = db.prefs();
+    if (ids.length > 3 || p.baixarAoSalvar === false || !servidorIA().url) return;
+    if (navigator.connection?.type === 'cellular' && !p.baixarDadosMoveis) return;
+    ids.map((id) => db.song(id)).filter((s) => s && midiaDe(s)).forEach((s) => baixarMusica(s, { perguntou: true }));
+  }, 2500);
 });
 // os botões de baixar na tela acompanham o andamento
 window.addEventListener('online', () => player.reavaliarFonte());
@@ -1187,6 +1216,105 @@ const player = (() => {
   const ytDaCapa = () => [atual?.video, atual?.youtube].find((id) => id && !ehArquivo(id)) || '';
   // o vídeo do YouTube tocando agora ('' no áudio da pessoa)
   const ytAgora = () => (ehArquivo(atual?.youtube) ? '' : atual?.youtube || '');
+  // O Canvas, como no Spotify: no modo música, atrás da parte de cima, passam trechos do próprio clipe, sem som (o som é
+  // só o da música). É o clipe de verdade andando junto com a música (o mesmo ponto cantado, pelos pares das duas
+  // versões), num segundo player do YouTube mudo e sem botões, ou no vídeo baixado, quando a música está no aparelho.
+  // Os quadros parados ficam embaixo até ele começar a andar (e no lugar dele sem internet ou com a Economia de dados)
+  const canvas = (() => {
+    let de = '';
+    let caixa = null; // o <iframe> ou o <video>
+    let tempoDele = -1; // o último tempo que o player mudo informou
+    let andando = false;
+    let relogio = 0;
+    let url = '';
+    let montagem = 0;
+    const noClipeAgora = () => {
+      // o tempo do clipe que corresponde ao que toca agora
+      if (!atual) return 0;
+      if (atual.youtube === de) return api.tempoAgora;
+      return atual.pares && atual.youtube === atual.audio ? tempoNoVideo(atual.pares, api.tempoAgora) : api.tempoAgora;
+    };
+    const cmd = (func, args = []) => caixa?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+    const tirar = () => {
+      clearInterval(relogio);
+      relogio = 0;
+      caixa?.remove();
+      caixa = null;
+      if (url) { URL.revokeObjectURL(url); url = ''; }
+      de = '';
+      tempoDele = -1;
+      andando = false;
+    };
+    // a cada segundo: anda e para junto com a música e, se escorregar mais de 1,5 s, volta ao ponto
+    const acompanhar = () => {
+      if (!caixa || !atual) return;
+      const visivel = !fundo.hidden && !el.hidden && !el.classList.contains('letra-cheia') && fundo.getClientRects().length > 0;
+      const tocar = visivel && estado === 'tocando';
+      const alvo = noClipeAgora();
+      if (caixa.tagName === 'VIDEO') {
+        if (tocar && caixa.paused) caixa.play().catch(() => {});
+        if (!tocar && !caixa.paused) caixa.pause();
+        if (Math.abs(caixa.currentTime - alvo) > 1.5 && alvo < (caixa.duration || Infinity)) caixa.currentTime = alvo;
+        return;
+      }
+      cmd('mute');
+      if (tocar !== andando) { cmd(tocar ? 'playVideo' : 'pauseVideo'); andando = tocar; }
+      if (tocar && tempoDele >= 0 && Math.abs(tempoDele - alvo) > 1.5) { cmd('seekTo', [alvo, true]); tempoDele = alvo; }
+    };
+    window.addEventListener('message', (e) => {
+      if (!caixa || caixa.tagName !== 'IFRAME' || e.source !== caixa.contentWindow) return;
+      try {
+        const msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+        const info = msg?.info;
+        if (msg?.event === 'onError') { caixa.remove(); caixa = null; return; } // (fica com os quadros)
+        if (typeof info?.currentTime === 'number') tempoDele = info.currentTime;
+        // começou a andar: aparece aos poucos por cima dos quadros (o título do YouTube some antes)
+        if (info?.playerState === 1 && !caixa.classList.contains('pronto')) setTimeout(() => caixa?.classList.add('pronto'), 900);
+      } catch { /* outra mensagem */ }
+    });
+    return {
+      async montar(q) {
+        const quer = q && db.prefs().videoFundo !== false && !db.prefs().economiaDados ? q : '';
+        if (quer === de && (caixa?.isConnected || !quer)) return;
+        tirar();
+        if (!quer) return;
+        de = quer;
+        const vez = ++montagem;
+        // baixado com o vídeo: o arquivo do aparelho (sem gastar internet)
+        const baixado = baixadoDe(quer);
+        if (baixado && String(baixado.tipo).startsWith('video')) {
+          const blob = await lerAudio(chaveBaixada(quer)).catch(() => null);
+          if (vez !== montagem) return;
+          if (blob) {
+            url = URL.createObjectURL(blob);
+            caixa = document.createElement('video');
+            Object.assign(caixa, { muted: true, defaultMuted: true, playsInline: true, loop: true, preload: 'auto', src: url });
+            caixa.setAttribute('playsinline', '');
+            caixa.className = 'pl-canvas';
+            caixa.addEventListener('playing', () => caixa?.classList.add('pronto'), { once: true });
+            caixa.addEventListener('loadedmetadata', () => { if (caixa) caixa.currentTime = noClipeAgora(); }, { once: true });
+          }
+        }
+        if (!caixa) {
+          if (!navigator.onLine) { de = ''; return; }
+          const p = new URLSearchParams({ autoplay: '1', mute: '1', controls: '0', playsinline: '1', loop: '1', playlist: quer, rel: '0', modestbranding: '1',
+            iv_load_policy: '3', disablekb: '1', fs: '0', enablejsapi: '1', start: String(Math.floor(noClipeAgora())), origin: location.origin });
+          caixa = document.createElement('iframe');
+          caixa.className = 'pl-canvas';
+          caixa.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(quer)}?${p}`;
+          caixa.allow = 'autoplay; encrypted-media';
+          caixa.tabIndex = -1;
+          caixa.setAttribute('aria-hidden', 'true');
+          caixa.title = '';
+          // pede ao player mudo que avise o tempo e o estado
+          caixa.addEventListener('load', () => { caixa?.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'canvas' }), '*'); andando = true; });
+        }
+        fundo.append(caixa);
+        relogio = setInterval(acompanhar, 1000);
+      },
+      tirar,
+    };
+  })();
   // a capa (no modo capa): a da música ou o quadro do vídeo; o botão de trocar diz para o que vai
   const desenharCapa = () => {
     // (tocando só o áudio, do aparelho: sempre a capa)
@@ -1223,6 +1351,7 @@ const player = (() => {
       fundo.innerHTML = q ? htmlQuadros(q, (song && renderSong(song.content).meta.x_canvas) || 'sd') : '';
       // todos os quadros já carregados (com "lazy", o quadro que chegava no meio da rolagem aparecia de repente)
       fundo.querySelectorAll('img[loading]').forEach((img) => { img.loading = 'eager'; });
+      canvas.montar(q);
     }
     mini.classList.toggle('capa-yt', (capa || barra) && capaYt);
     // no modo vídeo, a capa pequena ao lado do nome (como no Spotify)
@@ -1328,7 +1457,7 @@ const semLinhasDeAcordes = (sinc) => {
     if (marcando && marcando.video !== atual?.youtube) marcando = null; // trocou de música no meio da marcação
     if (!marcando) ajustando = ajustando && ajustandoVideo === atual?.youtube;
     mostrarSinc();
-    const chave = `${atual?.youtube}|${song?.sincronia?.tempos?.length || 0}|${song?.sincronia?.tempos?.[0]?.inicio}|${song?.content?.length || 0}|${marcando ? 'm' : ''}`;
+    const chave = `${atual?.youtube}|${song?.sincronia?.tempos?.length || 0}|${song?.sincronia?.tempos?.[0]?.inicio}|${song?.content?.length || 0}|${marcando ? 'm' : ''}|${emVideo() ? 'v' : ''}`;
     if (chave === letraDe) return;
     letraDe = chave;
     // a sincronia guardada antes de a linha só de acordes ("( Am7(4) )") ficar de fora da letra: ela sai daqui também
@@ -1358,9 +1487,10 @@ const semLinhasDeAcordes = (sinc) => {
     linhasDaLetra = linhas;
     linhaAcesa = -2;
     acesaChave = '';
-    $('.pl-frase', el).hidden = !tempos;
-    // no clipe (a música com as duas versões, no modo vídeo) não há letra, como no Spotify: ela fica no modo música
-    $('.pl-letra', el).hidden = noClipe() || (!linhas.length && !letraDaPagina);
+    $('.pl-frase', el).hidden = !tempos || emVideo();
+    // no modo vídeo não há letra, como no Spotify: ela fica no modo música (também quando o vídeo é a própria gravação
+    // cantada, sem as duas versões: antes, nesse caso, a letra continuava no vídeo)
+    $('.pl-letra', el).hidden = (emVideo() && !marcando) || (!linhas.length && !letraDaPagina);
     $('.pl-letra', el).classList.toggle('sincronizada', Boolean(tempos) || Boolean(marcando));
     $('.pl-letra', el).classList.toggle('marcando', Boolean(marcando));
     // na letra sincronizada, as partes só de música (a introdução, os solos e o final, de 10 s ou mais)
@@ -1738,6 +1868,27 @@ const semLinhasDeAcordes = (sinc) => {
     m.addEventListener('error', () => { if (doSom()) toast('Não consegui tocar o arquivo desta música'); });
     return m;
   };
+  // o vídeo baixado na tela inteira (no YouTube o botão é o do próprio player; no arquivo do aparelho não havia
+  // nenhum): na tela cheia aparecem os controles do aparelho (pausar, a barra do tempo); ao sair, somem de novo
+  const btnTelaCheia = document.createElement('button');
+  btnTelaCheia.className = 'pl-tela-cheia';
+  btnTelaCheia.type = 'button';
+  btnTelaCheia.setAttribute('aria-label', 'Ver o vídeo na tela inteira');
+  btnTelaCheia.title = 'Tela inteira';
+  btnTelaCheia.innerHTML = icon('expand', 18);
+  btnTelaCheia.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const v = somVideo;
+    if (!v) return;
+    v.controls = true;
+    const sair = () => { if (!(document.fullscreenElement || document.webkitFullscreenElement)) { v.controls = false; document.removeEventListener('fullscreenchange', sair); document.removeEventListener('webkitfullscreenchange', sair); } };
+    document.addEventListener('fullscreenchange', sair);
+    document.addEventListener('webkitfullscreenchange', sair);
+    const pedir = v.requestFullscreen?.bind(v) || v.webkitRequestFullscreen?.bind(v);
+    if (pedir) Promise.resolve(pedir()).then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => v.webkitEnterFullscreen?.());
+    else v.webkitEnterFullscreen?.(); // (iPhone: só o próprio vídeo vai para a tela cheia)
+    v.addEventListener('webkitendfullscreen', () => { v.controls = false; }, { once: true });
+  });
   // abre o arquivo guardado no aparelho no segundo t
   const tocarLocal = async (l, t, tocar) => {
     local = l;
@@ -1751,6 +1902,8 @@ const semLinhasDeAcordes = (sinc) => {
     if (somVideo) somVideo.style.display = l.video ? '' : 'none';
     if (l.video && m.parentElement !== tela) tela.append(m);
     tela.hidden = !l.video;
+    tela.classList.toggle('com-local', Boolean(l.video));
+    if (l.video && !btnTelaCheia.isConnected) tela.append(btnTelaCheia);
     if (m.dataset.de !== l.chave) {
       const arquivo = await lerAudio(l.chave).catch(() => null);
       if (local !== l) return; // trocou de música enquanto abria
@@ -1776,6 +1929,7 @@ const semLinhasDeAcordes = (sinc) => {
   const pararLocal = () => {
     som?.pause();
     if (somVideo) somVideo.style.display = 'none';
+    tela.classList.remove('com-local');
     local = null;
     const f = iframeAtual();
     if (f) { f.style.display = ''; tela.hidden = false; }
@@ -1817,15 +1971,25 @@ const semLinhasDeAcordes = (sinc) => {
     db.setPref('playerCapa', comCapa);
     if (atual?.audio && atual.video && !atual.semVideo) {
       if (comCapa && atual.youtube === atual.video) trocarVersao(atual.audio, tempoNoAudio(atual.pares, api.tempoAgora));
-      else if (!comCapa && atual.youtube === atual.audio) trocarVersao(atual.video, tempoNoVideo(atual.pares, api.tempoAgora));
+      else if (!comCapa && atual.youtube === atual.audio) { trocarVersao(atual.video, tempoNoVideo(atual.pares, api.tempoAgora)); foiProClipe = performance.now(); }
+      // ainda sem as duas casadas pelo som (só a estimativa pela duração, que erra nos clipes com cena antes e depois
+      // da música, como Espresso ou Speed Demon): o servidor ouve as duas agora; quando ele responder, o clipe vai
+      // sozinho para o ponto certo (veja versoes)
+      const s = musicaTocando();
+      if (s && !versoesDe(s)?.casadas) acertarVersoes(s);
     }
     if (atual && !atual.semVideo && (localDe(atual.youtube)?.chave || '') !== (local?.chave || '')) trocarVersao(atual.youtube, api.tempoAgora, true);
     // foi para o clipe com a letra na tela toda aberta: ela fecha (no clipe não há letra) e o vídeo aparece
-    if (noClipe() && el.classList.contains('letra-cheia') && !letraDaPagina) letraCheia(false);
+    if (emVideo() && el.classList.contains('letra-cheia') && !letraDaPagina) letraCheia(false);
+    letraDe = '';
+    desenharLetra();
     desenharCapa();
   };
   // tocando o clipe de uma música que tem as duas versões (a letra não acompanha: ela é do áudio)
   const noClipe = () => Boolean(atual?.audio && atual.youtube === atual.video);
+  let foiProClipe = -Infinity; // quando trocou para o clipe pela última vez (performance.now)
+  // o modo vídeo (o "Mudar para vídeo"): o clipe das duas versões ou, com um vídeo só, o vídeo no lugar da capa
+  const emVideo = () => noClipe() || Boolean(atual?.youtube && !comCapa && !atual.semVideo && !(ehArquivo(atual.youtube) && !atual.video));
   const api = {
     get atual() { return atual; },
     get estado() { return estado; },
@@ -1893,9 +2057,15 @@ const semLinhasDeAcordes = (sinc) => {
     versoes(song) {
       const vs = versoesDe(song);
       if (!atual || !vs || !(atual.songId === song.id || desta(vs.video))) return;
+      const antes = atual.pares;
       atual = { ...atual, video: vs.video, audio: vs.audio, pares: vs.pares };
       if (comCapa && atual.youtube === vs.video) trocarVersao(vs.audio, tempoNoAudio(vs.pares, api.tempoAgora));
-      else desenhar();
+      else if (!comCapa && estado === 'tocando' && atual.youtube === vs.video && vs.casadas && antes && performance.now() - foiProClipe < 90e3) {
+        // acabou de trocar para o clipe pela estimativa e chegou o casamento pelo som: o clipe vai para o mesmo ponto
+        // cantado (o ponto do áudio pela estimativa de antes, no clipe pelo casamento novo)
+        const certo = tempoNoVideo(vs.pares, tempoNoAudio(antes, api.tempoAgora));
+        if (Math.abs(certo - api.tempoAgora) > 1) api.irPara(certo); else desenhar();
+      } else desenhar();
     },
     irPara(seg) {
       if (!atual) return;
@@ -3186,6 +3356,9 @@ async function menuDaMusica(song, { set = null, i = -1 } = {}) {
   const opcoes = [
     { valor: 'compartilhar', rotulo: 'Compartilhar', ic: 'share' },
     { valor: 'playlist', rotulo: 'Adicionar a uma playlist ou repertório', ic: 'maisCirculo' },
+    // baixar para ouvir sem internet, como no ⋯ do Spotify (e tirar o download)
+    midiaDe(song) && db.song(song.id) && (baixando.has(song.id) ? { valor: 'baixando', rotulo: `Baixando… ${baixando.get(song.id).pct}%`, ic: 'baixar' }
+      : song.baixado ? { valor: 'tirar-download', rotulo: 'Remover o download', ic: 'baixada' } : { valor: 'baixar', rotulo: 'Baixar', ic: 'baixar' }),
     set && { valor: 'remover', rotulo: pl ? 'Remover desta playlist' : 'Remover deste repertório', ic: 'menosCirculo' },
     set && { valor: 'parte', rotulo: set.items[i]?.label ? `Parte da missa: ${set.items[i].label}` : 'Definir a parte da missa', ic: 'list' },
     song.youtube && { valor: 'tocar', rotulo: player.tocandoAgora(song.youtube) ? 'Pausar' : 'Tocar a referência', ic: player.tocandoAgora(song.youtube) ? 'pause' : 'play' },
@@ -3202,6 +3375,9 @@ async function menuDaMusica(song, { set = null, i = -1 } = {}) {
     compartilhar({ title: song.title, text: [song.title, song.artist].filter(Boolean).join(' — '), ...(url ? { url } : {}) });
   }
   if (v === 'playlist') addToSetDialog(song.id, set?.items[i]?.label || '');
+  if (v === 'baixar') baixarMusica(db.song(song.id));
+  if (v === 'baixando') toast(`Baixando: ${baixando.get(song.id)?.pct ?? 100}%`);
+  if (v === 'tirar-download' && await ask({ title: 'Remover o download?', text: `“${song.title}” continua na biblioteca, mas só toca com internet.`, ok: 'Remover', danger: true })) { await removerDownload(song); toast('Download removido'); }
   if (v === 'tocar') { if (player.desta(song.youtube)) player.alternar(); else tocarReferencia(song); }
   if (v === 'modo') { player.trocarModo(); toast(player.modoMusica ? 'O player mostra a capa (música)' : 'O player mostra o vídeo'); }
   if (v === 'video') {
@@ -7908,7 +8084,7 @@ function viewSong(id, ctx = {}) {
   // No servidor da nuvem (Modal) não: cada abertura gastava o crédito grátis; lá sincroniza pelo play ou pelo ⋯
   servidorCarregado.then(() => {
     // a música com o áudio oficial e o clipe ainda não casados pelo som: o servidor casa, para a troca cair no ponto certo
-    if (sincPelaIA() && view.contains(songEl)) acertarVersoes(song);
+    if (view.contains(songEl)) acertarVersoes(song);
     if (sincPelaIA() && precisaConferirVersoes(song) && view.contains(songEl)) { conferirVersoes(song, statusSinc).then(() => { mapa = null; }); return; }
     if (!sincPelaIA() || !midiaDe(song) || sincronia() || tentouSincronizar.has(midiaDe(song)) || !view.contains(songEl)) return;
     tentouSincronizar.add(midiaDe(song));
@@ -9365,10 +9541,94 @@ async function montarRepertorio(missa, sel, data, { btn = $('#montar'), tipo = '
 
 // ------------------------------------------------------------- ajustes
 
-function viewSettings() {
+function viewTopicosAjustes() {
   setTab('');
   setTint('#333');
   setHeader('Ajustes', { back: '#/' });
+  const resumo = (t) => {
+    if (t.id === 'qualidade') return `Áudio: ${QUALIDADES.find(([k]) => k === qualidadeDoDownload(false))[1]} · Vídeo: ${QUALIDADES.find(([k]) => k === qualidadeDoDownload(true))[1]}`;
+    if (t.id === 'offline') { const n = db.songs().filter((x) => x.baixado).length; return `${n} música${n === 1 ? '' : 's'} baixada${n === 1 ? '' : 's'} · Armazenamento · Cache`; }
+    return t.s;
+  };
+  view.innerHTML = `<div class="ajustes aj-topicos">
+    <section class="aj-topo">
+      <span class="aj-logo">${logo(44)}</span>
+      <div class="aj-ident"><h2>Ajustes</h2><span class="aj-versao">Songbook Litúrgico · versão ${APP_VERSAO}</span></div>
+    </section>
+    <nav class="aj-lista" aria-label="Tópicos dos ajustes">
+      ${TOPICOS_AJUSTES.map((t) => `<a class="aj-topico" href="${t.href || `#/ajustes/${t.id}`}"><span class="ico">${icon(t.ic, 22)}</span><span class="grow"><b>${t.t}</b><small>${esc(resumo(t))}</small></span>${icon('next', 18)}</a>`).join('')}
+    </nav></div>`;
+}
+// Qualidade de mídia, como a do Spotify: cada qualidade numa lista para escolher uma (e vale para todos os downloads
+// dali em diante: o servidor baixa o áudio e o vídeo nela). "Atualizar os downloads" baixa de novo, na qualidade
+// escolhida, as músicas que foram baixadas em outra
+function viewQualidade() {
+  setTab('');
+  setTint('#333');
+  setHeader('Qualidade de mídia', { back: '#/ajustes' });
+  const lista = (tipo, titulo, sub) => {
+    const pref = db.prefs()[tipo === 'video' ? 'qualidadeVideo' : 'qualidadeAudio'] || 'muito-alta';
+    return `<section class="aj-sec"><h3 class="aj-titulo">${titulo}</h3><p class="aj-nota">${sub}</p><div class="settings-group aj-radios" data-qtipo="${tipo}">
+      ${QUALIDADES.map(([k, rot]) => `<label class="setting aj-radio"><div class="grow"><div class="t">${rot}</div><div class="s">${QUALIDADE_DESC[tipo][k]}${tipo === 'audio' && k === 'muito-alta' && ehIOS() ? ' · no iPhone fica na alta' : ''}</div></div><input type="radio" name="q-${tipo}" value="${k}"${k === pref ? ' checked' : ''}></label>`).join('')}
+    </div></section>`;
+  };
+  const desatualizadas = () => db.songs().filter((s) => s.baixado && Object.values(s.baixado.arquivos || {}).some((a) => (a.qualidade || '') !== qualidadeDoDownload(String(a.tipo).startsWith('video'))));
+  const desenharAtualizar = () => {
+    const n = desatualizadas().length;
+    $('#q-atualizar-s').textContent = n ? `${n} música${n === 1 ? '' : 's'} baixada${n === 1 ? '' : 's'} em outra qualidade` : 'Todos os downloads já estão na qualidade escolhida';
+    $('#q-atualizar').disabled = !n;
+  };
+  view.innerHTML = `<div class="ajustes qualidade">
+    <h2 class="aj-pagina">Qualidade de mídia</h2>
+    <p class="aj-nota aj-nota-topo">${icon('info', 15)}<span>Qualidade mais alta ocupa mais espaço no aparelho. Ao mudar, vale para os próximos downloads.</span></p>
+    ${lista('audio', 'Qualidade do download de áudio', 'O som das músicas baixadas (o áudio oficial)')}
+    ${lista('video', 'Qualidade do download de vídeo', 'O clipe das músicas baixadas com “Áudio e vídeo”')}
+    <section class="aj-sec"><div class="settings-group">
+      <div class="setting"><span class="ico">${icon('refresh', 18)}</span><div class="grow"><div class="t">Atualizar os downloads</div><div class="s" id="q-atualizar-s"></div></div><button class="btn small" id="q-atualizar">Atualizar</button></div>
+    </div>
+    <p class="aj-nota">Ouvindo pela internet, quem escolhe a qualidade é o player do YouTube (ele não deixa outro app escolher); as músicas baixadas tocam na qualidade daqui.</p></section>
+  </div>`;
+  desenharAtualizar();
+  const aoEscolher = (e) => {
+    const r = e.target.closest('[data-qtipo] input[type="radio"]');
+    if (!r) return;
+    const tipo = r.closest('[data-qtipo]').dataset.qtipo;
+    db.setPref(tipo === 'video' ? 'qualidadeVideo' : 'qualidadeAudio', r.value);
+    desenharAtualizar();
+  };
+  view.addEventListener('change', aoEscolher);
+  aoSair(() => view.removeEventListener('change', aoEscolher));
+  $('#q-atualizar').onclick = async () => {
+    const velhas = desatualizadas();
+    if (!velhas.length) return;
+    if (!servidorIA().url) { toast('Para baixar o áudio e o vídeo, ligue o servidor no seu computador (Ajustes → Avançado)'); return; }
+    if (!(await podeBaixarAgora())) return;
+    for (const s of velhas) {
+      await removerDownload(s);
+      await baixarMusica(db.song(s.id), { perguntou: true });
+    }
+    toast(`${velhas.length} música${velhas.length > 1 ? 's' : ''} na fila para baixar de novo`);
+    desenharAtualizar();
+  };
+}
+// Os ajustes por tópicos, como no Spotify: a tela de Ajustes é uma lista (cada tópico com o resumo do que tem) e cada
+// um abre a sua página (antes ficava tudo junto numa tela só, comprida)
+const TOPICOS_AJUSTES = [
+  { id: 'aparencia', secao: 'Aparência', ic: 'palette', t: 'Aparência', s: 'Modo escuro ou claro · Cor de destaque' },
+  { id: 'musica', secao: 'Música', ic: 'chord', t: 'Música e cifra', s: 'Destaque e desenho dos acordes · Capa animada' },
+  { id: 'qualidade', href: '#/qualidade', ic: 'gauge', t: 'Qualidade de mídia', s: 'Qualidade do download do áudio e do vídeo' },
+  { id: 'offline', href: '#/offline', ic: 'baixar', t: 'Downloads e economia de dados', s: 'Músicas baixadas · Armazenamento · Cache' },
+  { id: 'powerpoint', secao: 'PowerPoint', ic: 'columns', t: 'PowerPoint', s: 'Modelo da apresentação da missa' },
+  { id: 'backup', secao: 'Backup', ic: 'upload', t: 'Backup', s: 'Exportar e importar músicas e repertórios' },
+  { id: 'avancado', secao: 'Avançado', ic: 'database', t: 'Avançado', s: 'Servidor no computador · Conta do YouTube · Apagar tudo' },
+  { id: 'sobre', secao: 'Sobre', ic: 'info', t: 'Sobre', s: 'Versão · Novidades · Instalar o app' },
+];
+function viewSettings(topico) {
+  const top = TOPICOS_AJUSTES.find((x) => x.id === topico && x.secao);
+  if (!top) return viewTopicosAjustes();
+  setTab('');
+  setTint('#333');
+  setHeader(top.t, { back: '#/ajustes' });
   const p = db.prefs();
   const accent = p.accent || COR_PADRAO;
   const personalizada = /^#/.test(accent) && !CORES_DESTAQUE.some(([c]) => c === accent);
@@ -9404,7 +9664,7 @@ function viewSettings() {
       <div class="setting wrap"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
       ${chave('diagramas', 'grid', 'Desenho dos acordes', 'Como montar cada acorde no violão', p.diagramas)}
-      ${chave('video-fundo', 'video', 'Capa animada', 'Cenas do clipe passam atrás da música, sem som. Desligue para economizar dados', p.videoFundo !== false)}
+      ${chave('video-fundo', 'video', 'Capa animada', 'Trechos do clipe passam atrás da música, sem som, como o Canvas do Spotify. Desligue para economizar dados', p.videoFundo !== false)}
     </div>`)}
 
     ${secao('Downloads e dados', `
@@ -9426,18 +9686,29 @@ function viewSettings() {
     <div class="settings-group">
       <a class="setting" href="#/youtube"><span class="ico">${icon('youtube', 18)}</span><div class="grow"><div class="t">Conta do YouTube</div><div class="s">Para baixar o áudio dos vídeos</div></div>${icon('next', 18)}</a>
       <div class="setting wrap" id="servidor-pc"><span class="ico">${icon('database', 18)}</span><div class="grow"><div class="t">Servidor no computador</div><div class="s" id="servidor-pc-estado">${p.servidorPc ? 'Verificando…' : 'Leia o QR code da página do servidor no PC'}</div></div>
-        <form class="aj-servidor" id="servidor-pc-form"><input type="url" class="input" id="servidor-pc-url" placeholder="https://….trycloudflare.com" value="${esc(p.servidorPc || '')}" aria-label="Endereço do servidor"><button class="btn small primary">Salvar</button>${p.servidorPc ? '<button type="button" class="btn small" id="servidor-pc-tirar">Tirar</button>' : ''}</form></div>
+        <form class="aj-servidor" id="servidor-pc-form"><input type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" class="input" id="servidor-pc-url" placeholder="Cole o link do QR code ou o endereço" value="${esc(p.servidorPc || '')}" aria-label="Endereço do servidor"><button class="btn small primary">Salvar</button>${p.servidorPc ? '<button type="button" class="btn small" id="servidor-pc-tirar">Tirar</button>' : ''}</form></div>
     </div></details>
     <div class="settings-group">
       <div class="setting"><span class="ico aj-perigo-ic">${icon('trash', 18)}</span><div class="grow"><div class="t">Apagar tudo</div><div class="s">Músicas, repertórios e ajustes deste aparelho</div></div><button class="btn small danger" id="clr">Apagar</button></div>
     </div>`)}
 
     ${secao('Sobre', `
+    <div class="settings-group"><div class="setting"><span class="ico">${logo(18)}</span><div class="grow"><div class="t">Songbook Litúrgico</div><div class="s">Versão ${APP_VERSAO}</div></div></div></div>
     <div class="settings-group">
       ${jaInstalado() ? '' : `<div class="setting"><span class="ico">${icon('download', 18)}</span><div class="grow"><div class="t">Instalar o app</div><div class="s">Ícone na tela inicial e funciona sem internet</div></div><button class="btn small primary" id="instalar">Instalar</button></div>`}
       <a class="setting" href="#/novidades"><span class="ico">${icon('sparkles', 18)}</span><div class="grow"><div class="t">Novidades</div><div class="s">O que mudou em cada versão</div></div>${icon('next', 18)}</a>
     </div>`)}
     </div>`;
+  // só o tópico aberto (as outras seções continuam na página, escondidas: os botões delas seguem ligados)
+  $('.aj-topo', view)?.replaceWith(Object.assign(document.createElement('h2'), { className: 'aj-pagina', textContent: top.t }));
+  view.querySelectorAll('.aj-sec').forEach((sec) => {
+    const h = sec.querySelector('.aj-titulo');
+    const deste = h?.textContent.trim() === top.secao;
+    sec.hidden = !deste;
+    if (deste && h) h.hidden = true;
+  });
+  // (o Avançado aberto: é a página dele)
+  if (top.id === 'avancado') view.querySelector('.aj-avancado')?.setAttribute('open', '');
   const nomeCor = () => {
     const a = db.prefs().accent || COR_PADRAO;
     const txt = a === 'liturgico'
@@ -9497,10 +9768,22 @@ function viewSettings() {
   if (p.servidorPc) Promise.all([responde(p.servidorPc), servidorCarregado]).then(([ok]) => { estadoPc.textContent = ok ? `Ligado: ${SERVIDOR_IA.pc ? 'o app está usando ele' : 'reabra o app para usar'}` : 'Não responde. O PC está ligado? Ao religar, o endereço muda: leia o QR code de novo'; });
   $('#servidor-pc-form').onsubmit = (e) => {
     e.preventDefault();
-    const url = baseDoServidor($('#servidor-pc-url').value);
+    const campo = $('#servidor-pc-url');
+    const url = baseDoServidor(campo.value);
     if (!url) { toast('Cole o endereço que aparece na página do servidor no PC'); return; }
-    db.setPref('servidorPc', url);
-    location.reload();
+    // confere antes de guardar: o campo mostra o endereço do servidor (o tirado do link do QR code) e só recarrega o
+    // app se ele responde (antes recarregava na hora com qualquer coisa, e a tela piscava sem conectar)
+    campo.value = url;
+    const bt = e.submitter || $('#servidor-pc-form button:not([type="button"])');
+    if (bt) bt.disabled = true;
+    estadoPc.textContent = 'Conectando…';
+    responde(url).then((ok) => {
+      if (bt) bt.disabled = false;
+      if (!ok) { db.setPref('servidorPc', url); estadoPc.textContent = 'Guardado, mas não respondeu agora. O PC está ligado? Ao religar, o endereço muda: leia o QR code de novo'; toast('O servidor não respondeu neste endereço'); return; }
+      db.setPref('servidorPc', url);
+      estadoPc.textContent = 'Conectado. Abrindo de novo…';
+      setTimeout(() => location.reload(), 400);
+    });
   };
   $('#servidor-pc-tirar')?.addEventListener('click', () => { db.setPref('servidorPc', ''); location.reload(); });
   $('#exp').onclick = () => download(`songbook-backup-${hojeISO()}.json`, db.exportAll(), 'application/json');
@@ -9808,7 +10091,7 @@ const contarCookies = (t) => String(t || '').split('\n').filter((l) => (!l.start
 function viewConectarYoutube() {
   setTab('inicio');
   setTint('#5a1a1a');
-  setHeader('Conectar o YouTube', { back: '#/ajustes' });
+  setHeader('Conectar o YouTube', { back: '#/ajustes/avancado' });
   const salvo = cookiesSalvos();
   const passoN = (n, t, d) => `<li><span class="cy-n">${n}</span><div><b>${t}</b><small>${d}</small></div></li>`;
   view.innerHTML = `<div class="conectar-yt">
@@ -9968,7 +10251,7 @@ async function sincronizarMusica(song, { sozinho = false, refazer = false, soLrc
     const durClipe = (player.atual?.youtube === song.youtube && player.duracao) || await duracaoDaMusica(song).catch(() => 0);
     guardarVersoes(song, { video: song.youtube, audio: achado.id, duracao: achado.segundos, pares: doClipe || paresPelaDuracao(durClipe, achado.segundos) });
     yt = achado.id;
-    if (pelaIA) acertarVersoes(song, doClipe ? null : lrc);
+    acertarVersoes(song, doClipe ? null : lrc); // (pelo servidor ou, sem ele, no aparelho)
     return { ...lrc, ajustar: false };
   };
   const peloLrclib = async () => { const lrc = await comAudio(await buscarLrc()); return lrc ? usarLrc(lrc) : null; };
@@ -10073,18 +10356,58 @@ function guardarVersoes(song, versoes) {
 // com a IA do servidor, em segundo plano: ela ouve o áudio oficial e o clipe e casa os dois pelo próprio som (como o
 // YouTube Music), ponto a ponto: a troca entre a música e o vídeo cai no mesmo ponto, com cena antes, no meio ou no fim
 // do clipe. Sem dar certo (não parecem a mesma gravação), fica a estimativa pela letra (lrc) ou pela duração
+// Sem o servidor (ou sem ele dar certo), o próprio aparelho casa as duas pelo som (lib/casamento.js, a mesma conta do
+// servidor): com o som do download, quando a música está baixada, ou o que o Piped entrega do YouTube
 const casandoVersoes = new Set();
+const casamentoFalhou = new Set(); // (uma vez por par enquanto o app está aberto: sem o som, não adianta insistir)
 async function acertarVersoes(song, lrc = null) {
   const vs = versoesDe(song);
-  if (!vs?.audio || !vs.video || vs.casadas || ehArquivo(vs.audio) || casandoVersoes.has(vs.video) || !sincPelaIA()) return;
+  if (!vs?.audio || !vs.video || vs.casadas || casandoVersoes.has(vs.video) || casamentoFalhou.has(`${vs.audio}|${vs.video}`)) return;
   casandoVersoes.add(vs.video);
   try {
-    const r = await chamarComEtapas(servidorIA(), '/versoes', { json: { audio: vs.audio, video: vs.video } }, () => {});
+    let pares = null;
+    if (sincPelaIA() && !ehArquivo(vs.audio)) pares = (await chamarComEtapas(servidorIA(), '/versoes', { json: { audio: vs.audio, video: vs.video } }, () => {}).catch(() => null))?.pares;
+    if (!pares?.length) pares = (await casarNoAparelho(vs.audio, vs.video).catch(() => null))?.pares;
     const agora = song.id === 'previa' ? preview : db.song(song.id);
-    if (r?.pares?.length && agora && versoesDe(agora)?.video === vs.video) guardarVersoes(agora, { ...versoesDe(agora), pares: r.pares, casadas: true });
-  } catch {
-    if (lrc) acertarClipe(song, lrc);
+    if (pares?.length && agora && versoesDe(agora)?.video === vs.video) {
+      if (ehArquivo(vs.audio)) {
+        db.updateSong(agora.id, { audioProprio: { ...agora.audioProprio, pares, casadas: true } });
+        player.versoes(db.song(agora.id));
+      } else guardarVersoes(agora, { ...versoesDe(agora), pares, casadas: true });
+    } else {
+      casamentoFalhou.add(`${vs.audio}|${vs.video}`);
+      if (lrc && sincPelaIA()) acertarClipe(song, lrc);
+    }
   } finally { casandoVersoes.delete(vs.video); }
+}
+// as amostras (mono, na taxa do casamento) de um vídeo do YouTube ou do áudio da pessoa
+async function amostrasDe(id) {
+  let blob = null;
+  if (ehArquivo(id)) blob = await lerAudio(id.slice(ARQ.length)).catch(() => null);
+  else if (baixadoDe(id)) blob = await lerAudio(chaveBaixada(id)).catch(() => null);
+  if (!blob && !ehArquivo(id) && navigator.onLine && !db.prefs().economiaDados) blob = await audioDoVideo(id).catch(() => null);
+  if (!blob) return null;
+  const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!Ctx) return null;
+  // (o navegador já converte para a taxa do casamento ao abrir)
+  const som = await new Ctx(1, 1, TAXA_CASAMENTO).decodeAudioData(await blob.arrayBuffer());
+  if (som.numberOfChannels === 1) return som.getChannelData(0).slice(); // (uma cópia: a do navegador não vai para o Worker)
+  const mono = new Float32Array(som.length);
+  for (let c = 0; c < som.numberOfChannels; c++) { const d = som.getChannelData(c); for (let i = 0; i < d.length; i++) mono[i] += d[i] / som.numberOfChannels; }
+  return mono;
+}
+async function casarNoAparelho(audioId, videoId) {
+  const [audio, video] = await Promise.all([amostrasDe(audioId), amostrasDe(videoId)]);
+  if (!audio || !video) return null;
+  return new Promise((ok) => {
+    let w;
+    try { w = new Worker(new URL('./lib/casamento-worker.js', import.meta.url), { type: 'module' }); } catch { ok(null); return; }
+    const fim = (r) => { clearTimeout(limite); w.terminate(); ok(r); };
+    const limite = setTimeout(() => fim(null), 120000);
+    w.onmessage = (e) => fim(e.data?.ok ? e.data.r : null);
+    w.onerror = () => fim(null);
+    w.postMessage({ audio, video }, [audio.buffer, video.buffer]);
+  });
 }
 // com a IA do servidor, em segundo plano: ela ouve o clipe e diz onde cada linha da letra está nele; a troca entre o
 // áudio e o clipe passa a cair no mesmo ponto cantado, trecho por trecho (mesmo com uma cena no meio do clipe)
@@ -10834,7 +11157,8 @@ function route() {
     case 'editar': return viewEditor(b, c);
     case 'repertorio': return c !== undefined ? viewSetSong(b, Number(c)) : viewSet(b);
     case 'liturgia': return viewLiturgia(b);
-    case 'ajustes': return viewSettings();
+    case 'ajustes': return viewSettings(b);
+    case 'qualidade': return viewQualidade();
     case 'partituras': return viewPartituras();
     case 'compartilhado': return viewCompartilhado();
     case 'oracoes': return viewOracoes();
@@ -11008,22 +11332,24 @@ const ehCacheLimpavel = (k) => k === 'songbook-imagens' || k === 'songbook-extra
 function viewOffline() {
   setTab('');
   setTint('#1f3a2c');
-  setHeader('Economia de dados e offline', { back: '#/ajustes' });
+  setHeader('Downloads e economia de dados', { back: '#/ajustes' });
   const desenhar = () => {
     const p = db.prefs();
     const salvas = db.songs();
     const baixadas = salvas.filter((x) => x.baixado);
     const faltam = salvas.filter((x) => !x.baixado && !baixando.has(x.id) && midiaDe(x));
     const chave = (id, ic, t, sub, ligado) => `<label class="setting"><span class="ico">${icon(ic, 18)}</span><div class="grow"><div class="t">${t}</div><div class="s">${sub}</div></div><input type="checkbox" class="switch" id="${id}"${ligado ? ' checked' : ''}></label>`;
-    view.innerHTML = `<div class="ajustes offline">
+    view.innerHTML = `<div class="ajustes offline"><h2 class="aj-pagina">Downloads e economia de dados</h2>
       <section class="aj-sec"><h3 class="aj-titulo">Economia de dados</h3><div class="settings-group">
         ${chave('of-economia', 'gauge', 'Economia de dados', 'Desliga a capa animada e, nas músicas baixadas, toca sempre o arquivo do aparelho (até no modo vídeo), sem gastar internet', p.economiaDados)}
       </div></section>
       <section class="aj-sec"><h3 class="aj-titulo">Downloads</h3><div class="settings-group">
         <div class="setting wrap"><span class="ico">${icon('baixar', 18)}</span><div class="grow"><div class="t">O que baixar</div><div class="s">O vídeo ocupa bem mais espaço que só o áudio</div></div>
           <div class="seg" id="of-oque"><button data-v="video" aria-pressed="${p.baixarVideo !== false}">Áudio e vídeo</button><button data-v="audio" aria-pressed="${p.baixarVideo === false}">Só o áudio</button></div></div>
+        <a class="setting" href="#/qualidade"><span class="ico">${icon('gauge', 18)}</span><div class="grow"><div class="t">Qualidade dos downloads</div><div class="s">Áudio: ${QUALIDADES.find(([k]) => k === qualidadeDoDownload(false))[1]} · Vídeo: ${QUALIDADES.find(([k]) => k === qualidadeDoDownload(true))[1]}</div></div>${icon('next', 18)}</a>
+        ${chave('of-ao-salvar', 'baixar', 'Baixar ao salvar', 'A música salva na biblioteca já é baixada para tocar sem internet', p.baixarAoSalvar !== false)}
         ${chave('of-moveis', 'aparelhos', 'Baixar com os dados móveis', 'Sem isso, fora do Wi-Fi o app pergunta antes de baixar', p.baixarDadosMoveis)}
-        <div class="setting"><span class="ico">${icon('library', 18)}</span><div class="grow"><div class="t">Baixar as músicas salvas</div><div class="s">${baixando.size ? `Baixando: ${baixando.size} na fila` : `${baixadas.length} de ${salvas.length} baixadas`}${servidorIA().url ? '' : ' · o áudio e o vídeo vêm pelo servidor do seu computador (Ajustes → Avançado)'}</div></div>
+        <div class="setting"><span class="ico">${icon('library', 18)}</span><div class="grow"><div class="t">Baixar as músicas salvas</div><div class="s" id="of-todas-s">${baixando.size ? `Baixando: ${baixando.size} na fila` : `${baixadas.length} de ${salvas.length} baixadas`}${servidorIA().url ? '' : ' · o áudio e o vídeo vêm pelo servidor do seu computador (Ajustes → Avançado)'}</div></div>
           <button class="btn small primary" id="of-todas"${faltam.length ? '' : ' disabled'}>${icon('baixar', 15)} ${faltam.length ? `Baixar ${faltam.length}` : 'Todas baixadas'}</button></div>
         <a class="setting" href="#/biblioteca/baixadas"><span class="ico">${icon('baixada', 18)}</span><div class="grow"><div class="t">Músicas baixadas</div><div class="s">Tocam sem internet, com a letra, a cifra e a partitura</div></div>${icon('next', 18)}</a>
       </div></section>
@@ -11045,16 +11371,40 @@ function viewOffline() {
     for (const s of db.songs().filter((x) => x.audioProprio)) meus += (await lerAudio(s.id).catch(() => null))?.size || 0;
     const usado = Math.max(est.usage || 0, dl + meus);
     const cache = Math.max(0, usado - dl - meus);
-    const livre = Math.max(0, (est.quota || 0) - usado);
+    // O "livre" do navegador não é o espaço do aparelho: é o limite que ele dá ao app, e o Chrome informa sempre o que
+    // o app já usa mais 10 GiB fixos (para os sites não saberem o tamanho do disco). Nenhum navegador deixa um app da
+    // web ler o espaço livre de verdade do aparelho: com o número fixo, a linha do livre sai e a barra mostra só o que o
+    // app ocupa (antes aparecia "10,7 GB livres" em qualquer aparelho)
+    const sobra = Math.max(0, (est.quota || 0) - usado);
+    const fixo = !est.quota || Math.abs(sobra - 10 * 2 ** 30) < 0.06 * 2 ** 30 || Math.abs((est.quota || 0) - (est.usage || 0) - 10 * 2 ** 30) < 0.06 * 2 ** 30;
+    const livre = fixo ? 0 : sobra;
     const total = usado + livre || 1;
     const barra = $('#of-barra');
     if (!barra) return;
     [['.of-dl', dl], ['.of-meus', meus], ['.of-cache', cache]].forEach(([c, n]) => { barra.querySelector(c).style.width = `${Math.max(n ? 0.6 : 0, (n / total) * 100)}%`; });
-    $('#of-legenda').innerHTML = [['of-dl', 'Downloads', dl], ['of-meus', 'Áudios seus', meus], ['of-cache', 'Dados e cache do app', cache], ['of-livre', 'Livre para o app', livre]]
-      .map(([c, n, v]) => `<li><i class="${c}"></i><span>${n}</span><b>${est.quota || c !== 'of-livre' ? fmtBytes(v) : '—'}</b></li>`).join('');
+    $('#of-legenda').innerHTML = [['of-dl', 'Downloads', dl], ['of-meus', 'Áudios seus', meus], ['of-cache', 'Dados e cache do app', cache], ...(fixo ? [] : [['of-livre', 'Ainda cabe no app', livre]])]
+      .map(([c, n, v]) => `<li><i class="${c}"></i><span>${n}</span><b>${fmtBytes(v)}</b></li>`).join('')
+      + `<li class="of-total"><span>Total usado pelo app</span><b>${fmtBytes(usado)}</b></li>`
+      + (fixo ? `<li class="of-aviso muted">${icon('info', 14)}<span>O espaço livre do aparelho fica em Configurações → Armazenamento: o navegador não deixa o app ver.</span></li>` : '');
   };
   desenhar();
-  const aoMudar = () => { if (location.hash === '#/offline') desenhar(); };
+  // a cada avanço de um download só os números mudam (antes a tela inteira era desenhada de novo a cada 1%, com o
+  // "Calculando…" no lugar do armazenamento: ela piscava sem parar enquanto baixava)
+  let medindo = 0;
+  const aoMudar = () => {
+    if (location.hash !== '#/offline') return;
+    const salvas = db.songs();
+    const baixadas = salvas.filter((x) => x.baixado);
+    const faltam = salvas.filter((x) => !x.baixado && !baixando.has(x.id) && midiaDe(x));
+    const sub = $('#of-todas-s');
+    if (sub) sub.textContent = (baixando.size ? `Baixando: ${baixando.size} na fila` : `${baixadas.length} de ${salvas.length} baixadas`) + (servidorIA().url ? '' : ' · o áudio e o vídeo vêm pelo servidor do seu computador (Ajustes → Avançado)');
+    const bt = $('#of-todas');
+    if (bt) { bt.disabled = !faltam.length; bt.innerHTML = `${icon('baixar', 15)} ${faltam.length ? `Baixar ${faltam.length}` : 'Todas baixadas'}`; }
+    const rem = $('#of-remover');
+    if (rem) rem.disabled = !baixadas.length;
+    clearTimeout(medindo);
+    medindo = setTimeout(() => medir(baixadas), 600);
+  };
   window.addEventListener('songbook:downloads', aoMudar);
   aoSair(() => window.removeEventListener('songbook:downloads', aoMudar));
   view.addEventListener('change', (e) => {
@@ -11065,6 +11415,7 @@ function viewOffline() {
       toast(e.target.checked ? 'Economia de dados ligada: a capa animada foi desligada' : 'Economia de dados desligada');
     }
     if (e.target.id === 'of-moveis') db.setPref('baixarDadosMoveis', e.target.checked);
+    if (e.target.id === 'of-ao-salvar') db.setPref('baixarAoSalvar', e.target.checked);
   });
   view.addEventListener('click', async (e) => {
     const b = e.target.closest('button');
@@ -11096,7 +11447,7 @@ function viewNovidades(versao) {
   const TIPO_NOVIDADE = { novo: ['Novo', 'sparkles'], melhoria: ['Melhoria', 'up'], correcao: ['Correção', 'check'] };
   setTab('');
   setTint('#1f3a44');
-  setHeader('Novidades', { back: '#/ajustes' });
+  setHeader('Novidades', { back: '#/ajustes/sobre' });
   const data = (d) => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
   view.innerHTML = `<h2 class="greet">Novidades do app</h2>
     <p class="muted nv-intro">O que foi corrigido e melhorado em cada atualização. Você está na versão ${esc(APP_VERSAO)}.</p>

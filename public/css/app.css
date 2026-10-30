@@ -2944,6 +2944,11 @@ html.tablet body.com-player .nav { left: calc(8px + (100vw - 24px - var(--painel
 :root[data-theme="light"].tablet .nav { background: rgb(255 255 255 / 0.85); border-color: rgb(0 0 0 / 0.08); }
 html.tablet .nav a { flex-direction: column; justify-content: center; gap: 5px; height: calc(100% - 12px); padding: 0; font-size: 15.5px; font-weight: 700; border-radius: 12px; }
 html.tablet .nav a svg { width: 31px; height: 31px; }
+/* em pé o tablet cai na faixa do menu lateral, que prendia o ícone numa caixa de 22px: o desenho de 31px vazava para a
+   direita e encostava no nome (os ícones ficavam tortos, fora do centro do texto) */
+html.tablet .nav a span { display: inline-flex; justify-content: center; width: auto; height: auto; }
+html.tablet .nav a .ic-on, html.tablet .nav a.active .ic-off { display: none; }
+html.tablet .nav a.active .ic-on { display: inline-flex; }
 html.tablet .nav a em { display: block; }
 html.tablet .nav a.active { color: var(--text); }
 /* em pé o tablet cai na faixa do menu lateral (700–1199 px), que pintava o ícone e o nome ativos de azul: no tablet
@@ -3018,7 +3023,9 @@ html.pp:not(.tablet) #player.modo-capa .pl-fundo:not([hidden]) { display: block;
 html.pp.tablet body.com-player:not(.painel-recolhido):not(.com-letra-cheia) .pl-fundo-casa.ativo { display: block; position: fixed; z-index: 24; top: 8px; right: 8px; bottom: 8px;
   width: var(--painel-w); overflow: hidden; pointer-events: none; border-radius: var(--radius);
   background: linear-gradient(180deg, color-mix(in srgb, var(--cor-musica, var(--tint)) 88%, #000) 0%, color-mix(in srgb, var(--cor-musica, var(--tint)) 45%, #121212) 55%, #121212 100%); }
-html.pp.tablet body.painel-cheio .pl-fundo-casa.ativo { z-index: 39; left: 8px; width: auto; }
+/* (com a mesma força da regra de cima: antes ela ganhava, o fundo ficava com a largura do painel preso à esquerda e o
+   resto da tela toda ficava preto) */
+html.pp.tablet body.com-player.painel-cheio:not(.painel-recolhido):not(.com-letra-cheia) .pl-fundo-casa.ativo { z-index: 39; left: 8px; right: 8px; width: auto; }
 html.pp.tablet body.com-player:not(.painel-recolhido):not(.com-letra-cheia) #player.fundo-fora.modo-capa:not(.letra-cheia) { background: transparent; }
 html.pp.tablet .pl-fundo-casa .pl-fundo:not([hidden]) { display: block; position: absolute; top: 0; left: 0; right: 0; height: min(var(--fundo-h, 100%), 100%);
   overflow: hidden; pointer-events: none; will-change: opacity;
@@ -3034,7 +3041,7 @@ html.pp.tablet body:not(.painel-recolhido) #player.modo-capa .pl-video.com-fundo
 /* ao trocar entre vídeo e música, a capa (ou o vídeo) aparece com um zoom suave */
 html.pp #player.modo-capa .pl-video { animation: pop 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
 /* a frase cantada agora (com a letra sincronizada), em cima do nome */
-html.pp #player .pl-frase { order: 2; margin: 6px 2px 0; font-size: 16px; font-weight: 800; line-height: 1.3; color: #fff; min-height: 1.3em; }
+html.pp #player .pl-frase { display: block; order: 2; margin: 6px 2px 0; font-size: 16px; font-weight: 800; line-height: 1.3; color: #fff; min-height: 1.3em; }
 html.pp #player .pl-frase[hidden] { display: none; }
 /* "Mudar para vídeo / capa": a pílula escura */
 /* "Mudar para música / vídeo", discreta como a do Spotify: um retângulo escuro translúcido de cantos redondos, só o ícone
@@ -4047,3 +4054,46 @@ html.pp #player .pl-artista-bio.so-mais .pl-artista-mais { position: static; pad
 .of-livre { background: var(--surface-3, rgb(255 255 255 / 0.25)); }
 .of-armazenamento .setting { padding-left: 0; padding-right: 0; }
 .ind-i.ind-baixada { background: none; }
+
+/* o Canvas (como no Spotify): o clipe de verdade, sem som, atrás da parte de cima no modo música. Cobre o fundo todo
+   (cortando as bordas, como a capa) e aparece aos poucos por cima dos quadros parados quando começa a andar; não
+   recebe toques (os botões do player ficam por cima) */
+#player .pl-fundo, .pl-fundo-casa .pl-fundo { container-type: size; }
+.pl-fundo .pl-canvas { position: absolute; z-index: 1; left: 50%; top: 50%; border: 0; pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
+  width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(1.18); object-fit: cover; background: transparent; }
+.pl-fundo .pl-canvas.pronto { opacity: 1; }
+/* (o escurecido em cima e embaixo, para os textos, fica por cima do clipe também) */
+html.pp .pl-fundo::after { z-index: 2; }
+
+/* Ajustes por tópicos (como no Spotify): uma lista, cada tópico com o ícone, o nome e o resumo do que tem */
+.aj-lista { display: grid; margin-top: 18px; }
+.aj-topico { display: flex; align-items: center; gap: 16px; padding: 14px 6px; color: var(--text); text-decoration: none; border-radius: 10px; }
+.aj-topico:hover { background: var(--surface-2); }
+.aj-topico .ico { display: grid; place-items: center; width: 28px; flex: none; color: var(--text); }
+.aj-topico .grow { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.aj-topico b { font-size: 16px; font-weight: 700; }
+.aj-topico small { color: var(--muted); font-size: 13.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.aj-topico > svg:last-child { color: var(--muted); flex: none; }
+html.tablet .aj-topico { padding: 16px 10px; }
+html.tablet .aj-topico b { font-size: 17.5px; }
+html.tablet .aj-topico small { font-size: 14.5px; }
+/* Qualidade de mídia: escolher uma da lista, com a bolinha à direita (como no Spotify) */
+.aj-nota { margin: -4px 4px 10px; color: var(--muted); font-size: 13.5px; line-height: 1.4; }
+.aj-nota-topo { display: flex; gap: 8px; align-items: flex-start; margin: 16px 4px 0; }
+.aj-nota-topo svg { flex: none; margin-top: 2px; }
+.aj-radio input[type="radio"] { appearance: none; -webkit-appearance: none; flex: none; width: 22px; height: 22px; margin: 0; border: 2px solid var(--muted); border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+.aj-radio input[type="radio"]:checked { border-color: var(--accent); }
+.aj-radio input[type="radio"]:checked::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.aj-radio:has(input:checked) .t { color: var(--accent-ink, var(--accent)); }
+
+/* o vídeo baixado: o botão de tela inteira no canto (o do YouTube só existe no player dele) */
+#pl-tela .pl-tela-cheia { display: none; }
+#pl-tela.com-local .pl-tela-cheia { display: grid; place-items: center; position: absolute; z-index: 3; right: 10px; bottom: 10px; width: 38px; height: 38px; padding: 0;
+  border: 0; border-radius: 50%; color: #fff; background: rgb(0 0 0 / 0.55); cursor: pointer; }
+#pl-tela.com-local .pl-tela-cheia:active { transform: scale(0.94); }
+#pl-tela video.pl-local:fullscreen { object-fit: contain; }
+.of-legenda li.of-total { grid-template-columns: 1fr auto; padding-top: 8px; border-top: 1px solid var(--border); font-weight: 700; }
+.of-legenda li.of-aviso { grid-template-columns: auto 1fr; align-items: start; font-size: 13px; line-height: 1.4; }
+.of-legenda li.of-aviso svg { margin-top: 2px; }
+.aj-pagina { margin: 8px 4px 4px; font-size: 26px; font-weight: 900; letter-spacing: -0.02em; }
+html.tablet .aj-pagina { font-size: 30px; }

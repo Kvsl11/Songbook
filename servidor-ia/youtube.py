@@ -150,18 +150,50 @@ def baixar_audio(video: str, pasta: str, progresso=lambda p: None) -> dict:
     return {"caminho": caminho, "titulo": info.get("title") or "", "duracao": info.get("duration")}
 
 
-# o que o celular toca sem converter: o áudio em M4A (AAC) e o vídeo em MP4 com o som junto, até 720p (o WebM/Opus é a
-# reserva: o Safari do iPhone não toca)
-FORMATO_AUDIO = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best"
-FORMATO_VIDEO = "best[ext=mp4][height<=720][vcodec!=none][acodec!=none]/18/best[ext=mp4]/best"
+# o que o celular toca sem converter: o áudio em M4A (AAC) e o vídeo em MP4 (H.264) com o som junto (o WebM/Opus é a
+# reserva: o Safari do iPhone não toca). A qualidade é a escolhida no app (Ajustes → Economia de dados e offline), como
+# no Spotify: normal, alta ou muito alta. O YouTube só entrega o vídeo com o som juntos até 360p: acima disso vêm a
+# imagem e o som separados, e o ffmpeg junta os dois num MP4 só (sem converter: é rápido)
+QUALIDADES = ("normal", "alta", "muito-alta")
+ALTURA_VIDEO = {"normal": 480, "alta": 720, "muito-alta": 1080}
+# o som: o M4A de 48 kb/s (o 139 do YouTube) no normal, o de 128 kb/s (o 140) no alto e, no muito alto, o Opus de
+# 160 kb/s (o melhor do YouTube; o app pede "alta" no iPhone, que não toca o Opus)
+FORMATO_AUDIO = {
+    "normal": "bestaudio[ext=m4a][abr<=64]/worstaudio[ext=m4a]/bestaudio[ext=m4a]/bestaudio/best",
+    "alta": "bestaudio[ext=m4a][abr>64]/bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best",
+    "muito-alta": "bestaudio[acodec=opus]/bestaudio[ext=m4a]/bestaudio/best",
+}
+SOM_DO_VIDEO = {"normal": "bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]", "alta": "bestaudio[ext=m4a]",
+                "muito-alta": "bestaudio[ext=m4a]"}
+
+
+def formato_video(qualidade: str) -> str:
+    """A imagem em H.264 (o celular toca sem converter) até a altura da qualidade, com o som em M4A; sem ela, o MP4
+    já junto (360p) e, por último, o que houver"""
+    q = qualidade if qualidade in QUALIDADES else "alta"
+    h = ALTURA_VIDEO[q]
+    som = SOM_DO_VIDEO[q]
+    return "/".join([
+        f"bestvideo[height<={h}][vcodec^=avc1]+{som.split('/')[0]}",
+        f"bestvideo[height<={h}][vcodec^=avc1]+bestaudio[ext=m4a]",
+        f"bestvideo[height<={h}][ext=mp4]+bestaudio[ext=m4a]",
+        f"best[ext=mp4][height<={h}][vcodec!=none][acodec!=none]",
+        "18", "best[ext=mp4]", "best",
+    ])
+
+
+def formato_audio(qualidade: str) -> str:
+    return FORMATO_AUDIO[qualidade if qualidade in QUALIDADES else "alta"]
 TIPOS = {".m4a": "audio/mp4", ".mp4": "video/mp4", ".webm": "video/webm", ".mp3": "audio/mpeg", ".opus": "audio/ogg",
          ".ogg": "audio/ogg", ".aac": "audio/aac"}
 
 
-def baixar_midia(video: str, pasta: str, progresso=lambda p: None, com_video: bool = False) -> dict:
-    """O áudio (ou o vídeo com o som) do jeito que vem do YouTube, para o app guardar no aparelho e tocar sem internet
-    (os downloads, como no Spotify). Devolve o caminho, o tipo (MIME), o título e a duração."""
-    info = _baixar(video, pasta, progresso, FORMATO_VIDEO if com_video else FORMATO_AUDIO, [])
+def baixar_midia(video: str, pasta: str, progresso=lambda p: None, com_video: bool = False, qualidade: str = "alta") -> dict:
+    """O áudio (ou o vídeo com o som) do jeito que vem do YouTube, na qualidade escolhida, para o app guardar no
+    aparelho e tocar sem internet (os downloads, como no Spotify). Devolve o caminho, o tipo (MIME), o título, a
+    duração e a altura do vídeo."""
+    info = _baixar(video, pasta, progresso, formato_video(qualidade) if com_video else formato_audio(qualidade), [],
+                   juntar="mp4" if com_video else None)
     arquivos = [f for f in os.listdir(pasta) if f.startswith("audio.") and not f.endswith((".part", ".ytdl"))]
     if not arquivos:
         raise ValueError("vídeo longo demais (mais de %d min) ou sem áudio" % (MAX_VIDEO // 60))
@@ -170,10 +202,11 @@ def baixar_midia(video: str, pasta: str, progresso=lambda p: None, com_video: bo
     tipo = TIPOS.get(ext, "video/mp4" if com_video else "audio/mp4")
     if ext == ".webm" and not com_video:
         tipo = "audio/webm"
-    return {"caminho": caminho, "tipo": tipo, "titulo": info.get("title") or "", "duracao": info.get("duration")}
+    return {"caminho": caminho, "tipo": tipo, "titulo": info.get("title") or "", "duracao": info.get("duration"),
+            "altura": info.get("height")}
 
 
-def _baixar(video: str, pasta: str, progresso, formato: str, pos: list) -> dict:
+def _baixar(video: str, pasta: str, progresso, formato: str, pos: list, juntar: str | None = None) -> dict:
     """Baixa o vídeo do YouTube para pasta/audio.<ext> no formato pedido (com os pós-processamentos do yt-dlp) e
     devolve as informações dele"""
     import yt_dlp
@@ -211,6 +244,8 @@ def _baixar(video: str, pasta: str, progresso, formato: str, pos: list) -> dict:
         "match_filter": match_filter_func(f"duration <= {MAX_VIDEO}"),
         "postprocessors": pos,
     }
+    if juntar:  # a imagem e o som baixados separados viram um arquivo só
+        opcoes["merge_output_format"] = juntar
     cookies = arquivo_de_cookies()
     antes = None
     if cookies:
