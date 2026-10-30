@@ -171,9 +171,9 @@ test('a consulta LRCLIB é sequencial para evitar limite de requisições e tem 
   const inicio = web.indexOf('export async function letraSincronizada(');
   const fim = web.indexOf('// A gravação oficial entre as letras', inicio);
   const rotina = web.slice(inicio, fim);
-  assert.match(rotina, /for \\(let i = 0; i < consultas\\.length; i\\+\\+\\)/);
-  assert.match(rotina, /setTimeout\\(ok, 350\\)/);
-  assert.doesNotMatch(rotina, /Promise\\.all\\(consultas\\.map/);
+  assert.ok(rotina.includes('for (let i = 0; i < consultas.length; i++)'));
+  assert.ok(rotina.includes('setTimeout(ok, 350)'));
+  assert.ok(!rotina.includes('Promise.all(consultas.map'));
   assert.match(rotina, /timeout = 10000/);
   assert.match(rotina, /tentativas = 4/);
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
@@ -185,10 +185,10 @@ test('se o LRCLIB encontrar duração diferente, refaz a busca do áudio mesmo q
   const inicio = app.indexOf('async function sincronizarMusica(song');
   const fim = app.indexOf('// A preparação começa no clique/entrada da música', inicio);
   const rotina = app.slice(inicio, fim);
-  assert.match(rotina, /if \\(lrc\\.ajustar && song\\.youtube && !ehArquivo\\(yt\\)\\)/);
-  assert.match(rotina, /procurarAudio\\(song, Number\\(lrc\\.duracao\\) \\|\\| 0\\)/);
-  assert.match(rotina, /guardarVersoes\\(song, \\{/);
-  assert.doesNotMatch(rotina, /lrc\\.ajustar && !vs\\?\\.audio/);
+  assert.ok(rotina.includes('if (lrc.ajustar && song.youtube && !ehArquivo(yt))'));
+  assert.ok(rotina.includes('procurarAudio(song, Number(lrc.duracao) || 0)'));
+  assert.ok(rotina.includes('guardarVersoes(song, {'));
+  assert.ok(!rotina.includes('lrc.ajustar && !vs?.audio'));
 });
 
 test('a busca não entra na música sem videoclipe e letra sincronizada confirmada no LRCLIB', async () => {
