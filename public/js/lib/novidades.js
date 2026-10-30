@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 332, data: '2026-10-30', titulo: 'Áudio musical separado do videoclipe longo',
+    itens: [
+      { tipo: 'correcao', texto: 'Quando a duração da letra sincronizada corresponde ao videoclipe longo, o Songbook ainda procura a gravação musical curta para o modo Áudio; o modo Vídeo mantém o videoclipe completo.' },
+      { tipo: 'correcao', texto: 'A capa animada prepara e decodifica o próximo trecho antes da troca, mantendo o trecho atual visível até a transição.' },
+    ],
+  },
+  {
     versao: 331, data: '2026-10-30', titulo: 'Capa animada sem flash na troca dos trechos',
     itens: [
       { tipo: 'correcao', texto: 'A capa animada prepara e decodifica o próximo trecho antes da troca. O vídeo atual continua visível até o novo estar pronto, e os dois se cruzam suavemente, sem mostrar quadro congelado ou tela escura.' },
@@ -71,11 +78,12 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'O Tocando agora não pisca mais: o botão de trocar, o nome, os controles e o aviso da letra eram reescritos 4 vezes por segundo, mesmo sem mudar nada.' },
     ],
   },
-  {
-    versao: 322, data: '2026-10-30', titulo: 'Troca sem engasgo também nas baixadas',
-    itens: [
-      { tipo: 'correcao', texto: 'Nas músicas baixadas, trocar entre a música e o vídeo não engasga mais: o arquivo de agora continua tocando até o outro começar no mesmo ponto, e os dois se cruzam suavemente (antes o som sumia por um instante).' },
-      { tipo: 'correcao', texto: 'O artista sem foto no canal do YouTube (a letra que o YouTube gera, como o “D”) agora fica com o desenho da pessoa com a nota, ou com a foto de verdade de outro lugar, quando houver.' },
-    ],
   },
  ];
+
+// as versões que a pessoa ainda não viu (mais nova primeiro); sem nenhuma vista ainda, só a atual
+export function novidadesNaoVistas(vista) {
+  const v = Number(vista) || 0;
+  if (!v) return NOVIDADES.slice(0, 1);
+  return NOVIDADES.filter((n) => n.versao > v);
+}
