@@ -35,10 +35,11 @@ const ehCelular = () => Math.min(screen.width, screen.height) < 600 && matchMedi
 // flutuando embaixo e o "Tocando agora" (vídeo, controles e a letra) num painel à direita, em pé e deitado
 const ehTablet = () => Math.min(screen.width, screen.height) >= 600 && matchMedia('(pointer: coarse)').matches;
 document.documentElement.classList.toggle('tablet', ehTablet());
-const travarEmPe = () => {
+const travarEmPe = (e) => {
   if (!ehCelular()) return;
-  // o vídeo em tela cheia pode deitar (assistir de lado); o resto do app, não
-  if (/^(IFRAME|VIDEO)$/.test(document.fullscreenElement?.tagName || '')) screen.orientation?.unlock?.();
+  // o vídeo em tela cheia pode deitar (assistir de lado); o resto do app, não. (Girar com o vídeo na tela cheia não
+  // mexe em nada: destravar de novo a cada giro fazia a tela voltar)
+  if (/^(IFRAME|VIDEO)$/.test(document.fullscreenElement?.tagName || '')) { if (e?.type !== 'change') screen.orientation?.unlock?.(); }
   else screen.orientation?.lock?.('portrait').catch(() => {});
 };
 document.documentElement.classList.toggle('celular', ehCelular());
@@ -130,7 +131,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-319';
+export const APP_VERSAO = '2026.10.30-320';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -223,7 +224,32 @@ function toast(msg, opcoes = {}) {
   // o mesmo aviso de novo, logo em seguida, não empilha
   const ultima = notificacoes[0];
   if (ultima && !ultima.lida && ultima.titulo === titulo && ultima.texto === detalhe && Date.now() - ultima.t < 10000) return;
+  // com as notificações no sistema: usando o app, o aviso aparece rapidinho na tela (a resposta a um toque não vai para
+  // a barra do celular); com o app em segundo plano, os que importam (pronto, erro, a IA) vão para a barra
+  if (podeNotificarNoSistema()) {
+    if (document.visibilityState === 'visible') avisoRapido([titulo, detalhe].filter(Boolean).join(': '), tipo);
+    else if (['sucesso', 'erro', 'ia'].includes(tipo)) notificarSistema({ titulo: titulo || 'Songbook Litúrgico', texto: detalhe || '' });
+    return;
+  }
   notificar(detalhe, { tipo, titulo });
+}
+// o aviso rápido na tela (some sozinho em 3 s, como o do Spotify)
+let avisoTempo = 0;
+function avisoRapido(texto, tipo = 'info') {
+  let el = $('#aviso-rapido');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'aviso-rapido';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    document.body.append(el);
+  }
+  el.dataset.tipo = tipo;
+  el.innerHTML = `${icon(ICONE_AVISO[tipo] || 'info', 16)}<span>${esc(texto)}</span>`;
+  el.classList.remove('some');
+  el.classList.add('aparece');
+  clearTimeout(avisoTempo);
+  avisoTempo = setTimeout(() => el.classList.replace('aparece', 'some'), 3200);
 }
 // compartilhar pelo sistema (WhatsApp, e-mail…); sem isso, copia o texto
 async function compartilhar(dados) {
@@ -253,13 +279,14 @@ function desenharSino() {
 // As notificações vão para a barra de notificações do celular (como as de qualquer app), com a permissão dada: aí o
 // sininho de dentro do app sai. Sem a permissão (negada, ou o iPhone sem o app instalado), ficam no sininho, como antes
 const podeNotificarNoSistema = () => typeof Notification !== 'undefined' && Notification.permission === 'granted' && 'serviceWorker' in navigator;
-async function notificarSistema({ titulo, texto = '', tag = '', href = '', silenciosa = false, renovar = false }) {
+// (o ícone pequeno da barra é a palheta branca vazada, que o Android pinta; a imagem grande, a capa da música)
+async function notificarSistema({ titulo, texto = '', tag = '', href = '', silenciosa = false, renovar = false, imagem = '' }) {
   if (!podeNotificarNoSistema()) return false;
   try {
     const reg = await navigator.serviceWorker.ready;
     await reg.showNotification(titulo || 'Songbook Litúrgico', {
-      body: texto, tag: tag || undefined, renotify: Boolean(tag && renovar), silent: silenciosa,
-      icon: new URL('icon-192-v7.png', document.baseURI).href, badge: new URL('icon-maskable-192-v7.png', document.baseURI).href,
+      body: texto, tag: tag || undefined, renotify: Boolean(tag && renovar), silent: silenciosa, timestamp: Date.now(),
+      icon: imagem || new URL('icon-192-v7.png', document.baseURI).href, badge: new URL('badge-96.png', document.baseURI).href,
       data: { href: href ? new URL(href, location.href).href : location.href.split('#')[0] },
     });
     return true;
@@ -732,8 +759,8 @@ async function baixarMusica(song, { perguntou = false } = {}) {
     while (filaBaixar.length) {
       const id = filaBaixar.shift();
       try { await baixarAgora(id); } catch (e) {
-        toast(`Não baixou “${db.song(id)?.title || 'a música'}”: ${erroExplicado(e)}`, 5000);
-        notificarSistema({ titulo: `Não baixou: ${db.song(id)?.title || 'a música'}`, texto: erroExplicado(e), tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}` });
+        if (!podeNotificarNoSistema() || document.visibilityState === 'visible') toast(`Não baixou “${db.song(id)?.title || 'a música'}”: ${erroExplicado(e)}`, 5000);
+        notificarSistema({ titulo: db.song(id)?.title || 'Download', texto: `Não deu para baixar · ${erroExplicado(e)}`, tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}`, imagem: capaDaNotificacao(db.song(id)) });
       }
       baixando.delete(id);
       avisarDownloads();
@@ -741,6 +768,8 @@ async function baixarMusica(song, { perguntou = false } = {}) {
     andandoFila = null;
   })();
 }
+// a capa da música na notificação (a dela ou a do vídeo)
+const capaDaNotificacao = (song) => (song?.cover && /^https?:/.test(song.cover) ? song.cover : song?.youtube ? `https://i.ytimg.com/vi/${song.youtube}/hqdefault.jpg` : '');
 async function baixarAgora(id) {
   const song = db.song(id);
   if (!song) return;
@@ -755,7 +784,7 @@ async function baixarAgora(id) {
       baixando.set(id, { pct });
       avisarDownloads();
       // na barra de notificações, como o Spotify: "Baixando… 40%" (a cada 10%, sem som), trocada pela de pronta no fim
-      if (Math.floor(pct / 10) !== Math.floor(antes / 10)) notificarSistema({ titulo: `Baixando: ${song.title}`, texto: `${pct}% · ${song.artist || 'Songbook Litúrgico'}`, tag: `baixar-${id}`, silenciosa: true, href: `#/musica/${id}` });
+      if (Math.floor(pct / 10) !== Math.floor(antes / 10)) notificarSistema({ titulo: song.title, texto: `${song.artist ? `${song.artist} · ` : ''}Baixando ${pct}%`, tag: `baixar-${id}`, silenciosa: true, href: `#/musica/${id}`, imagem: capaDaNotificacao(song) });
     };
     const r = await chamarComEtapas(servidorIA(), '/baixar', { json: { url: `https://youtu.be/${yt}`, video, qualidade: qualidadeDoDownload(video) } }, (etapa, p) => { if (etapa === 'baixando' && p !== null) andou(p * 0.8); });
     andou(0.85);
@@ -770,8 +799,9 @@ async function baixarAgora(id) {
   await guardarImagensDaMusica(song);
   if (!db.song(id)) return; // saiu da biblioteca enquanto baixava
   db.updateSong(id, { baixado: { arquivos, tamanho: Object.values(arquivos).reduce((a, x) => a + (x.tamanho || 0), 0), em: Date.now() } });
-  toast(`Baixada: ${song.title}`);
-  notificarSistema({ titulo: `Baixada: ${song.title}`, texto: `${song.artist ? `${song.artist} · ` : ''}Toca sem internet (${fmtBytes(db.song(id)?.baixado?.tamanho || 0)})`, tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}` });
+  // (com a notificação na barra, ela já diz; o aviso fica para quem não deu a permissão)
+  if (!podeNotificarNoSistema()) toast(`Baixada: ${song.title}`);
+  notificarSistema({ titulo: song.title, texto: `Download concluído${song.artist ? ` · ${song.artist}` : ''} · ${fmtBytes(db.song(id)?.baixado?.tamanho || 0)}`, tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}`, imagem: capaDaNotificacao(song) });
 }
 // as capas e a partitura da música no cache dos downloads (o service worker usa sem internet)
 async function guardarImagensDaMusica(song) {
@@ -1158,6 +1188,10 @@ const player = (() => {
   let quadro = 0;
   const seguir = () => {
     quadro = requestAnimationFrame(seguir);
+    // o vídeo em tela cheia (o botão do YouTube ou o do vídeo baixado) fica onde está: mudar ele de lugar (ao girar a
+    // tela, o lugar dele no player muda) tirava da tela cheia, e o vídeo girava, saía e voltava ao normal
+    const cheia = document.fullscreenElement || document.webkitFullscreenElement;
+    if (cheia && (cheia === tela || tela.contains(cheia))) return;
     const a = alvo();
     if (!tela.isConnected) { casa.append(tela); tela.classList.remove('na-telinha'); montar(); return; } // saiu junto com uma página (não deveria): refaz
     const escondida = (modoCapa() || capaNaBarra() || atual?.semVideo || el.classList.contains('letra-cheia')) && !noPalco();
@@ -1365,14 +1399,31 @@ const player = (() => {
       tirar,
     };
   })();
+  // a capa oficial da música tocando (uma vez por música): chegando, entra no player e fica guardada na música salva
+  // que não tinha capa (a biblioteca também passa a mostrar ela)
+  const buscarCapaOficial = () => {
+    const a = atual;
+    if (!a || a.capaOficial !== undefined || (a.capa && /^(https?:|data:)/.test(a.capa)) || !a.titulo || !a.artista) return;
+    a.capaOficial = '';
+    capaOficial(a.titulo, a.artista).then((u) => {
+      if (!u) return;
+      a.capaOficial = u;
+      if (atual && atual.songId === a.songId && atual.titulo === a.titulo) { atual.capaOficial = u; mini.dataset.conteudo = ''; desenharCapa(); }
+      const s = a.songId && a.songId !== 'previa' && db.song(a.songId);
+      if (s && !s.cover) db.saveSong({ ...s, content: definirMeta(s.content, 'cover', u) });
+    });
+  };
   // a capa (no modo capa): a da música ou o quadro do vídeo; o botão de trocar diz para o que vai
   const desenharCapa = () => {
     // (tocando só o áudio, do aparelho: sempre a capa)
     const capa = modoCapa() || Boolean(atual?.semVideo) || Boolean(local && !local.video);
     el.classList.toggle('modo-capa', capa);
     const doYt = ytDaCapa();
-    const url = atual?.capa && /^(https?:|data:)/.test(atual.capa) ? atual.capa : doYt ? `https://i.ytimg.com/vi/${doYt}/hqdefault.jpg` : '';
-    const capaYt = !(atual?.capa && /^(https?:|data:)/.test(atual.capa));
+    // sem a capa na música, a capa de verdade (do álbum), quando chegar; até lá (ou sem achar), o quadro do vídeo
+    buscarCapaOficial();
+    const propria = atual?.capa && /^(https?:|data:)/.test(atual.capa) ? atual.capa : atual?.capaOficial || '';
+    const url = propria || (doYt ? `https://i.ytimg.com/vi/${doYt}/hqdefault.jpg` : '');
+    const capaYt = !propria;
     // sem capa nem vídeo: a cor da música com uma nota no meio. Com vídeo, no modo música, a capa tem movimento: os
     // quadros do clipe passando com zoom lento (como no topo da página da música) atrás de toda a parte de cima do
     // Tocando agora, sumindo num degradê no fundo; o lugar da capa fica vazio, mostrando os quadros (como o Canvas do
@@ -1404,9 +1455,9 @@ const player = (() => {
       canvas.montar(q);
     }
     mini.classList.toggle('capa-yt', (capa || barra) && capaYt);
-    // no modo vídeo, a capa pequena ao lado do nome (como no Spotify)
+    // a capa pequena ao lado do nome, no modo vídeo e no modo música (no modo música, em cima ficam as cenas do clipe)
     const capinha = $('.pl-capinha', el);
-    capinha.style.backgroundImage = !capa && url ? `url("${url}")` : '';
+    capinha.style.backgroundImage = url ? `url("${url}")` : '';
     capinha.classList.toggle('capa-yt', capaYt);
     capinha.hidden = !url;
     const b = $('.pl-troca', el);
@@ -1935,7 +1986,9 @@ const semLinhasDeAcordes = (sinc) => {
     document.addEventListener('fullscreenchange', sair);
     document.addEventListener('webkitfullscreenchange', sair);
     const pedir = v.requestFullscreen?.bind(v) || v.webkitRequestFullscreen?.bind(v);
-    if (pedir) Promise.resolve(pedir()).then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => v.webkitEnterFullscreen?.());
+    // (sem travar a tela deitada: é só virar o aparelho, como no YouTube; a trava brigava com a do app e a tela girava
+    // e voltava)
+    if (pedir) Promise.resolve(pedir()).catch(() => v.webkitEnterFullscreen?.());
     else v.webkitEnterFullscreen?.(); // (iPhone: só o próprio vídeo vai para a tela cheia)
     v.addEventListener('webkitendfullscreen', () => { v.controls = false; }, { once: true });
   });
@@ -4257,6 +4310,34 @@ function jsonp(url, tempo = 8000) {
     tag.src = `${url}${url.includes('?') ? '&' : '?'}output=jsonp&callback=${cb}`;
     document.head.append(tag);
   });
+}
+// A capa de verdade da música (a do álbum ou do single, como no Spotify), e não um quadro do vídeo: no Deezer e, sem
+// achar lá, no iTunes, pela música com o mesmo título e o mesmo artista. '' se nenhum tiver. O último valor fica
+// guardado no aparelho (vale sem internet)
+const capasOficiais = new Map();
+function capaOficial(titulo, artista) {
+  const t = normalizar(tituloLimpo(titulo));
+  const a = String(artista || '').split(/\s*(?:,|&| e | feat\.? | ft\.? | part\.? | x )\s*/i)[0].trim();
+  if (!t || !a) return Promise.resolve('');
+  const k = `${normalizar(a)}|${t}`;
+  const titulo0 = (x) => normalizar(tituloLimpo(x || ''));
+  const mesmaMusica = (tit, art) => mesmoNome(art || '', a) && (titulo0(tit) === t || ` ${titulo0(tit)} `.startsWith(` ${t} `));
+  if (!capasOficiais.has(k)) {
+    capasOficiais.set(k, (async () => {
+      // (a busca simples: a com artist:"" track:"" às vezes volta vazia para a música que existe)
+      const dz = await jsonp(`https://api.deezer.com/search?q=${encodeURIComponent(`${a} ${tituloLimpo(titulo)}`)}&limit=15`);
+      // (de preferência o título igual, sem "(Remix)", "(Live)"…: a capa do single ou do álbum, não a do remix)
+      const exata = (tit) => normalizar(tit || '') === t;
+      const ds = (dz?.data || []).filter((x) => mesmaMusica(x.title, x.artist?.name) && x.album?.cover_xl);
+      const d = ds.find((x) => exata(x.title)) || ds[0];
+      if (d) return d.album.cover_xl;
+      const it = await jsonp(`https://itunes.apple.com/search?term=${encodeURIComponent(`${a} ${tituloLimpo(titulo)}`)}&entity=song&limit=15`);
+      const ms = (it?.results || []).filter((x) => mesmaMusica(x.trackName, x.artistName) && x.artworkUrl100);
+      const m = ms.find((x) => exata(x.trackName)) || ms[0];
+      return m ? m.artworkUrl100.replace(/\/\d+x\d+(bb)?\.(jpg|png)$/, '/600x600bb.jpg') : '';
+    })().catch(() => ''));
+  }
+  return comUltimoValor('capa', k, capasOficiais.get(k));
 }
 async function fotoDeezer(nome) {
   const r = await jsonp(`https://api.deezer.com/search/artist?q=${encodeURIComponent(nome)}&limit=5`);

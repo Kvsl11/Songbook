@@ -4,6 +4,16 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 320, data: '2026-10-30', titulo: 'A capa de verdade e notificações mais caprichadas',
+    itens: [
+      { tipo: 'melhoria', texto: 'Notificações mais bonitas: o ícone do app certinho na barra, a capa da música, o nome dela no título e “Baixando 80%” / “Download concluído” embaixo. Os avisos de quando você está usando o app aparecem rapidinho na tela, sem encher a barra do celular.' },
+      { tipo: 'novo', texto: 'A capa de verdade da música (a do álbum ou do single, pelo Deezer ou pelo iTunes), no lugar do quadro do vídeo. Fica guardada na música e aparece também na biblioteca.' },
+      { tipo: 'melhoria', texto: 'A capinha ao lado do nome aparece também no modo música, no mesmo lugar do modo vídeo.' },
+      { tipo: 'correcao', texto: 'O vídeo em tela cheia não sai mais sozinho ao virar o celular (antes ele girava, saía e voltava ao normal).' },
+      { tipo: 'correcao', texto: 'Na barrinha de baixo, o vídeo pequeno não fica mais coberto pelo botão de tela cheia: ele só aparece com o vídeo grande.' },
+    ],
+  },
+  {
     versao: 319, data: '2026-10-30', titulo: 'Música e vídeo no ponto certo, Canvas e downloads',
     itens: [
       { tipo: 'melhoria', texto: 'Trocar entre a música e o vídeo cai no mesmo ponto cantado também sem o servidor: o próprio aparelho casa o áudio oficial e o clipe pelo som (como o Spotify), mesmo com cena antes da música, como em Espresso e Speed Demon.' },
@@ -74,13 +84,6 @@ export const NOVIDADES = [
       { tipo: 'novo', texto: 'No ⋯ da música, “Criar partitura”: a IA do servidor ouve o áudio da música, escreve a partitura e ela já abre para você ver. Depois de criada, a opção vira “Ver partitura”.' },
       { tipo: 'melhoria', texto: 'Gerar a partitura com IA começa sozinho pelo áudio da música (o vídeo ou o seu áudio), sem escolher arquivo nem colar link. Só se não der certo é que aparece a opção de importar o áudio.' },
       { tipo: 'melhoria', texto: 'A tela de criar a partitura ficou mais clara: a automática, com IA, em destaque em cima; a manual, nota por nota, embaixo.' },
-    ],
-  },
-  {
-    versao: 310, data: '2026-10-29', titulo: 'Toque o seu próprio áudio',
-    itens: [
-      { tipo: 'novo', texto: 'Use um áudio seu na música (a gravação do ensaio, um MP3): no ⋯ da música, “Usar um áudio seu”. Ele fica guardado no aparelho e toca no modo música; o clipe continua no modo vídeo.' },
-      { tipo: 'novo', texto: 'A letra sincroniza sozinha com o seu áudio: pelo banco de letras, se for a mesma gravação, ou pela IA do servidor, que ouve o áudio e encaixa a letra. Sem servidor, dá para sincronizar à mão.' },
     ],
   },
 ];

@@ -3057,10 +3057,10 @@ html.pp #player .pl-meio { order: 4; display: flex; align-items: center; gap: 12
 html.pp #player .pl-info { flex: 1; min-width: 0; padding: 0 2px; margin: 0; }
 /* no modo vídeo, a capa pequena ao lado do nome, como no Spotify (no modo música a capa grande já está em cima) */
 #player .pl-capinha { display: none; }
-html.pp #player:not(.modo-capa) .pl-capinha { display: block; flex: none; width: 56px; height: 56px; border-radius: 6px; background: #000 center / cover no-repeat;
+html.pp #player .pl-capinha { display: block; flex: none; width: 56px; height: 56px; border-radius: 6px; background: #000 center / cover no-repeat;
   box-shadow: 0 4px 12px rgb(0 0 0 / 0.35); animation: pop 0.3s both; }
-html.pp #player:not(.modo-capa) .pl-capinha.capa-yt { background-size: auto 134%; }
-html.pp #player:not(.modo-capa) .pl-capinha[hidden] { display: none; }
+html.pp #player .pl-capinha.capa-yt { background-size: auto 134%; }
+html.pp #player .pl-capinha[hidden] { display: none; }
 html.pp #player .pl-salva { display: inline-grid; width: 34px; height: 34px; border-color: rgb(255 255 255 / 0.85); color: #fff; }
 html.pp #player .pl-salva.salva { border-color: var(--accent); color: var(--on-accent); }
 html.pp #player .pl-txt b { font-size: 22px; letter-spacing: -0.01em; white-space: normal; }
@@ -4088,7 +4088,12 @@ html.tablet .aj-topico small { font-size: 14.5px; }
 
 /* o vídeo baixado: o botão de tela inteira no canto (o do YouTube só existe no player dele) */
 #pl-tela .pl-tela-cheia { display: none; }
-#pl-tela.com-local .pl-tela-cheia { display: grid; place-items: center; position: absolute; z-index: 3; right: 10px; bottom: 10px; width: 38px; height: 38px; padding: 0;
+/* (só com o vídeo grande: no Tocando agora e na página da música. Na barrinha de baixo, o vídeo pequeno ficava coberto
+   por ele) */
+#pl-tela { container-type: inline-size; }
+#pl-tela.com-local .pl-tela-cheia { display: none; }
+@container (min-width: 260px) { #pl-tela.com-local .pl-tela-cheia { display: grid; } }
+#pl-tela.com-local .pl-tela-cheia { place-items: center; position: absolute; z-index: 3; right: 10px; bottom: 10px; width: 38px; height: 38px; padding: 0;
   border: 0; border-radius: 50%; color: #fff; background: rgb(0 0 0 / 0.55); cursor: pointer; }
 #pl-tela.com-local .pl-tela-cheia:active { transform: scale(0.94); }
 #pl-tela video.pl-local:fullscreen { object-fit: contain; }
@@ -4106,3 +4111,14 @@ html.tablet .aj-pagina { font-size: 30px; }
 .ref-avatar .sem-foto-artista svg { width: 100%; height: 100%; }
 .sa-sem-foto { background: #3d444d !important; color: #a7adb4 !important; }
 html.pp #player .pl-artista-foto span.sem-foto-artista, html.pp #player .pl-artista-foto > span { color: rgb(255 255 255 / 0.7); }
+
+/* o aviso rápido na tela (com as notificações na barra do celular): uma pílula escura em cima do menu, que some sozinha */
+#aviso-rapido { position: fixed; z-index: 90; left: 50%; width: max-content; hyphens: manual; text-wrap: pretty; bottom: calc(var(--nav-h, 64px) + 86px + env(safe-area-inset-bottom)); max-width: min(92vw, 520px);
+  display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 12px; background: #2a2a2a; color: #fff;
+  font-size: 14px; font-weight: 600; line-height: 1.35; box-shadow: 0 10px 30px rgb(0 0 0 / 0.45); pointer-events: none;
+  opacity: 0; transform: translate(-50%, 12px); transition: opacity 0.2s ease, transform 0.2s ease; }
+#aviso-rapido.aparece { opacity: 1; transform: translate(-50%, 0); }
+#aviso-rapido svg { flex: none; color: var(--accent); }
+#aviso-rapido[data-tipo="erro"] svg { color: var(--danger); }
+#aviso-rapido span { min-width: 0; }
+html.tablet #aviso-rapido { bottom: calc(var(--nav-alt, 84px) + var(--nav-pe, 16px) + 16px + env(safe-area-inset-bottom)); font-size: 15px; }
