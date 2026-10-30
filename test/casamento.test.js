@@ -51,3 +51,17 @@ test('casar acha a música editada no clipe, em outra ordem e com uma parte a me
   assert.ok(Math.abs(noClipe(20) - 35) < 1, `20 s → ${noClipe(20)}`);
   assert.ok(Math.abs(noClipe(52) - 87) < 1, `52 s → ${noClipe(52)}`);
 });
+
+test('casar localiza a música depois de uma introdução longa e mantém o tempo parado numa cena inserida', () => {
+  const m = musica(40, 13);
+  const parte1 = m.subarray(0, 20 * TAXA);
+  const parte2 = m.subarray(20 * TAXA);
+  const clipe = juntar(ruido(90), parte1, ruido(8), parte2, ruido(5));
+  const r = casar(m, clipe);
+  assert.ok(r?.mesma, JSON.stringify(r));
+  const inicio = r.pares[0];
+  assert.ok(Math.abs(inicio[1] - 90) < 1, `início do áudio → ${inicio[1]} s no clipe`);
+  const cena = r.pares.filter(([ta]) => Math.abs(ta - 20) < 0.6).map(([, tv]) => tv);
+  assert.ok(cena.length >= 2, `a cena precisa de âncoras de entrada e saída: ${JSON.stringify(cena)}`);
+  assert.ok(Math.max(...cena) - Math.min(...cena) >= 7, `a cena inserida precisa ser representada: ${JSON.stringify(cena)}`);
+});
