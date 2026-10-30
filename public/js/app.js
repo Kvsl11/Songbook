@@ -224,10 +224,11 @@ function toast(msg, opcoes = {}) {
   // o mesmo aviso de novo, logo em seguida, não empilha
   const ultima = notificacoes[0];
   if (ultima && !ultima.lida && ultima.titulo === titulo && ultima.texto === detalhe && Date.now() - ultima.t < 10000) return;
-  // com as notificações no sistema: usando o app, o aviso aparece rapidinho na tela (a resposta a um toque não vai para
-  // a barra do celular); com o app em segundo plano, os que importam (pronto, erro, a IA) vão para a barra
+  // com as notificações no sistema: usando o app, nada de aviso na tela (o "Salvo na biblioteca" e os outros só
+  // atrapalhavam); só o erro aparece, para o toque não ficar sem resposta. Com o app em segundo plano, os que importam
+  // (pronto, erro, a IA) vão para a barra do celular
   if (podeNotificarNoSistema()) {
-    if (document.visibilityState === 'visible') avisoRapido([titulo, detalhe].filter(Boolean).join(': '), tipo);
+    if (document.visibilityState === 'visible') { if (tipo === 'erro') avisoRapido([titulo, detalhe].filter(Boolean).join(': '), tipo); }
     else if (['sucesso', 'erro', 'ia'].includes(tipo)) notificarSistema({ titulo: titulo || 'Songbook Litúrgico', texto: detalhe || '' });
     return;
   }
