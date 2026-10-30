@@ -637,19 +637,30 @@ export async function buscarYoutube(termo, { fetchImpl, instancias = PIPED, filt
 // pelo Piped, que entrega o áudio pelo proxy dele (com CORS); null se nenhuma instância entregar
 export async function audioDoVideo(id, { fetchImpl, instancias = PIPED } = {}) {
   if (!/^[\w-]{11}$/.test(id || '')) return null;
-  for (const base of instancias) {
+  // Consulta as instâncias em paralelo: algumas ficam lentas ou fora do ar. O áudio em si é baixado
+  // de uma fonte por vez, para não multiplicar o consumo de dados no celular.
+  const fontes = await Promise.all(instancias.map(async (base) => {
     try {
-      const res = await buscar(`${base}/streams/${id}`, { fetchImpl, timeout: 12000 });
-      if (!res.ok) continue;
+      const res = await buscar(base + '/streams/' + id, { fetchImpl, timeout: 12000 });
+      if (!res.ok) return null;
       const json = await res.json();
-      const fluxos = (json?.audioStreams || []).filter((f) => f?.url && !f.videoOnly).sort((a, b) => (a.bitrate || 0) - (b.bitrate || 0));
-      for (const f of fluxos.slice(0, 2)) {
-        try {
-          const r = await buscar(f.url, { fetchImpl, timeout: 90000 });
-          if (r.ok) { const blob = await r.blob(); if (blob.size > 10000) return blob; }
-        } catch { /* o próximo */ }
-      }
-    } catch { /* a próxima instância */ }
+      const fluxos = (json?.audioStreams || [])
+        .filter((f) => f?.url && !f.videoOnly)
+        .sort((a, b) => (a.bitrate || 0) - (b.bitrate || 0));
+      return fluxos.length ? fluxos : null;
+    } catch { return null; }
+  }));
+  // Alguns formatos/URLs entregues pelo proxy falham ao abrir ou decodificar. Tenta até quatro
+  // faixas de áudio (da menor taxa para a maior) antes de desistir; nunca baixa a faixa de vídeo.
+  for (const fluxos of fontes) {
+    for (const f of (fluxos || []).slice(0, 4)) {
+      try {
+        const r = await buscar(f.url, { fetchImpl, timeout: 90000 });
+        if (!r.ok) continue;
+        const blob = await r.blob();
+        if (blob.size > 10000) return blob;
+      } catch { /* tenta outra faixa ou instância */ }
+    }
   }
   return null;
 }
