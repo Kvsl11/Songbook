@@ -1,12 +1,12 @@
 // O que mudou em cada versão do app, em palavras de quem usa. A primeira da lista é a versão atual (a mesma do
-// VERSION do sw.js: um teste confere): ao atualizar, o sininho avisa "Atualização" e tocar abre a tela Novidades.
+// VERSION do sw.js: um teste confere). As mudanças ficam disponíveis na tela Novidades.
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }. Ficam só as 10 últimas versões (um teste confere):
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
     versao: 339, data: '2026-10-30', titulo: 'Sincronia automática somente pelo LRCLIB',
     itens: [
-      { tipo: 'correcao', texto: 'A sincronia de letras usa exclusivamente o LRCLIB. A sincronização por IA do servidor e os comandos manuais foram removidos. Se o LRCLIB não encontrar a gravação correspondente, a música permanece sem sincronia e sem notificações desse processo.' },
+      { tipo: 'correcao', texto: 'A sincronia de letras usa exclusivamente o LRCLIB. A sincronização por IA do servidor e os comandos manuais foram removidos. Se o LRCLIB não encontrar a gravação correspondente, a música permanece sem sincronia. Foram removidas as notificações do sininho e do sistema.' },
     ],
   },
   {
