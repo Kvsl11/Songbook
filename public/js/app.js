@@ -17,7 +17,6 @@ import {
 import { corCss, corDominante } from './lib/cores.js';
 import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
 import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } from './lib/alinhamento.js';
-import { partesDoAviso, tipoDoAviso } from './lib/avisos.js';
 import { NOVIDADES } from './lib/novidades.js';
 import { baseDoServidor, cabecalhos, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, dataDaPergunta, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
@@ -80,21 +79,23 @@ if (doLink !== null) {
   history.replaceState(null, '', location.pathname + location.hash);
 }
 const responde = (url) => fetch(url + '/saude', { headers: cabecalhos(url), signal: AbortSignal.timeout(8000) }).then((r) => r.ok).catch(() => false);
-const servidorCarregado = (async () => {
-  const pc = baseDoServidor(db.prefs().servidorPc);
-  if (pc && await responde(pc)) {
-    SERVIDOR_IA = { url: pc, chave: '', pc: true, lumen: pc };
-    if (doLink) setTimeout(() => toast('Servidor do seu computador conectado'), 500);
-  } else {
-    if (pc && doLink) setTimeout(() => toast('O servidor do computador não respondeu. Ele está ligado?'), 500);
-    const d = await fetch(new URL('data/servidor-ia.json', document.baseURI)).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    if (!d?.url) return;
-    // sem o "bom dia" que acordava o servidor a cada vez que o app abria: cada acordada gastava o crédito grátis do
-    // Modal (a máquina liga e fica ligada um tempo), mesmo sem ninguém gerar nada
-    // "lumen": a máquina pequena só das perguntas do Lumen (a principal é a das partituras)
-    SERVIDOR_IA = { url: baseDoServidor(d.url), chave: d.chave || '', lumen: baseDoServidor(d.lumen || '') };
-  }
-})().catch(() => {});
+let carregamentoServidor = null;
+// O servidor de IA só é localizado quando uma função que realmente o utiliza é aberta.
+// Abrir/tocar músicas nunca consulta o servidor: a sincronia de letras usa apenas o LRCLIB.
+function carregarServidor() {
+  if (carregamentoServidor) return carregamentoServidor;
+  carregamentoServidor = (async () => {
+    const pc = baseDoServidor(db.prefs().servidorPc);
+    if (pc && await responde(pc)) {
+      SERVIDOR_IA = { url: pc, chave: '', pc: true, lumen: pc };
+    } else {
+      const d = await fetch(new URL('data/servidor-ia.json', document.baseURI)).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      if (!d?.url) return;
+      SERVIDOR_IA = { url: baseDoServidor(d.url), chave: d.chave || '', lumen: baseDoServidor(d.lumen || '') };
+    }
+  })().catch(() => {});
+  return carregamentoServidor;
+}
 const view = $('#view');
 const titleEl = $('#title');
 const eyebrowEl = $('#eyebrow');
@@ -133,7 +134,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-339';
+export const APP_VERSAO = '2026.10.30-340';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -214,33 +215,8 @@ function irParaMusica(id) {
 
 // ------------------------------------------------------------------ util
 
-// Avisos rápidos de interação, sem criar notificações persistentes ou do sistema.
-function toast(msg, opcoes = {}) {
-  if (typeof opcoes === 'number') opcoes = {};
-  const tipo = opcoes.tipo || tipoDoAviso(msg);
-  if (tipo === 'carregando') return;
-  const { titulo, detalhe } = opcoes.titulo ? { titulo: opcoes.titulo, detalhe: msg } : partesDoAviso(msg);
-  avisoRapido([titulo, detalhe].filter(Boolean).join(': '), tipo);
-}
-// o aviso rápido na tela (some sozinho em 3 s, como o do Spotify)
-let avisoTempo = 0;
-const ICONE_AVISO = { sucesso: 'check', erro: 'alerta', ia: 'sparkles', info: 'info', atualizacao: 'download' };
-function avisoRapido(texto, tipo = 'info') {
-  let el = $('#aviso-rapido');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'aviso-rapido';
-    el.setAttribute('role', 'status');
-    el.setAttribute('aria-live', 'polite');
-    document.body.append(el);
-  }
-  el.dataset.tipo = tipo;
-  el.innerHTML = `${icon(ICONE_AVISO[tipo] || 'info', 16)}<span>${esc(texto)}</span>`;
-  el.classList.remove('some');
-  el.classList.add('aparece');
-  clearTimeout(avisoTempo);
-  avisoTempo = setTimeout(() => el.classList.replace('aparece', 'some'), 3200);
-}
+// Avisos e notificações foram removidos conforme a configuração do app.
+function toast() {}
 // compartilhar pelo sistema (WhatsApp, e-mail…); sem isso, copia o texto
 async function compartilhar(dados) {
   if (navigator.share) {
@@ -249,8 +225,6 @@ async function compartilhar(dados) {
   try { await navigator.clipboard.writeText([dados.text, dados.url].filter(Boolean).join('\n')); toast('Copiado: é só colar onde quiser'); } catch { toast('Não consegui compartilhar'); }
 }
 
-try { localStorage.removeItem('songbook.notificacoes'); } catch { /* armazenamento indisponível */ }
-if ('serviceWorker' in navigator) navigator.serviceWorker.ready.then((reg) => reg.getNotifications().then((ns) => ns.forEach((n) => n.close()))).catch(() => {});
 
 function setHeader(title, { back = null, actions = [], eyebrow = '' } = {}) {
   titleEl.textContent = title;
@@ -7337,7 +7311,7 @@ async function gerarComIA(song, titulo, { salvarSozinho = false } = {}) {
   // espera o app saber do servidor (ao abrir, ele ainda confere se o do computador responde): antes, a tela que abria
   // nesse meio-tempo ia direto para "escolher o arquivo", sem tentar gerar
   view.innerHTML = `<div class="loading-note"><span class="spin"></span>Preparando a IA…</div>`;
-  await servidorCarregado;
+  await carregarServidor();
   const aqui = location.hash;
   if (!aqui.startsWith(`#/musica/${id}/compor/`)) return;
   // o servidor no computador de quem usa (Ajustes → Servidor no computador): de graça, sem crédito do Modal. O arquivo
@@ -10191,7 +10165,7 @@ function viewSettings(topico) {
   $('#video-fundo').onchange = (e) => { db.setPref('videoFundo', e.target.checked); player.atualizar({}); };
   // servidor no computador: diz se responde agora; salvar ou tirar vale na próxima vez que o app abrir
   const estadoPc = $('#servidor-pc-estado');
-  if (p.servidorPc) Promise.all([responde(p.servidorPc), servidorCarregado]).then(([ok]) => { estadoPc.textContent = ok ? `Ligado: ${SERVIDOR_IA.pc ? 'o app está usando ele' : 'reabra o app para usar'}` : 'Não responde. O PC está ligado? Ao religar, o endereço muda: leia o QR code de novo'; });
+  if (p.servidorPc) Promise.all([responde(p.servidorPc), carregarServidor()]).then(([ok]) => { estadoPc.textContent = ok ? `Ligado: ${SERVIDOR_IA.pc ? 'o app está usando ele' : 'reabra o app para usar'}` : 'Não responde. O PC está ligado? Ao religar, o endereço muda: leia o QR code de novo'; });
   $('#servidor-pc-form').onsubmit = (e) => {
     e.preventDefault();
     const campo = $('#servidor-pc-url');
@@ -10572,7 +10546,7 @@ function viewConectarYoutube() {
       }
     })
     .catch((e) => { estado.className = 'cy-estado erro'; estado.innerHTML = `<i></i>${esc(e.message)}`; });
-  servidorCarregado.then(verEstado);
+  carregarServidor().then(verEstado);
   // escolher ou arrastar o arquivo: o texto aparece no campo, fica guardado e já envia
   const usarArquivo = async (f) => {
     if (!f) return;
