@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { casar, paresDoCaminho, TAXA } from '../public/js/lib/casamento.js';
+import { tempoNoAudio, tempoNoVideo } from '../public/js/lib/versoes.js';
 
 // uma "música" de notas que mudam a cada meio segundo (sempre a mesma sequência, como uma gravação)
 function musica(segundos, semente = 1) {
@@ -68,4 +69,15 @@ test('casar localiza a música depois de uma introdução longa e mantém o temp
   const cena = r.pares.filter(([ta]) => Math.abs(ta - 20) < 0.6).map(([, tv]) => tv);
   assert.ok(cena.length >= 2, `a cena precisa de âncoras de entrada e saída: ${JSON.stringify(cena)}`);
   assert.ok(Math.max(...cena) - Math.min(...cena) >= 7, `a cena inserida precisa ser representada: ${JSON.stringify(cena)}`);
+
+  // Validação objetiva da ida e da volta: pelo menos 90% dos pontos amostrados devem ficar a até 1 s do ponto real.
+  const pontosAudio = [0, 5, 10, 15, 19, 20, 21, 25, 30, 35, 39];
+  const esperadoVideo = (t) => t < 20 ? 90 + t : 98 + t;
+  const acertosAudio = pontosAudio.filter((t) => Math.abs(tempoNoVideo(r.pares, t) - esperadoVideo(t)) <= 1).length;
+  assert.ok(acertosAudio / pontosAudio.length >= 0.9, `ida: ${acertosAudio}/${pontosAudio.length}; pares=${JSON.stringify(r.pares)}`);
+
+  const pontosVideo = [90, 95, 100, 109, 110, 114, 117, 118, 120, 130, 138];
+  const esperadoAudio = (t) => t < 110 ? t - 90 : t < 118 ? 20 : t - 98;
+  const acertosVideo = pontosVideo.filter((t) => Math.abs(tempoNoAudio(r.pares, t) - esperadoAudio(t)) <= 1).length;
+  assert.ok(acertosVideo / pontosVideo.length >= 0.9, `volta: ${acertosVideo}/${pontosVideo.length}; pares=${JSON.stringify(r.pares)}`);
 });
