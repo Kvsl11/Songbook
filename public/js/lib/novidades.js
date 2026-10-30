@@ -63,13 +63,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'A busca preserva o tipo original do YouTube: no modo Áudio, a faixa do YouTube Music (music) tem prioridade sobre resultados de vídeo (stream), mesmo quando título e duração são iguais. O modo Vídeo continua usando o videoclipe.' },
     ],
   },
-  {
-    versao: 333, data: '2026-10-30', titulo: 'Busca correta da gravação musical no YouTube Music',
-    itens: [
-      { tipo: 'correcao', texto: 'A busca agora reconhece também os resultados musicais do YouTube Music e faz buscas específicas por áudio oficial e canal Topic. O modo Áudio procura a gravação cantada curta; o modo Vídeo mantém o videoclipe.' },
-      { tipo: 'correcao', texto: 'A capa animada prepara e decodifica o próximo trecho antes da troca, mantendo o trecho atual visível até a transição.' },
-    ],
-  },
 ];
 
 // as versões que a pessoa ainda não viu (mais nova primeiro); sem nenhuma vista ainda, só a atual
