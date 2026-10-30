@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 343, data: '2026-10-30', titulo: 'Música carrega tudo antes de abrir',
+    itens: [
+      { tipo: 'correcao', texto: 'Ao tocar numa música da busca, o Songbook aguarda localizar o videoclipe, encontrar a gravação de áudio e consultar a sincronia da letra no LRCLIB antes de abrir a música.' },
+    ],
+  },
+  {
     versao: 342, data: '2026-10-30', titulo: 'Download retoma o arquivo que faltou',
     itens: [
       { tipo: 'correcao', texto: 'Se o áudio baixar, mas o videoclipe falhar, o Songbook não considera o download completo. Agora é possível tentar novamente e baixar só o arquivo que faltou; mudar de “Só o áudio” para “Áudio e vídeo” também completa o download sem repetir o áudio.' },

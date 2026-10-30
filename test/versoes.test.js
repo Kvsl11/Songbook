@@ -66,17 +66,26 @@ test('só compartilha o mesmo vídeo entre Música e Vídeo quando a sincronia �
   assert.equal(mesmaSincronia(null), false);
 });
 
-test('ao abrir uma música, inicia o preparo da faixa sem depender de sincronizar a letra ou apertar Play', async () => {
+test('a busca só abre a música depois de localizar o videoclipe e concluir áudio + LRCLIB', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   const abrir = app.indexOf('async function abrirPrevia(');
-  const chamar = app.indexOf('prepararMusicaAoAbrir(novo)', abrir);
+  const buscarVideo = app.indexOf('const v = await busca;', abrir);
+  const metadados = app.indexOf('Object.assign(novo, {', buscarVideo);
+  const preparar = app.indexOf('await prepararMusicaAoAbrir(novo)', metadados);
+  const entrar = app.indexOf("location.hash = '#/musica/previa'", preparar);
+  assert.ok(abrir >= 0 && buscarVideo > abrir, 'aguarda a busca do videoclipe');
+  assert.ok(metadados > buscarVideo && preparar > metadados, 'preenche os metadados antes de preparar áudio e letra');
+  assert.ok(entrar > preparar, 'só navega para a música depois que a preparação termina');
+  assert.doesNotMatch(app.slice(abrir, entrar), /Promise\.race|setTimeout/);
   const funcao = app.indexOf('async function descobrirVersoes(song)');
-  assert.ok(abrir >= 0 && chamar > abrir && chamar < abrir + 9000, 'abrirPrevia deve iniciar o preparo antes de navegar');
-  assert.ok(funcao > 0, 'a descoberta da faixa deve existir como fluxo independente');
+  assert.ok(funcao > 0, 'a descoberta da faixa de áudio deve existir');
   const fim = app.indexOf('// as duas versões da música (o clipe e o áudio oficial)', funcao);
-  const corpo = app.slice(funcao, fim);
-  assert.match(corpo, /procurarAudio\(song/);
-  assert.doesNotMatch(corpo, /sincronizarMusica|letraSincronizada/);
+  assert.match(app.slice(funcao, fim), /procurarAudio\(song/);
+  const prepararMusica = app.indexOf('function prepararMusicaAoAbrir(song)');
+  const fimPreparar = app.indexOf('// o áudio oficial da gravação', prepararMusica);
+  assert.ok(prepararMusica > 0 && fimPreparar > prepararMusica, 'a preparação da música deve existir');
+  assert.match(app.slice(prepararMusica, fimPreparar), /Promise\.all\(\[audioPromise,\s*sincroniaPromise\]\)/,
+    'a preparação deve aguardar áudio e LRCLIB mesmo quando o LRCLIB não encontra letra');
 });
 
 test('um download parcial pode ser retomado e o áudio não precisa ser baixado novamente', async () => {
