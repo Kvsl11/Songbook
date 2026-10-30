@@ -67,7 +67,7 @@ test('casar localiza a música depois de uma introdução longa e mantém o temp
   const inicio = r.pares[0];
   assert.ok(Math.abs(inicio[1] - 90) < 1, `início do áudio → ${inicio[1]} s no clipe`);
   const cena = r.pares.filter(([ta]) => Math.abs(ta - 20) < 0.6).map(([, tv]) => tv);
-  assert.ok(cena.length >= 2, `a cena precisa de âncoras de entrada e saída: ${JSON.stringify(cena)}`);
+  assert.ok(cena.length >= 2, `a cena precisa de âncoras de entrada e saída: ${JSON.stringify(cena)}; mapa=${JSON.stringify(r.pares)}`);
   assert.ok(Math.max(...cena) - Math.min(...cena) >= 7, `a cena inserida precisa ser representada: ${JSON.stringify(cena)}`);
 
   // Validação objetiva da ida e da volta: pelo menos 90% dos pontos amostrados devem ficar a até 1 s do ponto real.
