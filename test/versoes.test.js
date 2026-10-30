@@ -175,7 +175,7 @@ test('a consulta LRCLIB faz as buscas exata e ampla em paralelo com limite confi
   assert.match(rotina, /timeout = 10000/);
   assert.match(rotina, /tentativas = 4/);
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
-  assert.match(app, /OPÇÕES_LRCLIB_RÁPIDAS = \\{ espera: 1000, timeout: 10000, tentativas: 4 \\}/);
+  assert.match(app, /OPÇÕES_LRCLIB_RÁPIDAS = \{ espera: 1000, timeout: 10000, tentativas: 4 \}/);
 });
 
 test('a busca não entra na música sem videoclipe e letra sincronizada confirmada no LRCLIB', async () => {
