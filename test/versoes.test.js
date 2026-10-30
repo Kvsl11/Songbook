@@ -58,6 +58,12 @@ test('os pares pelas duas sincronias, ou pela duração', () => {
 });
 
 
+test('a conversão fica parada durante uma cena curta detectada entre âncoras', () => {
+  const pares = [[0, 3], [9.8, 12.8], [9.8, 17.8], [10, 18]];
+  assert.ok(Math.abs(tempoNoAudio(pares, 15), 9.8) < 0.01);
+  assert.equal(tempoNoVideo(pares, 9.8), 17.8);
+});
+
 test('a conversão preserva cenas inseridas e corrige pequenas diferenças de relógio', () => {
   const pares = [[0, 10], [20, 30], [20, 38], [40, 58]];
   // Durante a cena extra, o vídeo avança, mas a música fica parada no segundo 20.
