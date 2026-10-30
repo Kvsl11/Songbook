@@ -12,6 +12,8 @@ export const NOVIDADES = [
       { tipo: 'novo', texto: 'Qualidade de mídia, como no Spotify: escolha a qualidade do download do áudio e do vídeo (normal, alta ou muito alta, até 1080p). Vale para todos os downloads, e “Atualizar os downloads” baixa de novo os que estão em outra.' },
       { tipo: 'novo', texto: 'Baixar pelo ⋯ da música, e salvar na biblioteca já baixa a música (dá para desligar). O vídeo baixado ganhou o botão de tela inteira.' },
       { tipo: 'melhoria', texto: 'Ajustes organizados por tópicos, cada um na sua página.' },
+      { tipo: 'novo', texto: 'As notificações aparecem na barra de notificações do celular (com a permissão), e o download mostra ali o andamento e quando termina. Com elas, o sininho do app sai.' },
+      { tipo: 'novo', texto: 'O “Sobre o artista” vem junto no download: a apresentação, as fotos, os seguidores e os fãs ficam no aparelho. Com internet os números se atualizam; sem internet aparece o último valor.' },
       { tipo: 'correcao', texto: 'Colar o link do QR code do servidor nos Ajustes funciona: o app tira dele o endereço do servidor e confere antes de usar.' },
       { tipo: 'correcao', texto: 'A tela de downloads não pisca mais enquanto baixa, e o armazenamento não mostra mais os “10,7 GB livres” que o navegador inventa.' },
       { tipo: 'correcao', texto: 'Tablet: o Tocando agora na tela toda com o fundo inteiro (antes metade ficava preta) e os ícones do menu de baixo centralizados no nome.' },

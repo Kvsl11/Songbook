@@ -243,12 +243,38 @@ sino.className = 'icon-btn sino';
 sino.setAttribute('aria-label', 'Notificações');
 sino.title = 'Notificações';
 function desenharSino() {
+  // (com as notificações no sistema, o sininho sai; o que ficou nele de antes some junto)
+  sino.classList.toggle('no-sistema', podeNotificarNoSistema());
   const n = notificacoes.filter((x) => !x.lida).length;
   sino.innerHTML = `${icon('bell', 18)}${n ? `<b class="sino-n">${n > 9 ? '9+' : n}</b>` : ''}`;
   sino.setAttribute('aria-label', n ? `Notificações: ${n} novas` : 'Notificações');
 }
 // tipo: sucesso | erro | ia | info; href: para onde tocar leva (a música, a tela de conectar…)
+// As notificações vão para a barra de notificações do celular (como as de qualquer app), com a permissão dada: aí o
+// sininho de dentro do app sai. Sem a permissão (negada, ou o iPhone sem o app instalado), ficam no sininho, como antes
+const podeNotificarNoSistema = () => typeof Notification !== 'undefined' && Notification.permission === 'granted' && 'serviceWorker' in navigator;
+async function notificarSistema({ titulo, texto = '', tag = '', href = '', silenciosa = false, renovar = false }) {
+  if (!podeNotificarNoSistema()) return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification(titulo || 'Songbook Litúrgico', {
+      body: texto, tag: tag || undefined, renotify: Boolean(tag && renovar), silent: silenciosa,
+      icon: new URL('icon-192-v7.png', document.baseURI).href, badge: new URL('icon-maskable-192-v7.png', document.baseURI).href,
+      data: { href: href ? new URL(href, location.href).href : location.href.split('#')[0] },
+    });
+    return true;
+  } catch { return false; }
+}
+// pede a permissão uma vez, no primeiro toque na tela (o Android só mostra o pedido depois de um toque)
+if (typeof Notification !== 'undefined' && Notification.permission === 'default' && !localStorage.getItem('songbook.pediuNotificacao')) {
+  document.addEventListener('pointerup', function pedir() {
+    document.removeEventListener('pointerup', pedir);
+    try { localStorage.setItem('songbook.pediuNotificacao', '1'); } catch { /* sem armazenamento */ }
+    Notification.requestPermission().then(() => desenharSino()).catch(() => {});
+  });
+}
 function notificar(texto, { tipo = 'info', href = '', titulo = '' } = {}) {
+  if (podeNotificarNoSistema()) { notificarSistema({ titulo, texto, href, tag: tipo === 'atualizacao' ? 'atualizacao' : '' }); return; }
   notificacoes.unshift({ id: Date.now() + Math.random(), t: Date.now(), texto, titulo, tipo, href, lida: false });
   guardarNotificacoes();
   desenharSino();
@@ -705,7 +731,10 @@ async function baixarMusica(song, { perguntou = false } = {}) {
   andandoFila ||= (async () => {
     while (filaBaixar.length) {
       const id = filaBaixar.shift();
-      try { await baixarAgora(id); } catch (e) { toast(`Não baixou “${db.song(id)?.title || 'a música'}”: ${erroExplicado(e)}`, 5000); }
+      try { await baixarAgora(id); } catch (e) {
+        toast(`Não baixou “${db.song(id)?.title || 'a música'}”: ${erroExplicado(e)}`, 5000);
+        notificarSistema({ titulo: `Não baixou: ${db.song(id)?.title || 'a música'}`, texto: erroExplicado(e), tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}` });
+      }
       baixando.delete(id);
       avisarDownloads();
     }
@@ -720,7 +749,14 @@ async function baixarAgora(id) {
   for (const [n, { yt, video }] of lista.entries()) {
     const ja = baixadoDe(yt);
     if (ja && (!video || String(ja.tipo).startsWith('video'))) { arquivos[yt] = ja; continue; }
-    const andou = (p) => { baixando.set(id, { pct: Math.round(((n + p) / lista.length) * 100) }); avisarDownloads(); };
+    const andou = (p) => {
+      const pct = Math.round(((n + p) / lista.length) * 100);
+      const antes = baixando.get(id)?.pct ?? -100;
+      baixando.set(id, { pct });
+      avisarDownloads();
+      // na barra de notificações, como o Spotify: "Baixando… 40%" (a cada 10%, sem som), trocada pela de pronta no fim
+      if (Math.floor(pct / 10) !== Math.floor(antes / 10)) notificarSistema({ titulo: `Baixando: ${song.title}`, texto: `${pct}% · ${song.artist || 'Songbook Litúrgico'}`, tag: `baixar-${id}`, silenciosa: true, href: `#/musica/${id}` });
+    };
     const r = await chamarComEtapas(servidorIA(), '/baixar', { json: { url: `https://youtu.be/${yt}`, video, qualidade: qualidadeDoDownload(video) } }, (etapa, p) => { if (etapa === 'baixando' && p !== null) andou(p * 0.8); });
     andou(0.85);
     const base = baseDoServidor(servidorIA().url);
@@ -735,13 +771,23 @@ async function baixarAgora(id) {
   if (!db.song(id)) return; // saiu da biblioteca enquanto baixava
   db.updateSong(id, { baixado: { arquivos, tamanho: Object.values(arquivos).reduce((a, x) => a + (x.tamanho || 0), 0), em: Date.now() } });
   toast(`Baixada: ${song.title}`);
+  notificarSistema({ titulo: `Baixada: ${song.title}`, texto: `${song.artist ? `${song.artist} · ` : ''}Toca sem internet (${fmtBytes(db.song(id)?.baixado?.tamanho || 0)})`, tag: `baixar-${id}`, renovar: true, href: `#/musica/${id}` });
 }
 // as capas e a partitura da música no cache dos downloads (o service worker usa sem internet)
 async function guardarImagensDaMusica(song) {
   if (!('caches' in window)) return;
   const yts = [song.youtube, versoesDe(song)?.audio].filter((x) => x && !ehArquivo(x));
+  // e o "Sobre o artista" (a apresentação, os números, as fotos): os dados ficam guardados no aparelho e as fotos aqui,
+  // para a música baixada mostrar tudo sem internet (com internet, os números se atualizam sozinhos)
+  const artista = String(song.artist || '').split(/\s*(?:,|&| e | feat\.? | ft\.? | part\.? )\s*/i)[0].trim();
+  const slug = /cifraclub\.com\.br\/([^/?#]+)/.exec(song.source || '')?.[1] || '';
+  const dele = artista ? await Promise.all([fotoDoArtista(artista, slug).catch(() => ''), descricaoDoArtista(artista).catch(() => null), deezerDoArtista(artista).catch(() => null),
+    canalGuardado(artista).catch(() => null), audioDbGuardado(artista).catch(() => null)]) : [];
+  const [fotoA, info, dz, canal, adb] = dele;
+  const fotosVideos = canal?.id ? await fotosDosVideosGuardadas(artista, canal.id).catch(() => []) : [];
   const urls = [song.cover, ...yts.flatMap((y) => [`https://i.ytimg.com/vi/${y}/hqdefault.jpg`, `https://i.ytimg.com/vi/${y}/mqdefault.jpg`]),
-    ...paginasDaPartitura(song.content), mxlDaPartitura(song.content)].filter((u) => u && !/^data:/.test(u));
+    ...paginasDaPartitura(song.content), mxlDaPartitura(song.content),
+    fotoA, info?.foto, dz?.foto, canal?.foto, ...(adb?.fotos || []), ...(fotosVideos || [])].filter((u) => u && typeof u === 'string' && !/^data:/.test(u));
   const c = await caches.open(CACHE_BAIXADOS);
   await Promise.all(urls.map(async (u) => {
     try {
@@ -1228,6 +1274,7 @@ const player = (() => {
     let relogio = 0;
     let url = '';
     let montagem = 0;
+    let respondeu = false; // o player mudo já respondeu (antes disso, os comandos davam erro dentro dele)
     const noClipeAgora = () => {
       // o tempo do clipe que corresponde ao que toca agora
       if (!atual) return 0;
@@ -1244,6 +1291,7 @@ const player = (() => {
       de = '';
       tempoDele = -1;
       andando = false;
+      respondeu = false;
     };
     // a cada segundo: anda e para junto com a música e, se escorregar mais de 1,5 s, volta ao ponto
     const acompanhar = () => {
@@ -1257,7 +1305,7 @@ const player = (() => {
         if (Math.abs(caixa.currentTime - alvo) > 1.5 && alvo < (caixa.duration || Infinity)) caixa.currentTime = alvo;
         return;
       }
-      cmd('mute');
+      if (!respondeu) { caixa.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'canvas' }), '*'); return; } // (ainda carregando)
       if (tocar !== andando) { cmd(tocar ? 'playVideo' : 'pauseVideo'); andando = tocar; }
       if (tocar && tempoDele >= 0 && Math.abs(tempoDele - alvo) > 1.5) { cmd('seekTo', [alvo, true]); tempoDele = alvo; }
     };
@@ -1267,6 +1315,7 @@ const player = (() => {
         const msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
         const info = msg?.info;
         if (msg?.event === 'onError') { caixa.remove(); caixa = null; return; } // (fica com os quadros)
+        if (msg?.event === 'onReady' || msg?.event === 'infoDelivery' || msg?.event === 'initialDelivery') respondeu = true;
         if (typeof info?.currentTime === 'number') tempoDele = info.currentTime;
         // começou a andar: aparece aos poucos por cima dos quadros (o título do YouTube some antes)
         if (info?.playerState === 1 && !caixa.classList.contains('pronto')) setTimeout(() => caixa?.classList.add('pronto'), 900);
@@ -1308,6 +1357,7 @@ const player = (() => {
           caixa.title = '';
           // pede ao player mudo que avise o tempo e o estado
           caixa.addEventListener('load', () => { caixa?.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'canvas' }), '*'); andando = true; });
+          // (o mudo é garantido pelo endereço: mute=1)
         }
         fundo.append(caixa);
         relogio = setInterval(acompanhar, 1000);
@@ -1388,7 +1438,7 @@ const player = (() => {
     ].filter(([, v]) => v);
     const cartoes = [];
     if (principal) {
-      cartoes.push(`<section class="pl-cartao pl-artista"><div class="pl-artista-foto" data-foto><span>${esc(principal.split(/\s+/).slice(0, 2).map((x) => x[0] || '').join('').toUpperCase())}</span><h4>Sobre o artista</h4></div>
+      cartoes.push(`<section class="pl-cartao pl-artista"><div class="pl-artista-foto" data-foto><span>${semFotoArtista(84)}</span><h4>Sobre o artista</h4></div>
         <div class="pl-artista-pe"><span class="grow"><b>${esc(principal)}</b><small>${esc(pessoas[0]?.papeis.join(' • ') || 'Artista')}</small></span>
         ${slug ? `<a class="ref-pilula" href="#/artista/${encodeURIComponent(slug)}/${encodeURIComponent(principal)}">Ver artista</a>` : ''}</div>
         <div class="pl-artista-bio" hidden><p></p><button class="pl-artista-mais">ver mais</button></div></section>`);
@@ -1424,7 +1474,7 @@ const player = (() => {
     // a breve apresentação do artista embaixo do nome (3 linhas; tocando, abre o texto inteiro)
     // (em 3 linhas, com o "ver mais" no fim, como no Spotify: abre a tela "Sobre o artista", com o texto inteiro)
     // (sem a da Wikipédia, a biografia da TheAudioDB; sem nenhuma, só o "ver mais", que abre as fotos e os números)
-    if (principal) Promise.all([descricaoDoArtista(principal), audioDbDoArtista(principal).catch(() => null)]).then(([info, adb]) => {
+    if (principal) Promise.all([descricaoDoArtista(principal), audioDbGuardado(principal).catch(() => null)]).then(([info, adb]) => {
       const bio = $('.pl-extra .pl-artista-bio', el);
       if (!bio || extraDe !== chave) return;
       const texto = (info?.texto || adb?.bio || '').replace(/\s*\n+\s*/g, ' ');
@@ -4096,16 +4146,17 @@ function pessoasDosCreditos({ artista = '', titulo = '', compositor = '', letris
 }
 // ---- créditos como o SongDNA do Spotify: as pessoas da música em bolinhas, com a foto de cada uma (ou as iniciais
 // numa cor dela), e o "Explorar", que abre todas elas em detalhe
-const iniciaisDe = (n) => n.split(/\s+/).filter((x) => /^\p{L}/u.test(x)).slice(0, 2).map((x) => x[0]).join('').toUpperCase() || '♪';
 const corDaPessoa = (n) => `hsl(${[...n].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)} 45% 38%)`;
 const papeisCurtos = (p) => p.papeis[0] + (p.papeis.length > 1 ? ` + ${p.papeis.length - 1}` : '');
-const avatarDe = (p, i, classe = 'ref-avatar') => `<span class="${classe}" data-foto="${i}" style="background:${corDaPessoa(p.nome)}">${esc(iniciaisDe(p.nome))}</span>`;
+// (sem foto: a pessoa com a nota musical, como no Spotify, no lugar das iniciais)
+const semFotoArtista = (size = 48) => `<span class="sem-foto-artista">${icon('artistaSemFoto', size)}</span>`;
+const avatarDe = (p, i, classe = 'ref-avatar') => `<span class="${classe} sem-foto" data-foto="${i}">${semFotoArtista()}</span>`;
 // a foto de cada pessoa nas bolinhas [data-foto] da caixa (as que não têm foto ficam com as iniciais)
 function porFotos(box, pessoas) {
   pessoas.forEach((p, i) => fotoDoArtista(p.nome).then((url) => {
     if (!url || !box.isConnected) return;
     const img = new Image();
-    img.onload = () => box.querySelectorAll(`[data-foto="${i}"]`).forEach((av) => { av.textContent = ''; av.classList.add('com-foto'); av.style.backgroundImage = `url("${url}")`; });
+    img.onload = () => box.querySelectorAll(`[data-foto="${i}"]`).forEach((av) => { av.textContent = ''; av.classList.remove('sem-foto'); av.classList.add('com-foto'); av.style.backgroundImage = `url("${url}")`; });
     img.src = url;
   }).catch(() => {}));
 }
@@ -4146,6 +4197,33 @@ function explorarCreditos({ titulo, artista, capa, cor, pessoas, detalhes = [], 
   dlg.showModal();
   porFotos(dlg, pessoas);
 }
+// O que se sabe de cada artista (a apresentação, as fotos, os seguidores, os fãs, o canal) fica guardado no aparelho,
+// como no Spotify: com internet, cada vez vem o valor atual e ele passa a ser o guardado; sem internet (a música
+// baixada), aparece o último valor guardado. Guarda só os dados (texto e endereços); as fotos das músicas baixadas
+// vão para o cache dos downloads (guardarImagensDaMusica)
+const CHAVE_ARTISTAS = 'songbook.artistas';
+let artistasGuardados = (() => { try { return JSON.parse(localStorage.getItem(CHAVE_ARTISTAS) || '{}'); } catch { return {}; } })();
+let guardandoArtistas = 0;
+function comUltimoValor(tipo, nome, promessa) {
+  const k = `${tipo}:${normalizar(nome)}`;
+  return Promise.resolve(promessa).catch(() => null).then((v) => {
+    const vazio = v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length);
+    if (vazio) return artistasGuardados[k]?.v ?? v;
+    artistasGuardados[k] = { v, t: Date.now() };
+    clearTimeout(guardandoArtistas);
+    guardandoArtistas = setTimeout(() => {
+      // (os 300 mais recentes)
+      const ordem = Object.entries(artistasGuardados).sort((a, b) => b[1].t - a[1].t).slice(0, 300);
+      artistasGuardados = Object.fromEntries(ordem);
+      try { localStorage.setItem(CHAVE_ARTISTAS, JSON.stringify(artistasGuardados)); } catch { /* sem espaço: fica na sessão */ }
+    }, 800);
+    return v;
+  });
+}
+const ultimoValorDoArtista = (tipo, nome) => artistasGuardados[`${tipo}:${normalizar(nome)}`]?.v;
+const canalGuardado = (nome) => comUltimoValor('canal', nome, canalDoArtista(nome));
+const audioDbGuardado = (nome) => comUltimoValor('adb', nome, audioDbDoArtista(nome));
+const fotosDosVideosGuardadas = (nome, canal) => comUltimoValor('fotosvideos', nome, fotosDosVideos(nome, canal));
 // a foto de um artista pelo nome; guardada na sessão, para não buscar de novo a cada música
 const fotosArtistas = new Map();
 // (primeiro a do canal do artista no YouTube, a mais atual, só quando o canal é com certeza dele: verificado ou o
@@ -4164,7 +4242,7 @@ function fotoDoArtista(nome, slug = '') {
       || (a?.slug ? carregarArtista(a.slug, a.nome || nome).principal.then((x) => x?.foto || '') : '')).catch(() => '');
     fotosArtistas.set(k, fotoDoCanal(nome).then((f) => f || cifraClub()).then((f) => f || fotoDeezer(nome)).then((f) => f || fotoWikipedia(nome)));
   }
-  return fotosArtistas.get(k);
+  return comUltimoValor('foto', nome, fotosArtistas.get(k));
 }
 // o Deezer não libera a leitura direta (CORS), mas responde em JSONP: um <script> com a resposta
 let jsonpN = 0;
@@ -4206,7 +4284,7 @@ function descricaoDoArtista(nome) {
       return texto ? { texto, foto: certa.thumbnail?.source || '', url: certa.fullurl || '' } : null;
     }).catch(() => { descricoesArtistas.delete(k); return null; }));
   }
-  return descricoesArtistas.get(k);
+  return comUltimoValor('wiki', nome, descricoesArtistas.get(k));
 }
 // o artista no Deezer (o que tem mais fãs, com o mesmo nome): os fãs, os álbuns e a foto grande, para a tela "Sobre o
 // artista" (como os ouvintes mensais do Spotify)
@@ -4221,7 +4299,7 @@ function deezerDoArtista(nome) {
       return { fas: a.nb_fan || 0, albuns: a.nb_album || 0, foto };
     }).catch(() => null));
   }
-  return deezerArtistas.get(k);
+  return comUltimoValor('deezer', nome, deezerArtistas.get(k));
 }
 // a tela "Sobre o artista" (o "ver mais" do cartão, como no Spotify): as fotos dele passando para o lado, os fãs, a
 // apresentação inteira e os atalhos (as músicas e os álbuns dele no app, a página na Wikipédia). Abre por cima de
@@ -4240,7 +4318,7 @@ async function abrirSobreArtista({ nome, slug = '' }) {
   window.addEventListener('popstate', fechar, { once: true });
   tela.querySelector('[data-sa="voltar"]').onclick = () => history.back();
   const [info, dz, foto, canal, adb] = await Promise.all([descricaoDoArtista(nome), deezerDoArtista(nome), fotoDoArtista(nome, slug).catch(() => ''),
-    canalDoArtista(nome).catch(() => null), audioDbDoArtista(nome).catch(() => null)]);
+    canalGuardado(nome).catch(() => null), audioDbGuardado(nome).catch(() => null)]);
   if (!tela.isConnected) return;
   // as fotos (sem repetir): a do cartão, a do canal do YouTube, as da TheAudioDB (a principal e as de fundo), a do
   // Deezer e a da Wikipédia; depois chegam os quadros dos vídeos do próprio canal dele (até 10 ao todo)
@@ -4254,8 +4332,8 @@ async function abrirSobreArtista({ nome, slug = '' }) {
     caixaFotos.insertAdjacentHTML('beforeend', novas.map((u) => `<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()" onload="if (this.naturalWidth < 200) this.remove()">`).join(''));
   };
   porFotos([foto, canal?.foto, ...(adb?.fotos || []), dz?.foto, info?.foto]);
-  if (!vistas.size) caixaFotos.innerHTML = `<div class="sa-sem-foto">${esc(iniciaisDe(nome))}</div>`;
-  if (canal?.id) fotosDosVideos(nome, canal.id).then((l) => { if (tela.isConnected) porFotos(l); });
+  if (!vistas.size) caixaFotos.innerHTML = `<div class="sa-sem-foto">${semFotoArtista(120)}</div>`;
+  if (canal?.id) fotosDosVideosGuardadas(nome, canal.id).then((l) => { if (tela.isConnected && l) porFotos(l); });
   // os números grandes (como os ouvintes do Spotify): os seguidores no Spotify (pela TheAudioDB), os inscritos no
   // canal do YouTube e os fãs no Deezer, os que houver
   const num = (n, rotulo) => `<div><b>${n.toLocaleString('pt-BR')}</b><small>${rotulo}</small></div>`;

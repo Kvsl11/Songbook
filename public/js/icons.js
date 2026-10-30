@@ -13,6 +13,8 @@ const P = {
   maisCirculo: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
   menosCirculo: '<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>',
   pessoa: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  // o artista sem foto (como o do Spotify): a pessoa, com a nota musical no lugar do ombro direito
+  artistaSemFoto: '<path d="M8.4 12.6a4.3 4.3 0 1 1 5.6-.2"/><path d="M8.4 12.6C5.4 13.5 3.3 15.6 3.3 18.3V20h9.4"/><path d="M14 12.4l1.9 1"/><path d="M19.9 11.6v7.4"/><circle cx="17.8" cy="19" r="2.1"/>',
   imagem: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
   celular: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18h2"/>',
   computador: '<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/>',
