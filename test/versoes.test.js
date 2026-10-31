@@ -231,14 +231,12 @@ test('se o LRCLIB encontrar duração diferente, refaz a busca do áudio mesmo q
   assert.ok(!rotina.includes('lrc.ajustar && !vs?.audio'));
 });
 
-test('a busca não entra na música sem videoclipe e letra sincronizada confirmada no LRCLIB', async () => {
+test('a busca abre a música mesmo quando a sincronização automática não encontra correspondência', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   const abrir = app.indexOf('async function abrirPrevia(');
-  const preparar = app.indexOf('const preparo = await prepararMusicaAoAbrir(novo);', abrir);
-  const bloquear = app.indexOf("if (preparo !== 'ok' || !sincValida)", preparar);
-  const navegar = app.indexOf("location.hash = '#/musica/previa'", bloquear);
-  assert.ok(preparar > abrir && bloquear > preparar && navegar > bloquear);
-  assert.match(app.slice(bloquear, navegar), /openDialog/);
-  assert.match(app.slice(preparar, bloquear), /novo\.sincronia\?\.fonte === 'lrclib'/);
+  const preparar = app.indexOf('await prepararMusicaAoAbrir(novo);', abrir);
+  const navegar = app.indexOf("location.hash = '#/musica/previa'", preparar);
+  assert.ok(preparar > abrir && navegar > preparar, 'a música abre depois da tentativa de preparação');
+  assert.doesNotMatch(app.slice(preparar, navegar), /openDialog|Não foi possível sincronizar/);
   assert.match(app, /if \(r !== 'ok'\) tentouSincronizar\.delete\(chaveSync\)/);
 });
