@@ -252,3 +252,22 @@ test('trocar música e trocar vídeo alteram versões independentes', async () =
   assert.match(app, /const tipo = comCapa \? 'audio' : 'video'/);
   assert.match(app, /escolherVideo\(song, tipo\)/);
 });
+
+
+test('a letra sincronizada usa o identificador da faixa de áudio, não o do videoclipe', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  assert.match(app, /const videoDaLetra = \(song\) => versoesDe\(song\)\?\.audio \|\| song\?\.youtube/);
+  assert.match(app, /song\.sincronia\.video === videoDaLetra\(song\) \? song\.sincronia : null/);
+  assert.doesNotMatch(app, /song\.sincronia\.video === atual\?\.youtube/);
+  assert.match(app, /atual\.sincronia\.video === videoDaLetra\(atual\)/);
+});
+
+test('a foto do artista acompanha o salvamento e é persistida para a biblioteca', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  assert.match(app, /data-foto-artista=/);
+  assert.match(app, /fotoArtista: b\.dataset\.fotoArtista \|\| ''/);
+  assert.match(app, /fotoArtista: item\.fotoArtista/);
+  assert.match(app, /preview\.fotoArtista \? \{ fotoArtista: preview\.fotoArtista \}/);
+  assert.match(app, /db\.updateSong\(item\.id, \{ fotoArtista: foto \}\)/);
+  assert.match(app, /s\.fotoArtista \? `<img src=/);
+});
