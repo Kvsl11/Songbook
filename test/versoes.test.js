@@ -131,7 +131,7 @@ test('um download parcial pode ser retomado e o áudio não precisa ser baixado 
 test('o casamento sonoro recalibra mapas antigos e permite nova tentativa após falha temporária', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   assert.match(app, /const CASAMENTO = 3;/);
-  assert.match(app, /async function acertarVersoes\(song, _sincronia = null, \{ pedido = false \} = \{\}\)/);
+  assert.match(app, /function acertarVersoes\(song, _sincronia = null, \{ pedido = false \} = \{\}\)/);
   assert.match(app, /\(!pedido && casamentoFalhou\.has\(chave\)\)/);
   assert.match(app, /if \(pedido\) casamentoFalhou\.delete\(chave\)/);
   assert.match(app, /vsSalvasAoAbrir\.casamento \|\| 1\) < CASAMENTO/);
@@ -297,4 +297,18 @@ test('os pares pelas letras sincronizadas do áudio e do clipe (com cena antes e
   assert.equal(tempoNoVideo(pares, 15), 30);
   assert.equal(tempoNoAudio(pares, 78), 55);
   assert.equal(paresPelasLetras(doAudio, { linhas: ['outra', 'letra', 'nada', 'igual'], tempos: tv.slice(0, 4) }), null);
+});
+
+test('versões: o servidor casa pelo som já ao abrir, e a troca só pela estimativa espera o casamento', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const casar = app.slice(app.indexOf('async function casarVersoesAgora('), app.indexOf('// as amostras (mono, na taxa do casamento)'));
+  // sem as duas no aparelho, o servidor vem antes (não depende mais de trocar de versão)
+  assert.ok(casar.indexOf('casarNoServidor(') >= 0 && !/pedido && !ehArquivo/.test(casar));
+  assert.match(app, /if \(vs\?\.video && casandoVersoes\.has\(vs\.video\)\) return casandoPromessas\.get\(vs\.video\)/);
+  // a troca com só a estimativa espera (com limite) e, se trocar antes, acerta a partir do ponto de onde saiu
+  assert.match(app, /noMaximo\(acertarVersoes\(s, null, \{ pedido: true \}\), 9000\)/);
+  assert.match(app, /tempoNoVideo\(vs\.pares, ultimaTroca\.t \+ passou\)/);
+  assert.match(app, /tempoNoAudio\(vs\.pares, ultimaTroca\.t \+ passou\)/);
+  // a prévia da busca espera também as versões e o casamento (com limite) antes de abrir
+  assert.match(app, /noMaximo\(versoesProntas, 20000, null\)/);
 });
