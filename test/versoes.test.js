@@ -279,3 +279,11 @@ test('a expressão de busca da foto do artista é JavaScript válido e o salvame
   assert.doesNotMatch(app, /cifraclub\\\\\\\\\.com/);
   assert.match(app, /video, fotoArtista: item\.fotoArtista \|\| ''/);
 });
+
+
+test('app.js passa pela verificação real de sintaxe do Node', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const arquivo = new URL('../public/js/app.js', import.meta.url);
+  const r = spawnSync(process.execPath, ['--check', arquivo.pathname], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout || 'erro de sintaxe em app.js');
+});
