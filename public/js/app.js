@@ -1096,8 +1096,9 @@ function trocarAudioDaMusica(song, url) {
   const capaAntes = capa(s).match(/src="([^"]+)"/)?.[1] || '';
   const mud = { ...s };
   // A escolha no modo música altera apenas a faixa de áudio. O clipe original permanece intacto.
-  delete mud.audioProprio;
+  if (novo) delete mud.audioProprio;
   if (novo) {
+    mud.youtube = s.youtube || '';
     const durAudio = duracoesDaBusca.get(novo) || 0;
     const durVideo = duracoesDaBusca.get(s.youtube) || 0;
     mud.versoes = {
