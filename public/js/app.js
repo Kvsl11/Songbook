@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-357';
+export const APP_VERSAO = '2026.10.30-358';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -3651,7 +3651,7 @@ function indicadores(s) {
 
 const linhaMusica = (s, extra = '') => `
   <li class="track clickable" data-id="${s.id}" style="grid-template-columns:auto 1fr auto">
-    ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
+    ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}<span class="artista-mini" data-artista-mini>${semFotoArtista(14)}</span>${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
 
 // Escolhe uma música: da biblioteca ou procurando na internet (Cifra Club, cantos da missa, letras,
 // vídeos do YouTube). O que vem da internet é salvo na biblioteca. Devolve o id, 'nova' ou null.
@@ -4676,7 +4676,7 @@ const buscarTudo = (termo, nMusicas = 8, nVideos = 6) => {
 };
 // artista (Cifra Club): foto redonda; abre a página dele com as músicas mais tocadas
 const tileArtista = (a) => `<a class="tile tile-artista" href="#/artista/${encodeURIComponent(a.slug)}/${encodeURIComponent(a.nome)}">
-  <div class="cover">${a.capa ? `<img src="${esc(a.capa)}" alt="" loading="lazy">` : icon('mic', 40)}</div><b>${esc(a.nome)}</b><small>Artista</small></a>`;
+  <div class="cover" data-artista-foto data-nome="${esc(a.nome)}" data-slug="${esc(a.slug)}">${a.capa ? `<img src="${esc(a.capa)}" alt="" loading="lazy">` : icon('mic', 40)}</div><b>${esc(a.nome)}</b><small>Artista</small></a>`;
 const artistaCerto = (lista, nome) => lista.find((a) => mesmoNome(a.nome, nome)) || null;
 // as pessoas dos créditos, cada uma com os papéis dela: o artista principal, quem participa (o "feat." do nome do
 // artista ou do título: "Lady Gaga feat. Bruno Mars", "Die With A Smile (part. Bruno Mars)"), a composição e a letra
@@ -4715,6 +4715,22 @@ function porFotos(box, pessoas) {
     img.onload = () => box.querySelectorAll(`[data-foto="${i}"]`).forEach((av) => { av.textContent = ''; av.classList.remove('sem-foto'); av.classList.add('com-foto'); av.style.backgroundImage = `url("${url}")`; });
     img.src = url;
   }).catch(() => {}));
+}
+function enriquecerTilesArtistas(container) {
+  if (!container) return;
+  container.querySelectorAll('[data-artista-foto]').forEach((box) => {
+    const nome = box.dataset.nome || '';
+    const slug = box.dataset.slug || '';
+    if (!nome) return;
+    fotoDoArtista(nome, slug).then((url) => {
+      if (!url || !box.isConnected) return;
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = nome;
+      img.loading = 'lazy';
+      box.replaceChildren(img);
+    }).catch(() => {});
+  });
 }
 // o cartão: as duas primeiras pessoas, o nome da música, quantas pessoas e o "Explorar" (explorar: atributos do botão)
 const cartaoPessoas = ({ titulo, pessoas, explorar, classe = 'ref-cartao ref-pessoas' }) => `<section class="${classe}">
@@ -5189,6 +5205,7 @@ function viewSearch() {
       Promise.all(ARTISTAS_CATOLICOS.map((a) => buscarArtistasCifraClub(a).then((l) => artistaCerto(l, a)).catch(() => null))).then((lista) => {
         if (meu !== seq || !$('#art-cat')) return;
         $('#art-cat').innerHTML = lista.filter(Boolean).map(tileArtista).join('');
+        enriquecerTilesArtistas($('#art-cat'));
       });
       catolicasEmAlta().then((lista) => {
         if (meu !== seq || !$('#em-alta')) return;
@@ -5215,6 +5232,7 @@ function viewSearch() {
           if (!vivo('ar-res')) return;
           const artistas = lista.slice(0, filtro === 'artistas' ? 20 : 8);
           $('#ar-res').innerHTML = artistas.length ? `<div class="${filtro === 'artistas' ? 'grade-artistas' : 'shelf'}">${artistas.map(tileArtista).join('')}</div>` : '<p class="muted">Nenhum artista encontrado.</p>';
+          enriquecerTilesArtistas($('#ar-res'));
           // na aba Tudo, sem artista, a seção some
           if (!artistas.length && filtro === 'tudo') { $('#ar-res').previousElementSibling?.remove(); $('#ar-res').remove(); }
         }).catch((e) => vivo('ar-res') && erro('ar-res', 'Não consegui buscar artistas: ' + e.message));
