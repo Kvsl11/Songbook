@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 358, data: '2026-10-30', titulo: 'Capas de álbuns e fotos de artistas nas buscas',
+    itens: [
+      { tipo: 'melhoria', texto: 'Nas buscas, as músicas passam a mostrar a capa oficial do single ou álbum, separada da foto do artista. As fotos dos artistas também aparecem nas listas e nos resultados de artistas.' },
+      { tipo: 'melhoria', texto: 'Na biblioteca, as músicas mostram a foto do artista ao lado do nome e recebem a capa oficial quando a capa anterior era provisória. As capas escolhidas manualmente continuam preservadas.' },
+    ],
+  },
+  {
     versao: 357, data: '2026-10-30', titulo: 'Fila de reprodução reorganizável',
     itens: [
       { tipo: 'melhoria', texto: 'O aleatório agora embaralha a ordem real da fila, que também pode ser reorganizada arrastando as músicas com o dedo ou o mouse. A seleção por teclado também permite mover faixas.' },
