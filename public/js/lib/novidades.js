@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 359, data: '2026-10-30', titulo: 'Mais opções de capas e fotos de artistas',
+    itens: [
+      { tipo: 'melhoria', texto: 'Quando Deezer e iTunes não encontram a capa da música, o Songbook tenta localizar o álbum associado à faixa no TheAudioDB. As fotos de artistas também ganham essa fonte como alternativa antes da Wikipédia.' },
+    ],
+  },
+  {
     versao: 358, data: '2026-10-30', titulo: 'Letra sincronizada preservada ao salvar',
     itens: [
       { tipo: 'correcao', texto: 'Se a letra sincronizada terminar de carregar depois que a música for salva na biblioteca, ela também será gravada na música salva. A ordem entre tocar em Salvar e a resposta do LRCLIB não faz mais a sincronia desaparecer.' },
