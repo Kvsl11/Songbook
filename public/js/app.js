@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.31-365';
+export const APP_VERSAO = '2026.10.31-366';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -2905,6 +2905,7 @@ const semLinhasDeAcordes = (sinc) => {
           <span class="fila-capa${tocando ? ' tocando' : ''}">${capa(s)}${tocando ? '<span class="fila-eq" aria-hidden="true"><i></i><i></i><i></i></span>' : ''}</span>
           <span class="lista-txt"><b>${esc(s.title || 'Música')}</b><small>${esc([parte, s.artist].filter(Boolean).join(' · '))}</small></span>
           <span class="lista-dir">${duracao ? fmtTempo(duracao) : procurando ? '<span class="spin"></span>' : '—:—'}</span>
+          <span class="fila-reordenar" aria-hidden="true" title="Segure e arraste para mudar a ordem">${icon('reordenar', 20)}</span>
         </div>`;
       }).join('');
     };
@@ -2933,7 +2934,7 @@ const semLinhasDeAcordes = (sinc) => {
       const max = lista.scrollHeight - l.offsetHeight;
       const alvo = Math.max(-l.offsetTop, Math.min(max - l.offsetTop, y - arrastando.dy - topoDoLugar(l)));
       arrastando.desloc = alvo;
-      l.style.transform = `translateY(${alvo}px) scale(1.03)`;
+      l.style.transform = `translateY(${alvo}px)`;
     };
     // troca de lugar (os outros deslizam: guarda onde estavam e anima até o lugar novo)
     const moverPara = (y) => {

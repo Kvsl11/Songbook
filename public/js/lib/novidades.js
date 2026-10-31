@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 366, data: '2026-10-31', titulo: 'Fila como a do Spotify',
+    itens: [
+      { tipo: 'melhoria', texto: 'Cada música da fila tem os três tracinhos (≡) à direita, indicando que dá para mudar a posição. Segurando a música, ela fica com o fundo mais claro e acompanha o dedo, o lugar onde vai cair fica vazio e as outras deslizam para abrir espaço.' },
+    ],
+  },
+  {
     versao: 365, data: '2026-10-31', titulo: 'Fila: arrastar pelo card inteiro',
     itens: [
       { tipo: 'melhoria', texto: 'Na fila, segure qualquer parte da música e arraste para mudar a ordem (sem a alça): o card sobe, acompanha o dedo e as outras músicas abrem espaço deslizando.' },
@@ -63,12 +69,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'melhoria', texto: 'O aleatório agora embaralha a ordem real da fila, que também pode ser reorganizada arrastando as músicas com o dedo ou o mouse. A seleção por teclado também permite mover faixas.' },
       { tipo: 'melhoria', texto: 'A fila mostra a duração de cada música quando disponível e busca a duração que estiver faltando para guardá-la na biblioteca.' },
-    ],
-  },
-  {
-    versao: 356, data: '2026-10-30', titulo: 'Sincronização online mais resistente',
-    itens: [
-      { tipo: 'melhoria', texto: 'O Songbook consegue comparar o áudio da faixa com o áudio extraído do videoclipe online, sem baixar a imagem do vídeo. A consulta às fontes de áudio fica mais rápida e, se um formato falhar, tenta outras faixas de áudio e instâncias antes de desistir.' },
     ],
   },
 ];

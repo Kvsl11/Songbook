@@ -1959,15 +1959,17 @@ dialog.lista-fila .lista-cab h3 { flex: 1; min-width: 0; }
 dialog.lista-fila .lista-opcoes { max-height: min(68dvh, 680px); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
 dialog.lista-fila .fila-item { min-height: 68px; user-select: none; -webkit-user-select: none; }
 dialog.lista-fila .fila-item.atual { background: var(--accent-soft); }
-dialog.lista-fila .fila-item.atual.arrastando { background: var(--surface-3); }
+dialog.lista-fila .fila-item.atual.arrastando { background: color-mix(in srgb, var(--text) 11%, var(--surface, #181818)); }
 dialog.lista-fila .fila-item.indisponivel { opacity: .48; }
 dialog.lista-fila .fila-dica { margin: -4px 16px 6px; font-size: 12.5px; }
 dialog.lista-fila .lista-opcoes { position: relative; }
 dialog.lista-fila .fila-item { -webkit-touch-callout: none; cursor: grab; position: relative; transition: transform .18s cubic-bezier(.2, .8, .2, 1), background .15s, box-shadow .18s; }
-/* o card que está sendo arrastado sobe: cresce, ganha sombra e fica por cima, seguindo o dedo sem atraso */
-dialog.lista-fila .fila-item.arrastando { z-index: 3; cursor: grabbing; background: var(--surface-3); border-radius: 10px; box-shadow: 0 14px 34px rgb(0 0 0 / .45), 0 2px 6px rgb(0 0 0 / .3); transition: background .15s, box-shadow .18s; animation: fila-sobe .18s cubic-bezier(.2, .8, .2, 1); }
-dialog.lista-fila .fila-item.arrastando.soltando { transition: transform .2s cubic-bezier(.2, .8, .2, 1), box-shadow .2s; box-shadow: none; }
-@keyframes fila-sobe { from { transform: scale(1); box-shadow: none; } }
+/* como na fila do Spotify: o card segurado fica com o fundo mais claro e acompanha o dedo; o lugar onde ele vai cair
+   fica vazio, e as outras músicas deslizam para abrir espaço */
+dialog.lista-fila .fila-item.arrastando { z-index: 3; cursor: grabbing; background: color-mix(in srgb, var(--text) 11%, var(--surface, #181818)); transition: background .15s; }
+dialog.lista-fila .fila-item.arrastando.soltando { transition: transform .2s cubic-bezier(.2, .8, .2, 1), background .2s; }
+dialog.lista-fila .fila-reordenar { flex: none; display: grid; place-items: center; width: 24px; margin-left: -4px; color: var(--muted); }
+dialog.lista-fila .fila-item.arrastando .fila-reordenar { color: var(--text); }
 dialog.lista-fila.arrastando-fila .lista-opcoes { touch-action: none; }
 dialog.lista-fila .lista-dir .spin { width: 12px; height: 12px; border-width: 2px; }
 dialog.lista-fila .fila-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
