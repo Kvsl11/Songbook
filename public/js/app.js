@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.31-367';
+export const APP_VERSAO = '2026.10.31-368';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1693,8 +1693,9 @@ const player = (() => {
     // (com as duas versões, os quadros são os do clipe: o áudio oficial é só a capa parada)
     // (só com o clipe baixado: a capa animada é o próprio arquivo, sem os botões que o player do YouTube mostrava por
     // cima ao pausar; sem o download, fica a capa da música, parada, como no Spotify sem Canvas)
-    const clipeBaixado = doYt && String(baixadoDe(doYt)?.tipo || '').startsWith('video');
-    const q = capa && !atual?.semVideo && clipeBaixado && db.prefs().videoFundo !== false ? doYt : '';
+    // (com o clipe baixado, passam trechos do próprio arquivo; sem o download, os quadros que o YouTube publica do
+    // clipe, passando com zoom lento: a capa animada funciona nas duas)
+    const q = capa && !atual?.semVideo && doYt && db.prefs().videoFundo !== false ? doYt : '';
     const barra = capaNaBarra();
     el.classList.toggle('capa-na-barra', barra);
     mini.style.backgroundImage = (capa || barra) && url ? `url("${url}")` : ''; // (com os quadros no fundo, o CSS a esconde)
@@ -2559,6 +2560,8 @@ const semLinhasDeAcordes = (sinc) => {
     // modo do Tocando agora: o vídeo ou a música (a capa); o ⋯ das listas troca
     get modoMusica() { return comCapa; },
     trocarModo: () => mudarModo(),
+    // a música que abre (da busca, da biblioteca…) começa na versão da música (a capa e o áudio oficial), não no vídeo
+    paraModoMusica() { if (!comCapa) { comCapa = true; db.setPref('playerCapa', true); desenharCapa(); } },
     // a música tocando foi baixada (ou o download saiu), ou a internet caiu ou voltou: passa a tocar do aparelho ou do
     // YouTube, no mesmo ponto
     reavaliarFonte() {
@@ -9206,6 +9209,8 @@ function viewSong(id, ctx = {}) {
   // a cifra que chega depois, a cifra completada…). Com vídeo: tocando, se veio de uma lista, ou pausado; sem vídeo, a
   // capa e o botão de escolher um. O vídeo que chega depois (a busca demorou) passa a tocar
   if (!document.body.classList.contains('performance')) {
+    // (outra música abrindo: na versão da música, antes de montar o que vai tocar)
+    if (midiaDe(song) && !player.desta(midiaDe(song))) player.paraModoMusica();
     const item = itemDoPlayer(song, ctx.set ? db.set(ctx.set.id) : null, ctx.set ? ctx.index : -1);
     const semVideoDesta = player.atual?.semVideo && player.atual.songId === song.id;
     if (!midiaDe(song)) { if (!semVideoDesta) player.mostrarSemVideo(item); }
@@ -10725,7 +10730,7 @@ function viewSettings(topico) {
       <div class="setting wrap"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
       ${chave('diagramas', 'grid', 'Desenho dos acordes', 'Como montar cada acorde no violão', p.diagramas)}
-      ${chave('video-fundo', 'video', 'Capa animada', 'Nas músicas baixadas com o vídeo, trechos do clipe passam atrás da música, sem som, como o Canvas do Spotify', p.videoFundo !== false)}
+      ${chave('video-fundo', 'video', 'Capa animada', 'Trechos do clipe passam atrás da música, sem som, como o Canvas do Spotify (nas músicas baixadas, o próprio vídeo)', p.videoFundo !== false)}
     </div>`)}
 
     ${secao('Downloads e dados', `
