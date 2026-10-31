@@ -62,8 +62,20 @@ export function renderSong(content, { transpose = 0, capo = 0, key = '' } = {}) 
         else html.push(...palavra);
         palavra = [];
       };
+      // o acorde sobre uma sílaba curta ("m[Am7]e,", "l[Am7]ike") não alarga mais a sílaba até a largura dele (abria um
+      // buraco no meio da frase, "That's that me,      espresso"): ele avança por cima da letra que vem depois, quando ela
+      // é comprida o bastante até o próximo acorde ("solto"; soltarAcordes confere na tela e devolve o espaço se bater
+      // no próximo acorde ou passar da borda)
+      const solto = (i) => {
+        const p = pedacos[i];
+        if (onlyChords || !p.chord || !p.text.trim()) return false;
+        let livre = 0;
+        for (let k = i; k < pedacos.length && (k === i || !pedacos[k].chord); k++) livre += pedacos[k].text.length;
+        const proximo = pedacos.slice(i + 1).some((x) => x.chord);
+        return livre >= p.chord.length + 2 && (proximo || livre > p.text.length);
+      };
       pedacos.forEach((p, i) => {
-        palavra.push(`<span class="chunk"><span class="chord">${esc(p.chord)}</span><span class="lyric">${esc(p.text)}</span></span>`);
+        palavra.push(`<span class="chunk${solto(i) ? ' solto pode-soltar' : ''}"><span class="chord">${esc(p.chord)}</span><span class="lyric">${esc(p.text)}</span></span>`);
         const prox = pedacos[i + 1];
         if (!prox || /\s$/.test(p.text) || !p.text || /^\s/.test(prox.text) || !prox.text.trim()) fecharPalavra();
       });
@@ -73,4 +85,49 @@ export function renderSong(content, { transpose = 0, capo = 0, key = '' } = {}) 
     html.push('</div>');
   }
   return { meta, key: targetKey, html: html.join('') };
+}
+
+// Os acordes "soltos" (que avançam por cima da letra seguinte) na tela: o que bate no próximo acorde da mesma linha ou
+// passa da borda direita (a linha quebrou logo depois dele) volta a ocupar o espaço dele. Rodar depois de desenhar; a
+// conferência se repete sozinha quando a cifra muda de tamanho (tela girada, letra maior ou menor)
+const observadas = new WeakSet();
+export function soltarAcordes(raiz) {
+  if (!raiz?.querySelectorAll) return;
+  if (!observadas.has(raiz) && typeof ResizeObserver === 'function') {
+    observadas.add(raiz);
+    let largura = 0;
+    let fonte = '';
+    let pedido = 0;
+    new ResizeObserver(() => {
+      // (só quando muda a largura ou o tamanho da letra: a altura muda também ao soltar e prender os acordes)
+      const l = raiz.clientWidth;
+      const f = getComputedStyle(raiz).fontSize;
+      if (l === largura && f === fonte) return;
+      largura = l;
+      fonte = f;
+      cancelAnimationFrame(pedido);
+      pedido = requestAnimationFrame(() => soltarAcordes(raiz));
+    }).observe(raiz);
+  }
+  raiz.querySelectorAll('.chunk.pode-soltar:not(.solto)').forEach((c) => c.classList.add('solto'));
+  for (let volta = 0; volta < 3; volta++) {
+    const soltos = [...raiz.querySelectorAll('.chunk.solto')];
+    if (!soltos.length) return;
+    const borda = raiz.getBoundingClientRect().right;
+    if (!borda) return; // (escondido: confere quando aparecer)
+    const tirar = soltos.filter((c) => {
+      const ch = c.firstElementChild;
+      const r = ch.getBoundingClientRect();
+      const fim = r.left + ch.scrollWidth;
+      if (fim > borda + 1) return true;
+      // o próximo acorde da linha, na mesma altura
+      const acordes = [...c.closest('.line')?.querySelectorAll('.chord') || []].filter((x) => x.textContent);
+      const prox = acordes[acordes.indexOf(ch) + 1];
+      if (!prox) return false;
+      const rp = prox.getBoundingClientRect();
+      return Math.abs(rp.top - r.top) < 2 && fim + 6 > rp.left;
+    });
+    if (!tirar.length) return;
+    tirar.forEach((c) => c.classList.remove('solto'));
+  }
 }
