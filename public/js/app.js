@@ -8456,7 +8456,7 @@ function viewSong(id, ctx = {}) {
             : `<a role="menuitem" href="#/editar/${song.id}">${icon('edit', 18)}<span>Editar cifra</span></a>`}
           <button role="menuitem" id="btn-pdf">${icon('file', 18)}<span>Exportar PDF</span></button>
           ${song.artist || ehCifraClub(song.source || '') ? `<button role="menuitem" id="btn-album">${icon('disc', 18)}<span>Ver álbum</span></button>` : ''}
-          <button role="menuitem" id="btn-trocar-video">${icon(tipoMidiaAtiva() === 'audio' ? 'music' : (song.youtube ? 'refresh' : 'youtube'), 18)}<span>${tipoMidiaAtiva() === 'audio' ? 'Trocar música' : (song.youtube ? 'Trocar o vídeo' : 'Escolher um vídeo')}</span></button>
+          <button role="menuitem" id="btn-trocar-video">${icon(player.modoMusica ? 'music' : (song.youtube ? 'refresh' : 'youtube'), 18)}<span>${player.modoMusica ? 'Trocar música' : (song.youtube ? 'Trocar o vídeo' : 'Escolher um vídeo')}</span></button>
           ${isPreview ? '' : `<button role="menuitem" id="btn-audio-meu">${icon('upload', 18)}<span>${song.audioProprio ? 'Trocar o seu áudio' : 'Usar um áudio seu'}</span></button>`}
           ${!isPreview && song.audioProprio ? `<button role="menuitem" id="btn-audio-tirar">${icon('x', 18)}<span>Tirar o seu áudio</span></button>` : ''}
           ${(() => {
