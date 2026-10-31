@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-361';
+export const APP_VERSAO = '2026.10.30-362';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1828,7 +1828,7 @@ const semLinhasDeAcordes = (sinc) => {
     if (chave === letraDe) return;
     letraDe = chave;
     // a sincronia guardada antes de a linha só de acordes ("( Am7(4) )") ficar de fora da letra: ela sai daqui também
-    const sinc = semLinhasDeAcordes(song?.sincronia?.fonte === 'lrclib' && song.sincronia.video === atual?.youtube ? song.sincronia : null);
+    const sinc = semLinhasDeAcordes(song?.sincronia?.fonte === 'lrclib' && song.sincronia.video === videoDaLetra(song) ? song.sincronia : null);
     // as marcações das partes (Chorus, Bridge, Verse 2…) em cima da linha em que cada uma começa; na letra sincronizada
     // (que pode ter linhas a mais ou a menos que a cifra, e o refrão repetido), cada frase cantada casa com a linha da
     // cifra e a marcação entra onde a parte muda (a frase sem par fica na parte de antes)
@@ -1952,7 +1952,7 @@ const semLinhasDeAcordes = (sinc) => {
     $('.pl-tom', el).innerHTML = `<small>Tom</small>${esc(r.key || (transpose ? (transpose > 0 ? '+' : '') + transpose : '—'))}`;
     $('.pl-capo', el).innerHTML = `<small>Capo</small>${capo || '—'}`;
     // com a letra sincronizada, a linha cantada acende também na cifra
-    const sinc = song.sincronia?.fonte === 'lrclib' && song.sincronia.video === atual?.youtube ? song.sincronia : null;
+    const sinc = song.sincronia?.fonte === 'lrclib' && song.sincronia.video === videoDaLetra(song) ? song.sincronia : null;
     if (sinc) {
       const linhasTela = [...box.querySelectorAll('.line:not(.chords-only)')];
       const textos = linhasTela.map((l) => [...l.querySelectorAll('.lyric')].map((x) => x.textContent).join(''));
@@ -3216,7 +3216,7 @@ const semLinhasDeAcordes = (sinc) => {
       if (ja && (preview.versoes || preview.sincronia)) {
         db.updateSong(ja.id, { ...(preview.versoes ? { versoes: preview.versoes, versoesConferidas: true } : {}), ...(preview.sincronia ? { sincronia: preview.sincronia } : {}) });
       }
-      const salva = ja || db.saveSong({ content: preview.content, source: preview.source, transpose: preview.transpose || 0, capo: preview.capo || 0, ...(preview.sincronia ? { sincronia: preview.sincronia } : {}), ...(preview.versoes ? { versoes: preview.versoes } : {}) });
+      const salva = ja || db.saveSong({ content: preview.content, source: preview.source, transpose: preview.transpose || 0, capo: preview.capo || 0, ...(preview.sincronia ? { sincronia: preview.sincronia } : {}), ...(preview.versoes ? { versoes: preview.versoes } : {}), ...(preview.fotoArtista ? { fotoArtista: preview.fotoArtista } : {}) });
       api.atualizar({ songId: salva.id, href: `#/musica/${salva.id}` });
       toast(ja ? 'Já estava na biblioteca' : 'Salva na biblioteca');
       // na página da música (escondida atrás do Tocando agora), só o endereço muda: ir para ele redesenhava a página
@@ -3690,7 +3690,7 @@ function indicadores(s) {
 
 const linhaMusica = (s, extra = '') => `
   <li class="track clickable" data-id="${s.id}" style="grid-template-columns:auto 1fr auto">
-    ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}<span class="artista-mini" data-artista-mini>${semFotoArtista(14)}</span>${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
+    ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}<span class="artista-mini${s.fotoArtista ? ' com-foto' : ''}" data-artista-mini>${s.fotoArtista ? `<img src="${esc(s.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
 
 // Escolhe uma música: da biblioteca ou procurando na internet (Cifra Club, cantos da missa, letras,
 // vídeos do YouTube). O que vem da internet é salvo na biblioteca. Devolve o id, 'nova' ou null.
@@ -3769,7 +3769,7 @@ async function salvarDaInternet(tipo, item) {
     const vs = await Promise.race([r.video.catch(() => []), new Promise((ok) => setTimeout(() => ok(null), 4000))]);
     if (vs?.[0]) content = definirMeta(content, 'youtube', vs[0].url);
   }
-  const salva = db.saveSong({ content, source: r.source, capo: capoDaCifra(content) });
+  const salva = db.saveSong({ content, source: r.source, capo: capoDaCifra(content), ...(item.fotoArtista ? { fotoArtista: item.fotoArtista } : {}) });
   // o vídeo do YouTube (se ainda não veio com a música); dá para trocar depois em Referências
   if (!salva.youtube) {
     r.video.then((vs) => {
@@ -4563,6 +4563,14 @@ async function abrirPrevia(content, source, back, videoJa = null) {
   const buscaCapaDaPrevia = novo.title && novo.artist
     ? capaOficial(novo.title, novo.artist).catch(() => '')
     : Promise.resolve('');
+  const buscaFotoDaPrevia = novo.title && novo.artist
+    ? fotoDoArtista(novo.artist, /cifraclub\\.com\\.br\\/([^/?#]+)/.exec(source || '')?.[1] || '').catch(() => '')
+    : Promise.resolve('');
+  void buscaFotoDaPrevia.then((url) => {
+    if (!url || preview !== novo) return;
+    novo.fotoArtista = url;
+    if (db.songBySource(novo.source)) db.updateSong(db.songBySource(novo.source).id, { fotoArtista: url });
+  });
   const aplicarCapaDaPrevia = (url) => {
     if (!url || preview !== novo || !capaTrocavel(novo.cover)) return;
     novo.cover = url;
@@ -4856,7 +4864,10 @@ async function prepararMidiaBusca(itens) {
       fotoDoArtista(artista, item.slug || '').catch(() => ''),
     ]);
     if (capa) { item.capa = capa; item.cover = capa; }
-    if (foto) item.fotoArtista = foto;
+    if (foto) {
+      item.fotoArtista = foto;
+      if (item.id && db.song(item.id)?.fotoArtista !== foto) db.updateSong(item.id, { fotoArtista: foto });
+    }
   }));
   return itens;
 }
@@ -5128,7 +5139,7 @@ function musicaSalva({ titulo = '', artista = '', cifra = '', letra = '' } = {})
 const botaoSalvar = (item, cls = '') => {
   const salva = musicaSalva(item);
   const v = item.video;
-  return `<button class="salvar-btn ${cls}${salva ? ' salva' : ''}" data-salvar data-titulo="${esc(item.titulo || '')}" data-artista="${esc(item.artista || '')}" data-cifra="${esc(item.cifra || '')}" data-letra="${esc(item.letra || '')}"${v ? ` data-video="${esc(v.id || '')}" data-video-titulo="${esc(v.titulo || '')}" data-canal="${esc(v.canal || '')}"` : ''}
+  return `<button class="salvar-btn ${cls}${salva ? ' salva' : ''}" data-salvar data-titulo="${esc(item.titulo || '')}" data-artista="${esc(item.artista || '')}" data-cifra="${esc(item.cifra || '')}" data-letra="${esc(item.letra || '')}" data-foto-artista="${esc(item.fotoArtista || '')}"${v ? ` data-video="${esc(v.id || '')}" data-video-titulo="${esc(v.titulo || '')}" data-canal="${esc(v.canal || '')}"` : ''}
     aria-pressed="${!!salva}" aria-label="${salva ? 'Na biblioteca (tocar para tirar)' : 'Salvar na biblioteca'}" title="${salva ? 'Na sua biblioteca — tocar para tirar' : 'Salvar na biblioteca'}">${icon(salva ? 'check' : 'plus', 16)}</button>`;
 };
 const marcarSalvar = (b, salva) => {
@@ -5155,7 +5166,7 @@ document.addEventListener('click', async (e) => {
   e.preventDefault();
   e.stopPropagation();
   if (b.disabled) return;
-  const item = { titulo: b.dataset.titulo, artista: b.dataset.artista, cifra: b.dataset.cifra, letra: b.dataset.letra };
+  const item = { titulo: b.dataset.titulo, artista: b.dataset.artista, cifra: b.dataset.cifra, letra: b.dataset.letra, fotoArtista: b.dataset.fotoArtista || '' };
   const salva = musicaSalva(item);
   if (salva) { if (await tirarDaBiblioteca(salva)) marcarSalvar(b, false); return; }
   b.disabled = true;
@@ -5179,7 +5190,7 @@ const indicadoresWeb = (r) => {
 const linhaMusicaWeb = (r, i, extra = '') => `
   <li class="track clickable" data-web="musica" data-midia-index="${i}" data-i="${i}" style="grid-template-columns:auto 1fr auto">
     ${capa({ titulo: r.titulo, capa: r.capa || r.video?.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${indicadoresWeb(r)}<span class="artista-mini" data-artista-mini>${r.fotoArtista ? `<img src="${esc(r.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(r.artista || '')}${r.video?.duracao ? ` · ${esc(r.video.duracao)}` : ''}</div></div>
-    <span class="acts">${extra}${botaoSalvar({ titulo: r.titulo, artista: r.artista, cifra: r.cifra || '', letra: r.letra?.url || '', video: r.video }, 'mini')}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
+    <span class="acts">${extra}${botaoSalvar({ titulo: r.titulo, artista: r.artista, cifra: r.cifra || '', letra: r.letra?.url || '', video: r.video, fotoArtista: r.fotoArtista || '' }, 'mini')}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 
 // Busca vazia: as músicas católicas mais procuradas agora no Cifra Club — as mais tocadas de cada um dos
 // artistas católicos mais ouvidos, em ordem de popularidade (o índice da própria busca do Cifra Club)
