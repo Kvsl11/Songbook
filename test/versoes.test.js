@@ -333,3 +333,18 @@ test('os pares pelas legendas automáticas do clipe (Speed Demon: introdução l
   for (const [a, v] of pares) assert.ok(Math.abs(v - a - 360.5) < 1, `${a} → ${v}`);
   assert.ok(Math.abs(tempoNoVideo(pares, 30) - 390.5) < 1);
 });
+
+test('trocar a música/o vídeo não salva a prévia sozinho e refaz a sincronia para a versão nova', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const trocar = app.slice(app.indexOf("if (b.dataset.pl === 'trocar') {"), app.indexOf("if (b.dataset.pl === 'ampliar')"));
+  assert.doesNotMatch(trocar, /salvarDaPrevia\(\)/, 'o "Trocar música" não pode salvar a música na biblioteca');
+  assert.match(trocar, /trocarNaPrevia\(tipo, url\)/);
+  for (const f of ['function trocarAudioDaMusica(', 'function trocarVideoDaMusica(', 'function trocarNaPrevia(']) {
+    const corpo = app.slice(app.indexOf(f), app.indexOf('\n}\n', app.indexOf(f)));
+    assert.match(corpo, /reatarSincronia\(/, f);
+  }
+  // salvar a música da busca usa a prévia que está aberta (com a letra), sem trazer de novo
+  const salvar = app.slice(app.indexOf('async function salvarDaInternet('), app.indexOf('async function addToSetDialog('));
+  assert.ok(salvar.indexOf('preview.source === fonteItem') < salvar.indexOf('await trazerMusica('));
+  assert.match(app, /catch \{ return Infinity; \}/, 'um erro ao ler a cifra não pode fazer a letra dela ser trocada');
+});

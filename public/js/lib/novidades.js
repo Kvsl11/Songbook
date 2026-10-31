@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 372, data: '2026-10-31', titulo: 'A letra não some mais ao trocar a música ou salvar',
+    itens: [
+      { tipo: 'correcao', texto: 'O “Trocar música” no Tocando agora não salva mais a música na biblioteca sozinho (salvava até cancelando).' },
+      { tipo: 'correcao', texto: 'Depois de trocar a música ou o vídeo, a letra sincronizada é refeita para a versão nova; antes ela ficava presa à de antes, parava de acompanhar e às vezes sumia.' },
+      { tipo: 'correcao', texto: 'Salvar a música aberta da busca guarda exatamente a que está na tela, com a letra; antes ela era trazida de novo e, se o site falhasse naquela hora, ficava salva sem letra.' },
+    ],
+  },
+  {
     versao: 371, data: '2026-10-31', titulo: 'Música toca de novo ao abrir e troca na hora',
     itens: [
       { tipo: 'correcao', texto: 'A música aberta pela busca volta a tocar: a abertura esperava demais (até 20 s) e o navegador não deixava mais começar sozinha. Agora ela abre em poucos segundos e o resto chega já tocando.' },
@@ -68,12 +76,6 @@ export const NOVIDADES = [
     versao: 363, data: '2026-10-31', titulo: 'Correção na inicialização do aplicativo',
     itens: [
       { tipo: 'correcao', texto: 'Corrigida uma expressão inválida que impedia o Songbook de iniciar. O salvamento da foto do artista também foi conectado corretamente ao cadastro da música.' },
-    ],
-  },
-  {
-    versao: 362, data: '2026-10-30', titulo: 'Letra sincronizada e foto do artista preservadas',
-    itens: [
-      { tipo: 'correcao', texto: 'A letra sincronizada agora continua vinculada à faixa de áudio correta ao salvar e reabrir a música, mesmo quando o videoclipe é diferente. A foto do artista também é guardada na biblioteca e reaparece nas próximas visitas, inclusive sem internet quando já foi carregada.' },
     ],
   },
 ];
