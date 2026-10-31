@@ -98,3 +98,19 @@ test('linhasCantadas: linha só de acordes entre parênteses não é letra', () 
   const src = '(He say) Pull over boy\n( Am7(4) )\n( [Am7(4)] )\n[G] (2x)\n( E a vida )';
   assert.deepEqual(linhasCantadas(src), ['(He say) Pull over boy', '( E a vida )']);
 });
+
+test('afinação, capotraste, batida, créditos… não entram na letra nem na cifra; letra de verdade fica', async () => {
+  const { ehInfoDaCifra, linhasCantadas, letraDe, parseChordPro } = await import('../public/js/chordpro.js');
+  const { cifraTextoParaChordPro } = await import('../public/js/lib/web.js');
+  for (const l of ['Afinação: Eb Ab Db Gb Bb Eb', 'Capotraste na 2ª casa', 'Tom: G', 'Sugestão de batida: ↓ ↑', 'Riff: G D', 'Dedilhado: P-I-M-A',
+    'Obs: repetir 2x', 'Composição: Padre X', 'Contribuição: Maria', 'Revisões: João', 'Versão simplificada', 'Meio tom abaixo', '[Tom: G]']) assert.ok(ehInfoDaCifra(l), l);
+  for (const l of ['Autor da vida, meu Senhor', 'Tom, meu amigo, vem cantar', 'Solo tú eres Santo', 'Base firme é o teu amor', 'A batida do meu coração',
+    'Introduz a paz em mim', 'Versão da minha história', '[G]Deus está [D]aqui']) assert.ok(!ehInfoDaCifra(l), l);
+  const pro = cifraTextoParaChordPro('Afinação: Eb Ab Db Gb Bb Eb\nCapotraste na 2ª casa\n\nG        D\n  Deus está aqui\n\nComposição: Padre Fulano\nVersão simplificada');
+  assert.deepEqual(linhasCantadas(pro).map((l) => l.replace(/\[[^\]]*\]/g, '').trim()), ['Deus está aqui']);
+  // nas cifras já guardadas, elas também não aparecem (nem na letra, nem na cifra)
+  const guardada = '{title: X}\nAfinação: Eb Ab Db Gb Bb Eb\n[G]Deus está [D]aqui\nRevisões: João\n{comment: Capotraste na 2ª casa}';
+  assert.doesNotMatch(letraDe(guardada), /Afinação|Revisões/);
+  const linhas = parseChordPro(guardada).sections.flatMap((s) => s.lines);
+  assert.equal(linhas.length, 1);
+});

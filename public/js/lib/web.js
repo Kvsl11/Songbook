@@ -10,7 +10,7 @@
 // - YouTube: busca pelo Piped (instâncias públicas, com CORS); o oEmbed confirma um link colado.
 
 import { decodeEntities, normalize } from './html.js';
-import { cifraComCapo, doEditor, ehCabecalho, ehNomeDeParte, isChord, isChordOnlyLine, linhaDeTab, organizarPartes, partesDosBlocos, preferFlatsFor, semInvisiveis, semIntro, temInvisiveis, transposeChordPro } from '../chordpro.js';
+import { cifraComCapo, doEditor, ehCabecalho, ehInfoDaCifra, ehNomeDeParte, isChord, isChordOnlyLine, linhaDeTab, organizarPartes, partesDosBlocos, preferFlatsFor, semInvisiveis, semIntro, temInvisiveis, transposeChordPro } from '../chordpro.js';
 
 const NO_NAVEGADOR = typeof window !== 'undefined';
 const UA = NO_NAVEGADOR ? {} : { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36', 'Accept-Language': 'pt-BR,pt;q=0.9' };
@@ -66,7 +66,8 @@ export const ehCifraClub = (url) => /^https?:\/\/(www\.|m\.)?cifraclub\.com\.br\
 // ------------------------------------------------------------------ Cifra Club: página da cifra
 
 // Texto de cifra (acordes em cima da letra, partes em [Colchetes]) -> ChordPro com seções
-export const cifraTextoParaChordPro = (texto) => doEditor(texto);
+// (as linhas de informação — afinação, capotraste, batida, créditos… — saem já ao trazer a cifra)
+export const cifraTextoParaChordPro = (texto) => doEditor(String(texto || '').split('\n').filter((l) => !ehInfoDaCifra(l)).join('\n'));
 
 // o vídeo do YouTube que a página (Cifra Club, Letras) mostra junto da música
 // (estrito: só links do YouTube, data-video-id e "youtubeId", e o código com exatamente 11 caracteres, sem ser um número)

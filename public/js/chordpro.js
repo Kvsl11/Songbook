@@ -97,6 +97,7 @@ export function parseChordPro(src) {
         continue;
       }
       if (name === 'c' || name === 'comment' || name === 'ci' || name === 'comment_italic') {
+        if (ehInfoDaCifra(value)) continue; // (afinação, capotraste, batida… não aparecem)
         ensure().lines.push({ kind: 'comment', text: value });
         continue;
       }
@@ -108,6 +109,7 @@ export function parseChordPro(src) {
       if (current && !current.explicit) current = null;
       continue;
     }
+    if (ehInfoDaCifra(line)) continue; // (afinação, capotraste, batida, créditos… não são letra nem cifra)
     const sec = ensure();
     if (sec.type === 'tab') { sec.lines.push({ kind: 'text', text: line }); continue; }
     sec.lines.push({ kind: 'lyrics', segments: splitChordLine(line) });
@@ -383,7 +385,7 @@ export const soAcordes = (l) => {
 };
 
 export function letraDe(src) {
-  return String(src || '').replace(/\r\n?/g, '\n').split('\n').filter((l) => !soAcordes(l)).map((l) => (ehDiretiva(l) ? l : semAcordes(l))).join('\n');
+  return String(src || '').replace(/\r\n?/g, '\n').split('\n').filter((l) => !soAcordes(l) && (ehDiretiva(l) || !ehInfoDaCifra(l))).map((l) => (ehDiretiva(l) ? l : semAcordes(l))).join('\n');
 }
 
 // recoloca os acordes da linha original numa versão editada do texto
@@ -501,6 +503,22 @@ export function capoDaObservacao(src) {
 // Linha entre parênteses: é observação ("(2x)", "(bis)", "(só as mulheres)", "(solo)") ou é letra
 // cantada (o eco/segunda voz, "(Você não está sozinho)"), que continua a música e fica do tamanho normal
 const OBSERVACAO = /^\d+\s*x$|^x\s*\d+$|\b\d+\s*(x|vezes)\b|\bbis\b|repet|refr[ãa]o|\bcoro\b|chorus|\bverse\b|\bbridge\b|\brepeat\b|solo|intro|instrumental|\bfinal\b|\bfim\b|todos|homens|mulheres|crian[çc]as|vozes|\bs[óo]\s|falad|declama|pausa|ad lib|capo|\btom\b|bateria|viol[ãa]o|teclado|guitarra|palmas|ministro|presidente|assembleia|solista|dueto|un[íi]ssono|acelera|devagar|lento|fade|ponte|estrofe|pr[ée]-?refr|riff|base|dedilhado|interl[úu]dio|^\W*$/i;
+// As informações da cifra que não são cantadas e vinham no meio da letra (do Cifra Club e de cifras coladas): a
+// afinação, o capotraste, o tom, a batida, o riff, o dedilhado, o solo, as observações, os créditos (composição,
+// contribuição, revisões) e o "Versão simplificada". Uma linha assim sai da letra e da cifra (o tom e o capotraste
+// já aparecem nos botões da música). Para não tirar letra de verdade, o rótulo precisa vir com ":" ou "-" logo
+// depois (até 30 letras), menos nas frases que só existem na cifra ("Capotraste na 2ª casa", "Meio tom abaixo")
+// (as palavras que só existem na cifra aceitam um complemento antes dos dois-pontos: "Afinação (meio tom abaixo):";
+// as que também aparecem em letras — "Tom", "Base", "Solo", "Autor da vida: …" — só com os dois-pontos logo depois)
+const INFO_CERTA = /^\s*[([]?\s*(afina[çc][ãa]o|tuning|capotraste|capo|(sugest[ãa]o de )?batida|dedilhado|riff|intro(du[çc][ãa]o)?|interl[úu]dio|obs(erva[çc][ãa]o|\.)?|composi[çc][ãa]o|compositor(es|a)?|contribui[çc][ãa]o|colabora[çc][ãa]o|revis(ão|ões|ao|oes)|letra e cifra|cifrad[ao] por|cifra feita por|transcri[çc][ãa]o|cr[ée]ditos|tablatura|bpm|andamento|arranjo|produ[çc][ãa]o|strumming|written by|enviad[ao] por)\b[^:：\n]{0,30}?\s*[:：–—]/i;
+const INFO_RISCO = /^\s*[([]?\s*(tom|key|base|solo|autor(es|a)?|vers[ãa]o|cifra|acordes|tab|ritmo|levada|chords?|e-?mail|instagram|youtube)\s*[:：]/i;
+const INFO_SOLTA = /^\s*[([]?\s*(vers[ãa]o simplificada|vers[ãa]o completa|cifra (simplificada|completa)|capotraste\b.*|afina[çc][ãa]o\b.*|(meio )?tom abaixo|(meio )?tom acima|afina[çc][ãa]o padr[ãa]o|parte \d+ de \d+|sem capotraste|tom original|(com )?capo\s*\d+.*)\s*[)\]]?\s*$/i;
+export const ehInfoDaCifra = (texto) => {
+  // ("[Tom: G]" inteiro entre colchetes é a informação, não um acorde)
+  const inteiro = /^\s*\[([^\]]*[:：][^\]]*)\]\s*$/.exec(String(texto || ''))?.[1];
+  const t = (inteiro ?? String(texto || '').replace(/\[[^\]]*\]/g, '')).replace(/\s+/g, ' ').trim();
+  return Boolean(t) && (INFO_CERTA.test(t) || INFO_RISCO.test(t) || INFO_SOLTA.test(t));
+};
 export const ehObservacao = (texto) => OBSERVACAO.test(String(texto || '').trim()) || ehInstrumental(texto); // acordes entre parênteses também
 
 // Nomes das partes sempre em inglês (Intro, Verse 1, Pre-Chorus, Chorus, Bridge, Outro…), venham do Cifra Club
@@ -646,7 +664,7 @@ export function paraEditor(src) {
 // A IA recebe só as linhas da letra, numeradas, e devolve onde começa cada parte. O app só coloca
 // as marcações ([Refrão], [Estrofe 2]…): nenhuma palavra ou acorde é alterado.
 const NOMES_PARTE = { refrao: 'Chorus', estrofe: 'Verse', ponte: 'Bridge', 'pre-refrao': 'Pre-Chorus', intro: 'Intro', final: 'Outro' };
-const ehLinhaDeLetra = (l) => { const p = /^\s*\(([^()]*)\)\s*$/.exec(l); return l.trim() && !ehDiretiva(l) && !soAcordes(l) && !(p && ehObservacao(p[1])); };
+const ehLinhaDeLetra = (l) => { const p = /^\s*\(([^()]*)\)\s*$/.exec(l); return l.trim() && !ehDiretiva(l) && !soAcordes(l) && !(p && ehObservacao(p[1])) && !ehInfoDaCifra(l); };
 
 export function linhasDaLetra(src) {
   return paraEditor(src).split('\n').filter(ehLinhaDeLetra).map((l) => semAcordes(l).replace(/\s+/g, ' ').trim());

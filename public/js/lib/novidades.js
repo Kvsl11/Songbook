@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 373, data: '2026-10-31', titulo: 'Só a letra na letra, sem afinação nem créditos',
+    itens: [
+      { tipo: 'correcao', texto: 'Afinação, capotraste, tom, sugestão de batida, riff, dedilhado, solo, observações e créditos (composição, contribuição, revisões) não aparecem mais no meio da letra nem da cifra, também nas músicas já salvas: na Letra fica só o que se canta; na Cifra, os acordes com a letra.' },
+    ],
+  },
+  {
     versao: 372, data: '2026-10-31', titulo: 'A letra não some mais ao trocar a música ou salvar',
     itens: [
       { tipo: 'correcao', texto: 'O “Trocar música” no Tocando agora não salva mais a música na biblioteca sozinho (salvava até cancelando).' },
@@ -70,12 +76,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'A música salva ou baixada leva junto a letra sincronizada (e a própria letra, quando a cifra não tinha), como em Company, do Justin Bieber.' },
       { tipo: 'correcao', texto: 'Trocar entre música e videoclipe vai para o ponto certo com mais frequência mesmo sem baixar (pelas letras sincronizadas das duas versões), e a barra não pula mais para o fim durante a troca.' },
       { tipo: 'melhoria', texto: 'Fila: sem o botão de aleatório repetido (ele fica no player), com a duração de cada música e com a alça visível; segure a música e arraste para mudar a ordem.' },
-    ],
-  },
-  {
-    versao: 363, data: '2026-10-31', titulo: 'Correção na inicialização do aplicativo',
-    itens: [
-      { tipo: 'correcao', texto: 'Corrigida uma expressão inválida que impedia o Songbook de iniciar. O salvamento da foto do artista também foi conectado corretamente ao cadastro da música.' },
     ],
   },
 ];
