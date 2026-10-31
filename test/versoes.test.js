@@ -186,7 +186,7 @@ test('ao abrir uma música, o LRCLIB é consultado na hora, sem esperar o áudio
   const rota = app.indexOf("if (jaNaPrevia) route(); else location.hash = '#/musica/previa';", abrir);
   const preparo = app.indexOf('const preparo = prepararMusicaAoAbrir(novo)', abrir);
   assert.ok(preparo > abrir && preparo < rota, 'a tela só navega depois de iniciar o preparo da música');
-  assert.match(app, /noMaximo\(preparo, 15000, 'demorou'\)/, 'entra com a letra sincronizada, mas nunca fica presa');
+  assert.match(app, /noMaximo\(preparo, 25000, 'demorou'\)/, 'entra com a letra sincronizada, mas nunca fica presa');
   const helper = app.slice(app.indexOf('function prepararMusicaAoAbrir(song)'), app.indexOf('// o áudio oficial da gravação'));
   assert.match(helper, /descobrirVersoes\(song\)/);
   assert.match(helper, /sincronizarMusica\(song, \{ audioPromise \}\)/);
@@ -194,8 +194,8 @@ test('ao abrir uma música, o LRCLIB é consultado na hora, sem esperar o áudio
   const rotinaSync = app.slice(app.indexOf('async function sincronizarMusica(song'), app.indexOf('// A preparação começa no clique/entrada da música'));
   // o LRCLIB vem primeiro: a descoberta do áudio oficial anda junto e só é esperada em segundo plano
   const principal = rotinaSync.slice(0, rotinaSync.indexOf('const melhorando'));
-  assert.ok(principal.includes('letraSincronizada(') && !principal.includes('await descoberta'), 'o LRCLIB não pode esperar a descoberta do áudio oficial');
-  assert.match(rotinaSync, /void melhorarSincronia\(/);
+  assert.ok(principal.includes('letraSincronizadaJa(') && principal.indexOf('letraSincronizadaJa(') < (principal.indexOf('await descoberta') >>> 0), 'o LRCLIB não pode esperar a descoberta do áudio oficial');
+  assert.match(rotinaSync, /const melhora = melhorarSincronia\(/);
 });
 
 test('cada prévia da busca tem seu próprio bloqueio de sincronização LRCLIB', async () => {

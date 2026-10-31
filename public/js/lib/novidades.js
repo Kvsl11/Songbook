@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 376, data: '2026-10-31', titulo: 'A música entra com a letra já sincronizada',
+    itens: [
+      { tipo: 'correcao', texto: 'A música da busca não entra mais antes da letra sincronizada: quando um serviço da letra falha por um instante, o app tenta de novo até achar (ou ter certeza de que não há); antes desistia depois de duas tentativas e a letra aparecia segundos depois de entrar.' },
+      { tipo: 'melhoria', texto: 'A letra sincronizada começa a ser procurada no toque na música, junto com a cifra e o vídeo, e a música espera também a versão de música certa para a letra (a de mesma duração).' },
+    ],
+  },
+  {
     versao: 375, data: '2026-10-31', titulo: 'Músicas explícitas com o selo E, e a letra inteira',
     itens: [
       { tipo: 'melhoria', texto: 'As músicas explícitas ganham o selo “E” (como no Spotify) nos cartões da busca, da biblioteca e no Tocando agora.' },
@@ -67,12 +74,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'A letra sincronizada voltou: o app só perguntava ao LRCLIB depois de achar o áudio oficial e a duração do vídeo no YouTube, por serviços que andam fora do ar, e a letra demorava minutos ou nunca vinha. Agora o LRCLIB é consultado na hora e a letra aparece em poucos segundos.' },
       { tipo: 'melhoria', texto: 'Enquanto o áudio oficial é procurado, a letra já acompanha o vídeo; quando ele é encontrado, ela passa para ele com os tempos exatos. Se a posição for estimada, aparece “Letra sincronizada (aproximada)”.' },
-    ],
-  },
-  {
-    versao: 366, data: '2026-10-31', titulo: 'Fila como a do Spotify',
-    itens: [
-      { tipo: 'melhoria', texto: 'Cada música da fila tem os três tracinhos (≡) à direita, indicando que dá para mudar a posição. Segurando a música, ela fica com o fundo mais claro e acompanha o dedo, o lugar onde vai cair fica vazio e as outras deslizam para abrir espaço.' },
     ],
   },
 ];
