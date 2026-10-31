@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 360, data: '2026-10-30', titulo: 'A música abre mesmo quando a sincronização falha',
+    itens: [
+      { tipo: 'correcao', texto: 'Uma falha temporária na busca da letra sincronizada não bloqueia mais a abertura da música nem mostra o aviso repetido. A letra continua disponível, e o Songbook pode tentar sincronizá-la novamente depois.' },
+    ],
+  },
+  {
     versao: 359, data: '2026-10-30', titulo: 'Capas e fotos corretas desde o primeiro resultado',
     itens: [
       { tipo: 'correcao', texto: 'A busca agora prepara a capa oficial e a foto do artista antes de exibir as músicas. A miniatura antiga não aparece mais para ser substituída depois; a lista surge já com as imagens encontradas.' },
@@ -58,12 +64,6 @@ export const NOVIDADES = [
     versao: 351, data: '2026-10-30', titulo: 'Conexão mais estável com o servidor e YouTube',
     itens: [
       { tipo: 'correcao', texto: 'A descoberta do servidor é revalidada e pode se recuperar de falhas temporárias. O acompanhamento de tarefas tolera oscilações de gateway, e transferências interrompidas podem ser retomadas. O yt-dlp ganhou mais tentativas para falhas temporárias do YouTube.' },
-    ],
-  },
-  {
-    versao: 350, data: '2026-10-30', titulo: 'Estado de download imediato',
-    itens: [
-      { tipo: 'correcao', texto: 'Ao tocar em Baixar, o ícone da música entra imediatamente em modo de download. O app também avisa quando o servidor não está conectado e envia notificações de início, progresso, conclusão ou falha.' },
     ],
   },
 
