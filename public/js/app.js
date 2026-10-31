@@ -5211,6 +5211,7 @@ function viewSearch() {
         if (meu !== seq || !$('#em-alta')) return;
         achados.musica = lista;
         $('#em-alta').innerHTML = lista.length ? `<ul class="tracks tracks-grade em-alta">${lista.map((r, i) => linhaMusicaWeb(r, i)).join('')}</ul>` : '<p class="muted">Não consegui carregar agora. Digite o nome de uma música acima.</p>';
+        enriquecerLinhasMusicais($('#em-alta'), lista, { busca: true });
       });
       return;
     }
