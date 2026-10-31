@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 370, data: '2026-10-31', titulo: 'Capa animada andando e troca certa sem o servidor',
+    itens: [
+      { tipo: 'melhoria', texto: 'A capa animada mostra o clipe andando de verdade também nas músicas não baixadas (mudo, sem os botões do YouTube), e não mais imagens paradas.' },
+      { tipo: 'melhoria', texto: 'A troca entre música e vídeo acerta o ponto sem precisar do servidor: as legendas do clipe são casadas com a letra sincronizada (rápido, erro de menos de 1 s) e, quando dá, o próprio celular compara o som das duas versões (pelo Piped ou pelo Invidious). O servidor continua sendo usado quando está ligado.' },
+    ],
+  },
+  {
     versao: 369, data: '2026-10-31', titulo: 'Troca entre música e vídeo no ponto certo, mesmo sem baixar',
     itens: [
       { tipo: 'correcao', texto: 'Trocar entre música e vídeo vai para o mesmo trecho cantado também nos clipes com introdução longa ou cenas no meio (como Speed Demon, de Michael Jackson), sem precisar baixar: ao abrir a música, o servidor compara o som das duas versões.' },
@@ -64,12 +71,6 @@ export const NOVIDADES = [
     versao: 361, data: '2026-10-30', titulo: 'Troca independente da música e do vídeo',
     itens: [
       { tipo: 'melhoria', texto: 'No modo música, a busca substitui somente a faixa de áudio; no modo vídeo, substitui somente o clipe. As duas versões ficam separadas e a escolha não sobrescreve a outra.' },
-    ],
-  },
-  {
-    versao: 360, data: '2026-10-30', titulo: 'A música abre mesmo quando a sincronização falha',
-    itens: [
-      { tipo: 'correcao', texto: 'Uma falha temporária na busca da letra sincronizada não bloqueia mais a abertura da música nem mostra o aviso repetido. A letra continua disponível, e o Songbook pode tentar sincronizá-la novamente depois.' },
     ],
   },
 ];

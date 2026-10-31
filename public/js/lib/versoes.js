@@ -139,3 +139,57 @@ export function paresPelasLetras(doAudio, doVideo) {
   if (pares.length < 4) return null;
   return pares.map(([a, v]) => [Math.round(a * 100) / 100, Math.round(v * 100) / 100]);
 }
+
+// Os pares pelas legendas do clipe (as automáticas do YouTube, que trazem o que se canta com o tempo) e a letra
+// sincronizada do áudio oficial: cada linha da letra é procurada nas legendas pelas palavras em comum, na ordem (a
+// maior soma de parecença, sem voltar no tempo); os pares que fogem do deslocamento dos vizinhos saem. A legenda
+// automática erra palavras, mas as linhas certas bastam: dezenas de pares ao longo da música. null com menos de 4
+const palavras = (t) => frase(t).split(' ').filter((p) => p.length >= 3);
+export function paresPelaLegenda(doAudio, cues) {
+  const L = (doAudio?.linhas || []).map(palavras);
+  const ta = doAudio?.tempos || [];
+  const C = (cues || []).map((c) => palavras(c.texto));
+  if (L.length < 4 || C.length < 4) return null;
+  // parecença de uma linha da letra com uma legenda (e com a legenda junto da seguinte: a linha pode estar partida)
+  const nota = (i, j) => {
+    const l = L[i];
+    if (l.length < 2) return 0;
+    const propria = new Set(C[j]);
+    const junto = new Set([...C[j], ...(C[j + 1] || [])]);
+    // (a legenda que começa a linha vale mais que a de antes, que só a alcança somando a seguinte)
+    return (l.filter((p) => junto.has(p)).length + l.filter((p) => propria.has(p)).length) / (2 * l.length);
+  };
+  // programação dinâmica: melhor soma, linhas e legendas em ordem (cada linha casa com uma legenda ou fica sem)
+  const n = L.length;
+  const m = C.length;
+  const D = Array.from({ length: n + 1 }, () => new Float32Array(m + 1));
+  const de = Array.from({ length: n + 1 }, () => new Uint8Array(m + 1));
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) {
+    const v = nota(i - 1, j - 1);
+    let melhor = D[i - 1][j]; let d = 1;
+    if (D[i][j - 1] > melhor) { melhor = D[i][j - 1]; d = 2; }
+    if (v >= 0.5 && D[i - 1][j - 1] + v > melhor) { melhor = D[i - 1][j - 1] + v; d = 3; }
+    D[i][j] = melhor; de[i][j] = d;
+  }
+  const casadas = [];
+  for (let i = n, j = m; i > 0 && j > 0;) {
+    const d = de[i][j];
+    if (d === 3) { casadas.push([i - 1, j - 1]); i--; j--; } else if (d === 1) i--; else j--;
+  }
+  casadas.reverse();
+  let pares = casadas.map(([i, j]) => [ta[i]?.inicio, cues[j].inicio]).filter(([a, v]) => Number.isFinite(a) && Number.isFinite(v));
+  const desl = pares.map(([a, v]) => v - a);
+  pares = pares.filter((_, k) => {
+    const viz = desl.slice(Math.max(0, k - 3), k + 4).sort((x, y) => x - y);
+    return Math.abs(desl[k] - viz[Math.floor(viz.length / 2)]) <= 2.5;
+  }).filter((p, k, l) => !k || (p[0] > l[k - 1][0] && p[1] > l[k - 1][1]));
+  if (pares.length < 4) return null;
+  // (cada legenda começa num ponto um pouco diferente da linha: o deslocamento de cada par vira a mediana dos vizinhos,
+  // que é o deslocamento daquele trecho do clipe; um corte ou uma cena no meio muda a mediana dali em diante)
+  const d2 = pares.map(([a, v]) => v - a);
+  return pares.map(([a], k) => {
+    const viz = d2.slice(Math.max(0, k - 2), k + 3).sort((x, y) => x - y);
+    const d = viz[Math.floor(viz.length / 2)];
+    return [Math.round(a * 100) / 100, Math.round((a + d) * 100) / 100];
+  });
+}
