@@ -779,8 +779,8 @@ export async function capaAudioDb(titulo, artista, fetchImpl) {
     const albumRes = await buscar(detalhe, { fetchImpl, timeout: 10000 });
     if (!albumRes.ok) return '';
     const albuns = (await albumRes.json())?.album || [];
-    const album = albuns.find((x) => mesmoArtista(x.strArtist, a) && mesmoTitulo(x.strAlbum, faixa.strAlbum || x.strAlbum));
-    const capa = album?.strAlbumThumb || albuns[0]?.strAlbumThumb || '';
+    const album = albuns.find((x) => mesmoArtista(x.strArtist, a) && (!faixa.strAlbum || mesmoTitulo(x.strAlbum, faixa.strAlbum)));
+    const capa = album?.strAlbumThumb || '';
     return /^https?:\/\//.test(capa) ? capa : '';
   } catch { return ''; }
 }
