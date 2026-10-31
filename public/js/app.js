@@ -21,7 +21,7 @@ import { NOVIDADES } from './lib/novidades.js';
 import { baseDoServidor, baixarArquivoDoServidor, cabecalhos, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, dataDaPergunta, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { apagarAudio, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } from './audios.js';
-import { escolherAudio, mesmaSincronia, paresPelaDuracao, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
+import { escolherAudio, mesmaSincronia, paresPelaDuracao, paresPelasLetras, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
 import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { embaralharIndices, moverIndice } from './lib/fila.js';
 import { audioDbDoArtista, audioDoVideo, buscarYoutube, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-363';
+export const APP_VERSAO = '2026.10.31-364';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -866,6 +866,16 @@ async function baixarAgora(id) {
     // Isso não autoriza descartar o clipe: com "Áudio e vídeo" os dois foram pedidos.
     await acertarVersoes(db.song(id) || song, null, { pedido: true }).catch(() => {});
   }
+  // A música baixada leva a letra sincronizada junto (para tocar sem internet com a letra acompanhando): se ainda não
+  // tem (salva sem passar pela busca, ou a sincronia ficou presa a outra versão), procura agora, antes de terminar
+  const depois = db.song(id);
+  const sincOk = (x) => x?.sincronia?.fonte === 'lrclib' && x.sincronia.video === videoDaLetra(x) && x.sincronia.tempos?.length;
+  if (depois && !sincOk(depois) && navigator.onLine) {
+    // (a sincronia de outra versão da mesma música, do áudio para o clipe casados: só muda o vídeo)
+    const s0 = depois.sincronia;
+    if (s0?.fonte === 'lrclib' && s0.tempos?.length && [depois.youtube, versoesDe(depois)?.audio].includes(s0.video) && versoesDe(depois)?.casadas && mesmaSincronia(versoesDe(depois).pares || [])) guardarSincronia(depois, { ...s0, video: videoDaLetra(depois) });
+    else await noMaximo(sincronizarMusica(depois), 30000, 'demorou');
+  }
   const faltou = [...new Set(falhas.map((f) => f.video ? 'videoclipe' : 'áudio'))];
   const avisoFalhas = faltou.length ? 'faltou ' + faltou.join(' e ') : '';
 
@@ -1194,6 +1204,7 @@ const player = (() => {
   let tempo = 0;
   let marcaTempo = 0;
   let pendente = null;
+  let pendenteEm = 0; // quando o ponto pendente foi pedido (performance.now)
   let arrasto = null; // a barra do tempo sendo arrastada: { prog, id, fracao } // ida para um ponto do vídeo pedida antes de ele estar pronto
   let tentativasIda = 0;
   // o estado do player do YouTube (1 = tocando), pelo que ele avisa; volta a -1 a cada vídeo novo
@@ -1428,7 +1439,7 @@ const player = (() => {
       fs.setAttribute('aria-label', bs.title);
     }
     // arrastando a barra, ela fica onde está o dedo (o vídeo só vai para lá ao soltar)
-    const fracao = arrasto ? arrasto.fracao : duracao ? Math.min(1, tempo / duracao) : 0;
+    const fracao = arrasto ? arrasto.fracao : duracao ? Math.min(pendente !== null || trocando ? 0.995 : 1, Math.max(0, tempo / duracao)) : 0;
     el.querySelectorAll('.pl-prog i, .pl-fixo-prog i').forEach((i) => { i.style.width = `${fracao * 100}%`; });
     el.querySelectorAll('.pl-prog').forEach((b) => { b.setAttribute('aria-valuemin', '0'); b.setAttribute('aria-valuemax', String(Math.round(duracao))); b.setAttribute('aria-valuenow', String(Math.round(fracao * duracao))); });
     sessaoDeMidia();
@@ -1872,7 +1883,10 @@ const semLinhasDeAcordes = (sinc) => {
       if (chaveSync) {
         tentouSincronizar.add(chaveSync);
         void sincronizarMusica(alvoDaMusica(song), { noVideo: atual.youtube }).then((r) => {
-          if (r !== 'ok') tentouSincronizar.delete(chaveSync);
+          // (só a falha da internet tenta de novo, e depois de um tempo: antes, o "não tem" apagava a marca e o
+          // desenho logo abaixo pedia de novo, sem parar; o LRCLIB passava a recusar (429) e outras músicas, que têm a
+          // letra sincronizada, ficavam sem ela)
+          if (r === 'erro') setTimeout(() => tentouSincronizar.delete(chaveSync), 60e3);
           letraDe = '';
           desenharLetra();
         });
@@ -2347,6 +2361,7 @@ const semLinhasDeAcordes = (sinc) => {
       const info = (typeof e.data === 'string' ? JSON.parse(e.data) : e.data)?.info;
       if (typeof info?.playerState === 'number') rs.estado = info.playerState;
       if (typeof info?.currentTime === 'number') { rs.tempo = info.currentTime; rs.em = performance.now(); }
+      if (typeof info?.duration === 'number' && info.duration > 0) { rs.duracao = info.duration; if (r.dataset.yt) duracoes.set(r.dataset.yt, info.duration); }
     } catch { /* outra mensagem */ }
   });
   // A outra versão toca junto, sem volume, no mesmo ponto da música (a sombra): a troca é só cruzar os volumes, sem
@@ -2359,6 +2374,8 @@ const semLinhasDeAcordes = (sinc) => {
     if (!r || r.dataset.pronto !== '1' || trocando || local || !atual || r.dataset.yt !== outraVersao() || !sombraTocando()) return;
     if (estado !== 'tocando' || estadoYt !== 1) { if (rs.estado === 1 || rs.estado === 3) cmdEm(r, 'pauseVideo'); return; }
     const alvo = noOutroLado(api.tempoAgora);
+    // (o ponto fica fora da outra versão — o fim do clipe, sem a música no áudio: ela espera parada, sem chegar ao fim)
+    if (rs.duracao > 0 && alvo >= rs.duracao - 1) { if (rs.estado === 1 || rs.estado === 3) cmdEm(r, 'pauseVideo'); return; }
     if (rs.estado !== 1 && rs.estado !== 3) { cmdEm(r, 'setVolume', [0]); cmdEm(r, 'seekTo', [alvo, true]); cmdEm(r, 'playVideo'); return; }
     if (rs.estado === 1 && Math.abs(rsAgora() - alvo) > 0.3) cmdEm(r, 'seekTo', [alvo + 0.05, true]);
   }, 1000);
@@ -2376,8 +2393,11 @@ const semLinhasDeAcordes = (sinc) => {
     velho.classList.add('pl-reserva');
     velho.dataset.yt = antigo;
     delete velho.dataset.pronto;
-    rs = { estado: 1, tempo: tempoVelho, em: performance.now() }; // (a sombra agora é a de antes, tocando)
-    pendente = null;
+    rs = { estado: 1, tempo: tempoVelho, em: performance.now(), duracao: duracoes.get(antigo) || 0 }; // (a sombra agora é a de antes, tocando)
+    // (o ponto pedido vale até a nova estar tocando perto dele: antes, o primeiro aviso dela — às vezes o fim do vídeo,
+    // onde a sombra tinha parado — entrava na barra, que ia até o fim, ficava cheia e voltava)
+    pendente = jaNoPonto ? null : t;
+    pendenteEm = performance.now();
     trocando = { novo, velho };
     // (no iPhone o volume não muda pelo app: aí a de antes só para no instante em que a nova toca)
     const semVolume = ehIOS();
@@ -2426,12 +2446,15 @@ const semLinhasDeAcordes = (sinc) => {
     // começo e depois pulava para o ponto (parecia travada)
     const vs = atual.songId && versoesDe(atual.songId === 'previa' ? preview : db.song(atual.songId));
     duracao = duracoes.get(id) || (vs && id === vs.audio && vs.duracao) || (id !== atual.audio && db.song(atual.songId || '')?.duracao) || duracao;
+    // (o ponto nunca passa do fim da outra versão: o fim do clipe, sem música no áudio, vira o fim da música)
+    if (duracoes.get(id) > 0 && tempo > duracoes.get(id) - 1) tempo = Math.max(0, duracoes.get(id) - 1);
     tentativasIda = 0;
     const tocando = estado === 'tocando';
     const l = localDe(id);
     // o ponto pedido vale até o vídeo novo estar tocando nele (pausada, ele fica parado já no ponto e é conferido no
     // play): enquanto carrega, o YouTube avisa o tempo 0, e esse 0 levava a música de volta ao começo
     pendente = l ? null : tempo;
+    pendenteEm = performance.now();
     estadoYt = -1;
     if (l) { comandoYt('pauseVideo'); tocarLocal(l, tempo, tocando); }
     else if (tocando && !local && !mesmo && trocaSuave(antigo, id, tempo)) { /* a outra versão já estava carregada */ }
@@ -2482,6 +2505,8 @@ const semLinhasDeAcordes = (sinc) => {
     // (no máximo 2 s além do último aviso: com o app em segundo plano o vídeo para de avisar, e a letra corria sozinha
     // muito à frente do que se cantava)
     get tempoAgora() { return tempo + (estado === 'tocando' && marcaTempo ? Math.min(2, (performance.now() - marcaTempo) / 1000) : 0); },
+    // a duração de um vídeo do YouTube que o player já tocou (0 se não sabe)
+    duracaoDe(yt) { return duracoes.get(yt) || 0; },
     // o último tempo que o YouTube informou (não anda sozinho: no anúncio fica parado)
     get tempoInformado() { return tempo; },
     get duracao() { return duracao; },
@@ -2576,7 +2601,7 @@ const semLinhasDeAcordes = (sinc) => {
       // (outra versão só música no lugar da que tocava: a mesma gravação, no mesmo ponto)
       if (audioAntes && audioAntes !== vs.audio && atual.youtube === audioAntes) trocarVersao(vs.audio, api.tempoAgora);
       else if (comCapa && atual.youtube === vs.video && atual.youtube !== vs.audio) trocarVersao(vs.audio, tempoNoAudio(vs.pares, api.tempoAgora));
-      else if (!comCapa && estado === 'tocando' && atual.youtube === vs.video && vs.casadas && antes && performance.now() - foiProClipe < 90e3) {
+      else if (!comCapa && estado === 'tocando' && atual.youtube === vs.video && (vs.casadas || vs.porLetra) && antes && performance.now() - foiProClipe < 90e3) {
         // acabou de trocar para o clipe pela estimativa e chegou o casamento pelo som: o clipe vai para o mesmo ponto
         // cantado (o ponto do áudio pela estimativa de antes, no clipe pelo casamento novo)
         const certo = tempoNoVideo(vs.pares, tempoNoAudio(antes, api.tempoAgora));
@@ -2588,6 +2613,7 @@ const semLinhasDeAcordes = (sinc) => {
       tempo = Math.max(0, seg);
       marcaTempo = performance.now();
       pendente = local ? null : tempo;
+      pendenteEm = performance.now();
       tentativasIda = 0;
       comando('seekTo', [tempo, true]);
       if (estado !== 'tocando') { comando('playVideo'); estado = 'tocando'; desenhar(); avisar(); }
@@ -2815,9 +2841,11 @@ const semLinhasDeAcordes = (sinc) => {
       if (pendente !== null && usarTempo) {
         // a ida pedida (trocar de versão, pular para uma frase): só conta com o vídeo já tocando. Carregando, o YouTube
         // avisa o tempo 0 antes do ponto pedido: esse 0 não vale (o tempo fica no pedido) e não gasta as tentativas
-        const longe = Math.abs(info.currentTime - pendente) > 2;
+        // (enquanto toca, o ponto anda: vale de 2 s antes do pedido até onde ele já estaria agora, mais 2 s)
+        const andou = estado === 'tocando' ? Math.min(8, (performance.now() - pendenteEm) / 1000) : 0;
+        const longe = info.currentTime < pendente - 2 || info.currentTime > pendente + andou + 2;
         if (estadoYt !== 1) usarTempo = false;
-        else if (longe && ++tentativasIda < 8) { comando('seekTo', [pendente, true]); return; }
+        else if (longe && ++tentativasIda < 8) { comando('seekTo', [pendente + andou, true]); return; }
         else { pendente = null; tentativasIda = 0; }
       }
       if (usarTempo) { tempo = info.currentTime; marcaTempo = performance.now(); }
@@ -2831,21 +2859,33 @@ const semLinhasDeAcordes = (sinc) => {
       const antes = estado;
       if (info.playerState === 1) { estado = 'tocando'; prepararReserva(); }
       else if (info.playerState === 2) estado = 'pausado';
-      else if (info.playerState === 0) { estado = 'pausado'; if (fimDaMusica()) return; }
+      else if (info.playerState === 0) {
+        // (o "acabou" do vídeo que acabou de entrar na troca, parado no fim antes de ir ao ponto: não é o fim da música)
+        if (pendente !== null || trocando || performance.now() - pendenteEm < 4000) { comando('seekTo', [pendente ?? tempo, true]); comando('playVideo'); return; }
+        estado = 'pausado';
+        if (fimDaMusica()) return;
+      }
       desenhar();
       if (antes !== estado) avisar();
     } catch { /* mensagem de outro formato */ }
   });
-  // Fila interativa: tocar, embaralhar e reorganizar com arrastar (mouse ou dedo).
+  // Fila interativa: tocar e reorganizar arrastando (mouse ou dedo). O aleatório fica no próprio player (o botão de
+  // embaralhar ao lado do play), e não aqui também.
+  // Arrastar: pela alça (⋮⋮) começa na hora; segurando o dedo na música (~0,35 s) também. Perto da borda de cima ou de
+  // baixo a lista rola sozinha. Um toque rápido toca a música.
   const duracoesDaFila = new Map();
+  // a duração que já se sabe da música, sem ir à internet: a guardada, a do áudio da pessoa, a do áudio oficial, a
+  // que o player já viu tocando e a da letra sincronizada (a da gravação)
+  const duracaoNaFila = (s) => Number(s?.duracao) || Number(s?.audioProprio?.duracao) || Number(versoesDe(s)?.duracao)
+    || (s?.youtube && duracoes.get(s.youtube)) || (versoesDe(s)?.audio && duracoes.get(versoesDe(s).audio)) || Number(s?.sincronia?.duracao) || 0;
   const abrirFila = () => {
     if (!fila()) { toast('Esta música não está numa fila: salve-a na biblioteca ou toque de um repertório'); return; }
     const dlg = document.createElement('dialog');
     dlg.className = 'lista-dlg lista-fila';
     const titulo = () => { const f = fila(); return f?.set ? `Fila · ${f.set.name}` : 'Fila · Biblioteca'; };
     dlg.innerHTML = `<div class="lista-cab"><h3>${esc(titulo())}</h3>
-      <button class="icon-btn fila-aleatorio${aleatorio ? ' ligado' : ''}" data-fila-aleatorio aria-label="Embaralhar fila" aria-pressed="${aleatorio}" title="Embaralhar fila">${icon('shuffle',18)}</button>
-      <button class="icon-btn" data-fechar aria-label="Fechar">${icon('x',20)}</button></div>
+      <button class="icon-btn" data-fechar aria-label="Fechar">${icon('x', 20)}</button></div>
+      <p class="fila-dica muted">Segure uma música e arraste para mudar a ordem</p>
       <div class="lista-opcoes" role="listbox" aria-label="Músicas na fila"></div>`;
     const lista = $('.lista-opcoes', dlg);
     const desenharLista = () => {
@@ -2855,69 +2895,92 @@ const semLinhasDeAcordes = (sinc) => {
         const s = db.song(id) || {};
         const tocando = pos === f.i;
         const original = f.indices[pos];
-        const duracao = Number(s.duracao || s.audioProprio?.duracao) || 0;
+        const duracao = duracaoNaFila(s);
         const parte = f.set?.items[original]?.label || '';
         const reproduzivel = Boolean(midiaDe(s));
-        return `<div class="lista-op fila-item${tocando ? ' atual' : ''}${!reproduzivel ? ' indisponivel' : ''}" role="option" tabindex="${reproduzivel ? 0 : -1}" aria-selected="${tocando}" data-fila-pos="${pos}" data-original="${original}">
-          <button class="fila-arrastar" data-arrastar aria-label="Arrastar ${esc(s.title || 'música')}" title="Segure e arraste para mudar a ordem" ${!reproduzivel ? 'disabled' : ''}>${icon('grip-vertical',18)}</button>
+        const procurando = !duracao && duracoesDaFila.has(s.id) && !duracoesDaFila.get(s.id).pronto;
+        return `<div class="lista-op fila-item${tocando ? ' atual' : ''}${!reproduzivel ? ' indisponivel' : ''}" role="option" tabindex="0" aria-selected="${tocando}" data-fila-pos="${pos}" data-original="${original}">
+          <span class="fila-arrastar" data-arrastar aria-label="Arrastar ${esc(s.title || 'música')}" title="Segure e arraste para mudar a ordem">${icon('grip', 20)}</span>
           <span class="fila-capa${tocando ? ' tocando' : ''}">${capa(s)}${tocando ? '<span class="fila-eq" aria-hidden="true"><i></i><i></i><i></i></span>' : ''}</span>
           <span class="lista-txt"><b>${esc(s.title || 'Música')}</b><small>${esc([parte, s.artist].filter(Boolean).join(' · '))}</small></span>
-          <span class="lista-dir">${duracao ? fmtTempo(duracao) : '—:—'}</span>
+          <span class="lista-dir">${duracao ? fmtTempo(duracao) : procurando ? '<span class="spin"></span>' : '—:—'}</span>
         </div>`;
       }).join('');
-      const b = $('[data-fila-aleatorio]', dlg);
-      b.classList.toggle('ligado', aleatorio);
-      b.setAttribute('aria-pressed', String(aleatorio));
-      b.title = aleatorio ? 'Desligar aleatório' : 'Embaralhar fila';
     };
-    let arrastando = null;
-    dlg.addEventListener('pointerdown', (e) => {
-      const pega = e.target.closest('[data-arrastar]');
-      if (!pega || pega.disabled) return;
-      e.preventDefault();
-      const linha = pega.closest('[data-fila-pos]');
+    // ---- arrastar
+    let arrastando = null; // { linha, id, y0, alturas }
+    let segurando = null; // { timer, id, x, y, linha } (o dedo parado, antes de virar arrasto)
+    let rolar = 0;
+    let soltouEm = 0;
+    const comecarArrasto = (linha, e) => {
       arrastando = { linha, id: e.pointerId };
       linha.classList.add('arrastando');
-      pega.setPointerCapture?.(e.pointerId);
+      dlg.classList.add('arrastando-fila');
+      try { lista.setPointerCapture(e.pointerId); } catch { /* sem captura: segue pelos eventos do diálogo */ }
+      navigator.vibrate?.(15);
+    };
+    const moverPara = (y) => {
+      const linhas = [...lista.querySelectorAll('[data-fila-pos]')].filter((x) => x !== arrastando.linha);
+      const depois = linhas.find((x) => { const r = x.getBoundingClientRect(); return y < r.top + r.height / 2; });
+      if (depois) { if (depois.previousElementSibling !== arrastando.linha) lista.insertBefore(arrastando.linha, depois); }
+      else if (lista.lastElementChild !== arrastando.linha) lista.append(arrastando.linha);
+    };
+    // perto da borda: a lista rola sozinha enquanto o dedo fica ali
+    const rolarNaBorda = (y) => {
+      cancelAnimationFrame(rolar);
+      const r = lista.getBoundingClientRect();
+      const borda = 56;
+      const v = y < r.top + borda ? -Math.ceil((r.top + borda - y) / 6) : y > r.bottom - borda ? Math.ceil((y - (r.bottom - borda)) / 6) : 0;
+      if (!v || !arrastando) return;
+      const passo = () => { if (!arrastando) return; lista.scrollTop += v; moverPara(y); rolar = requestAnimationFrame(passo); };
+      rolar = requestAnimationFrame(passo);
+    };
+    const cancelarSegurar = () => { if (segurando) { clearTimeout(segurando.timer); segurando = null; } };
+    lista.addEventListener('pointerdown', (e) => {
+      if (e.button > 0) return;
+      const linha = e.target.closest('[data-fila-pos]');
+      if (!linha) return;
+      if (e.target.closest('[data-arrastar]')) { e.preventDefault(); comecarArrasto(linha, e); return; }
+      // segurar na música (dedo ou mouse) também arrasta
+      cancelarSegurar();
+      segurando = { id: e.pointerId, x: e.clientX, y: e.clientY, linha, timer: setTimeout(() => { const sg = segurando; segurando = null; if (sg) comecarArrasto(sg.linha, e); }, 350) };
     });
-    dlg.addEventListener('pointermove', (e) => {
+    lista.addEventListener('pointermove', (e) => {
+      if (segurando && segurando.id === e.pointerId && Math.hypot(e.clientX - segurando.x, e.clientY - segurando.y) > 8) cancelarSegurar(); // (rolando)
       if (!arrastando || arrastando.id !== e.pointerId) return;
-      const alvo = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('[data-fila-pos]');
-      if (!alvo || alvo === arrastando.linha || !lista.contains(alvo)) return;
-      const antes = e.clientY < alvo.getBoundingClientRect().top + alvo.offsetHeight / 2;
-      lista.insertBefore(arrastando.linha, antes ? alvo : alvo.nextSibling);
+      e.preventDefault();
+      moverPara(e.clientY);
+      rolarNaBorda(e.clientY);
     });
-    const terminarArrasto = () => {
-      if (!arrastando) return;
+    // (com o arrasto ligado, o dedo não rola a lista nem abre o menu do aparelho)
+    lista.addEventListener('touchmove', (e) => { if (arrastando) e.preventDefault(); }, { passive: false });
+    lista.addEventListener('contextmenu', (e) => { if (e.target.closest('[data-fila-pos]')) e.preventDefault(); });
+    const terminarArrasto = (e) => {
+      cancelarSegurar();
+      if (!arrastando || (e && e.pointerId !== arrastando.id)) return;
+      cancelAnimationFrame(rolar);
       arrastando.linha.classList.remove('arrastando');
+      dlg.classList.remove('arrastando-fila');
       const nova = [...lista.querySelectorAll('[data-original]')].map((x) => Number(x.dataset.original));
-      if (nova.length) { filaOrdem = nova; historico = []; desenhar(); }
+      if (nova.length === filaOrdem.length && nova.some((x, i) => x !== filaOrdem[i])) { filaOrdem = nova; historico = []; desenhar(); }
       arrastando = null;
+      soltouEm = performance.now();
       desenharLista();
     };
-    dlg.addEventListener('pointerup', terminarArrasto);
-    dlg.addEventListener('pointercancel', terminarArrasto);
+    lista.addEventListener('pointerup', terminarArrasto);
+    lista.addEventListener('pointercancel', terminarArrasto);
+    lista.addEventListener('lostpointercapture', terminarArrasto);
     dlg.addEventListener('click', (e) => {
       if (e.target === dlg || e.target.closest('[data-fechar]')) { dlg.close(); return; }
-      if (e.target.closest('[data-fila-aleatorio]')) {
-        const f = fila();
-        aleatorio = !aleatorio;
-        db.setPref('aleatorio', aleatorio);
-        filaOrdem = aleatorio ? embaralharIndices(filaOrdem, f?.indices[f.i]) : filaOrdem.map((_, i) => i);
-        historico = [];
-        desenhar();
-        desenharLista();
-        desenharModos();
-        return;
-      }
-      if (e.target.closest('[data-arrastar]')) return;
+      // (o clique que vem logo depois de soltar o arrasto não toca a música)
+      if (arrastando || performance.now() - soltouEm < 350 || e.target.closest('[data-arrastar]')) return;
       const linha = e.target.closest('[data-fila-pos]');
-      if (!linha || !midiaDe(db.song(fila().ids[Number(linha.dataset.filaPos)]))) return;
       const f = fila();
+      if (!linha || !f) return;
       const pos = Number(linha.dataset.filaPos);
-      if (pos === f.i || !atual) return;
-      historico.push(f.i);
       const s = db.song(f.ids[pos]);
+      if (!midiaDe(s) || pos === f.i || !atual) return;
+      historico.push(f.i);
       api.tocar(itemDoPlayer(s, f.set, f.set ? f.indices[pos] : -1));
       dlg.close();
     });
@@ -2940,22 +3003,27 @@ const semLinhasDeAcordes = (sinc) => {
       e.preventDefault();
       linha.click();
     });
-    dlg.addEventListener('close', () => dlg.remove());
+    dlg.addEventListener('close', () => { cancelarSegurar(); cancelAnimationFrame(rolar); dlg.remove(); });
     document.body.append(dlg);
     dlg.showModal();
-    desenharLista();
-    // Duração: usa o valor já salvo; se faltar, consulta o YouTube/Piped uma vez e guarda no cadastro da música.
+    // Duração: a que já se sabe; as que faltam, pela internet (três de cada vez), guardadas na música
     const f = fila();
-    const faltantes = f.ids.map((id) => db.song(id)).filter((s) => s && !Number(s.duracao || s.audioProprio?.duracao) && youtubeId(s.youtube));
+    const faltantes = f.ids.map((id) => db.song(id)).filter((s) => s && !duracaoNaFila(s) && (s.youtube || versoesDe(s)?.audio));
     for (const s of faltantes) {
-      if (duracoesDaFila.has(s.id)) continue;
-      const pedido = duracaoDoVideo(youtubeId(s.youtube)).then((d) => {
-        if (d > 0) { const atualizada = db.song(s.id); if (atualizada) db.saveSong({ ...atualizada, duracao: d }); }
+      if (duracoesDaFila.has(s.id) && duracoesDaFila.get(s.id).valor > 0) continue;
+      const yt = youtubeId(s.youtube) || versoesDe(s)?.audio;
+      const pedido = { pronto: false, valor: 0 };
+      pedido.promessa = duracaoDoVideo(yt).catch(() => 0).then((d) => {
+        pedido.pronto = true;
+        pedido.valor = d;
+        if (d > 0) { duracoes.set(yt, d); guardarDuracao(s.youtube, d); const atualizada = db.song(s.id); if (atualizada && !atualizada.duracao) db.updateSong(s.id, { duracao: Math.round(d) }); }
+        if (!d) setTimeout(() => { if (duracoesDaFila.get(s.id) === pedido) duracoesDaFila.delete(s.id); }, 60e3);
+        if (dlg.open && !arrastando) desenharLista();
         return d;
-      }).catch(() => 0);
+      });
       duracoesDaFila.set(s.id, pedido);
     }
-    if (faltantes.length) Promise.all(faltantes.map((s) => duracoesDaFila.get(s.id))).then(() => { if (dlg.open) desenharLista(); });
+    desenharLista();
   };
   // "Conectar" (como no Spotify): onde está tocando — este aparelho, com a música — e as saídas de som que o navegador
   // conhece (fones Bluetooth, caixas). Embaixo: levar para a TV (o YouTube transmite para TV e Chromecast) e procurar
@@ -3769,7 +3837,16 @@ async function salvarDaInternet(tipo, item) {
     const vs = await Promise.race([r.video.catch(() => []), new Promise((ok) => setTimeout(() => ok(null), 4000))]);
     if (vs?.[0]) content = definirMeta(content, 'youtube', vs[0].url);
   }
-  const salva = db.saveSong({ content, source: r.source, capo: capoDaCifra(content), ...(item.fotoArtista ? { fotoArtista: item.fotoArtista } : {}) });
+  // a mesma música aberta na busca (a prévia) já tem a letra sincronizada e as duas versões: vêm junto
+  const daPrevia = preview && preview.source && preview.source === r.source ? preview : null;
+  const yt = youtubeId(renderSong(content).meta.youtube);
+  const prevValida = daPrevia && (!yt || youtubeId(renderSong(daPrevia.content).meta.youtube) === yt);
+  if (prevValida && !yt && daPrevia.youtube) content = definirMeta(content, 'youtube', `https://www.youtube.com/watch?v=${daPrevia.youtube}`);
+  const salva = db.saveSong({ content: prevValida ? (letraPelaSincronia(content, daPrevia.sincronia) || content) : content, source: r.source, capo: capoDaCifra(content), ...(item.fotoArtista ? { fotoArtista: item.fotoArtista } : {}),
+    ...(prevValida && daPrevia.sincronia ? { sincronia: daPrevia.sincronia } : {}), ...(prevValida && daPrevia.versoes ? { versoes: daPrevia.versoes } : {}) });
+  // sem a sincronia ainda: procura agora, em segundo plano (para a música já ficar com a letra sincronizada, também
+  // para baixar e ouvir sem internet)
+  if (!salva.sincronia && midiaDe(salva)) void prepararMusicaAoAbrir(salva).catch(() => {});
   // o vídeo do YouTube (se ainda não veio com a música); dá para trocar depois em Referências
   if (!salva.youtube) {
     r.video.then((vs) => {
@@ -4587,10 +4664,22 @@ async function abrirPrevia(content, source, back, videoJa = null) {
   };
   void buscaCapaDaPrevia.then(aplicarCapaDaPrevia);
 
-  // A sincronização LRCLIB é complementar: uma falha temporária não deve impedir
-  // a abertura da música. A letra continua disponível sem tempos e a próxima abertura
-  // poderá tentar sincronizá-la novamente, sem avisos repetidos.
-  await prepararMusicaAoAbrir(novo);
+  // a capa que já se conhece desta música entra de primeira (sem a do vídeo antes)
+  if (capaTrocavel(novo.cover)) aplicarCapaDaPrevia(capaConhecida(novo.title, novo.artist));
+
+  // A sincronização LRCLIB é complementar: uma falha ou demora não deve impedir a abertura da música. Espera um
+  // tempo razoável (a maioria responde em 1–3 s); passou disso, a música abre e a letra sincronizada entra sozinha
+  // quando chegar (o evento songbook:sincronia). Sem sincronia, a música abre mesmo assim e mostra que não tem.
+  novo.sincronizando = true;
+  const preparo = prepararMusicaAoAbrir(novo).catch(() => 'erro').then((r) => {
+    if (preview === novo) {
+      novo.sincronizando = false;
+      novo.semSincronia = r !== 'ok';
+      window.dispatchEvent(new CustomEvent('songbook:estado-sincronia', { detail: { song: 'previa' } }));
+    }
+    return r;
+  });
+  await Promise.all([noMaximo(preparo, 9000, 'demorou'), noMaximo(buscaCapaDaPrevia, 2500, '').then(aplicarCapaDaPrevia)]);
   if (preview !== novo) return;
   if (jaNaPrevia) route(); else location.hash = '#/musica/previa';
 }
@@ -4710,8 +4799,13 @@ const buscarTudo = (termo, nMusicas = 8, nVideos = 6) => {
     .then(async (ms) => juntarVideos(ms.slice(0, nMusicas), (await pVideos).slice(0, nVideos)));
 };
 // artista (Cifra Club): foto redonda; abre a página dele com as músicas mais tocadas
-const tileArtista = (a) => `<a class="tile tile-artista" href="#/artista/${encodeURIComponent(a.slug)}/${encodeURIComponent(a.nome)}">
-  <div class="cover" data-artista-foto data-nome="${esc(a.nome)}" data-slug="${esc(a.slug)}">${a.capa ? `<img src="${esc(a.capa)}" alt="" loading="lazy">` : icon('mic', 40)}</div><b>${esc(a.nome)}</b><small>Artista</small></a>`;
+// (a foto já é a definitiva: a preparada antes de desenhar (prepararFotosArtistas) ou a última guardada. A do Cifra Club
+// não aparece primeiro: ela era a foto antiga, e em milissegundos piscava para a nova)
+const tileArtista = (a) => {
+  const foto = a.fotoFinal !== undefined ? a.fotoFinal : fotoConhecida(a.nome);
+  return `<a class="tile tile-artista" href="#/artista/${encodeURIComponent(a.slug)}/${encodeURIComponent(a.nome)}">
+  <div class="cover" data-artista-foto data-nome="${esc(a.nome)}" data-slug="${esc(a.slug)}"${foto ? ` data-mostrando="${esc(foto)}"` : ''}>${foto ? `<img src="${esc(foto)}" alt="" loading="lazy">` : icon('mic', 40)}</div><b>${esc(a.nome)}</b><small>Artista</small></a>`;
+};
 const artistaCerto = (lista, nome) => lista.find((a) => mesmoNome(a.nome, nome)) || null;
 // as pessoas dos créditos, cada uma com os papéis dela: o artista principal, quem participa (o "feat." do nome do
 // artista ou do título: "Lady Gaga feat. Bruno Mars", "Die With A Smile (part. Bruno Mars)"), a composição e a letra
@@ -4756,16 +4850,26 @@ function enriquecerTilesArtistas(container) {
   container.querySelectorAll('[data-artista-foto]').forEach((box) => {
     const nome = box.dataset.nome || '';
     const slug = box.dataset.slug || '';
-    if (!nome) return;
+    // (já com uma foto na tela: não troca na frente da pessoa; a nova, se for outra, fica guardada para a próxima vez)
+    if (!nome || box.dataset.mostrando) return;
     fotoDoArtista(nome, slug).then((url) => {
-      if (!url || !box.isConnected) return;
-      const img = document.createElement('img');
-      img.src = url;
+      if (!url || !box.isConnected || box.dataset.mostrando) return;
+      // (só entra depois de carregada: sem o quadro vazio antes da foto)
+      const img = new Image();
       img.alt = nome;
-      img.loading = 'lazy';
-      box.replaceChildren(img);
+      img.onload = () => { if (!box.isConnected || box.dataset.mostrando) return; box.dataset.mostrando = url; box.replaceChildren(img); };
+      img.src = url;
     }).catch(() => {});
   });
+}
+// as fotos dos artistas antes de desenhar a fileira (cada uma espera no máximo um pouco; a que não chegar a tempo fica
+// com a última guardada, ou com o desenho, e entra sozinha quando chegar)
+async function prepararFotosArtistas(lista) {
+  await Promise.all(lista.filter(Boolean).map(async (a) => {
+    const f = await fotoRapida(a.nome, a.slug || '');
+    if (f) a.fotoFinal = f;
+  }));
+  return lista;
 }
 // o cartão: as duas primeiras pessoas, o nome da música, quantas pessoas e o "Explorar" (explorar: atributos do botão)
 const cartaoPessoas = ({ titulo, pessoas, explorar, classe = 'ref-cartao ref-pessoas' }) => `<section class="${classe}">
@@ -4850,6 +4954,21 @@ function fotoDoArtista(nome, slug = '') {
   }
   return comUltimoValor('foto', nome, fotosArtistas.get(k));
 }
+// A foto e a capa que já se conhece na hora (a última trazida da internet, guardada no aparelho), sem esperar nada
+const fotoConhecida = (nome) => (nome && ultimoValorDoArtista('foto', nome)) || '';
+// espera a promessa no máximo ms; passou disso, vale a reserva
+const noMaximo = (p, ms, reserva = '') => Promise.race([Promise.resolve(p).catch(() => reserva), new Promise((ok) => setTimeout(() => ok(reserva), ms))]);
+// A foto definitiva para desenhar de primeira: a atual da internet; se ela demorar, a última guardada (que já é a
+// atual da vez anterior). Sem nenhuma guardada, espera um pouco mais pela da internet
+function fotoRapida(nome, slug = '') {
+  if (!nome) return Promise.resolve('');
+  const guardada = fotoConhecida(nome);
+  return noMaximo(fotoDoArtista(nome, slug).then((f) => f || guardada), guardada ? 1500 : 4500, guardada);
+}
+function capaRapida(titulo, artista) {
+  const guardada = capaConhecida(titulo, artista);
+  return noMaximo(capaOficial(titulo, artista).then((c) => c || guardada), guardada ? 1500 : 4500, guardada);
+}
 
 // Completa as linhas de busca e da biblioteca sem bloquear a renderização:
 // capa oficial do single/álbum + foto real do artista. As imagens manuais salvas nunca são substituídas.
@@ -4860,8 +4979,8 @@ async function prepararMidiaBusca(itens) {
     const artista = item.artist || item.artista || '';
     if (!titulo || !artista) return;
     const [capa, foto] = await Promise.all([
-      capaOficial(titulo, artista).catch(() => ''),
-      fotoDoArtista(artista, item.slug || '').catch(() => ''),
+      capaRapida(titulo, artista).catch(() => ''),
+      fotoRapida(artista, item.slug || '').catch(() => ''),
     ]);
     if (capa) { item.capa = capa; item.cover = capa; }
     if (foto) {
@@ -4881,7 +5000,8 @@ function enriquecerLinhasMusicais(container, itens, { busca = false } = {}) {
     const artista = item.artist || item.artista || '';
     if (!titulo || !artista) return;
     const avatar = linha.querySelector('[data-artista-mini]');
-    if (avatar) {
+    // (a busca já desenha a foto definitiva: trocar de novo seria a piscada)
+    if (avatar && !item.fotoArtista) {
       fotoDoArtista(artista, item.slug || '').then((url) => {
         if (!url || !avatar.isConnected) return;
         avatar.innerHTML = `<img src="${esc(url)}" alt="" loading="lazy">`;
@@ -4893,6 +5013,7 @@ function enriquecerLinhasMusicais(container, itens, { busca = false } = {}) {
     if (busca || capaTrocavel(item.cover || item.capa || '')) {
       capaOficial(titulo, artista).then((url) => {
         if (!url || !linha.isConnected) return;
+        if (linha.querySelector('.cover img')?.getAttribute('src') === url) return;
         const box = linha.querySelector('.cover');
         if (!box) return;
         const img = box.querySelector('img') || document.createElement('img');
@@ -4926,11 +5047,19 @@ function jsonp(url, tempo = 8000) {
 // achar lá, no iTunes, pela música com o mesmo título e o mesmo artista. '' se nenhum tiver. O último valor fica
 // guardado no aparelho (vale sem internet)
 const capasOficiais = new Map();
+const artistaDaCapa = (artista) => String(artista || '').split(/\s*(?:,|&| e | feat\.? | ft\.? | part\.? | x )\s*/i)[0].trim();
+const chaveDaCapa = (titulo, artista) => {
+  const t = normalizar(tituloLimpo(titulo));
+  const a = artistaDaCapa(artista);
+  return t && a ? `${normalizar(a)}|${t}` : '';
+};
+// a última capa oficial trazida desta música (guardada no aparelho), na hora
+const capaConhecida = (titulo, artista) => { const k = chaveDaCapa(titulo, artista); return (k && ultimoValorDoArtista('capa', k)) || ''; };
 function capaOficial(titulo, artista) {
   const t = normalizar(tituloLimpo(titulo));
-  const a = String(artista || '').split(/\s*(?:,|&| e | feat\.? | ft\.? | part\.? | x )\s*/i)[0].trim();
+  const a = artistaDaCapa(artista);
   if (!t || !a) return Promise.resolve('');
-  const k = `${normalizar(a)}|${t}`;
+  const k = chaveDaCapa(titulo, artista);
   const titulo0 = (x) => normalizar(tituloLimpo(x || ''));
   const mesmaMusica = (tit, art) => mesmoNome(art || '', a) && (titulo0(tit) === t || ` ${titulo0(tit)} `.startsWith(` ${t} `));
   if (!capasOficiais.has(k)) {
@@ -5256,7 +5385,7 @@ function viewSearch() {
         <div class="shelf-head"><h2>Artistas católicos</h2></div><div class="shelf" id="art-cat"></div>
         <div class="shelf-head"><h2>Católicas em alta</h2></div><div id="em-alta"><div class="loading-note"><span class="spin"></span>Carregando as mais tocadas…</div></div>`);
       const meu = ++seq;
-      Promise.all(ARTISTAS_CATOLICOS.map((a) => buscarArtistasCifraClub(a).then((l) => artistaCerto(l, a)).catch(() => null))).then((lista) => {
+      Promise.all(ARTISTAS_CATOLICOS.map((a) => buscarArtistasCifraClub(a).then((l) => artistaCerto(l, a)).catch(() => null))).then(prepararFotosArtistas).then((lista) => {
         if (meu !== seq || !$('#art-cat')) return;
         $('#art-cat').innerHTML = lista.filter(Boolean).map(tileArtista).join('');
         enriquecerTilesArtistas($('#art-cat'));
@@ -5284,9 +5413,10 @@ function viewSearch() {
     timer = setTimeout(() => {
       if (meu !== seq) return;
       if (mostra('artistas')) {
-        buscarArtistasCifraClub(term).then((lista) => {
+        buscarArtistasCifraClub(term).then(async (lista) => {
           if (!vivo('ar-res')) return;
-          const artistas = lista.slice(0, filtro === 'artistas' ? 20 : 8);
+          const artistas = await prepararFotosArtistas(lista.slice(0, filtro === 'artistas' ? 20 : 8));
+          if (!vivo('ar-res')) return;
           $('#ar-res').innerHTML = artistas.length ? `<div class="${filtro === 'artistas' ? 'grade-artistas' : 'shelf'}">${artistas.map(tileArtista).join('')}</div>` : '<p class="muted">Nenhum artista encontrado.</p>';
           enriquecerTilesArtistas($('#ar-res'));
           // na aba Tudo, sem artista, a seção some
@@ -5382,7 +5512,7 @@ async function viewArtista(slug, nome) {
   const chaveAba = 'artAba:' + slug;
   let aba = sessionStorage.getItem(chaveAba) || 'top';
   view.innerHTML = `
-    <section class="page-hero artista-hero"><div class="cover" id="art-foto">${icon('mic', 48)}</div>
+    <section class="page-hero artista-hero"><div class="cover" id="art-foto">${fotoConhecida(nome) ? `<img src="${esc(fotoConhecida(nome))}" alt="">` : icon('mic', 48)}</div>
       <div><div class="kind">Artista</div><h2>${esc(nome || slug)}</h2><div class="meta" id="art-meta">Do <a href="https://www.cifraclub.com.br/${esc(slug)}/" target="_blank" rel="noopener">Cifra Club</a></div></div></section>
     <label class="field">${icon('search', 18)}<input class="search" id="art-busca" type="search" placeholder="Buscar nas músicas de ${esc(nome || 'artista')}"></label>
     <div class="chips" id="art-abas" style="margin:12px 0 4px">
@@ -5467,11 +5597,18 @@ async function viewArtista(slug, nome) {
     const m = li && lista[Number(li.dataset.i)];
     if (m) abrirMusica({ titulo: m.titulo, artista: nome, cifra: m.url, video: m.video || null }, location.hash, li);
   });
-  d.principal.then((a) => {
-    foto = a.foto || '';
-    // a foto da página vale também para o painel e os créditos (a mesma em todo lugar)
-    if (foto && nome) fotosArtistas.set(normalizar(nome), Promise.resolve(foto));
-    if (foto && $('#art-foto')) $('#art-foto').innerHTML = `<img src="${esc(foto)}" alt="">`;
+  // a foto do topo é a mesma das buscas e do player (a definitiva, fotoDoArtista); a da página do Cifra Club (às vezes
+  // antiga) só vale quando não há outra. Antes ela entrava primeiro e passava a valer em todo lugar
+  const fotoAgora = fotoConhecida(nome);
+  fotoDoArtista(nome || slug, slug).catch(() => '').then(async (f) => f || (await d.principal.catch(() => null))?.foto || '').then((f) => {
+    if (!f) return;
+    foto = f;
+    const box = $('#art-foto');
+    if (!box || f === fotoAgora) return;
+    const img = new Image();
+    img.alt = '';
+    img.onload = () => { if (box.isConnected) box.replaceChildren(img); };
+    img.src = f;
   });
   Promise.all([d.disc, d.todas]).then(([disc, todas]) => {
     if (!$('#art-meta')) return;
@@ -8451,7 +8588,7 @@ function viewSong(id, ctx = {}) {
     ${canvas ? `<div class="canvas-fundo quadros" aria-hidden="true"><img class="canvas-img" src="https://i.ytimg.com/vi/${esc(song.youtube)}/hqdefault.jpg" alt="">${htmlQuadros(song.youtube, tipoQuadros || 'sd')}</div>` : ''}
     <section class="page-hero song-hero">${capa(song)}
       <div class="hero-txt">${ctx.set ? `<button class="kind kind-btn" id="btn-parte" title="Trocar a parte da missa desta música no repertório">${esc(ctx.set.items[ctx.index]?.label || 'Definir a parte da missa')} ${icon('edit', 12)}</button>` : kind ? `<div class="kind">${esc(kind)}</div>` : ''}<h2 id="song-title">${esc(song.title)}</h2>
-        <div class="meta" id="song-meta"></div></div></section>
+        <div class="meta" id="song-meta"></div><div class="sinc-estado" id="sinc-estado" hidden></div></div></section>
     <div class="actions-row acoes-musica">
       <button class="play-big ${midiaDe(song) ? '' : 'off'}" id="btn-play" aria-label="${midiaDe(song) ? 'Tocar' : 'Escolher vídeo'}" title="${midiaDe(song) ? 'Tocar (continua tocando no player enquanto você navega)' : 'Sem vídeo: escolher um no YouTube'}">${icon(midiaDe(song) ? (player.tocandoAgora(midiaDe(song)) ? 'pause' : 'play') : 'youtube', 24)}</button>
       <button class="salvar-btn${isPreview ? '' : ' salva'}" id="btn-biblio" data-salvar aria-pressed="${!isPreview}" aria-label="${isPreview ? 'Salvar na biblioteca' : 'Na biblioteca (tocar para tirar)'}" title="${isPreview ? 'Salvar na biblioteca' : 'Na sua biblioteca — tocar para tirar'}">${icon(isPreview ? 'plus' : 'check', 18)}</button>
@@ -8874,8 +9011,25 @@ function viewSong(id, ctx = {}) {
   view.addEventListener('wheel', marcarRolagem, { passive: true });
   view.addEventListener('touchmove', marcarRolagem, { passive: true });
   let acesa = null;
+  // o estado da letra sincronizada, embaixo do nome: sincronizando, sincronizada ou sem sincronização (a música
+  // abre sempre; sem a letra com os tempos, fica a letra normal, e isso aparece aqui)
+  let estadoSincDesenhado = '';
+  const desenharEstadoSinc = (sinc) => {
+    const box = $('#sinc-estado');
+    if (!box) return;
+    const procurando = song.sincronizando || sincronizando.has(isPreview ? preview : song.id);
+    const estado = !midiaDe(song) ? '' : sinc ? 'ok' : procurando ? 'procurando' : 'sem';
+    if (estado === estadoSincDesenhado) return;
+    estadoSincDesenhado = estado;
+    box.hidden = !estado;
+    box.className = `sinc-estado ${estado}`;
+    box.innerHTML = estado === 'ok' ? `${icon('text', 13)}<span>Letra sincronizada</span>`
+      : estado === 'procurando' ? '<span class="spin"></span><span>Procurando a letra sincronizada…</span>'
+        : estado === 'sem' ? `${icon('info', 13)}<span>Sem letra sincronizada para esta música</span>` : '';
+  };
   const seguir = setInterval(() => {
     const sinc = sincronia();
+    desenharEstadoSinc(sinc);
     songEl.classList.toggle('sincronizada', !!sinc);
     if (!sinc || player.atual?.youtube !== sinc.video) { acesa?.classList.remove('agora'); acesa = null; return; }
     const tela = linhasMapa();
@@ -11087,9 +11241,22 @@ async function sincronizarMusica(song, { noVideo = '', audioPromise = null } = {
 
     // Se o LRCLIB indicar que a letra pertence a uma gravação mais curta que o clipe,
     // procura essa gravação e consulta novamente com a duração exata dela.
+    // Sem achar essa gravação, ainda vale a letra do LRCLIB feita para a duração do que toca (o clipe ou o áudio de
+    // agora), se houver uma: antes a música que tinha a letra sincronizada ficava sem ela
+    const naDuracaoDoQueToca = async () => {
+      const durAgora = duracao || await duracaoDaMusica(song).catch(() => 0);
+      if (!(durAgora > 0)) return 'nada';
+      const outra = await letraSincronizada(
+        { titulo: tituloLimpo(song.title), artista: song.artist || '', duracao: durAgora },
+        undefined, { ...OPÇÕES_LRCLIB_RÁPIDAS, preferirDuracao: true },
+      ).catch(() => null);
+      if (!outra?.linhas?.length || !outra?.tempos?.length || outra.ajustar) return 'nada';
+      guardarSincronia(song, { video: yt, linhas: outra.linhas, tempos: outra.tempos, fonte: 'lrclib', ...(outra.duracao ? { duracao: outra.duracao } : {}) });
+      return 'ok';
+    };
     if (lrc.ajustar && song.youtube && !ehArquivo(yt)) {
       const achado = await procurarAudio(song, Number(lrc.duracao) || 0).catch(() => null);
-      if (!achado || achado.id === yt || achado.id === song.youtube) return 'nada';
+      if (!achado || achado.id === yt || achado.id === song.youtube) return naDuracaoDoQueToca();
       const durClipe = (player.atual?.youtube === song.youtube && player.duracao)
         || await duracaoDaMusica(song).catch(() => 0);
       guardarVersoes(song, {
@@ -11105,7 +11272,8 @@ async function sincronizarMusica(song, { noVideo = '', audioPromise = null } = {
         undefined, OPÇÕES_LRCLIB_RÁPIDAS,
       );
     }
-    if (!lrc?.linhas?.length || !lrc?.tempos?.length || lrc.ajustar) return 'nada';
+    if (lrc?.ajustar) return naDuracaoDoQueToca();
+    if (!lrc?.linhas?.length || !lrc?.tempos?.length) return 'nada';
     guardarSincronia(song, {
       video: yt, linhas: lrc.linhas, tempos: lrc.tempos, fonte: 'lrclib',
       ...(lrc.duracao ? { duracao: lrc.duracao } : {}),
@@ -11237,7 +11405,18 @@ async function acertarVersoes(song, _sincronia = null, { pedido = false } = {}) 
   if (pedido) casamentoFalhou.delete(chave);
   casandoVersoes.add(vs.video);
   try {
-    const r = await casarNoAparelho(vs.audio, vs.video).catch(() => null);
+    // Enquanto o som é comparado (precisa do áudio das duas; sem o download, pela internet, e pode nem vir), uma
+    // estimativa boa e rápida pelas letras sincronizadas das duas versões no LRCLIB: muito melhor que a da duração
+    const pLetras = !vs.casadas && !vs.porLetra && !ehArquivo(vs.audio) ? casarPelasLetras(song, vs).catch(() => null) : Promise.resolve(null);
+    void pLetras.then((pl) => {
+      const ag = song.id === 'previa' ? preview : db.song(song.id);
+      const v2 = ag && versoesDe(ag);
+      if (pl?.length && v2?.video === vs.video && v2.audio === vs.audio && !v2.casadas) guardarVersoes(ag, { ...v2, pares: pl, porLetra: true });
+    });
+    let r = await casarNoAparelho(vs.audio, vs.video).catch(() => null);
+    // sem o som no aparelho: o servidor (quando a pessoa tem um) baixa e compara os dois
+    if (!r && pedido && !ehArquivo(vs.audio)) r = await casarNoServidor(vs.audio, vs.video);
+    if (!r) await pLetras;
     const pares = r?.pares;
     const agora = song.id === 'previa' ? preview : db.song(song.id);
     if (r?.mesma === false) {
@@ -11246,7 +11425,12 @@ async function acertarVersoes(song, _sincronia = null, { pedido = false } = {}) 
       return;
     }
     if (pares?.length && agora && versoesDe(agora)?.video === vs.video && mesmaSincronia(pares)) {
+      const audioAntes = vs.audio;
       guardarVersoes(agora, { ...versoesDe(agora), audio: vs.video, pares: [[0, 0]], casadas: true, casamento: CASAMENTO });
+      // o clipe é a mesma gravação, no mesmo tempo: a letra sincronizada do áudio vale nele (antes ela ficava presa ao
+      // áudio de antes e sumia, como na música baixada)
+      const sincAntes = (song.id === 'previa' ? preview : db.song(song.id))?.sincronia;
+      if (sincAntes?.video === audioAntes) guardarSincronia(song.id === 'previa' ? preview : db.song(song.id), { ...sincAntes, video: vs.video });
     } else if (pares?.length && agora && versoesDe(agora)?.video === vs.video) {
       if (ehArquivo(vs.audio)) {
         db.updateSong(agora.id, { audioProprio: { ...agora.audioProprio, pares, casadas: true, casamento: CASAMENTO } });
@@ -11285,13 +11469,70 @@ async function casarNoAparelho(audioId, videoId) {
   });
 }
 // guarda a sincronia na música (a salva ou a prévia da busca) e o Tocando agora passa a acompanhar
+// quantas linhas cantadas a cifra (ou a letra) da música tem
+const linhasDeLetra = (content) => { try { return partesCantadas(content || '').flatMap((p) => p.linhas).map(linhaSemCifra).filter(Boolean).length; } catch { return 0; } };
+// A música sem letra no texto (o Cifra Club só com os acordes, o "Não achei a letra"), mas com a letra sincronizada
+// do LRCLIB: a letra entra no texto dela, em estrofes (separadas onde o canto para por 4 s ou mais), com os mesmos
+// dados (vídeo, capa, tom). Antes a busca mostrava a letra (a da sincronia) e a música salva/baixada ficava sem
+function letraPelaSincronia(content, sinc) {
+  if (!sinc?.linhas?.length || linhasDeLetra(content) >= 2) return null;
+  const estrofes = [[]];
+  sinc.linhas.forEach((l, i) => {
+    const antes = sinc.tempos?.[i - 1];
+    if (i && antes && sinc.tempos[i].inicio - antes.fim >= 4 && estrofes[estrofes.length - 1].length) estrofes.push([]);
+    estrofes[estrofes.length - 1].push(l);
+  });
+  const m = renderSong(content || '').meta;
+  let novo = letraParaChordPro({ titulo: m.title || '', artista: m.artist || '', compositor: m.composer || '', letra: estrofes.map((e) => e.join('\n')).join('\n\n') });
+  for (const k of ['youtube', 'cover', 'key', 'capo', 'album', 'year', 'source']) if (m[k]) novo = definirMeta(novo, k, m[k]);
+  return novo;
+}
 function guardarSincronia(song, sinc) {
   song.sincronia = sinc;
-  if (song.id === 'previa') { if (preview) preview.sincronia = sinc; } else if (db.song(song.id)) db.updateSong(song.id, { sincronia: sinc });
+  const comLetra = letraPelaSincronia(song.content, sinc);
+  if (comLetra) song.content = comLetra;
+  if (song.id === 'previa') { if (preview) { preview.sincronia = sinc; if (comLetra) preview.content = comLetra; } }
+  else if (db.song(song.id)) db.updateSong(song.id, { sincronia: sinc, ...(comLetra ? { content: comLetra } : {}) });
   player.atualizar({});
   // quem está mostrando esta música (a página dela, o Tocando agora) passa a usar a sincronia na hora, mesmo com a
   // música já tocando: antes só pegava ao sair e voltar para a música
   window.dispatchEvent(new CustomEvent('songbook:sincronia', { detail: { video: sinc?.video, sinc } }));
+}
+// Os pares pelas letras: a sincronia da música (a do áudio oficial) e, no LRCLIB, a letra feita para a duração do
+// clipe (muitas músicas têm as duas). Uma tentativa por par de vídeos na sessão
+const letrasCasadas = new Map();
+function casarPelasLetras(song, vs) {
+  const chave = `${vs.audio}|${vs.video}`;
+  if (!letrasCasadas.has(chave)) {
+    letrasCasadas.set(chave, (async () => {
+      const atual = (song.id === 'previa' ? preview : db.song(song.id)) || song;
+      const doAudio = atual.sincronia?.fonte === 'lrclib' && atual.sincronia.video === vs.audio ? atual.sincronia : null;
+      if (!doAudio?.tempos?.length) return null;
+      const durClipe = duracoesConhecidas(vs.video) || await duracaoDaMusica({ ...atual, youtube: vs.video }).catch(() => 0);
+      const durAudio = Number(vs.duracao) || Number(doAudio.duracao) || 0;
+      if (!(durClipe > 0) || (durAudio > 0 && Math.abs(durClipe - durAudio) <= 3)) return null;
+      const doClipe = await letraSincronizada({ titulo: tituloLimpo(atual.title), artista: atual.artist || '', duracao: durClipe },
+        undefined, { ...OPÇÕES_LRCLIB_RÁPIDAS, preferirDuracao: true }).catch(() => null);
+      if (!doClipe || doClipe.ajustar || !(Math.abs((doClipe.duracao || 0) - durClipe) <= 3)) return null;
+      return paresPelasLetras(doAudio, doClipe);
+    })().then((p) => { if (!p) setTimeout(() => letrasCasadas.delete(chave), 5 * 60e3); return p; }));
+  }
+  return letrasCasadas.get(chave);
+}
+const duracoesConhecidas = (yt) => player.duracaoDe?.(yt) || 0;
+// O casamento pelo som feito no servidor (o mesmo método; ele baixa os dois áudios), quando a pessoa tem um ligado.
+// null se não houver servidor ou ele não conseguir
+async function casarNoServidor(audioId, videoId) {
+  if (!/^[\w-]{11}$/.test(audioId || '') || !/^[\w-]{11}$/.test(videoId || '') || db.prefs().economiaDados) return null;
+  const cfg = await carregarServidor().catch(() => null);
+  if (!cfg?.url) return null;
+  try {
+    const r = await chamarComEtapas(cfg, '/versoes', { json: { audio: `https://youtu.be/${audioId}`, video: `https://youtu.be/${videoId}` }, tempo: 6 * 60e3 });
+    return r?.pares?.length ? { pares: r.pares, confianca: r.confianca, mesma: true } : null;
+  } catch (e) {
+    // (422: o servidor ouviu e não são a mesma gravação)
+    return /422|mesma grava/.test(String(e?.message || '')) ? { pares: null, mesma: false } : null;
+  }
 }
 
 

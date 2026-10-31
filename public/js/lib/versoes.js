@@ -106,3 +106,36 @@ function converter(pares, t, de, para) {
 }
 export const tempoNoVideo = (pares, tAudio) => converter(pares, tAudio, 0, 1);
 export const tempoNoAudio = (pares, tVideo) => converter(pares, tVideo, 1, 0);
+
+// Os pares pelas letras sincronizadas das duas versões (a do áudio oficial e a feita para o clipe, as duas do LRCLIB),
+// sem precisar baixar nada: cada frase igual nas duas, na mesma ordem, diz onde aquele trecho cantado está em cada uma.
+// As letras podem ter linhas a mais ou a menos (o refrão repetido, uma fala no clipe): as frases são casadas pela maior
+// sequência em comum, e os pares que andam para trás ou mudam de deslocamento sozinhos (uma frase repetida casada no
+// lugar errado) saem. null com menos de 4 frases casadas
+const frase = (t) => normal(t).replace(/\b(oh|ah|uh|yeah|ooh|hey)\b/g, ' ').replace(/\s+/g, ' ').trim();
+export function paresPelasLetras(doAudio, doVideo) {
+  const A = (doAudio?.linhas || []).map(frase);
+  const V = (doVideo?.linhas || []).map(frase);
+  const ta = doAudio?.tempos || [];
+  const tv = doVideo?.tempos || [];
+  if (A.length < 4 || V.length < 4) return null;
+  // maior sequência em comum (LCS) das frases
+  const n = A.length;
+  const m = V.length;
+  const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+    L[i][j] = A[i] && A[i] === V[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const casadas = [];
+  for (let i = 0, j = 0; i < n && j < m;) {
+    if (A[i] && A[i] === V[j]) { casadas.push([i, j]); i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) i++; else j++;
+  }
+  let pares = casadas.map(([i, j]) => [ta[i]?.inicio, tv[j]?.inicio]).filter(([a, v]) => Number.isFinite(a) && Number.isFinite(v));
+  // deslocamento de cada par; o que foge muito da mediana dos vizinhos (uma frase casada no refrão errado) sai
+  const desl = pares.map(([a, v]) => v - a);
+  pares = pares.filter((_, k) => {
+    const viz = desl.slice(Math.max(0, k - 2), k + 3).sort((x, y) => x - y);
+    return Math.abs(desl[k] - viz[Math.floor(viz.length / 2)]) <= 1.5;
+  }).filter((p, k, l) => !k || (p[0] > l[k - 1][0] && p[1] > l[k - 1][1]));
+  if (pares.length < 4) return null;
+  return pares.map(([a, v]) => [Math.round(a * 100) / 100, Math.round(v * 100) / 100]);
+}

@@ -87,17 +87,17 @@ test('só compartilha o mesmo vídeo entre Música e Vídeo quando a sincronia �
   assert.equal(mesmaSincronia(null), false);
 });
 
-test('a busca só abre a música depois de localizar o videoclipe e concluir áudio + LRCLIB', async () => {
+test('a busca abre a música depois de localizar o videoclipe e esperar (com limite) áudio + LRCLIB', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   const abrir = app.indexOf('async function abrirPrevia(');
   const buscarVideo = app.indexOf('const v = await busca;', abrir);
   const metadados = app.indexOf('Object.assign(novo, {', buscarVideo);
-  const preparar = app.indexOf('await prepararMusicaAoAbrir(novo)', metadados);
-  const entrar = app.indexOf("location.hash = '#/musica/previa'", preparar);
+  const preparar = app.indexOf('prepararMusicaAoAbrir(novo)', metadados);
+  const esperar = app.indexOf('await Promise.all([noMaximo(preparo,', preparar);
+  const entrar = app.indexOf("location.hash = '#/musica/previa'", esperar);
   assert.ok(abrir >= 0 && buscarVideo > abrir, 'aguarda a busca do videoclipe');
   assert.ok(metadados > buscarVideo && preparar > metadados, 'preenche os metadados antes de preparar áudio e letra');
-  assert.ok(entrar > preparar, 'só navega para a música depois que a preparação termina');
-  assert.doesNotMatch(app.slice(abrir, entrar), /Promise\.race|setTimeout/);
+  assert.ok(esperar > preparar && entrar > esperar, 'espera a preparação (com limite) antes de navegar');
   const buscarCapa = app.indexOf('const buscaCapaDaPrevia =', metadados);
   const aplicarCapa = app.indexOf('const aplicarCapaDaPrevia =', buscarCapa);
   assert.ok(buscarCapa > metadados && aplicarCapa > buscarCapa && aplicarCapa < preparar,
@@ -183,10 +183,9 @@ test('ao abrir uma música, confirma a faixa e o LRCLIB antes de entrar', async 
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   const abrir = app.indexOf('async function abrirPrevia(');
   const rota = app.indexOf("if (jaNaPrevia) route(); else location.hash = '#/musica/previa';", abrir);
-  const preparo = app.indexOf('await prepararMusicaAoAbrir(novo);', abrir);
-  assert.ok(preparo > abrir && preparo < rota, 'a tela só navega depois de iniciar e concluir o preparo da música');
-  assert.match(app, /await prepararMusicaAoAbrir\(novo\)/, 'a tela só abre depois de áudio e LRCLIB terminarem');
-  assert.doesNotMatch(app, /Promise\.race\(\[preparo, new Promise\(\(ok\) => setTimeout\(ok, 1100\)\)\]\)/, 'não deve abrir antes da preparação terminar');
+  const preparo = app.indexOf('const preparo = prepararMusicaAoAbrir(novo)', abrir);
+  assert.ok(preparo > abrir && preparo < rota, 'a tela só navega depois de iniciar o preparo da música');
+  assert.match(app, /noMaximo\(preparo, 9000, 'demorou'\)/, 'espera o LRCLIB, mas uma demora não impede a música de abrir');
   const helper = app.slice(app.indexOf('function prepararMusicaAoAbrir(song)'), app.indexOf('// o áudio oficial da gravação'));
   assert.match(helper, /descobrirVersoes\(song\)/);
   assert.match(helper, /sincronizarMusica\(song, \{ audioPromise \}\)/);
@@ -234,11 +233,13 @@ test('se o LRCLIB encontrar duração diferente, refaz a busca do áudio mesmo q
 test('a busca abre a música mesmo quando a sincronização automática não encontra correspondência', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   const abrir = app.indexOf('async function abrirPrevia(');
-  const preparar = app.indexOf('await prepararMusicaAoAbrir(novo);', abrir);
+  const preparar = app.indexOf('const preparo = prepararMusicaAoAbrir(novo)', abrir);
   const navegar = app.indexOf("location.hash = '#/musica/previa'", preparar);
   assert.ok(preparar > abrir && navegar > preparar, 'a música abre depois da tentativa de preparação');
   assert.doesNotMatch(app.slice(preparar, navegar), /openDialog|Não foi possível sincronizar/);
-  assert.match(app, /if \(r !== 'ok'\) tentouSincronizar\.delete\(chaveSync\)/);
+  // sem letra sincronizada, a página mostra isso (e não pede de novo ao LRCLIB sem parar)
+  assert.match(app, /Sem letra sincronizada para esta música/);
+  assert.match(app, /if \(r === 'erro'\) setTimeout\(\(\) => tentouSincronizar\.delete\(chaveSync\), 60e3\)/);
 });
 
 test('trocar música e trocar vídeo alteram versões independentes', async () => {
@@ -278,4 +279,18 @@ test('app.js passa pela verificação real de sintaxe do Node', async () => {
   const arquivo = new URL('../public/js/app.js', import.meta.url);
   const r = spawnSync(process.execPath, ['--check', arquivo.pathname], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr || r.stdout || 'erro de sintaxe em app.js');
+});
+
+test('os pares pelas letras sincronizadas do áudio e do clipe (com cena antes e frases a mais)', async () => {
+  const { paresPelasLetras } = await import('../public/js/lib/versoes.js');
+  const linhas = ['Primeira frase', 'Segunda frase', 'O refrão aqui', 'Mais uma do refrão', 'Terceira estrofe', 'Fim da música'];
+  const doAudio = { linhas, tempos: linhas.map((_, i) => ({ inicio: 10 + i * 10, fim: 18 + i * 10 })) };
+  // o clipe: 15 s de cena antes, uma fala a mais no meio e, depois da 4ª frase, mais 8 s de cena
+  const lv = ['Fala do clipe', ...linhas.slice(0, 4), 'Outra fala', ...linhas.slice(4)];
+  const tv = [3, 25, 35, 45, 55, 60, 73, 83].map((x) => ({ inicio: x, fim: x + 8 }));
+  const pares = paresPelasLetras(doAudio, { linhas: lv, tempos: tv });
+  assert.deepEqual(pares, [[10, 25], [20, 35], [30, 45], [40, 55], [50, 73], [60, 83]]);
+  assert.equal(tempoNoVideo(pares, 15), 30);
+  assert.equal(tempoNoAudio(pares, 78), 55);
+  assert.equal(paresPelasLetras(doAudio, { linhas: ['outra', 'letra', 'nada', 'igual'], tempos: tv.slice(0, 4) }), null);
 });

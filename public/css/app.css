@@ -1466,6 +1466,11 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 .song-hero .kind-btn { margin-left: 0; }
 .song-hero .meta { gap: 8px; font-size: 15px; font-weight: 600; }
 .song-hero .meta b { font-weight: 800; }
+.sinc-estado { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700; background: var(--surface-2); color: var(--muted); }
+.sinc-estado[hidden] { display: none; }
+.sinc-estado.ok { color: var(--accent-ink); background: var(--accent-soft); }
+.sinc-estado.sem { color: #f0b429; background: rgb(240 180 41 / 0.14); }
+.sinc-estado .spin { width: 12px; height: 12px; border-width: 2px; }
 .song-hero .meta .meta-ponto { font-style: normal; opacity: 0.6; }
 .song-hero .meta .meta-tom { color: var(--accent-ink); font-weight: 800; }
 .song-topo.canvas-on .song-hero .meta .meta-tom { color: #fff; }
@@ -1955,11 +1960,14 @@ dialog.lista-fila .lista-opcoes { max-height: min(68dvh, 680px); overflow-y: aut
 dialog.lista-fila .fila-item { min-height: 68px; user-select: none; -webkit-user-select: none; }
 dialog.lista-fila .fila-item.atual { background: var(--accent-soft); }
 dialog.lista-fila .fila-item.indisponivel { opacity: .48; }
-dialog.lista-fila .fila-item.arrastando { opacity: .35; background: var(--surface-3); }
 dialog.lista-fila .fila-arrastar { all: unset; display: grid; place-items: center; width: 28px; height: 42px; flex: none; color: var(--muted); cursor: grab; touch-action: none; border-radius: 7px; }
 dialog.lista-fila .fila-arrastar:active { cursor: grabbing; color: var(--text); background: var(--surface-3); }
-dialog.lista-fila .fila-arrastar:disabled { visibility: hidden; }
-dialog.lista-fila .fila-aleatorio.ligado { color: var(--accent-ink); background: var(--accent-soft); }
+dialog.lista-fila .fila-dica { margin: -4px 16px 6px; font-size: 12.5px; }
+dialog.lista-fila .fila-item { -webkit-touch-callout: none; cursor: pointer; transition: background .15s; }
+dialog.lista-fila .fila-item.arrastando { opacity: 1; background: var(--surface-3); box-shadow: 0 8px 24px rgb(0 0 0 / .35); transform: scale(1.02); position: relative; z-index: 2; }
+dialog.lista-fila.arrastando-fila .lista-opcoes { touch-action: none; }
+dialog.lista-fila.arrastando-fila .fila-item:not(.arrastando) { transition: none; }
+dialog.lista-fila .lista-dir .spin { width: 12px; height: 12px; border-width: 2px; }
 dialog.lista-fila .fila-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (max-width: 699px) {
   dialog.lista-fila .lista-op { padding: 8px 8px; gap: 9px; }
