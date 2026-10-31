@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 374, data: '2026-10-31', titulo: 'Letra sincronizada antes de entrar, acordes certos e partes em inglês',
+    itens: [
+      { tipo: 'melhoria', texto: 'A música da busca só abre com a versão de música, o clipe e a letra sincronizada prontos (embaixo do nome aparece o que está sendo preparado; no máximo 15 s). A letra sincronizada vem bem mais rápido: a reserva (NetEase) é procurada junto com o LRCLIB, pelos serviços ao mesmo tempo, e uma falha da internet é tentada de novo na hora.' },
+      { tipo: 'correcao', texto: 'Linhas de acordes com parênteses soltos, como “( Am ) C” ou “G C ( D )”, aparecem como acordes, e não mais como se fossem letra (também nas músicas já salvas).' },
+      { tipo: 'correcao', texto: 'Os nomes das partes ficam sempre em inglês (Verse, Chorus, Pre-Chorus, Bridge, Outro…), também na letra do Tocando agora, que mostrava “Refrão”, “Primeira Parte”.' },
+    ],
+  },
+  {
     versao: 373, data: '2026-10-31', titulo: 'Só a letra na letra, sem afinação nem créditos',
     itens: [
       { tipo: 'correcao', texto: 'Afinação, capotraste, tom, sugestão de batida, riff, dedilhado, solo, observações e créditos (composição, contribuição, revisões) não aparecem mais no meio da letra nem da cifra, também nas músicas já salvas: na Letra fica só o que se canta; na Cifra, os acordes com a letra.' },
@@ -65,17 +73,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'melhoria', texto: 'Na fila, segure qualquer parte da música e arraste para mudar a ordem (sem a alça): o card sobe, acompanha o dedo e as outras músicas abrem espaço deslizando.' },
       { tipo: 'correcao', texto: 'Escolher uma música pela fila desliga o aleatório, e o botão volta ao normal (não fica mais azul e apagado ao mesmo tempo).' },
-    ],
-  },
-  {
-    versao: 364, data: '2026-10-31', titulo: 'Capas sem piscar, letra sincronizada mais certeira e fila melhor',
-    itens: [
-      { tipo: 'correcao', texto: 'Na Busca, as fotos dos artistas e as capas já aparecem na versão atual, sem mostrar antes a foto antiga e trocar em seguida. A página do artista usa a mesma foto.' },
-      { tipo: 'melhoria', texto: 'A letra sincronizada é encontrada em mais músicas: o nome do artista e o título escritos de outro jeito (Pe./Padre, Ministério, feat.) também valem, e sem achar o áudio oficial vale a letra feita para o próprio clipe.' },
-      { tipo: 'melhoria', texto: 'A música abre mesmo sem letra sincronizada (sem esperar demais), e embaixo do nome aparece se ela está sincronizada, procurando ou sem sincronização.' },
-      { tipo: 'correcao', texto: 'A música salva ou baixada leva junto a letra sincronizada (e a própria letra, quando a cifra não tinha), como em Company, do Justin Bieber.' },
-      { tipo: 'correcao', texto: 'Trocar entre música e videoclipe vai para o ponto certo com mais frequência mesmo sem baixar (pelas letras sincronizadas das duas versões), e a barra não pula mais para o fim durante a troca.' },
-      { tipo: 'melhoria', texto: 'Fila: sem o botão de aleatório repetido (ele fica no player), com a duração de cada música e com a alça visível; segure a música e arraste para mudar a ordem.' },
     ],
   },
 ];

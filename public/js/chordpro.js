@@ -111,6 +111,9 @@ export function parseChordPro(src) {
     }
     if (ehInfoDaCifra(line)) continue; // (afinação, capotraste, batida, créditos… não são letra nem cifra)
     const sec = ensure();
+    // (linha de acordes com parênteses soltos guardada como texto: vira acordes, como as outras)
+    const soltos = sec.type !== 'tab' && linhaDeAcordesSoltos(line);
+    if (soltos) { sec.lines.push({ kind: 'lyrics', segments: soltos.trim().split(/\s+/).map((x) => (isChord(x) ? { chord: x, text: ' ' } : { chord: null, text: `${x} ` })) }); continue; }
     if (sec.type === 'tab') { sec.lines.push({ kind: 'text', text: line }); continue; }
     sec.lines.push({ kind: 'lyrics', segments: splitChordLine(line) });
   }
@@ -144,6 +147,18 @@ export function isChordOnlyLine(line) {
   return ok === tokens.length && tokens.some(isChord);
 }
 
+// Linha de acordes com parênteses soltos ("( Am ) C", "G C ( D )", "(Am)  C"): os parênteses (acorde de passagem ou
+// opcional) saem, cada um trocado por espaço (os acordes continuam na mesma coluna, em cima da sílaba). Antes a linha
+// não era reconhecida como acordes e aparecia como se fosse letra. null se não for uma linha só de acordes
+const tirarParenteses = (linha) => linha.replace(/\S+/g, (tok) => (isChord(tok) || MARCA_NA_LINHA.test(tok) ? tok
+  : tok.replace(/^[([]+/, (m) => ' '.repeat(m.length)).replace(/[)\]]+$/, (m) => ' '.repeat(m.length))));
+export function linhaDeAcordesSoltos(linha) {
+  const s = semInvisiveis(String(linha || ''));
+  if (!/[()]/.test(s) || /\[[^\]]*\]/.test(s)) return null;
+  const t = tirarParenteses(s);
+  return t.trim() && isChordOnlyLine(t) ? t : null;
+}
+
 // "( C  Em  G  Bm )" — sequência de acordes entre parênteses (passagem, introdução de uma parte):
 // devolve os acordes, para virar uma linha de acordes de verdade, ou null
 export function acordesEntreParenteses(texto) {
@@ -175,7 +190,8 @@ export function chordsOverLyricsToChordPro(text) {
   const lines = semInvisiveis(text).replace(/\r\n?/g, '\n').split('\n');
   const out = [];
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const line = linhaDeAcordesSoltos(lines[i]) ?? lines[i];
+    if (lines[i + 1] !== undefined) lines[i + 1] = linhaDeAcordesSoltos(lines[i + 1]) ?? lines[i + 1];
     const header = /^\s*\[?(intro|refr[ãa]o|coro|ponte|final|solo|estrofe|verso|pr[ée]-?refr[ãa]o|chorus|verse|bridge|pre-?chorus|outro)(\s+\d+)?\]?:?\s*(.*)$/i.exec(line);
     if (header && (!header[3] || isChordOnlyLine(header[3]))) {
       out.push(`{comment: ${parteEmIngles(header[1] + (header[2] || ''))}}`);
@@ -380,6 +396,7 @@ const semAcordes = (l) => l.replace(/\[[^\]]*\]/g, '');
 const MARCAS_DE_REPETIR = /\b(\d+\s*x|x\s*\d+|bis)\b/gi;
 export const soAcordes = (l) => {
   if (ehDiretiva(l)) return false;
+  if (linhaDeAcordesSoltos(l)) return true;
   if (/\[[^\]]*\]/.test(l)) return !/[\p{L}\d]/u.test(semAcordes(l).replace(MARCAS_DE_REPETIR, ''));
   return /^\s*\(.*\)\s*$/.test(l) && Boolean(acordesEntreParenteses(l));
 };
@@ -526,17 +543,23 @@ export const ehObservacao = (texto) => OBSERVACAO.test(String(texto || '').trim(
 const ORDINAIS = { primeira: 1, segunda: 2, terceira: 3, quarta: 4, quinta: 5, sexta: 6, 'sétima': 7, setima: 7, oitava: 8, nona: 9, 'décima': 10, decima: 10 };
 const NOMES_EM_INGLES = [
   [/^(pr[ée]|pre)\s*-?\s*(refr[ãa]o|coro|chorus)$/i, 'Pre-Chorus'],
+  [/^(p[óo]s|post)\s*-?\s*(refr[ãa]o|coro|chorus)$/i, 'Post-Chorus'],
+  [/^(refr[ãa]o|coro|chorus)\s+final$|^final\s+(refr[ãa]o|chorus)$/i, 'Final Chorus'],
+  [/^(ponte|interl[úu]dio)\s+instrumental$|^instrumental$/i, 'Instrumental'],
   [/^(refr[ãa]o|coro|chorus)$/i, 'Chorus'],
   [/^(ponte|bridge)$/i, 'Bridge'],
-  [/^(estrofe|verso|verse|parte)$/i, 'Verse'],
+  [/^(estrofe|estrofes|verso|versos|verse|parte|primeira|segunda|terceira)$/i, 'Verse'],
   [/^(intro|introdu[çc][ãa]o)$/i, 'Intro'],
-  [/^(final|finaliza[çc][ãa]o|encerramento|outro)$/i, 'Outro'],
+  [/^(final|finaliza[çc][ãa]o|encerramento|outro|coda|fim)$/i, 'Outro'],
+  [/^(tag|gancho|hook)$/i, 'Tag'],
   [/^(interl[úu]dio|interlude)$/i, 'Interlude'],
   [/^solo$/i, 'Solo'],
   [/^(repetir|repete|repeat)\s+(o\s+)?(refr[ãa]o|coro|chorus)$/i, 'Repeat Chorus'],
 ];
 const nomeConhecido = (nome) => {
-  const t = String(nome || '').trim().replace(/\s+/g, ' ').replace(/:$/, '');
+  // (sem as marcas de repetição — "Refrão 2x", "Refrão (bis)" —, que não fazem parte do nome)
+  const t = String(nome || '').trim().replace(/\s+/g, ' ').replace(/:$/, '')
+    .replace(/\s*[-–(]?\s*(\d+\s*x|x\s*\d+|bis|\d+\s*vezes)\s*\)?\s*$/i, '').trim();
   const ord = /^(\p{L}+)\s+parte$/iu.exec(t); // "Primeira Parte" -> Verse 1
   if (ord && ORDINAIS[ord[1].toLowerCase()]) return `Verse ${ORDINAIS[ord[1].toLowerCase()]}`;
   const m = /^(.*?)(?:\s*(\d+))?$/.exec(t);
@@ -585,7 +608,8 @@ export function doEditor(texto) {
     aberta = null;
   };
   for (const bruta of linhas) {
-    const linha = bruta.replace(/\s+$/, '');
+    // (a passagem inteira entre parênteses, "( C Em G Bm )", continua no caminho dela, mais abaixo)
+    const linha = ((/^\s*\(([^()]+)\)\s*$/.test(bruta) ? null : linhaDeAcordesSoltos(bruta)) ?? bruta).replace(/\s+$/, '');
     if (/^\s*\{.*\}\s*$/.test(linha)) {
       // ChordPro escrito à mão continua valendo
       if (/^\s*\{\s*(start_of_|so[cvbt]\s*[:}]|end_of_|eo[cvbt]\s*[:}]|chorus\s*[:}])/i.test(linha)) fechar();

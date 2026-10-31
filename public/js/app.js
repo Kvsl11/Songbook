@@ -1,6 +1,6 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
-import { definirMeta, semInvisiveis, soAcordes, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasCantadas, partesCantadas, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
+import { definirMeta, semInvisiveis, soAcordes, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasCantadas, partesCantadas, capoDaCifra, capoDaObservacao, organizarPartes, parteEmIngles } from './chordpro.js';
 import { icon, iconeMenu, logo, logoLumen } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.31-373';
+export const APP_VERSAO = '2026.10.31-374';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1949,7 +1949,7 @@ const semLinhasDeAcordes = (sinc) => {
       const n = parteDaLinha[i];
       // a parte muda (ou o refrão recomeça pela primeira linha dele)
       if (n !== parteAntes || ((i === 0 || parteDaLinha[i - 1] !== n) && casadas[k - 1] !== i)) {
-        const nome = partes[n].nome;
+        const nome = parteEmIngles(partes[n].nome); // (sempre em inglês: Verse, Chorus, Pre-Chorus…)
         if (nome && !/^verse$/i.test(nome)) marcas.set(k, nome);
       }
       parteAntes = n;
@@ -1980,7 +1980,7 @@ const semLinhasDeAcordes = (sinc) => {
           // (só a falha da internet tenta de novo, e depois de um tempo: antes, o "não tem" apagava a marca e o
           // desenho logo abaixo pedia de novo, sem parar; o LRCLIB passava a recusar (429) e outras músicas, que têm a
           // letra sincronizada, ficavam sem ela)
-          if (r === 'erro') setTimeout(() => tentouSincronizar.delete(chaveSync), 60e3);
+          if (r === 'erro') setTimeout(() => { tentouSincronizar.delete(chaveSync); letraDe = ''; desenharLetra(); }, 8000);
           letraDe = '';
           desenharLetra();
         });
@@ -4749,8 +4749,15 @@ async function abrirMusica(dados, back, el) {
   else toast('Trazendo a música…');
   try {
     // vídeo da busca: primeiro descobre qual música é (para vir com a cifra e a letra dela)
-    const r = await trazerMusica(dados.video && !dados.cifra && !dados.letra ? await musicaDoVideo(dados.video) : dados);
-    await abrirPrevia(r.content, r.source, back, r.video);
+    // (o que está sendo preparado aparece embaixo do nome, na linha tocada)
+    const sub = el?.querySelector('.s');
+    const subAntes = sub?.innerHTML;
+    const aoPreparar = (txt) => { if (sub?.isConnected) { sub.innerHTML = `<span class="preparando">${esc(txt)}</span>`; } };
+    aoPreparar('Trazendo a cifra e a letra…');
+    try {
+      const r = await trazerMusica(dados.video && !dados.cifra && !dados.letra ? await musicaDoVideo(dados.video) : dados);
+      await abrirPrevia(r.content, r.source, back, r.video, aoPreparar);
+    } finally { if (sub?.isConnected) sub.innerHTML = subAntes; }
   } catch (e) {
     abrirNoTocando = false;
     toast('Não consegui trazer: ' + e.message);
@@ -4793,7 +4800,7 @@ async function videoDaMusica(titulo, artista, source) {
   return vs.find((v) => videoCombina(v.titulo, titulo)) || null;
 }
 
-async function abrirPrevia(content, source, back, videoJa = null) {
+async function abrirPrevia(content, source, back, videoJa = null, aoPreparar = null) {
   const novo = { id: 'previa', content, source, transpose: 0, capo: capoDaCifra(content), back }; // capo da cifra (Cifra Club)
   let m = renderSong(novo.content).meta;
   if (!youtubeId(m.youtube) && !String(source || '').startsWith('cnbb:')) {
@@ -4866,10 +4873,12 @@ async function abrirPrevia(content, source, back, videoJa = null) {
   // Enquanto carrega, também as duas versões (o áudio oficial e o clipe) e onde cada trecho cantado está em cada uma
   // (o casamento pelo som), para a troca entre música e vídeo já ir ao ponto certo desde o primeiro toque. Com limite:
   // passando dele, a música abre e o resto termina em segundo plano
-  // (espera curta: o navegador só deixa a música começar a tocar sozinha por poucos segundos depois do toque da pessoa;
-  // esperando mais, ela abria e não tocava nada. O que não chegar a tempo entra sozinho logo depois, já tocando)
+  // A música só abre com tudo pronto: a versão de música (o áudio oficial), o clipe e a letra sincronizada. Espera até
+  // achar (com limite de 15 s, para nunca ficar presa); o que não chegar a tempo entra sozinho logo depois
   const versoesProntas = novo.youtube ? descobrirVersoes(novo).catch(() => null) : Promise.resolve(null);
-  await Promise.all([noMaximo(preparo, 3500, 'demorou'), noMaximo(versoesProntas, 3500, null), noMaximo(buscaCapaDaPrevia, 2000, '').then(aplicarCapaDaPrevia)]);
+  aoPreparar?.('Procurando a música, o clipe e a letra sincronizada…');
+  void versoesProntas.then(() => { if (preview === novo && !novo.sincronia) aoPreparar?.('Sincronizando a letra…'); });
+  await Promise.all([noMaximo(preparo, 15000, 'demorou'), noMaximo(versoesProntas, 15000, null), noMaximo(buscaCapaDaPrevia, 2000, '').then(aplicarCapaDaPrevia)]);
   if (preview !== novo) return;
   if (jaNaPrevia) route(); else location.hash = '#/musica/previa';
 }
@@ -11537,7 +11546,16 @@ function prepararMusicaAoAbrir(song) {
   tentouSincronizar.delete(chave);
   tentouSincronizar.add(chave);
   // (o LRCLIB não espera a descoberta do áudio oficial: a letra vem assim que ele responder)
-  const sincroniaPromise = sincronizarMusica(song, { audioPromise });
+  // (a internet falhou: tenta de novo logo, duas vezes, em vez de deixar para depois)
+  const tentar = async () => {
+    let r = await sincronizarMusica(song, { audioPromise });
+    for (let vez = 1; r === 'erro' && vez <= 2; vez++) {
+      await new Promise((ok) => setTimeout(ok, 1500 * vez));
+      r = await sincronizarMusica(song.id === 'previa' ? (preview || song) : (db.song(song.id) || song), { audioPromise });
+    }
+    return r;
+  };
+  const sincroniaPromise = tentar();
   return sincroniaPromise.then((resultado) => {
     const atual = song.id === 'previa' ? preview : db.song(song.id);
     const valida = atual?.youtube

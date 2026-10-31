@@ -380,7 +380,7 @@ test('letra sincronizada do LRCLIB: LRC -> linhas e tempos da sincronia', async 
     { id: 2, trackName: 'Noites Traiçoeiras', artistName: 'Outro Cantor', duration: 241, syncedLyrics: lrc },
     { id: 3, trackName: 'Noites Traiçoeiras', artistName: 'Padre Marcelo Rossi', duration: 241, syncedLyrics: lrc },
   ];
-  const fetchImpl = async (url) => { pedidos.push(url); return resp(lista); };
+  const fetchImpl = async (url) => { if (!url.includes('lrclib')) return { ok: false, status: 404 }; pedidos.push(url); return resp(lista); };
   // a do mesmo artista e com a duração do vídeo (a ao vivo, mais longa, fica de fora)
   const r = await letraSincronizada({ titulo: 'Noites Traiçoeiras', artista: 'Padre Marcelo Rossi', duracao: 243 }, fetchImpl);
   assert.equal(r.id, 3);
@@ -400,6 +400,7 @@ test('LRCLIB: procura pelo título quando as buscas exata e ampla não localizam
   const lrc = '[00:04.91] I need the tears\\n[00:08.18] to fall';
   const pedidos = [];
   const fetchImpl = async (url) => {
+    if (!url.includes('lrclib')) return { ok: false, status: 404 };
     pedidos.push(url);
     if (url.includes('track_name=Tears&artist_name=')) return { ok: true, status: 200, json: async () => [] };
     if (url.includes('q=Tears')) return { ok: true, status: 200, json: async () => [] };
@@ -421,10 +422,10 @@ test('letra sincronizada: o LRCLIB ocupado (503) tenta de novo; sem resposta nen
   const ok = { ok: true, status: 200, json: async () => [{ id: 5, trackName: 'Colo de Mãe (Ao Vivo)', artistName: 'Frei Gilson', duration: 265, syncedLyrics: lrc }] };
   const ocupado = { ok: false, status: 503, json: async () => ({ message: 'The server is busy, please retry in a moment' }) };
   let n = 0;
-  const r = await letraSincronizada({ titulo: 'Colo de Mãe', artista: 'Frei Gilson', duracao: 263 }, async () => (++n < 3 ? ocupado : ok), { espera: 1 });
+  const r = await letraSincronizada({ titulo: 'Colo de Mãe', artista: 'Frei Gilson', duracao: 263 }, async (u) => (!u.includes('lrclib') ? { ok: false, status: 404 } : ++n < 3 ? ocupado : ok), { espera: 1 });
   assert.equal(r.id, 5);
   assert.equal(n, 3); // consulta sequencial: dois 503 e depois a resposta válida
-  await assert.rejects(letraSincronizada({ titulo: 'Colo de Mãe', artista: 'Frei Gilson' }, async () => ocupado, { espera: 1 }), /não respondeu|ocupado/);
+  await assert.rejects(letraSincronizada({ titulo: 'Colo de Mãe', artista: 'Frei Gilson' }, async (u) => (u.includes('lrclib') ? ocupado : { ok: false, status: 404 }), { espera: 1 }), /não respondeu|ocupado/);
 });
 
 // foto do artista pelo YouTube: só o canal que é com certeza dele (verificado com o nome dele ou o "Tópico" do YouTube)

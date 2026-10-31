@@ -114,3 +114,15 @@ test('afinação, capotraste, batida, créditos… não entram na letra nem na c
   const linhas = parseChordPro(guardada).sections.flatMap((s) => s.lines);
   assert.equal(linhas.length, 1);
 });
+
+test('acordes com parênteses soltos são acordes; nomes das partes sempre em inglês', async () => {
+  const { linhaDeAcordesSoltos, doEditor, linhasCantadas, parteEmIngles } = await import('../public/js/chordpro.js');
+  assert.ok(linhaDeAcordesSoltos('( Am ) C'));
+  assert.ok(linhaDeAcordesSoltos('G C ( D )'));
+  assert.equal(linhaDeAcordesSoltos('Before I make a move (Woo, oh, oh, oh)'), null);
+  const pro = doEditor('G\nIs this gonna happen?\n( Am ) C\nBeen waiting and waiting');
+  assert.doesNotMatch(pro, /\( Am \)/);
+  assert.deepEqual(linhasCantadas('Is this gonna happen?\n( Am ) C\nBeen waiting').map((l) => l.trim()), ['Is this gonna happen?', 'Been waiting']);
+  for (const [pt, en] of [['Refrão', 'Chorus'], ['Refrão 2x', 'Chorus'], ['Pré-Refrão', 'Pre-Chorus'], ['Primeira Parte', 'Verse 1'], ['Ponte', 'Bridge'], ['Pós-refrão', 'Post-Chorus'], ['Final', 'Outro']])
+    assert.equal(parteEmIngles(pt), en);
+});

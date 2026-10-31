@@ -491,6 +491,8 @@ export async function letraSincronizada(
   const a = String(artista || '').trim();
   if (!t) return null;
   let respondeu = false;
+  // a reserva (NetEase) já começa junto: se o LRCLIB não tiver ou estiver fora do ar, ela já está pronta
+  const pReserva = letraSincronizadaNetease({ titulo: t, artista: a, duracao }, fetchImpl, { preferirDuracao }).catch(() => null);
   const pedir = async (params) => {
     // (o LRCLIB caiu há pouco — a API dele responde 502 quando o servidor de trás está fora —: nem tenta, vai direto à
     // reserva, em vez de esperar ~30 s de tentativas a cada música)
@@ -500,7 +502,7 @@ export async function letraSincronizada(
         const res = await buscar(`https://lrclib.net/api/search?${params}`, { fetchImpl, timeout });
         if (res.status === 502 || res.status === 521 || res.status === 522) {
           // (fora do ar, não ocupado: uma segunda tentativa e, falhando de novo, desiste por 2 minutos)
-          if (vez >= 1) { lrclibForaAte = Date.now() + 120e3; throw new Error('LRCLIB fora do ar'); }
+          if (vez >= 1) { lrclibForaAte = Date.now() + 20e3; throw new Error('LRCLIB fora do ar'); }
           await new Promise((ok) => setTimeout(ok, Math.min(espera, 800)));
           continue;
         }
@@ -556,7 +558,7 @@ export async function letraSincronizada(
     if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: oficial.id, duracao: oficial.duration || 0, ...(bate ? {} : { ajustar: true }) };
   }
   // sem a letra no LRCLIB (ou ele fora do ar): a da NetEase, que tem a letra sincronizada de muitas músicas
-  const reserva = await letraSincronizadaNetease({ titulo: t, artista: a, duracao }, fetchImpl, { preferirDuracao }).catch(() => null);
+  const reserva = await pReserva;
   if (reserva) return reserva;
   if (!respondeu) throw new Error('O LRCLIB não respondeu agora');
   return null;
@@ -571,14 +573,12 @@ const NETEASE = 'https://music.163.com/api';
 const PROXIES_JSON = ['https://api.allorigins.win/raw?url={url}', 'https://api.codetabs.com/v1/proxy/?quest={url}', 'https://r.jina.ai/{raw}'];
 async function jsonSemCors(url, { fetchImpl, proxies = PROXIES_JSON } = {}) {
   const tentativas = [...(NO_NAVEGADOR ? [] : [[url, {}]]), ...proxies.map((p) => [viaProxy(p, url), /r\.jina\.ai/.test(p) ? { 'X-Return-Format': 'text' } : {}])];
-  for (const [alvo, headers] of tentativas) {
-    try {
-      const res = await buscar(alvo, { fetchImpl, timeout: 15000, headers });
-      if (!res.ok) continue;
-      return lerJsonp(await res.text());
-    } catch { /* o próximo */ }
-  }
-  return null;
+  // (todos ao mesmo tempo, vale o primeiro que responder: um de cada vez, um fora do ar fazia esperar 15 s)
+  return Promise.any(tentativas.map(async ([alvo, headers]) => {
+    const res = await buscar(alvo, { fetchImpl, timeout: 10000, headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return lerJsonp(await res.text());
+  })).catch(() => null);
 }
 // as linhas de créditos que a NetEase põe no começo ("作词 : …", "作曲 : …") e o título/artista falados no começo
 const CREDITO = /[\u4e00-\u9fff]|^\s*(lyrics?|composed|written|producer|produced|arranged)\s*(by)?\s*[:：]/i;
@@ -601,8 +601,9 @@ export async function letraSincronizadaNetease({ titulo = '', artista = '', dura
   if (!candidatas.length) return null;
   // (com a duração conhecida, a da mesma gravação primeiro)
   if (duracao > 0) candidatas.sort((x, y) => Math.abs(x.duracao - duracao) - Math.abs(y.duracao - duracao));
-  for (const c of candidatas.slice(0, 3)) {
-    const j = await jsonSemCors(`${NETEASE}/song/lyric?id=${c.id}&lv=1`, { fetchImpl });
+  const letras = candidatas.slice(0, 3).map((c) => jsonSemCors(`${NETEASE}/song/lyric?id=${c.id}&lv=1`, { fetchImpl }));
+  for (const [k, c] of candidatas.slice(0, 3).entries()) {
+    const j = await letras[k];
     const lrc = lrcSemCreditos(j?.lrc?.lyric || '', { titulo: t, artista: a });
     const sinc = sincroniaDoLrc(lrc, c.duracao || duracao);
     if (sinc.linhas.length < 4) continue;
