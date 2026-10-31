@@ -65,12 +65,7 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'Ao tocar em Baixar, o ícone da música entra imediatamente em modo de download. O app também avisa quando o servidor não está conectado e envia notificações de início, progresso, conclusão ou falha.' },
     ],
   },
-  {
-    versao: 348, data: '2026-10-30', titulo: 'Sincronização confirmada antes de abrir a música',
-    itens: [
-      { tipo: 'correcao', texto: 'A busca agora identifica primeiro a gravação de áudio e só depois consulta o LRCLIB com a duração correta. A música só abre quando o videoclipe e a letra sincronizada são confirmados; tentativas sem correspondência podem ser refeitas.' },
-    ],
-  },
+
 
 ];
 
