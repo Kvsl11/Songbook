@@ -4,6 +4,27 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 370, data: '2026-10-31', titulo: 'Capa animada andando e troca certa sem o servidor',
+    itens: [
+      { tipo: 'melhoria', texto: 'A capa animada mostra o clipe andando de verdade também nas músicas não baixadas (mudo, sem os botões do YouTube), e não mais imagens paradas.' },
+      { tipo: 'melhoria', texto: 'A troca entre música e vídeo acerta o ponto sem precisar do servidor: as legendas do clipe são casadas com a letra sincronizada (rápido, erro de menos de 1 s) e, quando dá, o próprio celular compara o som das duas versões (pelo Piped ou pelo Invidious). O servidor continua sendo usado quando está ligado.' },
+    ],
+  },
+  {
+    versao: 369, data: '2026-10-31', titulo: 'Troca entre música e vídeo no ponto certo, mesmo sem baixar',
+    itens: [
+      { tipo: 'correcao', texto: 'Trocar entre música e vídeo vai para o mesmo trecho cantado também nos clipes com introdução longa ou cenas no meio (como Speed Demon, de Michael Jackson), sem precisar baixar: ao abrir a música, o servidor compara o som das duas versões.' },
+      { tipo: 'melhoria', texto: 'Enquanto a música carrega, ela já vem com a versão de música, a de vídeo, a letra sincronizada e o ponto de cada trecho nas duas. Se a comparação ainda não terminou na hora da troca, o botão mostra “Acertando a posição…” e troca no ponto certo assim que ela chega.' },
+    ],
+  },
+  {
+    versao: 368, data: '2026-10-31', titulo: 'Música abre na versão da música, com a capa animada',
+    itens: [
+      { tipo: 'correcao', texto: 'A música aberta (da busca, da biblioteca, de um repertório) começa na versão da música, com a capa e a letra sincronizada, e não no vídeo. No vídeo não há letra, e por isso parecia que a sincronia não funcionava.' },
+      { tipo: 'melhoria', texto: 'A capa animada funciona sem baixar a música: passam os quadros do clipe; nas músicas baixadas, o próprio vídeo.' },
+    ],
+  },
+  {
     versao: 367, data: '2026-10-31', titulo: 'Letra sincronizada de volta, e mais rápida',
     itens: [
       { tipo: 'correcao', texto: 'A letra sincronizada voltou: o app só perguntava ao LRCLIB depois de achar o áudio oficial e a duração do vídeo no YouTube, por serviços que andam fora do ar, e a letra demorava minutos ou nunca vinha. Agora o LRCLIB é consultado na hora e a letra aparece em poucos segundos.' },
@@ -50,25 +71,6 @@ export const NOVIDADES = [
     versao: 361, data: '2026-10-30', titulo: 'Troca independente da música e do vídeo',
     itens: [
       { tipo: 'melhoria', texto: 'No modo música, a busca substitui somente a faixa de áudio; no modo vídeo, substitui somente o clipe. As duas versões ficam separadas e a escolha não sobrescreve a outra.' },
-    ],
-  },
-  {
-    versao: 360, data: '2026-10-30', titulo: 'A música abre mesmo quando a sincronização falha',
-    itens: [
-      { tipo: 'correcao', texto: 'Uma falha temporária na busca da letra sincronizada não bloqueia mais a abertura da música nem mostra o aviso repetido. A letra continua disponível, e o Songbook pode tentar sincronizá-la novamente depois.' },
-    ],
-  },
-  {
-    versao: 359, data: '2026-10-30', titulo: 'Capas e fotos corretas desde o primeiro resultado',
-    itens: [
-      { tipo: 'correcao', texto: 'A busca agora prepara a capa oficial e a foto do artista antes de exibir as músicas. A miniatura antiga não aparece mais para ser substituída depois; a lista surge já com as imagens encontradas.' },
-    ],
-  },
-  {
-    versao: 358, data: '2026-10-30', titulo: 'Capas de álbuns e fotos de artistas nas buscas',
-    itens: [
-      { tipo: 'melhoria', texto: 'Nas buscas, as músicas passam a mostrar a capa oficial do single ou álbum, separada da foto do artista. As fotos dos artistas também aparecem nas listas e nos resultados de artistas.' },
-      { tipo: 'melhoria', texto: 'Na biblioteca, as músicas mostram a foto do artista ao lado do nome e recebem a capa oficial quando a capa anterior era provisória. As capas escolhidas manualmente continuam preservadas.' },
     ],
   },
 ];

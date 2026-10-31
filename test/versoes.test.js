@@ -131,7 +131,7 @@ test('um download parcial pode ser retomado e o áudio não precisa ser baixado 
 test('o casamento sonoro recalibra mapas antigos e permite nova tentativa após falha temporária', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   assert.match(app, /const CASAMENTO = 3;/);
-  assert.match(app, /async function acertarVersoes\(song, _sincronia = null, \{ pedido = false \} = \{\}\)/);
+  assert.match(app, /function acertarVersoes\(song, _sincronia = null, \{ pedido = false \} = \{\}\)/);
   assert.match(app, /\(!pedido && casamentoFalhou\.has\(chave\)\)/);
   assert.match(app, /if \(pedido\) casamentoFalhou\.delete\(chave\)/);
   assert.match(app, /vsSalvasAoAbrir\.casamento \|\| 1\) < CASAMENTO/);
@@ -297,4 +297,39 @@ test('os pares pelas letras sincronizadas do áudio e do clipe (com cena antes e
   assert.equal(tempoNoVideo(pares, 15), 30);
   assert.equal(tempoNoAudio(pares, 78), 55);
   assert.equal(paresPelasLetras(doAudio, { linhas: ['outra', 'letra', 'nada', 'igual'], tempos: tv.slice(0, 4) }), null);
+});
+
+test('versões: o servidor casa pelo som já ao abrir, e a troca só pela estimativa espera o casamento', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const casar = app.slice(app.indexOf('async function casarVersoesAgora('), app.indexOf('// as amostras (mono, na taxa do casamento)'));
+  // sem as duas no aparelho, o servidor vem antes (não depende mais de trocar de versão)
+  assert.ok(casar.indexOf('casarNoServidor(') >= 0 && !/pedido && !ehArquivo/.test(casar));
+  assert.match(app, /if \(vs\?\.video && casandoVersoes\.has\(vs\.video\)\) return casandoPromessas\.get\(vs\.video\)/);
+  // a troca com só a estimativa espera (com limite) e, se trocar antes, acerta a partir do ponto de onde saiu
+  assert.match(app, /noMaximo\(acertarVersoes\(s, null, \{ pedido: true \}\), 9000\)/);
+  assert.match(app, /tempoNoVideo\(vs\.pares, ultimaTroca\.t \+ passou\)/);
+  assert.match(app, /tempoNoAudio\(vs\.pares, ultimaTroca\.t \+ passou\)/);
+  // a prévia da busca espera também as versões e o casamento (com limite) antes de abrir
+  assert.match(app, /noMaximo\(versoesProntas, 20000, null\)/);
+});
+
+test('os pares pelas legendas automáticas do clipe (Speed Demon: introdução longa e palavras erradas)', async () => {
+  const { paresPelaLegenda } = await import('../public/js/lib/versoes.js');
+  const { lerVtt } = await import('../public/js/lib/web.js');
+  const linhas = ['Speed demon you got to pay your fine', 'All this way you got to hit the line', 'Gotta stop you now you run the light',
+    'Speed demon you wanna win the race', 'Pull over boy and get what you deserve', 'Got a cop in back who wanna get your name'];
+  const doAudio = { linhas, tempos: linhas.map((_, i) => ({ inicio: 20 + i * 8, fim: 27 + i * 8 })) };
+  // o clipe: 6 min de cena antes da música; a legenda automática erra palavras e parte as linhas
+  const vtt = `WEBVTT\n\n00:00:10.000 --> 00:00:14.000\n[Music]\n\n` + [
+    ['06:20.500', 'speed demon you got to pay'], ['06:23.000', 'your fine'], ['06:28.400', 'all this way you gotta hit the line'],
+    ['06:36.600', 'gotta stop you now you run the lights'], ['06:44.300', 'speed demon you want to win the race'],
+    ['06:52.500', 'pull over boy and get what you deserve'], ['07:00.400', 'got a cop in back who want to get your name'],
+  ].map(([t, x]) => `00:${t} --> 00:${t.replace(/\.\d+$/, '.999')}\n${x}`).join('\n\n');
+  const cues = lerVtt(vtt);
+  assert.equal(cues.length, 7);
+  const pares = paresPelaLegenda(doAudio, cues);
+  assert.ok(pares.length >= 5);
+  // o deslocamento achado é o da cena antes da música (360 s), com erro de menos de 1 s
+  for (const [a, v] of pares) assert.ok(Math.abs(v - a - 360.5) < 1, `${a} → ${v}`);
+  assert.ok(Math.abs(tempoNoVideo(pares, 30) - 390.5) < 1);
 });

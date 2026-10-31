@@ -4021,6 +4021,8 @@ html.pp #player .pl-artista-bio.so-mais .pl-artista-mais { position: static; pad
 .pl-fundo .pl-canvas { position: absolute; z-index: 1; left: 50%; top: 50%; border: 0; pointer-events: none; opacity: 0; transition: opacity 0.42s ease;
   width: max(100cqw, 177.78cqh); height: max(100cqh, 56.25cqw); transform: translate(-50%, -50%) scale(var(--zoom, 1.18)); object-fit: cover; background: transparent; }
 .pl-fundo .pl-canvas.pronto { opacity: 1; }
+/* o clipe pelo YouTube (sem o download): mais zoom, para cortar o logotipo e o título nas bordas */
+.pl-fundo .pl-canvas-yt { --zoom: 1.4; }
 /* dois vídeos se cruzam: o próximo só ganha opacidade depois de ter o primeiro quadro decodificado */
 /* (o escurecido em cima e embaixo, para os textos, fica por cima do clipe também) */
 html.pp .pl-fundo::after { z-index: 2; }

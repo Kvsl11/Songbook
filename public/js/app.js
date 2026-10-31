@@ -21,10 +21,10 @@ import { NOVIDADES } from './lib/novidades.js';
 import { baseDoServidor, baixarArquivoDoServidor, cabecalhos, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, dataDaPergunta, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { apagarAudio, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } from './audios.js';
-import { escolherAudio, mesmaSincronia, paresPelaDuracao, paresPelasLetras, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
+import { escolherAudio, mesmaSincronia, paresPelaDuracao, paresPelaLegenda, paresPelasLetras, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
 import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { embaralharIndices, moverIndice } from './lib/fila.js';
-import { audioDbDoArtista, audioDoVideo, buscarYoutube, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { audioDbDoArtista, audioDoVideo, buscarYoutube, legendasDoVideo, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.31-367';
+export const APP_VERSAO = '2026.10.31-370';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1516,7 +1516,58 @@ const player = (() => {
       v.className = 'pl-canvas';
       return v;
     };
+    // Sem o download: o próprio clipe, andando, num player do YouTube mudo, sem controles e sem receber toques (escondido
+    // atrás da capa, com zoom para cortar as bordas). Ele só aparece depois de uns segundos tocando (o YouTube mostra o
+    // título no começo) e some ao pausar (ele mostraria os botões); toca do meio do clipe (evita abertura e créditos)
+    let yt = null; // { f (iframe), estado, tempo, em, duracao, visto }
+    const ytCmd = (func, args = []) => yt?.f.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+    const aoMsgYt = (e) => {
+      if (!yt || e.source !== yt.f.contentWindow) return;
+      try {
+        const info = (typeof e.data === 'string' ? JSON.parse(e.data) : e.data)?.info;
+        if (!info) return;
+        if (typeof info.playerState === 'number') {
+          yt.estado = info.playerState;
+          if (info.playerState === 1 && !yt.tocandoDesde) yt.tocandoDesde = performance.now();
+          if (info.playerState !== 1) { yt.tocandoDesde = 0; yt.f.classList.remove('pronto'); }
+          if (info.playerState === 0) { ytCmd('seekTo', [yt.inicio || 0, true]); ytCmd('playVideo'); }
+        }
+        if (typeof info.duration === 'number' && info.duration > 0 && !yt.duracao) {
+          yt.duracao = info.duration;
+          yt.inicio = info.duration > 40 ? Math.round(info.duration * 0.15) : 0;
+          yt.fim = info.duration > 40 ? Math.round(info.duration * 0.85) : info.duration - 0.5;
+          ytCmd('seekTo', [yt.inicio, true]);
+        }
+        if (typeof info.currentTime === 'number') yt.tempo = info.currentTime;
+      } catch { /* outra mensagem */ }
+    };
+    window.addEventListener('message', aoMsgYt);
+    const montarOnline = (id) => {
+      const p = new URLSearchParams({ autoplay: '1', mute: '1', controls: '0', disablekb: '1', fs: '0', iv_load_policy: '3', playsinline: '1', rel: '0', modestbranding: '1', enablejsapi: '1', loop: '1', playlist: id });
+      if (/^https?:/.test(location.origin)) p.set('origin', location.origin);
+      const f = document.createElement('iframe');
+      f.className = 'pl-canvas pl-canvas-yt';
+      f.src = `https://www.youtube.com/embed/${encodeURIComponent(id)}?${p}`;
+      f.allow = 'autoplay; encrypted-media';
+      f.tabIndex = -1;
+      f.title = '';
+      f.setAttribute('aria-hidden', 'true');
+      f.addEventListener('load', () => { f.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 3 }), '*'); ytCmd('mute'); });
+      yt = { f, estado: -1, tempo: 0, duracao: 0, tocandoDesde: 0 };
+      fundo.append(f);
+      relogio = setInterval(() => {
+        if (!yt || !atual) return;
+        const visivel = !fundo.hidden && !el.hidden && !el.classList.contains('letra-cheia') && fundo.getClientRects().length > 0;
+        const tocar = visivel && estado === 'tocando';
+        if (tocar && yt.estado !== 1 && yt.estado !== 3) { ytCmd('mute'); ytCmd('playVideo'); }
+        if (!tocar && yt.estado === 1) ytCmd('pauseVideo');
+        // (aparece depois de 2,5 s tocando: o título do YouTube já sumiu)
+        yt.f.classList.toggle('pronto', tocar && yt.estado === 1 && yt.tocandoDesde && performance.now() - yt.tocandoDesde > 2500);
+        if (yt.fim && yt.tempo >= yt.fim) { yt.tocandoDesde = 0; yt.f.classList.remove('pronto'); ytCmd('seekTo', [yt.inicio, true]); }
+      }, 300);
+    };
     const tirar = () => {
+      if (yt) { yt.f.remove(); yt = null; }
       clearInterval(relogio);
       relogio = 0;
       preparo++;
@@ -1609,7 +1660,7 @@ const player = (() => {
     return {
       async montar(q) {
         const quer = q && db.prefs().videoFundo !== false && !db.prefs().economiaDados ? q : '';
-        if (quer === de && (caixa?.isConnected || !quer)) return;
+        if (quer === de && (caixa?.isConnected || yt?.f.isConnected || !quer)) return;
         tirar();
         if (!quer) return;
         de = quer;
@@ -1648,6 +1699,8 @@ const player = (() => {
             }, { once: true });
           }
         }
+        // sem o download (com internet): o clipe andando pelo YouTube, mudo
+        if ((!caixa || !reserva) && navigator.onLine && /^[\w-]{11}$/.test(quer)) { montarOnline(quer); return; }
         if (!caixa || !reserva) { de = ''; return; }
         fundo.append(caixa, reserva);
         relogio = setInterval(acompanhar, 180);
@@ -1693,8 +1746,9 @@ const player = (() => {
     // (com as duas versões, os quadros são os do clipe: o áudio oficial é só a capa parada)
     // (só com o clipe baixado: a capa animada é o próprio arquivo, sem os botões que o player do YouTube mostrava por
     // cima ao pausar; sem o download, fica a capa da música, parada, como no Spotify sem Canvas)
-    const clipeBaixado = doYt && String(baixadoDe(doYt)?.tipo || '').startsWith('video');
-    const q = capa && !atual?.semVideo && clipeBaixado && db.prefs().videoFundo !== false ? doYt : '';
+    // (com o clipe baixado, passam trechos do próprio arquivo; sem o download, os quadros que o YouTube publica do
+    // clipe, passando com zoom lento: a capa animada funciona nas duas)
+    const q = capa && !atual?.semVideo && doYt && db.prefs().videoFundo !== false ? doYt : '';
     const barra = capaNaBarra();
     el.classList.toggle('capa-na-barra', barra);
     mini.style.backgroundImage = (capa || barra) && url ? `url("${url}")` : ''; // (com os quadros no fundo, o CSS a esconde)
@@ -2472,13 +2526,51 @@ const semLinhasDeAcordes = (sinc) => {
   };
   // o modo música (a capa) ou vídeo; com as duas versões, troca também o que toca, no mesmo ponto da música (e o
   // download só do áudio toca no modo música, no lugar do YouTube)
+  // Os pares de agora acertam o ponto? Casados pelo som ou pelas letras, sim; só a estimativa pela duração, só quando
+  // as duas têm quase a mesma duração (a diferença como introdução erra muito nos clipes longos, como Speed Demon)
+  const paresConfiaveis = () => {
+    const s = musicaTocando();
+    const vs = s && versoesDe(s);
+    if (!vs || vs.casadas || vs.porLetra || vs.diferentes) return true;
+    return (vs.pares || []).every(([a, v]) => Math.abs(v - a) <= 2);
+  };
+  let alinhando = 0;
+  let ultimaTroca = null; // { para: 'video' | 'audio', t (o ponto de onde saiu), em } (para acertar se o casamento chegar)
   const mudarModo = () => {
     if (atual?.soMusica) return; // (só música: não há outro vídeo da mesma gravação)
+    if (alinhando) return; // (esperando o casamento: o segundo toque não troca de novo)
+    // só a estimativa: espera o casamento pelo som (já começou ao abrir a música) por alguns segundos, com o botão
+    // mostrando que está acertando; chegando, troca no ponto certo; senão, troca pela estimativa e acerta quando chegar
+    const s = musicaTocando();
+    if (atual?.audio && atual.video && !atual.semVideo && s && !paresConfiaveis()) {
+      const minha = ++alinhando;
+      el.classList.add('alinhando-versoes');
+      const bt = $('.pl-troca', el);
+      if (bt) porHtml(bt, '<span class="spin"></span><span>Acertando a posição…</span>');
+      noMaximo(acertarVersoes(s, null, { pedido: true }), 9000).then(() => {
+        if (minha !== alinhando) return;
+        alinhando = 0;
+        el.classList.remove('alinhando-versoes');
+        mudarModoAgora();
+      });
+      return;
+    }
+    mudarModoAgora();
+  };
+  const mudarModoAgora = () => {
+    if (atual?.soMusica) return;
     comCapa = !comCapa;
     db.setPref('playerCapa', comCapa);
     if (atual?.audio && atual.video && !atual.semVideo) {
-      if (comCapa && atual.youtube === atual.video && atual.youtube !== atual.audio) trocarVersao(atual.audio, tempoNoAudio(atual.pares, api.tempoAgora));
-      else if (!comCapa && atual.youtube === atual.audio && atual.youtube !== atual.video) { trocarVersao(atual.video, tempoNoVideo(atual.pares, api.tempoAgora)); foiProClipe = performance.now(); }
+      const confiavel = paresConfiaveis();
+      if (comCapa && atual.youtube === atual.video && atual.youtube !== atual.audio) {
+        ultimaTroca = confiavel ? null : { para: 'audio', t: api.tempoAgora, em: performance.now() };
+        trocarVersao(atual.audio, tempoNoAudio(atual.pares, api.tempoAgora));
+      } else if (!comCapa && atual.youtube === atual.audio && atual.youtube !== atual.video) {
+        ultimaTroca = confiavel ? null : { para: 'video', t: api.tempoAgora, em: performance.now() };
+        trocarVersao(atual.video, tempoNoVideo(atual.pares, api.tempoAgora));
+        foiProClipe = performance.now();
+      }
       // ainda sem as duas casadas pelo som (só a estimativa pela duração, que erra nos clipes com cena antes e depois
       // da música, como Espresso ou Speed Demon): a comparação sonora local é refeita; quando terminar, o clipe vai
       // sozinho para o ponto certo (veja versoes)
@@ -2559,6 +2651,8 @@ const semLinhasDeAcordes = (sinc) => {
     // modo do Tocando agora: o vídeo ou a música (a capa); o ⋯ das listas troca
     get modoMusica() { return comCapa; },
     trocarModo: () => mudarModo(),
+    // a música que abre (da busca, da biblioteca…) começa na versão da música (a capa e o áudio oficial), não no vídeo
+    paraModoMusica() { if (!comCapa) { comCapa = true; db.setPref('playerCapa', true); desenharCapa(); } },
     // a música tocando foi baixada (ou o download saiu), ou a internet caiu ou voltou: passa a tocar do aparelho ou do
     // YouTube, no mesmo ponto
     reavaliarFonte() {
@@ -2594,7 +2688,6 @@ const semLinhasDeAcordes = (sinc) => {
         return;
       }
       if (!(atual.songId === song.id || desta(vs.video))) return;
-      const antes = atual.pares;
       const audioAntes = atual.audio;
       atual = { ...atual, video: vs.video, audio: vs.audio, pares: vs.pares, soMusica: Boolean(vs.diferentes) };
       // (o vídeo é outra gravação: fica só a música, mesmo no modo vídeo)
@@ -2602,11 +2695,14 @@ const semLinhasDeAcordes = (sinc) => {
       // (outra versão só música no lugar da que tocava: a mesma gravação, no mesmo ponto)
       if (audioAntes && audioAntes !== vs.audio && atual.youtube === audioAntes) trocarVersao(vs.audio, api.tempoAgora);
       else if (comCapa && atual.youtube === vs.video && atual.youtube !== vs.audio) trocarVersao(vs.audio, tempoNoAudio(vs.pares, api.tempoAgora));
-      else if (!comCapa && estado === 'tocando' && atual.youtube === vs.video && (vs.casadas || vs.porLetra) && antes && performance.now() - foiProClipe < 90e3) {
-        // acabou de trocar para o clipe pela estimativa e chegou o casamento pelo som: o clipe vai para o mesmo ponto
-        // cantado (o ponto do áudio pela estimativa de antes, no clipe pelo casamento novo)
-        const certo = tempoNoVideo(vs.pares, tempoNoAudio(antes, api.tempoAgora));
-        if (Math.abs(certo - api.tempoAgora) > 1) api.irPara(certo); else desenhar();
+      else if ((vs.casadas || vs.porLetra) && ultimaTroca && estado === 'tocando' && performance.now() - ultimaTroca.em < 180e3) {
+        // trocou pela estimativa e chegou o casamento: vai para o mesmo ponto cantado, a partir do ponto de onde saiu
+        // (de verdade, na versão de antes) mais o tempo que passou. Antes ele partia do ponto já errado da estimativa
+        const passou = (performance.now() - ultimaTroca.em) / 1000;
+        const certo = ultimaTroca.para === 'video' && atual.youtube === vs.video ? tempoNoVideo(vs.pares, ultimaTroca.t + passou)
+          : ultimaTroca.para === 'audio' && atual.youtube === vs.audio ? tempoNoAudio(vs.pares, ultimaTroca.t + passou) : null;
+        ultimaTroca = null;
+        if (certo !== null && Math.abs(certo - api.tempoAgora) > 1) api.irPara(certo); else desenhar();
       } else desenhar();
     },
     irPara(seg) {
@@ -4728,7 +4824,17 @@ async function abrirPrevia(content, source, back, videoJa = null) {
     }
     return r;
   });
-  await Promise.all([noMaximo(preparo, 9000, 'demorou'), noMaximo(buscaCapaDaPrevia, 2500, '').then(aplicarCapaDaPrevia)]);
+  // Enquanto carrega, também as duas versões (o áudio oficial e o clipe) e onde cada trecho cantado está em cada uma
+  // (o casamento pelo som), para a troca entre música e vídeo já ir ao ponto certo desde o primeiro toque. Com limite:
+  // passando dele, a música abre e o resto termina em segundo plano
+  const versoesProntas = (async () => {
+    if (!novo.youtube) return;
+    await descobrirVersoes(novo).catch(() => null);
+    if (preview !== novo) return;
+    const vs = versoesDe(preview);
+    if (vs?.audio && vs.video && !vs.casadas && !vs.diferentes) await acertarVersoes(preview);
+  })().catch(() => null);
+  await Promise.all([noMaximo(preparo, 9000, 'demorou'), noMaximo(versoesProntas, 20000, null), noMaximo(buscaCapaDaPrevia, 2500, '').then(aplicarCapaDaPrevia)]);
   if (preview !== novo) return;
   if (jaNaPrevia) route(); else location.hash = '#/musica/previa';
 }
@@ -9206,6 +9312,8 @@ function viewSong(id, ctx = {}) {
   // a cifra que chega depois, a cifra completada…). Com vídeo: tocando, se veio de uma lista, ou pausado; sem vídeo, a
   // capa e o botão de escolher um. O vídeo que chega depois (a busca demorou) passa a tocar
   if (!document.body.classList.contains('performance')) {
+    // (outra música abrindo: na versão da música, antes de montar o que vai tocar)
+    if (midiaDe(song) && !player.desta(midiaDe(song))) player.paraModoMusica();
     const item = itemDoPlayer(song, ctx.set ? db.set(ctx.set.id) : null, ctx.set ? ctx.index : -1);
     const semVideoDesta = player.atual?.semVideo && player.atual.songId === song.id;
     if (!midiaDe(song)) { if (!semVideoDesta) player.mostrarSemVideo(item); }
@@ -10725,7 +10833,7 @@ function viewSettings(topico) {
       <div class="setting wrap"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
       ${chave('diagramas', 'grid', 'Desenho dos acordes', 'Como montar cada acorde no violão', p.diagramas)}
-      ${chave('video-fundo', 'video', 'Capa animada', 'Nas músicas baixadas com o vídeo, trechos do clipe passam atrás da música, sem som, como o Canvas do Spotify', p.videoFundo !== false)}
+      ${chave('video-fundo', 'video', 'Capa animada', 'Trechos do clipe passam atrás da música, sem som, como o Canvas do Spotify (nas músicas baixadas, o próprio vídeo)', p.videoFundo !== false)}
     </div>`)}
 
     ${secao('Downloads e dados', `
@@ -11497,14 +11605,24 @@ function guardarVersoes(song, versoes) {
 const casandoVersoes = new Set();
 const casamentoFalhou = new Set();
 const CASAMENTO = 3;
-async function acertarVersoes(song, _sincronia = null, { pedido = false } = {}) {
+// (o casamento em andamento de cada clipe: quem pede de novo espera o mesmo, em vez de sair sem nada)
+const casandoPromessas = new Map();
+function acertarVersoes(song, _sincronia = null, { pedido = false } = {}) {
   const vs = versoesDe(song);
   const chave = vs?.audio && vs?.video ? `${vs.audio}|${vs.video}` : '';
+  if (vs?.video && casandoVersoes.has(vs.video)) return casandoPromessas.get(vs.video) || Promise.resolve();
   if (!vs?.audio || !vs.video || (vs.casadas || vs.diferentes) && (vs.casamento || 1) >= CASAMENTO
-    || casandoVersoes.has(vs.video) || (!pedido && casamentoFalhou.has(chave))) return;
+    || (!pedido && casamentoFalhou.has(chave))) return Promise.resolve();
   // Uma troca explícita de modo é uma nova oportunidade: falhas de leitura/download podem ter sido temporárias.
   if (pedido) casamentoFalhou.delete(chave);
   casandoVersoes.add(vs.video);
+  const tarefa = casarVersoesAgora(song, vs).finally(() => { casandoVersoes.delete(vs.video); casandoPromessas.delete(vs.video); });
+  casandoPromessas.set(vs.video, tarefa);
+  return tarefa;
+}
+// as duas versões estão no aparelho (baixadas, ou o áudio da pessoa e o clipe baixado)?
+const noAparelho = (id) => ehArquivo(id) || String(baixadoDe(id)?.tipo || '') !== '';
+async function casarVersoesAgora(song, vs) {
   try {
     // Enquanto o som é comparado (precisa do áudio das duas; sem o download, pela internet, e pode nem vir), uma
     // estimativa boa e rápida pelas letras sincronizadas das duas versões no LRCLIB: muito melhor que a da duração
@@ -11512,12 +11630,24 @@ async function acertarVersoes(song, _sincronia = null, { pedido = false } = {}) 
     void pLetras.then((pl) => {
       const ag = song.id === 'previa' ? preview : db.song(song.id);
       const v2 = ag && versoesDe(ag);
-      if (pl?.length && v2?.video === vs.video && v2.audio === vs.audio && !v2.casadas) guardarVersoes(ag, { ...v2, pares: pl, porLetra: true });
+      if (pl?.length && v2?.video === vs.video && v2.audio === vs.audio && !v2.casadas && !v2.porLegenda) guardarVersoes(ag, { ...v2, pares: pl, porLetra: true });
     });
-    let r = await casarNoAparelho(vs.audio, vs.video).catch(() => null);
-    // sem o som no aparelho: o servidor (quando a pessoa tem um) baixa e compara os dois
-    if (!r && pedido && !ehArquivo(vs.audio)) r = await casarNoServidor(vs.audio, vs.video);
-    if (!r) await pLetras;
+    // e pelas legendas do clipe (as automáticas do YouTube) com a letra sincronizada do áudio: sem servidor e sem
+    // baixar o som, acerta o ponto de cada trecho cantado (erro de menos de 1 s), até com introdução longa
+    const pLegendas = !vs.casadas && !ehArquivo(vs.audio) ? casarPelaLegenda(song, vs).catch(() => null) : Promise.resolve(null);
+    void pLegendas.then((pl) => {
+      const ag = song.id === 'previa' ? preview : db.song(song.id);
+      const v2 = ag && versoesDe(ag);
+      if (pl?.length && v2?.video === vs.video && v2.audio === vs.audio && !v2.casadas) guardarVersoes(ag, { ...v2, pares: pl, porLetra: true, porLegenda: true });
+    });
+    // Pelo som, que é o certo (até nos clipes com introdução longa ou cenas no meio, como Speed Demon): com as duas no
+    // aparelho, aqui mesmo; sem elas, o servidor baixa e compara as duas (antes só tentava o aparelho, que dependia
+    // do Piped para pegar o áudio e quase nunca conseguia, e o servidor só entrava depois de trocar de versão)
+    const locais = noAparelho(vs.audio) && noAparelho(vs.video);
+    let r = locais ? await casarNoAparelho(vs.audio, vs.video).catch(() => null) : null;
+    if (!r && !ehArquivo(vs.audio)) r = await casarNoServidor(vs.audio, vs.video);
+    if (!r && !locais) r = await casarNoAparelho(vs.audio, vs.video).catch(() => null);
+    if (!r) await Promise.all([pLetras, pLegendas]);
     const pares = r?.pares;
     const agora = song.id === 'previa' ? preview : db.song(song.id);
     if (r?.mesma === false) {
@@ -11538,7 +11668,7 @@ async function acertarVersoes(song, _sincronia = null, { pedido = false } = {}) 
         player.versoes(db.song(agora.id));
       } else guardarVersoes(agora, { ...versoesDe(agora), pares, casadas: true, casamento: CASAMENTO });
     } else casamentoFalhou.add(`${vs.audio}|${vs.video}`);
-  } finally { casandoVersoes.delete(vs.video); }
+  } catch { /* fica a estimativa */ }
 }
 // as amostras (mono, na taxa do casamento) de um vídeo do YouTube ou do áudio da pessoa
 async function amostrasDe(id) {
@@ -11620,11 +11750,24 @@ function casarPelasLetras(song, vs) {
   }
   return letrasCasadas.get(chave);
 }
+// as legendas do clipe casadas com a letra sincronizada do áudio oficial (que pode chegar um pouco depois: espera)
+async function casarPelaLegenda(song, vs) {
+  const pCues = legendasDoVideo(vs.video);
+  let doAudio = null;
+  for (let i = 0; i < 40 && !doAudio; i++) {
+    const s = song.id === 'previa' ? preview : db.song(song.id);
+    const sinc = s?.sincronia;
+    if (sinc?.fonte === 'lrclib' && sinc.video === vs.audio && sinc.tempos?.length) doAudio = sinc;
+    else await new Promise((ok) => setTimeout(ok, 500));
+  }
+  const cues = await pCues;
+  return doAudio && cues.length ? paresPelaLegenda(doAudio, cues) : null;
+}
 const duracoesConhecidas = (yt) => player.duracaoDe?.(yt) || 0;
 // O casamento pelo som feito no servidor (o mesmo método; ele baixa os dois áudios), quando a pessoa tem um ligado.
 // null se não houver servidor ou ele não conseguir
 async function casarNoServidor(audioId, videoId) {
-  if (!/^[\w-]{11}$/.test(audioId || '') || !/^[\w-]{11}$/.test(videoId || '') || db.prefs().economiaDados) return null;
+  if (!/^[\w-]{11}$/.test(audioId || '') || !/^[\w-]{11}$/.test(videoId || '') || db.prefs().economiaDados || !navigator.onLine) return null;
   const cfg = await carregarServidor().catch(() => null);
   if (!cfg?.url) return null;
   try {

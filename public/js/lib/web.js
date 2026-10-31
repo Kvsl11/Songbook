@@ -702,7 +702,74 @@ export async function audioDoVideo(id, { fetchImpl, instancias = PIPED } = {}) {
       } catch { /* tenta outra faixa ou instância */ }
     }
   }
+  // nenhum Piped entregou: o Invidious (outro front-end aberto do YouTube), que entrega o áudio pelo proxy dele
+  return audioPeloInvidious(id, { fetchImpl });
+}
+
+// Instâncias públicas do Invidious (com CORS): a reserva do Piped para o áudio e as legendas dos vídeos
+export const INVIDIOUS = ['https://inv.nadeko.net', 'https://invidious.nerdvpn.de', 'https://yewtu.be', 'https://invidious.privacyredirect.com', 'https://iv.melmac.space', 'https://invidious.f5.si'];
+// o áudio de menor qualidade (basta para casar as versões): itag 249/250 (opus) ou 139/140 (m4a), pelo proxy da instância
+export async function audioPeloInvidious(id, { fetchImpl, instancias = INVIDIOUS } = {}) {
+  if (!/^[\w-]{11}$/.test(id || '')) return null;
+  // (a primeira instância que responde à página do vídeo é a que entrega o áudio)
+  const viva = await Promise.any(instancias.map(async (base) => {
+    const r = await buscar(`${base}/api/v1/videos/${id}?fields=lengthSeconds`, { fetchImpl, timeout: 10000 });
+    if (!r.ok) throw new Error(String(r.status));
+    return base;
+  })).catch(() => null);
+  const ordem = viva ? [viva, ...instancias.filter((b) => b !== viva)] : [];
+  for (const base of ordem.slice(0, 3)) {
+    for (const itag of [249, 250, 139, 251, 140]) {
+      try {
+        const r = await buscar(`${base}/latest_version?id=${id}&itag=${itag}&local=true`, { fetchImpl, timeout: 90000 });
+        if (!r.ok) continue;
+        const blob = await r.blob();
+        if (blob.size > 10000) return blob;
+      } catch { /* outro formato ou instância */ }
+    }
+  }
   return null;
+}
+
+// As legendas de um vídeo (as automáticas do YouTube também), pelo Invidious: [{ inicio, fim, texto }] ou [].
+// Nos clipes, as automáticas trazem o que se canta com o tempo de cada trecho: casadas com a letra sincronizada do
+// áudio oficial, dizem onde cada trecho cantado está no clipe, sem baixar o som
+export function lerVtt(vtt) {
+  const cues = [];
+  const tempo = (t) => { const p = t.trim().split(':').map(Number); return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p[0] * 60 + p[1]; };
+  for (const bloco of String(vtt || '').replace(/\r/g, '').split(/\n\n+/)) {
+    const linhas = bloco.split('\n');
+    const i = linhas.findIndex((l) => /-->/.test(l));
+    if (i < 0) continue;
+    const [a, b] = linhas[i].split('-->');
+    const texto = linhas.slice(i + 1).join(' ').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+    if (!texto || /^\[[^\]]*\]$/.test(texto)) continue;
+    const inicio = tempo(a);
+    const fim = tempo(b.split(' ').filter(Boolean)[0]);
+    if (Number.isFinite(inicio)) cues.push({ inicio, fim: Number.isFinite(fim) ? fim : inicio + 2, texto });
+  }
+  // (as automáticas repetem a linha de antes ao rolar: fica o texto novo de cada uma)
+  return cues.filter((c, k) => !k || c.texto !== cues[k - 1].texto);
+}
+export async function legendasDoVideo(id, { fetchImpl, instancias = INVIDIOUS, idioma = '' } = {}) {
+  if (!/^[\w-]{11}$/.test(id || '')) return [];
+  try {
+    return await Promise.any(instancias.map(async (base) => {
+      const r = await buscar(`${base}/api/v1/captions/${id}`, { fetchImpl, timeout: 10000 });
+      if (!r.ok) throw new Error(String(r.status));
+      const lista = (await r.json())?.captions || [];
+      if (!lista.length) throw new Error('sem legendas');
+      const doIdioma = lista.filter((c) => !idioma || String(c.language_code || c.languageCode || '').startsWith(idioma));
+      // (a automática primeiro: ela está no idioma em que se canta; uma escrita à mão pode ser a tradução)
+      const escolha = lista.find((c) => /auto/i.test(c.label)) || doIdioma[0] || lista[0];
+      const url = /^https?:/.test(escolha.url) ? escolha.url : base + escolha.url;
+      const v = await buscar(url, { fetchImpl, timeout: 15000 });
+      if (!v.ok) throw new Error(String(v.status));
+      const cues = lerVtt(await v.text());
+      if (cues.length < 4) throw new Error('legenda vazia');
+      return cues;
+    }));
+  } catch { return []; }
 }
 
 // confere um link colado (título e canal), sem login, pelo oEmbed do YouTube
