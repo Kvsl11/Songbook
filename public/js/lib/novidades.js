@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 362, data: '2026-10-30', titulo: 'Letra sincronizada e foto do artista preservadas',
+    itens: [
+      { tipo: 'correcao', texto: 'A letra sincronizada agora continua vinculada à faixa de áudio correta ao salvar e reabrir a música, mesmo quando o videoclipe é diferente. A foto do artista também é guardada na biblioteca e reaparece nas próximas visitas, inclusive sem internet quando já foi carregada.' },
+    ],
+  },
+  {
     versao: 361, data: '2026-10-30', titulo: 'Troca independente da música e do vídeo',
     itens: [
       { tipo: 'melhoria', texto: 'No modo música, a busca substitui somente a faixa de áudio; no modo vídeo, substitui somente o clipe. As duas versões ficam separadas e a escolha não sobrescreve a outra.' },
@@ -58,12 +64,6 @@ export const NOVIDADES = [
     versao: 353, data: '2026-10-30', titulo: 'Sincronia LRCLIB recupera a gravação correta',
     itens: [
       { tipo: 'correcao', texto: 'Quando o LRCLIB encontra a letra sincronizada, o Songbook agora refaz a busca do áudio pela duração exata da gravação, mesmo que já tenha associado outra versão antes. As consultas ao LRCLIB também são sequenciais para evitar bloqueios temporários.' },
-    ],
-  },
-  {
-    versao: 352, data: '2026-10-30', titulo: 'Download de áudio e videoclipe sem cortes',
-    itens: [
-      { tipo: 'correcao', texto: 'Com “Áudio e vídeo” ativado, o Songbook mantém o videoclipe mesmo quando ele é uma gravação diferente do áudio oficial. Se um dos arquivos falhar, o download fica parcial e informa qual arquivo faltou, permitindo completar depois.' },
     ],
   },
 
