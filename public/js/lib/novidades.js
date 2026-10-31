@@ -4,6 +4,15 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 371, data: '2026-10-31', titulo: 'Música toca de novo ao abrir e troca na hora',
+    itens: [
+      { tipo: 'correcao', texto: 'A música aberta pela busca volta a tocar: a abertura esperava demais (até 20 s) e o navegador não deixava mais começar sozinha. Agora ela abre em poucos segundos e o resto chega já tocando.' },
+      { tipo: 'correcao', texto: 'Trocar entre música e vídeo é sempre na hora, sem o “Acertando a posição…”; quando o ponto certo é descoberto depois, ele é corrigido sozinho.' },
+      { tipo: 'correcao', texto: 'A letra sincronizada tem uma reserva: o LRCLIB está fora do ar, e a letra vem da NetEase (em ~2 s). O app também percebe logo quando o LRCLIB cai, em vez de insistir por 30 s.' },
+      { tipo: 'correcao', texto: 'Sem o download, a capa animada volta a ser os quadros do clipe passando: o clipe tocando junto pelo YouTube atrapalhava o player.' },
+    ],
+  },
+  {
     versao: 370, data: '2026-10-31', titulo: 'Capa animada andando e troca certa sem o servidor',
     itens: [
       { tipo: 'melhoria', texto: 'A capa animada mostra o clipe andando de verdade também nas músicas não baixadas (mudo, sem os botões do YouTube), e não mais imagens paradas.' },
@@ -65,12 +74,6 @@ export const NOVIDADES = [
     versao: 362, data: '2026-10-30', titulo: 'Letra sincronizada e foto do artista preservadas',
     itens: [
       { tipo: 'correcao', texto: 'A letra sincronizada agora continua vinculada à faixa de áudio correta ao salvar e reabrir a música, mesmo quando o videoclipe é diferente. A foto do artista também é guardada na biblioteca e reaparece nas próximas visitas, inclusive sem internet quando já foi carregada.' },
-    ],
-  },
-  {
-    versao: 361, data: '2026-10-30', titulo: 'Troca independente da música e do vídeo',
-    itens: [
-      { tipo: 'melhoria', texto: 'No modo música, a busca substitui somente a faixa de áudio; no modo vídeo, substitui somente o clipe. As duas versões ficam separadas e a escolha não sobrescreve a outra.' },
     ],
   },
 ];

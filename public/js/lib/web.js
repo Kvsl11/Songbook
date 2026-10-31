@@ -491,9 +491,18 @@ export async function letraSincronizada(
   if (!t) return null;
   let respondeu = false;
   const pedir = async (params) => {
+    // (o LRCLIB caiu há pouco — a API dele responde 502 quando o servidor de trás está fora —: nem tenta, vai direto à
+    // reserva, em vez de esperar ~30 s de tentativas a cada música)
+    if (Date.now() < lrclibForaAte) throw new Error('LRCLIB fora do ar');
     for (let vez = 0; vez < tentativas; vez++) {
       try {
         const res = await buscar(`https://lrclib.net/api/search?${params}`, { fetchImpl, timeout });
+        if (res.status === 502 || res.status === 521 || res.status === 522) {
+          // (fora do ar, não ocupado: uma segunda tentativa e, falhando de novo, desiste por 2 minutos)
+          if (vez >= 1) { lrclibForaAte = Date.now() + 120e3; throw new Error('LRCLIB fora do ar'); }
+          await new Promise((ok) => setTimeout(ok, Math.min(espera, 800)));
+          continue;
+        }
         if (res.ok) {
           const j = await res.json();
           respondeu = true;
@@ -501,7 +510,7 @@ export async function letraSincronizada(
         }
         if (![429, 500, 502, 503, 504].includes(res.status)) throw new Error(`LRCLIB respondeu ${res.status}`);
       } catch (e) {
-        if (/LRCLIB respondeu/.test(e.message) || vez + 1 >= tentativas) throw e;
+        if (/LRCLIB respondeu|fora do ar/.test(e.message) || vez + 1 >= tentativas) throw e;
       }
       if (vez + 1 < tentativas) await new Promise((ok) => setTimeout(ok, espera * (vez + 1)));
     }
@@ -527,6 +536,7 @@ export async function letraSincronizada(
   let parecidas = [];
   for (let i = 0; i < consultas.length; i++) {
     const lista = await pedir(consultas[i]).catch(() => null);
+    if (Date.now() < lrclibForaAte) break; // (caiu: as outras consultas também falhariam)
     if (Array.isArray(lista)) {
       mesmas = lista.filter(corresponde);
       if (!parecidas.length) parecidas = lista.filter(parecida);
@@ -536,6 +546,7 @@ export async function letraSincronizada(
   }
   if (!mesmas.length) mesmas = parecidas;
   if (mesmas.length) {
+    lrclibForaAte = 0;
     // preferirDuracao: sem o áudio oficial no YouTube, a letra feita para esta duração (a do clipe), se houver
     const naDuracao = preferirDuracao && duracao > 0 ? mesmas.filter((r) => r.duration > 0 && Math.abs(r.duration - duracao) <= 3) : [];
     const oficial = gravacaoOficial(naDuracao.length ? naDuracao : mesmas, duracao);
@@ -543,7 +554,61 @@ export async function letraSincronizada(
     const sinc = sincroniaDoLrc(oficial.syncedLyrics, oficial.duration || duracao);
     if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: oficial.id, duracao: oficial.duration || 0, ...(bate ? {} : { ajustar: true }) };
   }
+  // sem a letra no LRCLIB (ou ele fora do ar): a da NetEase, que tem a letra sincronizada de muitas músicas
+  const reserva = await letraSincronizadaNetease({ titulo: t, artista: a, duracao }, fetchImpl, { preferirDuracao }).catch(() => null);
+  if (reserva) return reserva;
   if (!respondeu) throw new Error('O LRCLIB não respondeu agora');
+  return null;
+}
+let lrclibForaAte = 0;
+
+// ------------------------------------------------------------------ letra sincronizada de reserva (NetEase)
+// A NetEase Cloud Music tem a letra sincronizada (LRC) de muitas músicas, também das ocidentais. A API dela não libera
+// CORS: no navegador, vai pelos mesmos serviços públicos que abrem o Cifra Club. Só vale a mesma música (título e
+// artista) e, sabendo a duração, a da mesma gravação
+const NETEASE = 'https://music.163.com/api';
+const PROXIES_JSON = ['https://api.allorigins.win/raw?url={url}', 'https://api.codetabs.com/v1/proxy/?quest={url}', 'https://r.jina.ai/{raw}'];
+async function jsonSemCors(url, { fetchImpl, proxies = PROXIES_JSON } = {}) {
+  const tentativas = [...(NO_NAVEGADOR ? [] : [[url, {}]]), ...proxies.map((p) => [viaProxy(p, url), /r\.jina\.ai/.test(p) ? { 'X-Return-Format': 'text' } : {}])];
+  for (const [alvo, headers] of tentativas) {
+    try {
+      const res = await buscar(alvo, { fetchImpl, timeout: 15000, headers });
+      if (!res.ok) continue;
+      return lerJsonp(await res.text());
+    } catch { /* o próximo */ }
+  }
+  return null;
+}
+// as linhas de créditos que a NetEase põe no começo ("作词 : …", "作曲 : …") e o título/artista falados no começo
+const CREDITO = /[\u4e00-\u9fff]|^\s*(lyrics?|composed|written|producer|produced|arranged)\s*(by)?\s*[:：]/i;
+export function lrcSemCreditos(lrc, { titulo = '', artista = '' } = {}) {
+  const nada = new Set([normalize(titulo), normalize(artista)].filter(Boolean));
+  return String(lrc || '').split(/\r?\n/).filter((l) => {
+    const texto = l.replace(/\[[^\]]*\]/g, '').trim();
+    return !(texto && (CREDITO.test(texto) || nada.has(normalize(texto))));
+  }).join('\n');
+}
+export async function letraSincronizadaNetease({ titulo = '', artista = '', duracao = 0 } = {}, fetchImpl, { preferirDuracao = false } = {}) {
+  const t = String(titulo || '').trim();
+  const a = String(artista || '').trim();
+  if (!t) return null;
+  const busca = await jsonSemCors(`${NETEASE}/search/get?s=${encodeURIComponent(`${t} ${a}`.trim())}&type=1&limit=15`, { fetchImpl });
+  const versao = (n) => /\b(remix|live|ao vivo|ac[uú]stic|acoustic|instrumental|karaoke|cover|sped up|slowed|version|vers[aã]o|mix)\b/i.test(n || '');
+  const candidatas = (busca?.result?.songs || [])
+    .filter((x) => mesmoTituloSinc(x.name, t) && (!a || mesmoArtistaSinc((x.artists || []).map((y) => y.name).join(', '), a)) && (versao(t) || !versao(x.name)))
+    .map((x) => ({ id: x.id, duracao: Math.round((x.duration || 0) / 100) / 10 }));
+  if (!candidatas.length) return null;
+  // (com a duração conhecida, a da mesma gravação primeiro)
+  if (duracao > 0) candidatas.sort((x, y) => Math.abs(x.duracao - duracao) - Math.abs(y.duracao - duracao));
+  for (const c of candidatas.slice(0, 3)) {
+    const j = await jsonSemCors(`${NETEASE}/song/lyric?id=${c.id}&lv=1`, { fetchImpl });
+    const lrc = lrcSemCreditos(j?.lrc?.lyric || '', { titulo: t, artista: a });
+    const sinc = sincroniaDoLrc(lrc, c.duracao || duracao);
+    if (sinc.linhas.length < 4) continue;
+    const bate = !(duracao > 0) || !(c.duracao > 0) || Math.abs(c.duracao - duracao) <= 4;
+    if (!bate && preferirDuracao) continue;
+    return { ...sinc, fonte: 'netease', id: `ne:${c.id}`, duracao: c.duracao || 0, ...(bate ? {} : { ajustar: true }) };
+  }
   return null;
 }
 // A gravação oficial entre as letras da mesma música no LRCLIB: a duração que mais aparece (até 2 s de diferença; as
@@ -594,7 +659,8 @@ export function letraParaChordPro({ titulo = '', artista = '', letra = '', fonte
 // ------------------------------------------------------------------ YouTube
 // Busca de vídeos sem chave e sem login, por instâncias públicas do Piped (front-end aberto do
 // YouTube, com CORS). Se uma estiver fora do ar, tenta a próxima.
-export const PIPED = ['https://api.piped.private.coffee', 'https://pipedapi.kavin.rocks', 'https://pipedapi.adminforge.de', 'https://pipedapi.leptons.xyz'];
+// (conferido em 31/10/2026: só o ducks.party e o private.coffee respondiam; os outros ficam para quando voltarem)
+export const PIPED = ['https://pipedapi.ducks.party', 'https://api.piped.private.coffee', 'https://pipedapi.kavin.rocks', 'https://pipedapi.adminforge.de', 'https://pipedapi.leptons.xyz'];
 
 export function videosDoPiped(json) {
   return (json?.items || [])

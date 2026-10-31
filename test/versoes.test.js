@@ -186,7 +186,7 @@ test('ao abrir uma música, o LRCLIB é consultado na hora, sem esperar o áudio
   const rota = app.indexOf("if (jaNaPrevia) route(); else location.hash = '#/musica/previa';", abrir);
   const preparo = app.indexOf('const preparo = prepararMusicaAoAbrir(novo)', abrir);
   assert.ok(preparo > abrir && preparo < rota, 'a tela só navega depois de iniciar o preparo da música');
-  assert.match(app, /noMaximo\(preparo, 9000, 'demorou'\)/, 'espera o LRCLIB, mas uma demora não impede a música de abrir');
+  assert.match(app, /noMaximo\(preparo, 3500, 'demorou'\)/, 'espera pouco: depois de uns segundos o navegador não deixa mais a música começar sozinha');
   const helper = app.slice(app.indexOf('function prepararMusicaAoAbrir(song)'), app.indexOf('// o áudio oficial da gravação'));
   assert.match(helper, /descobrirVersoes\(song\)/);
   assert.match(helper, /sincronizarMusica\(song, \{ audioPromise \}\)/);
@@ -299,18 +299,18 @@ test('os pares pelas letras sincronizadas do áudio e do clipe (com cena antes e
   assert.equal(paresPelasLetras(doAudio, { linhas: ['outra', 'letra', 'nada', 'igual'], tempos: tv.slice(0, 4) }), null);
 });
 
-test('versões: o servidor casa pelo som já ao abrir, e a troca só pela estimativa espera o casamento', async () => {
+test('versões: o servidor casa pelo som já ao abrir, e a troca é sempre na hora', async () => {
   const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
   const casar = app.slice(app.indexOf('async function casarVersoesAgora('), app.indexOf('// as amostras (mono, na taxa do casamento)'));
   // sem as duas no aparelho, o servidor vem antes (não depende mais de trocar de versão)
   assert.ok(casar.indexOf('casarNoServidor(') >= 0 && !/pedido && !ehArquivo/.test(casar));
   assert.match(app, /if \(vs\?\.video && casandoVersoes\.has\(vs\.video\)\) return casandoPromessas\.get\(vs\.video\)/);
-  // a troca com só a estimativa espera (com limite) e, se trocar antes, acerta a partir do ponto de onde saiu
-  assert.match(app, /noMaximo\(acertarVersoes\(s, null, \{ pedido: true \}\), 9000\)/);
+  // a troca não espera o casamento; chegando depois, acerta a partir do ponto de onde saiu
+  assert.doesNotMatch(app, /Acertando a posição/);
   assert.match(app, /tempoNoVideo\(vs\.pares, ultimaTroca\.t \+ passou\)/);
   assert.match(app, /tempoNoAudio\(vs\.pares, ultimaTroca\.t \+ passou\)/);
-  // a prévia da busca espera também as versões e o casamento (com limite) antes de abrir
-  assert.match(app, /noMaximo\(versoesProntas, 20000, null\)/);
+  // a prévia espera pouco pelas versões (para ainda poder começar a tocar sozinha)
+  assert.match(app, /noMaximo\(versoesProntas, 3500, null\)/);
 });
 
 test('os pares pelas legendas automáticas do clipe (Speed Demon: introdução longa e palavras erradas)', async () => {
