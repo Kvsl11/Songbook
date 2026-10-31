@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-360';
+export const APP_VERSAO = '2026.10.30-361';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1132,7 +1132,7 @@ function escolherVideo(song, tipo = 'video') {
       <span class="input-btn"><input class="input" id="yt-link" placeholder="https://www.youtube.com/watch?v=…" value="${esc(atualId && !ehArquivo(atualId) ? 'https://www.youtube.com/watch?v=' + atualId : '')}"><button class="btn small" type="button" data-colar>Colar</button><button class="btn small primary" type="button" data-ok>Usar</button></span>
       <p class="muted" id="yt-info" style="margin:6px 0 0;font-size:13px"></p>
       <a class="link-btn" id="yt-abrir" href="${esc(ytBusca(termo))}" target="_blank" rel="noopener" style="margin-top:8px">${icon('youtube', 15)} ${tipo === 'audio' ? 'Procurar a música' : 'Procurar no YouTube'} e copiar o link</a></details>
-    <div class="acts">${song.youtube ? '<button class="btn ghost danger" data-rm>Remover vídeo</button><span class="spacer"></span>' : ''}<button class="btn ghost" data-no>Cancelar</button></div>`,
+    <div class="acts">${atualId ? '<button class="btn ghost danger" data-rm>Remover versão</button><span class="spacer"></span>' : ''}<button class="btn ghost" data-no>Cancelar</button></div>`,
   (dlg, done) => {
     const link = $('#yt-link', dlg);
     const info = $('#yt-info', dlg);
@@ -8785,7 +8785,7 @@ function viewSong(id, ctx = {}) {
         const novo = url ? youtubeId(url) : '';
         preview.versoes = novo ? { video: preview.youtube || '', audio: novo, duracao: duracoesDaBusca.get(novo) || 0, pares: [[0, 0]] } : undefined;
       } else trocarAudioDaMusica(song, url);
-      toast(url ? 'Música escolhida' : 'Versão música removida');
+      if (isPreview) toast(url ? 'Música escolhida' : 'Versão música removida');
     } else {
       const content = definirMeta(song.content, 'youtube', url);
       if (isPreview) preview.content = content; else db.saveSong({ ...db.song(song.id), content });
