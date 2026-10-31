@@ -1089,16 +1089,49 @@ function trocarVideoDaMusica(song, url) {
   toast(url ? 'Vídeo trocado' : 'Vídeo removido');
   return salva;
 }
-function escolherVideo(song) {
+function trocarAudioDaMusica(song, url) {
+  const s = db.song(song.id);
+  if (!s) return null;
+  const novo = url ? youtubeId(url) : '';
+  const capaAntes = capa(s).match(/src="([^"]+)"/)?.[1] || '';
+  const mud = { ...s };
+  // A escolha no modo música altera apenas a faixa de áudio. O clipe original permanece intacto.
+  delete mud.audioProprio;
+  if (novo) {
+    const durAudio = duracoesDaBusca.get(novo) || 0;
+    const durVideo = duracoesDaBusca.get(s.youtube) || 0;
+    mud.versoes = {
+      video: s.youtube || '',
+      audio: novo,
+      duracao: durAudio || versoesDe(s)?.duracao || 0,
+      pares: durVideo && durAudio ? paresPelaDuracao(durVideo, durAudio) : [[0, 0]],
+    };
+  } else {
+    delete mud.versoes;
+  }
+  const salva = db.saveSong(mud);
+  // A rotina atualiza o player somente se esta música estiver tocando. No modo vídeo,
+  // o clipe não muda; no modo música, ele passa para a nova faixa de áudio.
+  player.trocouVideo(salva);
+  if (novo && salva.youtube) acertarVersoes(salva, null, { pedido: true });
+  const capaDepois = capa(salva).match(/src="([^"]+)"/)?.[1] || '';
+  if (capaAntes && capaDepois && capaAntes !== capaDepois) trocarCapaNaTela(capaAntes, capaDepois.replace(/&amp;/g, '&'));
+  toast(url ? 'Música trocada' : 'Versão música removida');
+  return salva;
+}
+function escolherVideo(song, tipo = 'video') {
   const termo = [song.title, song.artist].filter(Boolean).join(' ');
+  const atualId = tipo === 'audio' ? versoesDe(song)?.audio : song.youtube;
+  const tituloDialogo = tipo === 'audio' ? 'Música (áudio)' : 'Vídeo do YouTube';
+  const dicaBusca = tipo === 'audio' ? 'Busque a gravação da música…' : 'Música, artista…';
   return openDialog(`
-    <h3>Vídeo do YouTube</h3>
-    <label class="field">${icon('search', 18)}<input class="search" type="search" id="yt-q" value="${esc(termo)}" placeholder="Música, artista…"></label>
+    <h3>${tituloDialogo}</h3>
+    <label class="field">${icon('search', 18)}<input class="search" type="search" id="yt-q" value="${esc(termo)}" placeholder="${dicaBusca}"></label>
     <ul class="tracks lista-videos" id="yt-lista"><li class="loading-note"><span class="spin"></span>Buscando vídeos…</li></ul>
     <details class="colar-link"><summary>Tenho o link do vídeo</summary>
-      <span class="input-btn"><input class="input" id="yt-link" placeholder="https://www.youtube.com/watch?v=…" value="${esc(song.youtube ? 'https://www.youtube.com/watch?v=' + song.youtube : '')}"><button class="btn small" type="button" data-colar>Colar</button><button class="btn small primary" type="button" data-ok>Usar</button></span>
+      <span class="input-btn"><input class="input" id="yt-link" placeholder="https://www.youtube.com/watch?v=…" value="${esc(atualId && !ehArquivo(atualId) ? 'https://www.youtube.com/watch?v=' + atualId : '')}"><button class="btn small" type="button" data-colar>Colar</button><button class="btn small primary" type="button" data-ok>Usar</button></span>
       <p class="muted" id="yt-info" style="margin:6px 0 0;font-size:13px"></p>
-      <a class="link-btn" id="yt-abrir" href="${esc(ytBusca(termo))}" target="_blank" rel="noopener" style="margin-top:8px">${icon('youtube', 15)} Procurar no YouTube e copiar o link</a></details>
+      <a class="link-btn" id="yt-abrir" href="${esc(ytBusca(termo))}" target="_blank" rel="noopener" style="margin-top:8px">${icon('youtube', 15)} ${tipo === 'audio' ? 'Procurar a música' : 'Procurar no YouTube'} e copiar o link</a></details>
     <div class="acts">${song.youtube ? '<button class="btn ghost danger" data-rm>Remover vídeo</button><span class="spacer"></span>' : ''}<button class="btn ghost" data-no>Cancelar</button></div>`,
   (dlg, done) => {
     const link = $('#yt-link', dlg);
@@ -3004,7 +3037,7 @@ const semLinhasDeAcordes = (sinc) => {
       naLetra && atual.songId && db.song(atual.songId) && { valor: 'editar', rotulo: 'Editar a cifra', ic: 'edit' },
       // a partitura no ⋯ do Tocando agora (não no da letra): ver a que a música tem, ou a IA criar sozinha
       !naLetra && atual.songId && { valor: 'partitura', rotulo: temPartituraMusica(song) ? 'Ver partitura' : 'Criar partitura', ic: temPartituraMusica(song) ? 'score' : 'sparkles' },
-      (salva || (preview && (atual.songId === 'previa' || atual.href === '#/musica/previa'))) && { valor: 'trocar', rotulo: atual.semVideo ? 'Escolher um vídeo' : 'Trocar o vídeo', ic: atual.semVideo ? 'youtube' : 'refresh' },
+      (salva || (preview && (atual.songId === 'previa' || atual.href === '#/musica/previa'))) && { valor: 'trocar', rotulo: atual.semVideo ? 'Escolher um vídeo' : (modoCapa() ? 'Trocar música' : 'Trocar o vídeo'), ic: atual.semVideo ? 'youtube' : (modoCapa() ? 'music' : 'refresh') },
       !naLetra && !atual.semVideo && !atual.soMusica && !(ehArquivo(atual.youtube) && !atual.video) && { valor: 'troca', rotulo: modoCapa() ? 'Mudar para vídeo' : 'Mudar para música', ic: modoCapa() ? 'video' : 'music' },
       (atual.artista || ehCifraClub(song?.source || '')) && { valor: 'album', rotulo: 'Ver álbum', ic: 'disc' },
       { valor: 'compartilhar', rotulo: 'Compartilhar', ic: 'share' },
@@ -3300,10 +3333,15 @@ const semLinhasDeAcordes = (sinc) => {
     // tablet: expandir o "Tocando agora" para a tela toda (o vídeo grande e a letra ao lado) ou voltar ao painel
     if (b.dataset.pl === 'expandir') painelCheio(!document.body.classList.contains('painel-cheio'));
     if (b.dataset.pl === 'trocar') {
-      // (a música da busca, ainda não salva, é salva antes, para guardar o vídeo nela)
+      // A mesma busca escolhe a faixa de áudio ou o clipe, conforme o modo atual do player.
       const s = db.song(atual?.songId) || (daPrevia() ? salvarDaPrevia() : null);
-      if (!s) { toast('Salve a música na biblioteca para trocar o vídeo'); return; }
-      escolherVideo(s).then((url) => { if (url !== null) trocarVideoDaMusica(s, url); });
+      if (!s) { toast('Salve a música na biblioteca para trocar a versão'); return; }
+      const tipo = comCapa ? 'audio' : 'video';
+      escolherVideo(s, tipo).then((url) => {
+        if (url === null) return;
+        if (tipo === 'audio') trocarAudioDaMusica(s, url);
+        else trocarVideoDaMusica(s, url);
+      });
     }
     if (b.dataset.pl === 'ampliar') { el.classList.toggle('grande'); b.innerHTML = icon(el.classList.contains('grande') ? 'shrink' : 'expand', 18); }
     // abrir a música (o nome no player): a página dela (o expandir da letra abre a letra na tela toda, aqui mesmo)
@@ -8418,7 +8456,7 @@ function viewSong(id, ctx = {}) {
             : `<a role="menuitem" href="#/editar/${song.id}">${icon('edit', 18)}<span>Editar cifra</span></a>`}
           <button role="menuitem" id="btn-pdf">${icon('file', 18)}<span>Exportar PDF</span></button>
           ${song.artist || ehCifraClub(song.source || '') ? `<button role="menuitem" id="btn-album">${icon('disc', 18)}<span>Ver álbum</span></button>` : ''}
-          <button role="menuitem" id="btn-trocar-video">${icon(song.youtube ? 'refresh' : 'youtube', 18)}<span>${song.youtube ? 'Trocar o vídeo' : 'Escolher um vídeo'}</span></button>
+          <button role="menuitem" id="btn-trocar-video">${icon(tipoMidiaAtiva() === 'audio' ? 'music' : (song.youtube ? 'refresh' : 'youtube'), 18)}<span>${tipoMidiaAtiva() === 'audio' ? 'Trocar música' : (song.youtube ? 'Trocar o vídeo' : 'Escolher um vídeo')}</span></button>
           ${isPreview ? '' : `<button role="menuitem" id="btn-audio-meu">${icon('upload', 18)}<span>${song.audioProprio ? 'Trocar o seu áudio' : 'Usar um áudio seu'}</span></button>`}
           ${!isPreview && song.audioProprio ? `<button role="menuitem" id="btn-audio-tirar">${icon('x', 18)}<span>Tirar o seu áudio</span></button>` : ''}
           ${(() => {
@@ -8739,16 +8777,29 @@ function viewSong(id, ctx = {}) {
   porFotos($('#creditos'), pessoas);
   $('#creditos [data-explorar-creditos]')?.addEventListener('click', () => explorarCreditos({ titulo: song.title, artista: song.artist, capa: capaDaMusica(song), cor: corDe(song), pessoas, detalhes }));
 
-  // vídeo do YouTube: escolher/trocar e tocar no player do app
-  const salvarVideo = (url) => {
-    const content = definirMeta(song.content, 'youtube', url);
-    if (isPreview) preview.content = content; else db.saveSong({ ...db.song(song.id), content });
-    toast(url ? 'Vídeo escolhido' : 'Vídeo removido');
+  // A opção acompanha o modo ativo: trocar música altera só o áudio; trocar vídeo altera só o clipe.
+  const tipoMidiaAtiva = () => player.modoMusica ? 'audio' : 'video';
+  const salvarMidia = (url, tipo) => {
+    if (tipo === 'audio') {
+      if (isPreview) {
+        const novo = url ? youtubeId(url) : '';
+        preview.versoes = novo ? { video: preview.youtube || '', audio: novo, duracao: duracoesDaBusca.get(novo) || 0, pares: [[0, 0]] } : undefined;
+      } else trocarAudioDaMusica(song, url);
+      toast(url ? 'Música escolhida' : 'Versão música removida');
+    } else {
+      const content = definirMeta(song.content, 'youtube', url);
+      if (isPreview) preview.content = content; else db.saveSong({ ...db.song(song.id), content });
+      toast(url ? 'Vídeo escolhido' : 'Vídeo removido');
+    }
     route();
-    if (url) setTimeout(() => $('#btn-play')?.click(), 50); // já toca o vídeo novo, aqui na página
+    if (url && tipo === 'video') setTimeout(() => $('#btn-play')?.click(), 50);
   };
-  const mudarVideo = async () => { const url = await escolherVideo(song); if (url !== null) salvarVideo(url); };
-  // também nos ⋯ do topo: buscar outras versões aqui dentro ou colar o link do YouTube
+  const mudarVideo = async () => {
+    const tipo = tipoMidiaAtiva();
+    const url = await escolherVideo(song, tipo);
+    if (url !== null) salvarMidia(url, tipo);
+  };
+  // também nos ⋯ do topo: trocar somente a versão atualmente selecionada
   $('#btn-trocar-video').onclick = mudarVideo;
   if ($('#btn-album')) $('#btn-album').onclick = () => irParaAlbum({ titulo: song.title, artista: song.artist, fonte: song.source });
   const tocar = () => player.tocar(itemDoPlayer(song, ctx.set ? db.set(ctx.set.id) : null, ctx.set ? ctx.index : -1));
