@@ -24,7 +24,7 @@ import { apagarAudio, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } f
 import { escolherAudio, mesmaSincronia, paresPelaDuracao, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
 import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { embaralharIndices, moverIndice } from './lib/fila.js';
-import { audioDbDoArtista, audioDoVideo, buscarYoutube, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { audioDbDoArtista, audioDoVideo, capaAudioDb, buscarYoutube, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-358';
+export const APP_VERSAO = '2026.10.30-359';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4792,13 +4792,15 @@ function fotoDoArtista(nome, slug = '') {
   // a música veio do Cifra Club: o artista é o da página dela (sem adivinhar pelo nome)
   if (slug && !fotosArtistas.has(k)) fotosArtistas.set(k, fotoDoCanalDeVerdade(nome).then((f) => f || carregarArtista(slug, nome).principal.then((x) => x?.foto || '').catch(() => '')
     .then((f) => f || buscarArtistasCifraClub(nome).then((l) => l.find((a) => a.slug === slug)?.capa || '').catch(() => ''))
-    .then((f) => f || fotoDeezer(nome))));
+    .then((f) => f || fotoDeezer(nome))
+    .then((f) => f || audioDbGuardado(nome).then((a) => a?.fotos?.[0] || '').catch(() => '')));
   if (!fotosArtistas.has(k)) {
     // a busca do Cifra Club nem sempre traz a foto (a do Justice vem vazia): aí vale a da página do artista, a mesma
     // que aparece ao abrir o artista (sem isso, o Deezer trazia a foto de outro artista com o mesmo nome)
     const cifraClub = () => buscarArtistasCifraClub(nome).then((l) => artistaCerto(l, nome)).then((a) => a?.capa
       || (a?.slug ? carregarArtista(a.slug, a.nome || nome).principal.then((x) => x?.foto || '') : '')).catch(() => '');
-    fotosArtistas.set(k, fotoDoCanalDeVerdade(nome).then((f) => f || cifraClub()).then((f) => f || fotoDeezer(nome)).then((f) => f || fotoWikipedia(nome)));
+    fotosArtistas.set(k, fotoDoCanalDeVerdade(nome).then((f) => f || cifraClub()).then((f) => f || fotoDeezer(nome))
+      .then((f) => f || audioDbGuardado(nome).then((a) => a?.fotos?.[0] || '').catch(() => '')).then((f) => f || fotoWikipedia(nome)));
   }
   return comUltimoValor('foto', nome, fotosArtistas.get(k));
 }
@@ -4839,7 +4841,9 @@ function capaOficial(titulo, artista) {
       const it = await jsonp(`https://itunes.apple.com/search?term=${encodeURIComponent(`${a} ${tituloLimpo(titulo)}`)}&entity=song&limit=15`);
       const ms = (it?.results || []).filter((x) => mesmaMusica(x.trackName, x.artistName) && x.artworkUrl100);
       const m = ms.find((x) => exata(x.trackName)) || ms[0];
-      return m ? m.artworkUrl100.replace(/\/\d+x\d+(bb)?\.(jpg|png)$/, '/600x600bb.jpg') : '';
+      const itunes = m ? m.artworkUrl100.replace(/\/\d+x\d+(bb)?\.(jpg|png)$/, '/600x600bb.jpg') : '';
+      // Última reserva: TheAudioDB, que também associa a faixa ao álbum quando Deezer e iTunes não encontram.
+      return itunes || await capaAudioDb(tituloLimpo(titulo), a).catch(() => '');
     })().catch(() => '');
     capasOficiais.set(k, busca.then((url) => {
       // Uma falha temporária não pode ficar memorizada como "sem capa" para sempre.

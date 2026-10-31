@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 359, data: '2026-10-30', titulo: 'Mais opções de capas e fotos de artistas',
+    itens: [
+      { tipo: 'melhoria', texto: 'Quando Deezer e iTunes não encontram a capa da música, o Songbook tenta localizar o álbum associado à faixa no TheAudioDB. As fotos de artistas também ganham essa fonte como alternativa antes da Wikipédia.' },
+    ],
+  },
+  {
     versao: 358, data: '2026-10-30', titulo: 'Letra sincronizada preservada ao salvar',
     itens: [
       { tipo: 'correcao', texto: 'Se a letra sincronizada terminar de carregar depois que a música for salva na biblioteca, ela também será gravada na música salva. A ordem entre tocar em Salvar e a resposta do LRCLIB não faz mais a sincronia desaparecer.' },
@@ -59,18 +65,7 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'Ao tocar em Baixar, o ícone da música entra imediatamente em modo de download. O app também avisa quando o servidor não está conectado e envia notificações de início, progresso, conclusão ou falha.' },
     ],
   },
-  {
-    versao: 349, data: '2026-10-30', titulo: 'Busca LRCLIB mais resistente a variações',
-    itens: [
-      { tipo: 'correcao', texto: 'A consulta de letras sincronizadas ganhou mais tempo e novas tentativas. Se a busca exata não localizar a gravação, o Songbook procura pelo título e confirma o artista antes de aceitar a letra.' },
-    ],
-  },
-  {
-    versao: 348, data: '2026-10-30', titulo: 'Sincronização confirmada antes de abrir a música',
-    itens: [
-      { tipo: 'correcao', texto: 'A busca agora identifica primeiro a gravação de áudio e só depois consulta o LRCLIB com a duração correta. A música só abre quando o videoclipe e a letra sincronizada são confirmados; tentativas sem correspondência podem ser refeitas.' },
-    ],
-  },
+
 
 ];
 
