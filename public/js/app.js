@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.31-364';
+export const APP_VERSAO = '2026.10.31-365';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1449,6 +1449,7 @@ const player = (() => {
     if (filaDe !== deQual) { filaDe = deQual; tocadas = new Set(f ? [f.i] : []); historico = []; }
     el.classList.toggle('com-fila', Boolean(f));
     $('[data-pl="aleatorio"]', el).disabled = !f;
+    // (desativado, sem fila, ele não aparece ligado: antes ficava azul e apagado ao mesmo tempo)
     desenharCapa();
     $('[data-pl="anterior"]', el).disabled = !f || (anteriorIndice() < 0 && tempo < 3);
     el.querySelectorAll('[data-pl="proxima"]').forEach((x) => { x.disabled = !f || proximoIndice() < 0; });
@@ -2809,8 +2810,9 @@ const semLinhasDeAcordes = (sinc) => {
   const desenharModos = () => {
     const bA = $('[data-pl="aleatorio"]', el);
     const bR = $('[data-pl="repetir"]', el);
-    bA.classList.toggle('ligado', aleatorio);
-    bA.setAttribute('aria-pressed', String(aleatorio));
+    const ligado = aleatorio && !bA.disabled;
+    bA.classList.toggle('ligado', ligado);
+    bA.setAttribute('aria-pressed', String(ligado));
     bA.title = aleatorio ? 'Aleatório: ligado' : 'Aleatório';
     bR.classList.toggle('ligado', repetir !== 'nao');
     bR.classList.toggle('uma', repetir === 'uma');
@@ -2900,72 +2902,116 @@ const semLinhasDeAcordes = (sinc) => {
         const reproduzivel = Boolean(midiaDe(s));
         const procurando = !duracao && duracoesDaFila.has(s.id) && !duracoesDaFila.get(s.id).pronto;
         return `<div class="lista-op fila-item${tocando ? ' atual' : ''}${!reproduzivel ? ' indisponivel' : ''}" role="option" tabindex="0" aria-selected="${tocando}" data-fila-pos="${pos}" data-original="${original}">
-          <span class="fila-arrastar" data-arrastar aria-label="Arrastar ${esc(s.title || 'música')}" title="Segure e arraste para mudar a ordem">${icon('grip', 20)}</span>
           <span class="fila-capa${tocando ? ' tocando' : ''}">${capa(s)}${tocando ? '<span class="fila-eq" aria-hidden="true"><i></i><i></i><i></i></span>' : ''}</span>
           <span class="lista-txt"><b>${esc(s.title || 'Música')}</b><small>${esc([parte, s.artist].filter(Boolean).join(' · '))}</small></span>
           <span class="lista-dir">${duracao ? fmtTempo(duracao) : procurando ? '<span class="spin"></span>' : '—:—'}</span>
         </div>`;
       }).join('');
     };
-    // ---- arrastar
-    let arrastando = null; // { linha, id, y0, alturas }
+    // ---- arrastar: segurando qualquer parte da música (no dedo, ~0,3 s parado; no mouse, é só puxar). O card sobe
+    // (cresce um pouco, com sombra) e acompanha o dedo; os outros abrem espaço deslizando
+    let arrastando = null; // { linha, id, dy, desloc }
     let segurando = null; // { timer, id, x, y, linha } (o dedo parado, antes de virar arrasto)
     let rolar = 0;
     let soltouEm = 0;
-    const comecarArrasto = (linha, e) => {
-      arrastando = { linha, id: e.pointerId };
+    let ultimoY = 0;
+    // o topo da linha no lugar dela na lista (sem o deslocamento do arrasto), na tela
+    const topoDoLugar = (x) => lista.getBoundingClientRect().top + x.offsetTop - lista.scrollTop;
+    const comecarArrasto = (linha, y, pointerId) => {
+      cancelarSegurar();
+      arrastando = { linha, id: pointerId, dy: y - topoDoLugar(linha), desloc: 0 };
+      ultimoY = y;
       linha.classList.add('arrastando');
       dlg.classList.add('arrastando-fila');
-      try { lista.setPointerCapture(e.pointerId); } catch { /* sem captura: segue pelos eventos do diálogo */ }
-      navigator.vibrate?.(15);
+      try { lista.setPointerCapture(pointerId); } catch { /* sem captura: segue pelos eventos da lista */ }
+      navigator.vibrate?.(12);
+      seguirDedo(y); // (já sobe no lugar, antes de mexer)
     };
+    // o card segue o dedo (só no eixo de cima a baixo, dentro da lista)
+    const seguirDedo = (y) => {
+      const l = arrastando.linha;
+      const max = lista.scrollHeight - l.offsetHeight;
+      const alvo = Math.max(-l.offsetTop, Math.min(max - l.offsetTop, y - arrastando.dy - topoDoLugar(l)));
+      arrastando.desloc = alvo;
+      l.style.transform = `translateY(${alvo}px) scale(1.03)`;
+    };
+    // troca de lugar (os outros deslizam: guarda onde estavam e anima até o lugar novo)
     const moverPara = (y) => {
-      const linhas = [...lista.querySelectorAll('[data-fila-pos]')].filter((x) => x !== arrastando.linha);
-      const depois = linhas.find((x) => { const r = x.getBoundingClientRect(); return y < r.top + r.height / 2; });
-      if (depois) { if (depois.previousElementSibling !== arrastando.linha) lista.insertBefore(arrastando.linha, depois); }
-      else if (lista.lastElementChild !== arrastando.linha) lista.append(arrastando.linha);
+      const l = arrastando.linha;
+      const centro = y - arrastando.dy + l.offsetHeight / 2;
+      const outras = [...lista.querySelectorAll('[data-fila-pos]')].filter((x) => x !== l);
+      const depois = outras.find((x) => centro < topoDoLugar(x) + x.offsetHeight / 2);
+      const precisa = depois ? l.nextElementSibling !== depois : lista.lastElementChild !== l;
+      if (!precisa) return;
+      const antes = new Map(outras.map((x) => [x, x.offsetTop]));
+      if (depois) lista.insertBefore(l, depois); else lista.append(l);
+      for (const x of outras) {
+        const d = antes.get(x) - x.offsetTop;
+        if (!d) continue;
+        x.style.transition = 'none';
+        x.style.transform = `translateY(${d}px)`;
+        x.getBoundingClientRect();
+        x.style.transition = '';
+        x.style.transform = '';
+      }
     };
     // perto da borda: a lista rola sozinha enquanto o dedo fica ali
-    const rolarNaBorda = (y) => {
+    const rolarNaBorda = () => {
       cancelAnimationFrame(rolar);
       const r = lista.getBoundingClientRect();
       const borda = 56;
-      const v = y < r.top + borda ? -Math.ceil((r.top + borda - y) / 6) : y > r.bottom - borda ? Math.ceil((y - (r.bottom - borda)) / 6) : 0;
+      const v = ultimoY < r.top + borda ? -Math.ceil((r.top + borda - ultimoY) / 6) : ultimoY > r.bottom - borda ? Math.ceil((ultimoY - (r.bottom - borda)) / 6) : 0;
       if (!v || !arrastando) return;
-      const passo = () => { if (!arrastando) return; lista.scrollTop += v; moverPara(y); rolar = requestAnimationFrame(passo); };
+      const passo = () => { if (!arrastando) return; lista.scrollTop += v; moverPara(ultimoY); seguirDedo(ultimoY); rolar = requestAnimationFrame(passo); };
       rolar = requestAnimationFrame(passo);
     };
     const cancelarSegurar = () => { if (segurando) { clearTimeout(segurando.timer); segurando = null; } };
     lista.addEventListener('pointerdown', (e) => {
-      if (e.button > 0) return;
+      if (e.button > 0 || arrastando) return;
       const linha = e.target.closest('[data-fila-pos]');
       if (!linha) return;
-      if (e.target.closest('[data-arrastar]')) { e.preventDefault(); comecarArrasto(linha, e); return; }
-      // segurar na música (dedo ou mouse) também arrasta
       cancelarSegurar();
-      segurando = { id: e.pointerId, x: e.clientX, y: e.clientY, linha, timer: setTimeout(() => { const sg = segurando; segurando = null; if (sg) comecarArrasto(sg.linha, e); }, 350) };
+      const toque = e.pointerType !== 'mouse';
+      segurando = { id: e.pointerId, x: e.clientX, y: e.clientY, linha, toque,
+        // (no dedo, segurar parado começa o arrasto; mexer antes disso é rolar a lista)
+        timer: toque ? setTimeout(() => { const sg = segurando; if (sg) comecarArrasto(sg.linha, sg.y, sg.id); }, 300) : 0 };
+      if (!toque) e.preventDefault(); // (no mouse, sem selecionar texto)
     });
     lista.addEventListener('pointermove', (e) => {
-      if (segurando && segurando.id === e.pointerId && Math.hypot(e.clientX - segurando.x, e.clientY - segurando.y) > 8) cancelarSegurar(); // (rolando)
+      if (segurando && segurando.id === e.pointerId) {
+        const longe = Math.hypot(e.clientX - segurando.x, e.clientY - segurando.y) > 6;
+        if (longe && segurando.toque) cancelarSegurar(); // (o dedo andou: está rolando)
+        else if (longe) comecarArrasto(segurando.linha, segurando.y, e.pointerId); // (o mouse puxou a música)
+        else segurando.y = e.clientY;
+      }
       if (!arrastando || arrastando.id !== e.pointerId) return;
       e.preventDefault();
-      moverPara(e.clientY);
-      rolarNaBorda(e.clientY);
+      ultimoY = e.clientY;
+      moverPara(ultimoY);
+      seguirDedo(ultimoY);
+      rolarNaBorda();
     });
     // (com o arrasto ligado, o dedo não rola a lista nem abre o menu do aparelho)
     lista.addEventListener('touchmove', (e) => { if (arrastando) e.preventDefault(); }, { passive: false });
     lista.addEventListener('contextmenu', (e) => { if (e.target.closest('[data-fila-pos]')) e.preventDefault(); });
     const terminarArrasto = (e) => {
-      cancelarSegurar();
+      if (segurando && (!e || e.pointerId === segurando.id)) cancelarSegurar();
       if (!arrastando || (e && e.pointerId !== arrastando.id)) return;
       cancelAnimationFrame(rolar);
-      arrastando.linha.classList.remove('arrastando');
-      dlg.classList.remove('arrastando-fila');
-      const nova = [...lista.querySelectorAll('[data-original]')].map((x) => Number(x.dataset.original));
-      if (nova.length === filaOrdem.length && nova.some((x, i) => x !== filaOrdem[i])) { filaOrdem = nova; historico = []; desenhar(); }
+      const { linha } = arrastando;
       arrastando = null;
       soltouEm = performance.now();
-      desenharLista();
+      // o card desce para o lugar dele (anima de onde está até lá) e só então a lista é redesenhada
+      linha.classList.add('soltando');
+      linha.style.transform = '';
+      dlg.classList.remove('arrastando-fila');
+      const nova = [...lista.querySelectorAll('[data-original]')].map((x) => Number(x.dataset.original));
+      const mudou = nova.length === filaOrdem.length && nova.some((x, i) => x !== filaOrdem[i]);
+      setTimeout(() => {
+        linha.classList.remove('arrastando', 'soltando');
+        if (mudou) { filaOrdem = nova; historico = []; desenhar(); }
+        if (!arrastando) desenharLista();
+      }, 200);
     };
     lista.addEventListener('pointerup', terminarArrasto);
     lista.addEventListener('pointercancel', terminarArrasto);
@@ -2973,7 +3019,7 @@ const semLinhasDeAcordes = (sinc) => {
     dlg.addEventListener('click', (e) => {
       if (e.target === dlg || e.target.closest('[data-fechar]')) { dlg.close(); return; }
       // (o clique que vem logo depois de soltar o arrasto não toca a música)
-      if (arrastando || performance.now() - soltouEm < 350 || e.target.closest('[data-arrastar]')) return;
+      if (arrastando || performance.now() - soltouEm < 350) return;
       const linha = e.target.closest('[data-fila-pos]');
       const f = fila();
       if (!linha || !f) return;
@@ -2981,6 +3027,8 @@ const semLinhasDeAcordes = (sinc) => {
       const s = db.song(f.ids[pos]);
       if (!midiaDe(s) || pos === f.i || !atual) return;
       historico.push(f.i);
+      // escolher a música pela fila desliga o aleatório: segue a ordem que está na tela, e o botão volta ao normal
+      if (aleatorio) { aleatorio = false; db.setPref('aleatorio', false); historico = []; desenharModos(); }
       api.tocar(itemDoPlayer(s, f.set, f.set ? f.indices[pos] : -1));
       dlg.close();
     });
