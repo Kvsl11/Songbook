@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-358';
+export const APP_VERSAO = '2026.10.30-359';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4818,6 +4818,22 @@ function fotoDoArtista(nome, slug = '') {
 
 // Completa as linhas de busca e da biblioteca sem bloquear a renderização:
 // capa oficial do single/álbum + foto real do artista. As imagens manuais salvas nunca são substituídas.
+// Nas buscas, prepara capa e foto antes de desenhar a lista. Assim a primeira imagem exibida já é a definitiva.
+async function prepararMidiaBusca(itens) {
+  await Promise.all(itens.map(async (item) => {
+    const titulo = item.title || item.titulo || '';
+    const artista = item.artist || item.artista || '';
+    if (!titulo || !artista) return;
+    const [capa, foto] = await Promise.all([
+      capaOficial(titulo, artista).catch(() => ''),
+      fotoDoArtista(artista, item.slug || '').catch(() => ''),
+    ]);
+    if (capa) { item.capa = capa; item.cover = capa; }
+    if (foto) item.fotoArtista = foto;
+  }));
+  return itens;
+}
+
 function enriquecerLinhasMusicais(container, itens, { busca = false } = {}) {
   if (!container || !Array.isArray(itens)) return;
   itens.forEach((item, i) => {
@@ -5135,7 +5151,7 @@ const indicadoresWeb = (r) => {
 };
 const linhaMusicaWeb = (r, i, extra = '') => `
   <li class="track clickable" data-web="musica" data-midia-index="${i}" data-i="${i}" style="grid-template-columns:auto 1fr auto">
-    ${capa({ titulo: r.titulo, capa: r.capa || r.video?.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${indicadoresWeb(r)}<span class="artista-mini" data-artista-mini>${semFotoArtista(14)}</span>${esc(r.artista || '')}${r.video?.duracao ? ` · ${esc(r.video.duracao)}` : ''}</div></div>
+    ${capa({ titulo: r.titulo, capa: r.capa || r.video?.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${indicadoresWeb(r)}<span class="artista-mini" data-artista-mini>${r.fotoArtista ? `<img src="${esc(r.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(r.artista || '')}${r.video?.duracao ? ` · ${esc(r.video.duracao)}` : ''}</div></div>
     <span class="acts">${extra}${botaoSalvar({ titulo: r.titulo, artista: r.artista, cifra: r.cifra || '', letra: r.letra?.url || '', video: r.video }, 'mini')}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 
 // Busca vazia: as músicas católicas mais procuradas agora no Cifra Club — as mais tocadas de cada um dos
@@ -5207,11 +5223,12 @@ function viewSearch() {
         $('#art-cat').innerHTML = lista.filter(Boolean).map(tileArtista).join('');
         enriquecerTilesArtistas($('#art-cat'));
       });
-      catolicasEmAlta().then((lista) => {
+      catolicasEmAlta().then(async (lista) => {
+        if (meu !== seq || !$('#em-alta')) return;
+        await prepararMidiaBusca(lista);
         if (meu !== seq || !$('#em-alta')) return;
         achados.musica = lista;
         $('#em-alta').innerHTML = lista.length ? `<ul class="tracks tracks-grade em-alta">${lista.map((r, i) => linhaMusicaWeb(r, i)).join('')}</ul>` : '<p class="muted">Não consegui carregar agora. Digite o nome de uma música acima.</p>';
-        enriquecerLinhasMusicais($('#em-alta'), lista, { busca: true });
       });
       return;
     }
@@ -5259,11 +5276,12 @@ function viewSearch() {
       }
       if (mostra('musicas')) {
         // uma lista só: as músicas (Cifra Club e Letras) com o vídeo de cada uma (YouTube) e os vídeos que sobraram
-        const mostrar = (lista) => {
+        const mostrar = async (lista) => {
+          if (!vivo('mu-res')) return;
+          await prepararMidiaBusca(lista);
           if (!vivo('mu-res')) return;
           achados.musica = lista;
           $('#mu-res').innerHTML = lista.length ? `<ul class="tracks tracks-grade">${lista.map((r, i) => linhaMusicaWeb(r, i)).join('')}</ul>` : '<p class="muted">Nenhuma música encontrada.</p>';
-          enriquecerLinhasMusicais($('#mu-res'), lista, { busca: true });
         };
         buscarTudo(term, filtro === 'musicas' ? 25 : 8, filtro === 'musicas' ? 15 : 6).then(mostrar)
           .catch((e) => vivo('mu-res') && erro('mu-res', 'Não consegui buscar músicas: ' + e.message));
