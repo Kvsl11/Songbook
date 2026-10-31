@@ -4105,3 +4105,8 @@ html.pp.tablet body.com-player:not(.painel-recolhido):not(.com-letra-cheia) .pl-
 .ind-i.ind-baixando { background: none; color: var(--muted); animation: baixando-pulsa 1.2s ease-in-out infinite; }
 @keyframes baixando-pulsa { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .ind-i.ind-baixando { animation: none; } }
+
+/* Foto do artista ao lado do nome: a capa quadrada continua sendo a do single/álbum. */
+.artista-mini { display: inline-grid; place-items: center; width: 17px; height: 17px; margin: 0 5px 0 2px; vertical-align: -4px; overflow: hidden; border-radius: 50%; color: var(--muted); flex: none; }
+.artista-mini img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.artista-mini .sem-foto-artista { width: 100%; height: 100%; }
