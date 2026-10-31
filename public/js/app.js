@@ -1,5 +1,5 @@
 import { db, youtubeId } from './store.js';
-import { esc, renderSong } from './render.js';
+import { esc, renderSong, soltarAcordes } from './render.js';
 import { definirMeta, semInvisiveis, soAcordes, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasCantadas, partesCantadas, capoDaCifra, capoDaObservacao, organizarPartes, parteEmIngles } from './chordpro.js';
 import { icon, iconeMenu, logo, logoLumen } from './icons.js';
 import { diagramaSvg } from './acordes.js';
@@ -24,7 +24,7 @@ import { apagarAudio, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } f
 import { escolherAudio, mesmaSincronia, paresPelaDuracao, paresPelaLegenda, paresPelasLetras, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
 import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { embaralharIndices, moverIndice } from './lib/fila.js';
-import { audioDbDoArtista, audioDoVideo, buscarYoutube, legendasDoVideo, semCensura, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { audioDbDoArtista, audioDoVideo, buscarYoutube, legendasDoVideo, semCensura, cifraComoCantada, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.31-377';
+export const APP_VERSAO = '2026.10.31-378';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1297,6 +1297,10 @@ const player = (() => {
   let tentativasIda = 0;
   // o estado do player do YouTube (1 = tocando), pelo que ele avisa; volta a -1 a cada vídeo novo
   let estadoYt = -1;
+  // o anúncio do YouTube antes da música (ou no meio): enquanto ele passa, a barra, o tempo e a letra ficam parados no
+  // ponto da música. O YouTube avisa o tempo e a duração do próprio anúncio, e a barra andava como se fosse a música
+  let anuncio = false;
+  let montadoEm = 0; // quando o vídeo do YouTube começou a carregar (o anúncio vem logo no começo)
   const duracoes = new Map(); // a duração de cada vídeo já tocado (o áudio oficial e o clipe), para a troca entre eles
   let duracao = 0;
   // na página da própria música o vídeo toca lá (na telinha das Referências); fora dela, no mini player
@@ -2110,6 +2114,7 @@ const semLinhasDeAcordes = (sinc) => {
     const capo = song.capo || 0;
     const r = renderSong(song.content, { transpose, capo, key: song.key || '' });
     box.innerHTML = `<div class="song lyrics-mode with-chords">${r.html}</div>`;
+    soltarAcordes(box);
     $('.pl-tom', el).innerHTML = `<small>Tom</small>${esc(r.key || (transpose ? (transpose > 0 ? '+' : '') + transpose : '—'))}`;
     $('.pl-capo', el).innerHTML = `<small>Capo</small>${capo || '—'}`;
     // com a letra sincronizada, a linha cantada acende também na cifra
@@ -2259,8 +2264,10 @@ const semLinhasDeAcordes = (sinc) => {
     estadoYt = -1;
     tela.innerHTML = `<iframe src="${esc(ytEmbed(atual.youtube, { autoplay }))}" title="${esc(atual.titulo || 'Vídeo')}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
     const f = $('iframe', tela);
-    f.addEventListener('load', () => f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'));
-    reouvir = () => f.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*');
+    anuncio = false;
+    montadoEm = performance.now();
+    f.addEventListener('load', () => { ouvirAnuncio(f); f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'); ouvirAnuncio(f); });
+    reouvir = () => { f.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'); ouvirAnuncio(f); };
     tela.hidden = false;
     mostrarBarra();
     if (!quadro) seguir();
@@ -2277,6 +2284,24 @@ const semLinhasDeAcordes = (sinc) => {
     else atual = null;
   };
   const comandoYt = (func, args = []) => iframeAtual()?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+  // o YouTube avisa o anúncio num evento só dele (o estado do vídeo não muda): é preciso pedir (antes e depois do
+  // "listening": o anúncio pode começar logo, e o aviso que passou antes do pedido não volta)
+  const ouvirAnuncio = (f) => f?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'addEventListener', args: ['onAdStateChange'] }), '*');
+  // a duração que já se sabe do vídeo que toca (a que ele mesmo informou antes, a da versão de música, a da letra
+  // sincronizada dele ou a da música): um "vídeo" bem mais curto que ela, logo no começo, é o anúncio
+  const duracaoEsperada = () => {
+    const id = atual?.youtube;
+    if (!id) return 0;
+    const s = atual.songId ? (atual.songId === 'previa' ? preview : db.song(atual.songId)) : null;
+    const vs = s && versoesDe(s);
+    return duracoes.get(id) || (vs && id === vs.audio && Number(vs.duracao)) || (s?.sincronia?.video === id && Number(s.sincronia.duracao))
+      || (s?.youtube === id && Number(s.duracao)) || 0;
+  };
+  const pareceAnuncio = (info) => {
+    if (!(info.duration > 0) || performance.now() - montadoEm > 150000) return false;
+    const esperada = duracaoEsperada();
+    return esperada > 30 && info.duration < esperada * 0.7;
+  };
   // O que toca do próprio aparelho, sem o YouTube: o áudio da pessoa e os downloads (como no Spotify). { chave, video }
   // (a chave do arquivo guardado; video: o download é o vídeo, que aparece no lugar do clipe), ou null: o YouTube.
   // O áudio toca num <audio> do app e o vídeo num <video> na tela do player; os comandos do YouTube valem para os dois
@@ -2493,7 +2518,7 @@ const semLinhasDeAcordes = (sinc) => {
     f.title = '';
     f.tabIndex = -1;
     f.setAttribute('aria-hidden', 'true');
-    f.addEventListener('load', () => f.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 2 }), '*'));
+    f.addEventListener('load', () => { ouvirAnuncio(f); f.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 2 }), '*'); ouvirAnuncio(f); });
     rs = { estado: -1, tempo: 0, em: 0 };
     tela.append(f);
   };
@@ -2588,6 +2613,8 @@ const semLinhasDeAcordes = (sinc) => {
     atual = { ...atual, youtube: id };
     tempo = Math.max(0, t);
     marcaTempo = performance.now();
+    anuncio = false; // (o outro vídeo pode ter o anúncio dele: conferido de novo)
+    montadoEm = performance.now();
     // a barra já vai direto para o ponto certo da outra versão: a duração dela, se já se sabe (a desta vez, a das
     // versões ou a da música); sem saber, fica a de antes até o vídeo dizer. Antes ela zerava, e a barra voltava ao
     // começo e depois pulava para o ponto (parecia travada)
@@ -2674,7 +2701,9 @@ const semLinhasDeAcordes = (sinc) => {
     // segundos do vídeo agora (o YouTube avisa algumas vezes por segundo; entre um aviso e outro, estima)
     // (no máximo 2 s além do último aviso: com o app em segundo plano o vídeo para de avisar, e a letra corria sozinha
     // muito à frente do que se cantava)
-    get tempoAgora() { return tempo + (estado === 'tocando' && marcaTempo ? Math.min(2, (performance.now() - marcaTempo) / 1000) : 0); },
+    get tempoAgora() { return tempo + (estado === 'tocando' && marcaTempo && !anuncio ? Math.min(2, (performance.now() - marcaTempo) / 1000) : 0); },
+    // passando o anúncio do YouTube (a música ainda não começou)
+    get emAnuncio() { return Boolean(anuncio); },
     // a duração de um vídeo do YouTube que o player já tocou (0 se não sabe)
     duracaoDe(yt) { return duracoes.get(yt) || 0; },
     // o último tempo que o YouTube informou (não anda sozinho: no anúncio fica parado)
@@ -3007,9 +3036,30 @@ const semLinhasDeAcordes = (sinc) => {
         avisar();
         return;
       }
+      if (msg?.event === 'onAdStateChange') {
+        // 1 tocando, 2 pausado, 3 carregando: o anúncio está na tela; o resto (0 acabou, -1, 5): voltou a música
+        const antes = anuncio;
+        anuncio = [1, 2, 3].includes(Number(msg.info));
+        if (anuncio) marcaTempo = 0;
+        if (antes !== anuncio) desenhar();
+        return;
+      }
+      // (a música começou a tocar de verdade: o anúncio avisado acabou, mesmo sem o aviso do fim dele)
+      if (msg?.event === 'onStateChange' && msg.info === 1 && anuncio === true) anuncio = false;
       const info = msg?.info;
-      if (!info) return;
+      if (!info || typeof info !== 'object') return;
       if (typeof info.playerState === 'number') estadoYt = info.playerState;
+      // durante o anúncio, o tempo e a duração avisados são os dele: não valem para a música
+      if (!anuncio && typeof info.duration === 'number' && pareceAnuncio(info)) anuncio = 'pela-duracao';
+      else if (anuncio === 'pela-duracao' && typeof info.duration === 'number' && info.duration > 0 && !pareceAnuncio(info)) anuncio = false;
+      if (anuncio) {
+        marcaTempo = 0;
+        const antes = estado;
+        if (info.playerState === 1) estado = 'tocando';
+        desenhar();
+        if (antes !== estado) avisar();
+        return;
+      }
       // aviso que ainda é do vídeo de antes (logo depois de trocar da música para o clipe, ou ao contrário)
       const outroVideo = info.videoData?.video_id && info.videoData.video_id !== atual.youtube;
       let usarTempo = typeof info.currentTime === 'number' && !outroVideo;
@@ -8934,6 +8984,7 @@ function viewSong(id, ctx = {}) {
     // Cifra e Letra usam o mesmo painel estilo Spotify; na Cifra os acordes aparecem por cima
     songEl.classList.add('lyrics-mode');
     songEl.classList.toggle('with-chords', comCifra);
+    if (comCifra) soltarAcordes(songEl);
     $('#tools').classList.toggle('sem-cifra', !comCifra);
     const tomAtual = tomBase ? transposeKey(tomBase, transpose) : '';
     $('#key').innerHTML = `<small>Tom</small>${tomAtual ? esc(tomAtual) : (transpose ? (transpose > 0 ? '+' : '') + transpose : '—')}`;
@@ -11855,7 +11906,11 @@ function guardarSincronia(song, sinc) {
   // (as palavras escondidas com asteriscos pela fonte da letra voltam a ser as cantadas, pela letra da própria música)
   if (sinc?.linhas?.length) { try { sinc = { ...sinc, linhas: semCensura(sinc.linhas, linhasDaLetra(song.content || '')) }; } catch { /* fica como veio */ } }
   song.sincronia = sinc;
-  const comLetra = letraPelaSincronia(song.content, sinc);
+  // (e a cifra com a versão limpa, "give a damns", passa a ter a palavra cantada pela gravação que toca, como a letra)
+  let comLetra = letraPelaSincronia(song.content, sinc);
+  if (!comLetra && sinc?.linhas?.length) {
+    try { const cantada = cifraComoCantada(song.content || '', sinc.linhas); if (cantada !== song.content) { comLetra = cantada; song.content = cantada; } } catch { /* fica como está */ }
+  }
   if (comLetra) song.content = comLetra;
   if (song.id === 'previa') { if (preview) { preview.sincronia = sinc; if (comLetra) preview.content = comLetra; } }
   else if (db.song(song.id)) db.updateSong(song.id, { sincronia: sinc, ...(comLetra ? { content: comLetra } : {}) });

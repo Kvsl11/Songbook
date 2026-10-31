@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 378, data: '2026-10-31', titulo: 'Letra como é cantada, cifra sem buracos e barra parada no anúncio',
+    itens: [
+      { tipo: 'correcao', texto: 'A letra sincronizada não vem mais da versão de rádio (“give a damns” no lugar de “give a fucks”, em Espresso): fica a letra da gravação que toca, e a Letra e a Cifra mostram as mesmas palavras cantadas.' },
+      { tipo: 'melhoria', texto: 'Na cifra, o acorde sobre uma sílaba curta (“m[Am7]e”, “l[Am7]ike”) não abre mais um buraco no meio da frase: ele passa por cima da letra seguinte, sem encostar no próximo acorde.' },
+      { tipo: 'correcao', texto: 'Enquanto passa o anúncio do YouTube, a barra de reprodução, o tempo e a letra ficam parados: eles só começam a andar quando a música começa a tocar.' },
+    ],
+  },
+  {
     versao: 377, data: '2026-10-31', titulo: 'Capa animada sem as faixas pretas',
     itens: [
       { tipo: 'correcao', texto: 'Na capa animada das músicas não baixadas, os quadros do clipe não mostram mais as faixas pretas em cima e embaixo (as das miniaturas do YouTube e as dos clipes filmados como cinema): cada imagem é medida e ampliada só o bastante para elas ficarem de fora.' },
@@ -66,13 +74,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'Trocar entre música e vídeo vai para o mesmo trecho cantado também nos clipes com introdução longa ou cenas no meio (como Speed Demon, de Michael Jackson), sem precisar baixar: ao abrir a música, o servidor compara o som das duas versões.' },
       { tipo: 'melhoria', texto: 'Enquanto a música carrega, ela já vem com a versão de música, a de vídeo, a letra sincronizada e o ponto de cada trecho nas duas. Se a comparação ainda não terminou na hora da troca, o botão mostra “Acertando a posição…” e troca no ponto certo assim que ela chega.' },
-    ],
-  },
-  {
-    versao: 368, data: '2026-10-31', titulo: 'Música abre na versão da música, com a capa animada',
-    itens: [
-      { tipo: 'correcao', texto: 'A música aberta (da busca, da biblioteca, de um repertório) começa na versão da música, com a capa e a letra sincronizada, e não no vídeo. No vídeo não há letra, e por isso parecia que a sincronia não funcionava.' },
-      { tipo: 'melhoria', texto: 'A capa animada funciona sem baixar a música: passam os quadros do clipe; nas músicas baixadas, o próprio vídeo.' },
     ],
   },
 ];

@@ -391,6 +391,8 @@ a.chip.sm { cursor: pointer; }
 .song.lyrics-mode.with-chords .lyrics-only .palavra { display: inline; }
 .song .chord { color: var(--chord); font-weight: 800; font-size: 0.86em; min-height: 1.25em; padding-right: 0.4em; }
 .song.no-chords .chord, .song .lyrics-only .chord { display: none; }
+/* o acorde sobre uma sílaba curta avança por cima da letra seguinte, em vez de abrir um buraco na frase (render.js) */
+.song .chunk.solto > .chord, .song.lyrics-mode.with-chords .chunk.solto > .chord { width: 0; min-width: 0; padding-right: 0; overflow: visible; white-space: nowrap; }
 .song.no-chords .line.chords-only { display: none; }
 .song .lyric { min-height: 1.3em; }
 .song .comment { color: var(--muted); font-style: italic; margin: 2px 0; }
