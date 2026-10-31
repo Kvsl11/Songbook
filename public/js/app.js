@@ -4540,23 +4540,11 @@ async function abrirPrevia(content, source, back, videoJa = null) {
   };
   void buscaCapaDaPrevia.then(aplicarCapaDaPrevia);
 
-  // Só abre a tela da música quando terminar a busca do áudio oficial e a sincronização LRCLIB.
-  // prepararMusicaAoAbrir coordena as duas tarefas em paralelo e guarda os resultados na prévia.
-  const preparo = await prepararMusicaAoAbrir(novo);
+  // A sincronização LRCLIB é complementar: uma falha temporária não deve impedir
+  // a abertura da música. A letra continua disponível sem tempos e a próxima abertura
+  // poderá tentar sincronizá-la novamente, sem avisos repetidos.
+  await prepararMusicaAoAbrir(novo);
   if (preview !== novo) return;
-  const sincValida = novo.youtube
-    && novo.sincronia?.fonte === 'lrclib'
-    && novo.sincronia.video === videoDaLetra(novo)
-    && novo.sincronia.tempos?.length;
-  if (preparo !== 'ok' || !sincValida) {
-    await openDialog(`
-      <h3>Não foi possível sincronizar esta música</h3>
-      <p>O Songbook só abre a música depois de confirmar o videoclipe e encontrar a letra sincronizada no LRCLIB. Esta faixa não teve uma correspondência confiável agora.</p>
-      <p>Ela não foi aberta nem marcada como sincronizada. Você pode tentar novamente mais tarde.</p>
-      <button class="btn primary" data-fechar>Voltar à busca</button>
-    `, (dlg) => dlg.querySelector('[data-fechar]').addEventListener('click', () => dlg.close()));
-    return;
-  }
   if (jaNaPrevia) route(); else location.hash = '#/musica/previa';
 }
 
