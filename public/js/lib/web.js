@@ -754,6 +754,37 @@ export async function audioDbDoArtista(nome, fetchImpl) {
   } catch { return null; }
 }
 
+// Capa do álbum associado à faixa, como última reserva para quando Deezer e iTunes não têm a imagem.
+// A busca é validada por título e artista; nunca aceita a capa de um resultado apenas parecido.
+export async function capaAudioDb(titulo, artista, fetchImpl) {
+  const t = String(titulo || '').trim();
+  const a = String(artista || '').trim();
+  if (!t || !a) return '';
+  try {
+    const url = `https://www.theaudiodb.com/api/v1/json/123/searchtrack.php?s=${encodeURIComponent(a)}&t=${encodeURIComponent(t)}`;
+    const res = await buscar(url, { fetchImpl, timeout: 10000 });
+    if (!res.ok) return '';
+    const faixas = (await res.json())?.track || [];
+    const faixa = faixas.find((x) => x?.strTrack && x?.strArtist
+      && mesmoTitulo(x.strTrack, t) && mesmoArtista(x.strArtist, a));
+    if (!faixa) return '';
+    if (/^https?:\/\//.test(faixa.strTrackThumb || '')) return faixa.strTrackThumb;
+    // O endpoint de faixa costuma trazer o ID do grupo do álbum; usa-o para pedir a capa cadastrada do disco.
+    const mbid = String(faixa.strMusicBrainzAlbumID || '').trim();
+    const id = String(faixa.idAlbum || '').trim();
+    if (!mbid && !id) return '';
+    const detalhe = mbid
+      ? `https://www.theaudiodb.com/api/v1/json/123/album-mb.php?i=${encodeURIComponent(mbid)}`
+      : `https://www.theaudiodb.com/api/v1/json/123/album.php?m=${encodeURIComponent(id)}`;
+    const albumRes = await buscar(detalhe, { fetchImpl, timeout: 10000 });
+    if (!albumRes.ok) return '';
+    const albuns = (await albumRes.json())?.album || [];
+    const album = albuns.find((x) => mesmoArtista(x.strArtist, a) && mesmoTitulo(x.strAlbum, faixa.strAlbum || x.strAlbum));
+    const capa = album?.strAlbumThumb || albuns[0]?.strAlbumThumb || '';
+    return /^https?:\/\//.test(capa) ? capa : '';
+  } catch { return ''; }
+}
+
 export async function youtubeOEmbed(url, fetchImpl) {
   const res = await buscar(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`, { fetchImpl });
   if (!res.ok) throw new Error('Vídeo não encontrado');
