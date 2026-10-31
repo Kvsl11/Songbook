@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.31-376';
+export const APP_VERSAO = '2026.10.31-377';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1051,8 +1051,60 @@ function infoDoVideo(id) {
 // faixas pretas em cima e embaixo (o CSS corta). O tipo é descoberto uma vez e fica salvo na música.
 const QUADROS = { hd: ['maxres1', 'maxres2', 'maxres3', 'maxresdefault'], sd: ['sd1', 'sd2', 'sd3', 'hqdefault'] };
 function htmlQuadros(id, tipo = 'sd') {
-  return QUADROS[tipo].map((q, n) => `<img class="q ${tipo === 'sd' && q !== 'hqdefault' ? 'lb' : ''}" style="--n:${n}" src="https://i.ytimg.com/vi/${esc(id)}/${q}.jpg" alt="" ${n ? 'loading="lazy"' : ''}>`).join('');
+  return QUADROS[tipo].map((q, n) => `<img class="q" style="--n:${n}" src="https://i.ytimg.com/vi/${esc(id)}/${q}.jpg" alt="" ${n ? 'loading="lazy"' : ''}>`).join('');
 }
+// As faixas pretas dos quadros do clipe (em cima e embaixo): as das miniaturas 4:3 do YouTube (os vídeos 16:9 vêm com
+// faixas) e as do próprio clipe (os filmados como cinema). Cada imagem é medida quando chega e esticada só o
+// bastante para elas ficarem fora (antes era um corte fixo, só em três das quatro imagens: as faixas apareciam e
+// pareciam o degradê falhando)
+const faixasMedidas = new Map(); // endereço → fração da altura em faixa preta (em cima e embaixo)
+function medirFaixasDaImagem(img) {
+  const w = 128;
+  const h = Math.max(12, Math.round((w * img.naturalHeight) / img.naturalWidth));
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, w, h);
+  const px = ctx.getImageData(0, 0, w, h).data;
+  // (uma linha é faixa quando quase toda ela é escura: o logotipo do canal pode estar em cima da faixa)
+  const escura = (y) => { let n = 0; for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; if (px[i] * 0.3 + px[i + 1] * 0.59 + px[i + 2] * 0.11 <= 30) n++; } return n >= w * 0.92; };
+  let cima = 0;
+  while (cima < h && escura(cima)) cima++;
+  if (cima >= h) return 0; // (a imagem toda escura: não é faixa)
+  let baixo = 0;
+  while (baixo < h && escura(h - 1 - baixo)) baixo++;
+  // (o maior dos dois lados, um pouco a mais para a borda borrada da faixa não aparecer; no máximo 30%)
+  return Math.min(0.3, Math.max(cima, baixo) / h + (Math.max(cima, baixo) ? 1 / h : 0));
+}
+// (sem poder medir — sem internet —: o corte das miniaturas 4:3, que sempre têm as faixas)
+const faixasPadrao = (src) => (/\/(sd\d|hqdefault)\.jpg/.test(src) ? 0.125 : 0);
+function aplicarFaixas(img, f) {
+  // esticada para fora na altura (o meio da imagem continua no meio): as faixas ficam fora da caixa
+  img.style.top = f ? `${(-f / (1 - 2 * f)) * 100}%` : '';
+  img.style.height = f ? `${100 / (1 - 2 * f)}%` : '';
+}
+function cortarFaixas(img) {
+  const src = img.currentSrc || img.src;
+  if (!img.naturalWidth || !src) return;
+  const ja = faixasMedidas.get(src);
+  if (typeof ja === 'number') { aplicarFaixas(img, ja); return; }
+  aplicarFaixas(img, faixasPadrao(src)); // (até a medida chegar)
+  if (!ja) {
+    // a medida é numa cópia pedida com CORS (o i.ytimg.com libera), num endereço só dela: a imagem da tela pode ter
+    // vindo guardada do modo offline, que não deixa ler os pixels
+    const copia = new Image();
+    copia.crossOrigin = 'anonymous';
+    const medida = new Promise((ok) => {
+      copia.onload = () => { try { ok(medirFaixasDaImagem(copia)); } catch { ok(faixasPadrao(src)); } };
+      copia.onerror = () => ok(faixasPadrao(src));
+    }).then((f) => { faixasMedidas.set(src, f); return f; });
+    faixasMedidas.set(src, medida);
+    copia.src = `${src}${src.includes('?') ? '&' : '?'}medir=1`;
+  }
+  Promise.resolve(faixasMedidas.get(src)).then((f) => { if (img.isConnected && (img.currentSrc || img.src) === src) aplicarFaixas(img, f); });
+}
+document.addEventListener('load', (e) => { if (e.target?.matches?.('.quadros img.q')) cortarFaixas(e.target); }, true);
 // tem quadros em alta? (quando não tem, o YouTube devolve uma imagem cinza de 120x90)
 function tipoDosQuadros(id) {
   return new Promise((ok) => {

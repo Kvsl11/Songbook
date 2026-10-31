@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 377, data: '2026-10-31', titulo: 'Capa animada sem as faixas pretas',
+    itens: [
+      { tipo: 'correcao', texto: 'Na capa animada das músicas não baixadas, os quadros do clipe não mostram mais as faixas pretas em cima e embaixo (as das miniaturas do YouTube e as dos clipes filmados como cinema): cada imagem é medida e ampliada só o bastante para elas ficarem de fora.' },
+    ],
+  },
+  {
     versao: 376, data: '2026-10-31', titulo: 'A música entra com a letra já sincronizada',
     itens: [
       { tipo: 'correcao', texto: 'A música da busca não entra mais antes da letra sincronizada: quando um serviço da letra falha por um instante, o app tenta de novo até achar (ou ter certeza de que não há); antes desistia depois de duas tentativas e a letra aparecia segundos depois de entrar.' },
@@ -67,13 +73,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'A música aberta (da busca, da biblioteca, de um repertório) começa na versão da música, com a capa e a letra sincronizada, e não no vídeo. No vídeo não há letra, e por isso parecia que a sincronia não funcionava.' },
       { tipo: 'melhoria', texto: 'A capa animada funciona sem baixar a música: passam os quadros do clipe; nas músicas baixadas, o próprio vídeo.' },
-    ],
-  },
-  {
-    versao: 367, data: '2026-10-31', titulo: 'Letra sincronizada de volta, e mais rápida',
-    itens: [
-      { tipo: 'correcao', texto: 'A letra sincronizada voltou: o app só perguntava ao LRCLIB depois de achar o áudio oficial e a duração do vídeo no YouTube, por serviços que andam fora do ar, e a letra demorava minutos ou nunca vinha. Agora o LRCLIB é consultado na hora e a letra aparece em poucos segundos.' },
-      { tipo: 'melhoria', texto: 'Enquanto o áudio oficial é procurado, a letra já acompanha o vídeo; quando ele é encontrado, ela passa para ele com os tempos exatos. Se a posição for estimada, aparece “Letra sincronizada (aproximada)”.' },
     ],
   },
 ];
