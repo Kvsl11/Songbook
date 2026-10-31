@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 359, data: '2026-10-30', titulo: 'Capas e fotos corretas desde o primeiro resultado',
+    itens: [
+      { tipo: 'correcao', texto: 'A busca agora prepara a capa oficial e a foto do artista antes de exibir as músicas. A miniatura antiga não aparece mais para ser substituída depois; a lista surge já com as imagens encontradas.' },
+    ],
+  },
+  {
     versao: 358, data: '2026-10-30', titulo: 'Capas de álbuns e fotos de artistas nas buscas',
     itens: [
       { tipo: 'melhoria', texto: 'Nas buscas, as músicas passam a mostrar a capa oficial do single ou álbum, separada da foto do artista. As fotos dos artistas também aparecem nas listas e nos resultados de artistas.' },
