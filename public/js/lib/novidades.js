@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 367, data: '2026-10-31', titulo: 'Letra sincronizada de volta, e mais rápida',
+    itens: [
+      { tipo: 'correcao', texto: 'A letra sincronizada voltou: o app só perguntava ao LRCLIB depois de achar o áudio oficial e a duração do vídeo no YouTube, por serviços que andam fora do ar, e a letra demorava minutos ou nunca vinha. Agora o LRCLIB é consultado na hora e a letra aparece em poucos segundos.' },
+      { tipo: 'melhoria', texto: 'Enquanto o áudio oficial é procurado, a letra já acompanha o vídeo; quando ele é encontrado, ela passa para ele com os tempos exatos. Se a posição for estimada, aparece “Letra sincronizada (aproximada)”.' },
+    ],
+  },
+  {
     versao: 366, data: '2026-10-31', titulo: 'Fila como a do Spotify',
     itens: [
       { tipo: 'melhoria', texto: 'Cada música da fila tem os três tracinhos (≡) à direita, indicando que dá para mudar a posição. Segurando a música, ela fica com o fundo mais claro e acompanha o dedo, o lugar onde vai cair fica vazio e as outras deslizam para abrir espaço.' },
@@ -62,13 +69,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'melhoria', texto: 'Nas buscas, as músicas passam a mostrar a capa oficial do single ou álbum, separada da foto do artista. As fotos dos artistas também aparecem nas listas e nos resultados de artistas.' },
       { tipo: 'melhoria', texto: 'Na biblioteca, as músicas mostram a foto do artista ao lado do nome e recebem a capa oficial quando a capa anterior era provisória. As capas escolhidas manualmente continuam preservadas.' },
-    ],
-  },
-  {
-    versao: 357, data: '2026-10-30', titulo: 'Fila de reprodução reorganizável',
-    itens: [
-      { tipo: 'melhoria', texto: 'O aleatório agora embaralha a ordem real da fila, que também pode ser reorganizada arrastando as músicas com o dedo ou o mouse. A seleção por teclado também permite mover faixas.' },
-      { tipo: 'melhoria', texto: 'A fila mostra a duração de cada música quando disponível e busca a duração que estiver faltando para guardá-la na biblioteca.' },
     ],
   },
 ];
