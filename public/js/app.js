@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.31-366';
+export const APP_VERSAO = '2026.10.31-367';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -9068,11 +9068,11 @@ function viewSong(id, ctx = {}) {
     if (!box) return;
     const procurando = song.sincronizando || sincronizando.has(isPreview ? preview : song.id);
     const estado = !midiaDe(song) ? '' : sinc ? 'ok' : procurando ? 'procurando' : 'sem';
-    if (estado === estadoSincDesenhado) return;
-    estadoSincDesenhado = estado;
+    if (`${estado}${sinc?.aproximada ? 'a' : ''}` === estadoSincDesenhado) return;
+    estadoSincDesenhado = `${estado}${sinc?.aproximada ? 'a' : ''}`;
     box.hidden = !estado;
     box.className = `sinc-estado ${estado}`;
-    box.innerHTML = estado === 'ok' ? `${icon('text', 13)}<span>Letra sincronizada</span>`
+    box.innerHTML = estado === 'ok' ? `${icon('text', 13)}<span>Letra sincronizada${sinc?.aproximada ? ' (aproximada)' : ''}</span>`
       : estado === 'procurando' ? '<span class="spin"></span><span>Procurando a letra sincronizada…</span>'
         : estado === 'sem' ? `${icon('info', 13)}<span>Sem letra sincronizada para esta música</span>` : '';
   };
@@ -11256,6 +11256,17 @@ const tentouSincronizar = new Set();
 // a música permanece sem sincronia; nenhum áudio é enviado a servidor de IA.
 const sincronizando = new Set();
 const OPÇÕES_LRCLIB_RÁPIDAS = { espera: 1000, timeout: 10000, tentativas: 4 };
+// os tempos da letra adiantados d segundos (o vídeo com d segundos de cena antes da música)
+const deslocarTempos = (tempos, d) => (d ? tempos.map((t) => ({ inicio: Math.round((t.inicio + d) * 100) / 100, fim: Math.round((t.fim + d) * 100) / 100 })) : tempos);
+// a mesma gravação: as durações perto (ou uma delas desconhecida)
+const mesmaDuracao = (a, b) => !(a > 0) || !(b > 0) || Math.abs(a - b) <= 4;
+// A letra sincronizada do LRCLIB vem PRIMEIRO, sem esperar nada do YouTube: antes o app só perguntava ao LRCLIB depois
+// de achar o áudio oficial e a duração do vídeo (pelo Piped e pelo Jina, que andam fora do ar ou lentos), e a letra
+// demorava minutos ou nunca vinha. Agora:
+// 1. o LRCLIB responde (a letra da gravação, com a duração dela);
+// 2. com o áudio oficial já conhecido (e da mesma duração), a letra fica nele, exata;
+// 3. senão, fica no vídeo que toca: exata, se ele tem a duração da gravação; senão provisória (com o deslocamento
+//    estimado pela diferença das durações) até o áudio oficial aparecer, em segundo plano, e ela passar para ele
 async function sincronizarMusica(song, { noVideo = '', audioPromise = null } = {}) {
   const previaOriginal = song?.id === 'previa' ? preview : null;
   song = (song?.id === 'previa' ? { ...song, ...preview } : db.song(song?.id)) || song;
@@ -11264,75 +11275,109 @@ async function sincronizarMusica(song, { noVideo = '', audioPromise = null } = {
   const chaveSincronizacao = previaOriginal || song.id;
   if (!song?.id || sincronizando.has(chaveSincronizacao)) return undefined;
   sincronizando.add(chaveSincronizacao);
+  const agora = () => (song.id === 'previa' ? (preview === previaOriginal ? { ...song, ...preview } : null) : db.song(song.id));
+  const alvo = () => (song.id === 'previa' ? preview : db.song(song.id));
   try {
-    // Primeiro confirma qual gravação de áudio acompanha o clipe. Só depois consulta o LRCLIB,
-    // usando a duração da gravação correta; consultar antes com a duração do clipe podia descartar
-    // a letra certa e deixar a música marcada como já tentada.
-    const descoberta = audioPromise || (song.youtube && !song.audioProprio && !versoesDe(song)?.audio
+    // (a descoberta do áudio oficial anda junto, sem segurar o LRCLIB)
+    const descoberta = (audioPromise || (song.youtube && !song.audioProprio && !versoesDe(song)?.audio
       ? descobrirVersoes(song)
-      : Promise.resolve(versoesDe(song)));
-    await descoberta.catch(() => null);
-    if (previaOriginal && preview !== previaOriginal) return 'nada';
-    song = (song.id === 'previa' ? { ...song, ...preview } : db.song(song.id)) || song;
-
+      : Promise.resolve(versoesDe(song)))).catch(() => null);
+    const titulo = tituloLimpo(song.title);
+    const artista = song.artist || '';
     let vs = versoesDe(song);
-    let yt = noVideo && (noVideo === vs?.audio || ehArquivo(noVideo)) ? noVideo : videoDaLetra(song);
-    if (!yt) return 'nada';
-    let duracao = (vs?.audio === yt ? Number(vs.duracao) || 0 : 0)
-      || (ehArquivo(yt) ? Number(song.audioProprio?.duracao) || 0 : 0)
-      || (player.atual?.youtube === yt && player.duracao)
-      || await duracaoDaMusica(song).catch(() => 0);
-    let lrc = await letraSincronizada(
-      { titulo: tituloLimpo(song.title), artista: song.artist || '', duracao },
-      undefined, OPÇÕES_LRCLIB_RÁPIDAS,
-    );
-    if (!lrc?.linhas?.length || !lrc?.tempos?.length) return 'nada';
 
-    // Se o LRCLIB indicar que a letra pertence a uma gravação mais curta que o clipe,
-    // procura essa gravação e consulta novamente com a duração exata dela.
-    // Sem achar essa gravação, ainda vale a letra do LRCLIB feita para a duração do que toca (o clipe ou o áudio de
-    // agora), se houver uma: antes a música que tinha a letra sincronizada ficava sem ela
-    const naDuracaoDoQueToca = async () => {
-      const durAgora = duracao || await duracaoDaMusica(song).catch(() => 0);
-      if (!(durAgora > 0)) return 'nada';
-      const outra = await letraSincronizada(
-        { titulo: tituloLimpo(song.title), artista: song.artist || '', duracao: durAgora },
-        undefined, { ...OPÇÕES_LRCLIB_RÁPIDAS, preferirDuracao: true },
-      ).catch(() => null);
-      if (!outra?.linhas?.length || !outra?.tempos?.length || outra.ajustar) return 'nada';
-      guardarSincronia(song, { video: yt, linhas: outra.linhas, tempos: outra.tempos, fonte: 'lrclib', ...(outra.duracao ? { duracao: outra.duracao } : {}) });
+    // o áudio da própria pessoa: a letra vale nele se for a mesma gravação (ou a feita para a duração dele)
+    if (song.audioProprio && (!noVideo || ehArquivo(noVideo))) {
+      const durArq = Number(song.audioProprio.duracao) || 0;
+      let lrc = await letraSincronizada({ titulo, artista, duracao: durArq }, undefined, OPÇÕES_LRCLIB_RÁPIDAS);
+      if (lrc?.ajustar) lrc = await letraSincronizada({ titulo, artista, duracao: durArq }, undefined, { ...OPÇÕES_LRCLIB_RÁPIDAS, preferirDuracao: true }).catch(() => null);
+      if (!lrc?.tempos?.length || lrc.ajustar) return 'nada';
+      guardarSincronia(alvo(), { video: ARQ + song.id, linhas: lrc.linhas, tempos: lrc.tempos, fonte: 'lrclib', ...(lrc.duracao ? { duracao: lrc.duracao } : {}) });
       return 'ok';
-    };
-    if (lrc.ajustar && song.youtube && !ehArquivo(yt)) {
-      const achado = await procurarAudio(song, Number(lrc.duracao) || 0).catch(() => null);
-      if (!achado || achado.id === yt || achado.id === song.youtube) return naDuracaoDoQueToca();
-      const durClipe = (player.atual?.youtube === song.youtube && player.duracao)
-        || await duracaoDaMusica(song).catch(() => 0);
-      guardarVersoes(song, {
-        video: song.youtube, audio: achado.id, duracao: achado.segundos,
-        pares: paresPelaDuracao(durClipe, achado.segundos),
-      });
-      song = (song.id === 'previa' ? { ...song, ...preview } : db.song(song.id)) || song;
-      vs = versoesDe(song);
-      yt = vs?.audio || achado.id;
-      duracao = Number(vs?.duracao) || achado.segundos || 0;
-      lrc = await letraSincronizada(
-        { titulo: tituloLimpo(song.title), artista: song.artist || '', duracao },
-        undefined, OPÇÕES_LRCLIB_RÁPIDAS,
-      );
     }
-    if (lrc?.ajustar) return naDuracaoDoQueToca();
+    if (!song.youtube) return 'nada';
+
+    // 1. o LRCLIB, já (com a duração do áudio oficial, se ele já é conhecido, só para desempatar)
+    const durAudioSabida = vs?.audio && !ehArquivo(vs.audio) ? Number(vs.duracao) || 0 : 0;
+    const lrc = await letraSincronizada({ titulo, artista, duracao: durAudioSabida }, undefined, OPÇÕES_LRCLIB_RÁPIDAS);
     if (!lrc?.linhas?.length || !lrc?.tempos?.length) return 'nada';
-    guardarSincronia(song, {
-      video: yt, linhas: lrc.linhas, tempos: lrc.tempos, fonte: 'lrclib',
-      ...(lrc.duracao ? { duracao: lrc.duracao } : {}),
-    });
-    return 'ok';
+    if (!agora()) return 'nada'; // (a pessoa já abriu outra música)
+    const durLrc = Number(lrc.duracao) || 0;
+    const naGravacao = (video) => ({ video, linhas: lrc.linhas, tempos: lrc.tempos, fonte: 'lrclib', ...(durLrc ? { duracao: durLrc } : {}) });
+
+    // 2. o áudio oficial já conhecido e da mesma gravação: exata nele
+    vs = versoesDe(agora());
+    if (vs?.audio && !ehArquivo(vs.audio) && mesmaDuracao(Number(vs.duracao) || 0, durLrc)) {
+      guardarSincronia(alvo(), naGravacao(vs.audio));
+      return 'ok';
+    }
+    // 3. o vídeo que toca (o clipe), pela duração que já se sabe dele
+    const clipe = agora().youtube;
+    const durClipe = Number(agora().duracao) || player.duracaoDe(clipe) || (player.atual?.youtube === clipe && player.duracao) || 0;
+    if (!vs?.audio && durClipe > 0 && mesmaDuracao(durClipe, durLrc)) {
+      guardarSincronia(alvo(), naGravacao(clipe)); // (o vídeo é a própria gravação)
+      return 'ok';
+    }
+    // provisória no clipe (a letra já aparece e acompanha), enquanto o áudio oficial é procurado
+    if (!vs?.audio) {
+      const desloc = durClipe > durLrc && durLrc > 0 ? Math.round((durClipe - durLrc) * 10) / 10 : 0;
+      guardarSincronia(alvo(), { ...naGravacao(clipe), tempos: deslocarTempos(lrc.tempos, desloc), provisoria: true, desloc, ...(durClipe > 0 ? { aproximada: true } : {}) });
+    }
+    void melhorarSincronia(song, previaOriginal, { lrc, descoberta, titulo, artista });
+    return vs?.audio ? 'nada' : 'ok';
   } catch {
     return 'erro';
   } finally {
     sincronizando.delete(chaveSincronizacao);
   }
+}
+// Em segundo plano: espera a descoberta do áudio oficial (ou procura o da duração da letra) e passa a letra para ele,
+// exata; sem áudio oficial, confere a duração do clipe e, se ele tiver uma letra feita para a duração dele, usa essa
+const melhorando = new Set();
+async function melhorarSincronia(song, previaOriginal, { lrc, descoberta, titulo, artista }) {
+  const chave = previaOriginal || song.id;
+  if (melhorando.has(chave)) return;
+  melhorando.add(chave);
+  const agora = () => (song.id === 'previa' ? (preview === previaOriginal ? preview : null) : db.song(song.id));
+  const durLrc = Number(lrc.duracao) || 0;
+  const naGravacao = (video) => ({ video, linhas: lrc.linhas, tempos: lrc.tempos, fonte: 'lrclib', ...(durLrc ? { duracao: durLrc } : {}) });
+  const exata = (s) => s?.sincronia?.fonte === 'lrclib' && !s.sincronia.provisoria && s.sincronia.video === videoDaLetra(s);
+  try {
+    await descoberta;
+    let s = agora();
+    if (!s || exata(s)) return;
+    let vs = versoesDe(s);
+    // a descoberta achou o áudio, mas de outra duração (ou não achou): procura o da duração da letra
+    if (!(vs?.audio && mesmaDuracao(Number(vs.duracao) || 0, durLrc)) && durLrc > 0 && !ehArquivo(vs?.audio)) {
+      const achado = await procurarAudio(s, durLrc).catch(() => null);
+      s = agora();
+      if (!s || exata(s)) return;
+      if (achado && achado.id !== s.youtube) {
+        const durClipe = player.duracaoDe(s.youtube) || await duracaoDaMusica(s).catch(() => 0);
+        s = agora();
+        if (!s) return;
+        guardarVersoes(s, { video: s.youtube, audio: achado.id, duracao: achado.segundos, pares: paresPelaDuracao(durClipe, achado.segundos) });
+        void acertarVersoes(s);
+      }
+      vs = versoesDe(agora() || {});
+    }
+    s = agora();
+    if (!s || exata(s)) return;
+    if (vs?.audio && !ehArquivo(vs.audio) && mesmaDuracao(Number(vs.duracao) || 0, durLrc)) { guardarSincronia(s, naGravacao(vs.audio)); return; }
+    // sem o áudio oficial: o clipe, pela duração dele (a letra feita para ele, ou a da gravação no deslocamento)
+    const durClipe = player.duracaoDe(s.youtube) || await duracaoDaMusica(s).catch(() => 0);
+    s = agora();
+    if (!s || exata(s) || versoesDe(s)?.audio || !(durClipe > 0)) return;
+    if (mesmaDuracao(durClipe, durLrc)) { guardarSincronia(s, naGravacao(s.youtube)); return; }
+    const doClipe = await letraSincronizada({ titulo, artista, duracao: durClipe }, undefined, { ...OPÇÕES_LRCLIB_RÁPIDAS, preferirDuracao: true }).catch(() => null);
+    s = agora();
+    if (!s || exata(s) || versoesDe(s)?.audio) return;
+    if (doClipe?.tempos?.length && !doClipe.ajustar) guardarSincronia(s, { video: s.youtube, linhas: doClipe.linhas, tempos: doClipe.tempos, fonte: 'lrclib', ...(doClipe.duracao ? { duracao: doClipe.duracao } : {}) });
+    else if (s.sincronia?.provisoria && !s.sincronia.aproximada) {
+      const desloc = durClipe > durLrc && durLrc > 0 ? Math.round((durClipe - durLrc) * 10) / 10 : 0;
+      guardarSincronia(s, { ...naGravacao(s.youtube), tempos: deslocarTempos(lrc.tempos, desloc), provisoria: true, aproximada: true, desloc });
+    }
+  } catch { /* fica a provisória */ } finally { melhorando.delete(chave); }
 }
 
 // A preparação começa no clique/entrada da música: descoberta do áudio e LRCLIB em paralelo.
@@ -11344,18 +11389,19 @@ function prepararMusicaAoAbrir(song) {
     ? descobrirVersoes(song)
     : Promise.resolve(versoesDe(song));
   const sincAtual = song.sincronia;
-  if (sincAtual?.fonte === 'lrclib' && sincAtual.video === videoDaLetra(song) && sincAtual.tempos?.length) {
-    return audioPromise.then(() => {
+  if (sincAtual?.fonte === 'lrclib' && sincAtual.video === videoDaLetra(song) && sincAtual.tempos?.length && !sincAtual.provisoria) {
+    // (já sincronizada: abre na hora; se a descoberta do áudio mudar a versão, a sincronia é refeita depois)
+    void audioPromise.then(() => {
       const atual = song.id === 'previa' ? preview : db.song(song.id);
-      return atual?.sincronia?.fonte === 'lrclib'
-        && atual.sincronia.video === videoDaLetra(atual)
-        && atual.sincronia.tempos?.length ? 'ok' : prepararMusicaAoAbrir(atual || song);
+      if (atual && !(atual.sincronia?.fonte === 'lrclib' && atual.sincronia.video === videoDaLetra(atual) && atual.sincronia.tempos?.length)) void prepararMusicaAoAbrir(atual);
     });
+    return Promise.resolve('ok');
   }
   tentouSincronizar.delete(chave);
   tentouSincronizar.add(chave);
+  // (o LRCLIB não espera a descoberta do áudio oficial: a letra vem assim que ele responder)
   const sincroniaPromise = sincronizarMusica(song, { audioPromise });
-  return Promise.all([audioPromise, sincroniaPromise]).then(([, resultado]) => {
+  return sincroniaPromise.then((resultado) => {
     const atual = song.id === 'previa' ? preview : db.song(song.id);
     const valida = atual?.youtube
       && atual.sincronia?.fonte === 'lrclib'
@@ -11439,6 +11485,12 @@ async function descobrirVersoes(song) {
 function guardarVersoes(song, versoes) {
   song.versoes = versoes;
   if (song.id === 'previa') { if (preview) preview.versoes = versoes; } else if (db.song(song.id)) db.updateSong(song.id, { versoes });
+  // a letra provisória no clipe (a da gravação, deslocada) passa para o áudio oficial, já sem o deslocamento: exata
+  const s0 = (song.id === 'previa' ? preview : db.song(song.id))?.sincronia || song.sincronia;
+  if (s0?.fonte === 'lrclib' && s0.provisoria && versoes?.audio && !ehArquivo(versoes.audio) && s0.video === versoes.video && mesmaDuracao(Number(versoes.duracao) || 0, Number(s0.duracao) || 0)) {
+    const { provisoria, aproximada, desloc, ...resto } = s0;
+    guardarSincronia(song.id === 'previa' ? preview : db.song(song.id) || song, { ...resto, video: versoes.audio, tempos: deslocarTempos(s0.tempos, -(desloc || 0)) });
+  }
   player.versoes(song);
 }
 // O alinhamento entre a faixa e o videoclipe é calculado localmente no aparelho; não usa IA/servidor.
