@@ -10,7 +10,7 @@
 // - YouTube: busca pelo Piped (instâncias públicas, com CORS); o oEmbed confirma um link colado.
 
 import { decodeEntities, normalize } from './html.js';
-import { cifraComCapo, doEditor, ehCabecalho, ehNomeDeParte, isChord, isChordOnlyLine, linhaDeTab, organizarPartes, partesDosBlocos, preferFlatsFor, semInvisiveis, semIntro, temInvisiveis, transposeChordPro } from '../chordpro.js';
+import { cifraComCapo, doEditor, ehCabecalho, ehInfoDaCifra, ehNomeDeParte, isChord, isChordOnlyLine, linhaDeTab, organizarPartes, partesDosBlocos, preferFlatsFor, semInvisiveis, semIntro, temInvisiveis, transposeChordPro } from '../chordpro.js';
 
 const NO_NAVEGADOR = typeof window !== 'undefined';
 const UA = NO_NAVEGADOR ? {} : { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36', 'Accept-Language': 'pt-BR,pt;q=0.9' };
@@ -66,7 +66,8 @@ export const ehCifraClub = (url) => /^https?:\/\/(www\.|m\.)?cifraclub\.com\.br\
 // ------------------------------------------------------------------ Cifra Club: página da cifra
 
 // Texto de cifra (acordes em cima da letra, partes em [Colchetes]) -> ChordPro com seções
-export const cifraTextoParaChordPro = (texto) => doEditor(texto);
+// (as linhas de informação — afinação, capotraste, batida, créditos… — saem já ao trazer a cifra)
+export const cifraTextoParaChordPro = (texto) => doEditor(String(texto || '').split('\n').filter((l) => !ehInfoDaCifra(l)).join('\n'));
 
 // o vídeo do YouTube que a página (Cifra Club, Letras) mostra junto da música
 // (estrito: só links do YouTube, data-video-id e "youtubeId", e o código com exatamente 11 caracteres, sem ser um número)
@@ -490,6 +491,8 @@ export async function letraSincronizada(
   const a = String(artista || '').trim();
   if (!t) return null;
   let respondeu = false;
+  // a reserva (NetEase) já começa junto: se o LRCLIB não tiver ou estiver fora do ar, ela já está pronta
+  const pReserva = letraSincronizadaNetease({ titulo: t, artista: a, duracao }, fetchImpl, { preferirDuracao }).catch(() => null);
   const pedir = async (params) => {
     // (o LRCLIB caiu há pouco — a API dele responde 502 quando o servidor de trás está fora —: nem tenta, vai direto à
     // reserva, em vez de esperar ~30 s de tentativas a cada música)
@@ -499,7 +502,7 @@ export async function letraSincronizada(
         const res = await buscar(`https://lrclib.net/api/search?${params}`, { fetchImpl, timeout });
         if (res.status === 502 || res.status === 521 || res.status === 522) {
           // (fora do ar, não ocupado: uma segunda tentativa e, falhando de novo, desiste por 2 minutos)
-          if (vez >= 1) { lrclibForaAte = Date.now() + 120e3; throw new Error('LRCLIB fora do ar'); }
+          if (vez >= 1) { lrclibForaAte = Date.now() + 20e3; throw new Error('LRCLIB fora do ar'); }
           await new Promise((ok) => setTimeout(ok, Math.min(espera, 800)));
           continue;
         }
@@ -555,7 +558,7 @@ export async function letraSincronizada(
     if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: oficial.id, duracao: oficial.duration || 0, ...(bate ? {} : { ajustar: true }) };
   }
   // sem a letra no LRCLIB (ou ele fora do ar): a da NetEase, que tem a letra sincronizada de muitas músicas
-  const reserva = await letraSincronizadaNetease({ titulo: t, artista: a, duracao }, fetchImpl, { preferirDuracao }).catch(() => null);
+  const reserva = await pReserva;
   if (reserva) return reserva;
   if (!respondeu) throw new Error('O LRCLIB não respondeu agora');
   return null;
@@ -570,14 +573,12 @@ const NETEASE = 'https://music.163.com/api';
 const PROXIES_JSON = ['https://api.allorigins.win/raw?url={url}', 'https://api.codetabs.com/v1/proxy/?quest={url}', 'https://r.jina.ai/{raw}'];
 async function jsonSemCors(url, { fetchImpl, proxies = PROXIES_JSON } = {}) {
   const tentativas = [...(NO_NAVEGADOR ? [] : [[url, {}]]), ...proxies.map((p) => [viaProxy(p, url), /r\.jina\.ai/.test(p) ? { 'X-Return-Format': 'text' } : {}])];
-  for (const [alvo, headers] of tentativas) {
-    try {
-      const res = await buscar(alvo, { fetchImpl, timeout: 15000, headers });
-      if (!res.ok) continue;
-      return lerJsonp(await res.text());
-    } catch { /* o próximo */ }
-  }
-  return null;
+  // (todos ao mesmo tempo, vale o primeiro que responder: um de cada vez, um fora do ar fazia esperar 15 s)
+  return Promise.any(tentativas.map(async ([alvo, headers]) => {
+    const res = await buscar(alvo, { fetchImpl, timeout: 10000, headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return lerJsonp(await res.text());
+  })).catch(() => null);
 }
 // as linhas de créditos que a NetEase põe no começo ("作词 : …", "作曲 : …") e o título/artista falados no começo
 const CREDITO = /[\u4e00-\u9fff]|^\s*(lyrics?|composed|written|producer|produced|arranged)\s*(by)?\s*[:：]/i;
@@ -600,22 +601,74 @@ export async function letraSincronizadaNetease({ titulo = '', artista = '', dura
   if (!candidatas.length) return null;
   // (com a duração conhecida, a da mesma gravação primeiro)
   if (duracao > 0) candidatas.sort((x, y) => Math.abs(x.duracao - duracao) - Math.abs(y.duracao - duracao));
-  for (const c of candidatas.slice(0, 3)) {
-    const j = await jsonSemCors(`${NETEASE}/song/lyric?id=${c.id}&lv=1`, { fetchImpl });
+  const letras = candidatas.slice(0, 3).map((c) => jsonSemCors(`${NETEASE}/song/lyric?id=${c.id}&lv=1`, { fetchImpl }));
+  let censuradaReserva = null;
+  for (const [k, c] of candidatas.slice(0, 3).entries()) {
+    const j = await letras[k];
     const lrc = lrcSemCreditos(j?.lrc?.lyric || '', { titulo: t, artista: a });
     const sinc = sincroniaDoLrc(lrc, c.duracao || duracao);
     if (sinc.linhas.length < 4) continue;
     const bate = !(duracao > 0) || !(c.duracao > 0) || Math.abs(c.duracao - duracao) <= 4;
     if (!bate && preferirDuracao) continue;
-    return { ...sinc, fonte: 'netease', id: `ne:${c.id}`, duracao: c.duracao || 0, ...(bate ? {} : { ajustar: true }) };
+    const r = { ...sinc, fonte: 'netease', id: `ne:${c.id}`, duracao: c.duracao || 0, ...(bate ? {} : { ajustar: true }) };
+    // (a letra com palavras escondidas fica de reserva: outra versão pode ter a letra inteira)
+    if (censurada(lrc)) { censuradaReserva ||= r; continue; }
+    return r;
   }
-  return null;
+  return censuradaReserva;
 }
 // A gravação oficial entre as letras da mesma música no LRCLIB: a duração que mais aparece (até 2 s de diferença; as
 // coletâneas repetem a do álbum), de preferência não ao vivo; no empate, a da duração do vídeo. Antes valia a letra
 // com a duração do vídeo, e uma feita para o videoclipe (como a de "Tears", de 304 s, contra 160 s da gravação) fazia
 // o clipe passar por gravação: a música não ganhava o áudio oficial e a letra saía fora do tempo
 const aoVivo = (r) => /\b(ao vivo|live|ac[uú]stico|acoustic)\b/i.test(`${r.trackName || ''} ${r.albumName || ''}`);
+// a letra com palavras escondidas por asteriscos ("give a ****s", "f**k")
+export const censurada = (t) => /\*{2,}|\p{L}\*+\p{L}?/u.test(String(t || ''));
+// As palavras escondidas por asteriscos voltam a ser as cantadas: pela letra da própria música (a da cifra, que vem
+// inteira), na linha mais parecida, a palavra no mesmo lugar; sem ela, as mais comuns pelas letras que sobraram
+// ("f**k", "sh*t"…). As que não dá para saber ficam como estão
+const PALAVRAS_ESCONDIDAS = [[/^f[*u]{1}[*c]{1}[*k]{1}$|^f\*\*\*$|^f\*ck$|^f\*\*k$/i, 'fuck'], [/^sh\*t$|^s\*\*t$|^s\*it$/i, 'shit'], [/^b\*tch$|^b\*\*ch$|^b\*\*\*h$|^b\*\*\*\*$/i, 'bitch'],
+  [/^d\*mn$|^d\*\*n$/i, 'damn'], [/^a\*\*$/i, 'ass'], [/^p\*ssy$|^p\*\*\*y$/i, 'pussy'], [/^d\*ck$|^d\*\*k$/i, 'dick'], [/^h\*ll$/i, 'hell']];
+const palavraEscondida = (tok) => {
+  const m = /^([^\p{L}*]*)([\p{L}*']+?)((?:in'?|ing|ed|er|s)?)([^\p{L}*]*)$/u.exec(tok);
+  if (!m || !m[2].includes('*')) return null;
+  const achada = PALAVRAS_ESCONDIDAS.find(([re]) => re.test(m[2]));
+  return achada ? m[1] + (m[2][0] === m[2][0].toUpperCase() && /\p{L}/u.test(m[2][0]) ? achada[1][0].toUpperCase() + achada[1].slice(1) : achada[1]) + m[3] + m[4] : null;
+};
+export function semCensura(linhas, letraDaMusica = []) {
+  const norm = (w) => normalize(w).replace(/[^a-z0-9]/g, '');
+  const daMusica = (letraDaMusica || []).map((l) => String(l).split(/\s+/).filter(Boolean));
+  return (linhas || []).map((linha) => {
+    if (!censurada(linha)) return linha;
+    const toks = linha.split(/(\s+)/);
+    const palavras = toks.filter((t) => t.trim());
+    // a linha da música mais parecida (as palavras que não estão escondidas), do mesmo tamanho (±1)
+    const visiveis = new Set(palavras.filter((w) => !w.includes('*')).map(norm));
+    let melhor = null;
+    let nota = 0;
+    for (const ws of daMusica) {
+      if (Math.abs(ws.length - palavras.length) > 1 || ws.some((w) => w.includes('*'))) continue;
+      const n = ws.filter((w) => visiveis.has(norm(w))).length / Math.max(1, visiveis.size);
+      if (n > nota) { nota = n; melhor = ws; }
+    }
+    let k = -1;
+    return toks.map((t) => {
+      if (!t.trim()) return t;
+      k++;
+      if (!t.includes('*')) return t;
+      // pela música: a palavra no mesmo lugar (ou na vizinha, se a linha tem uma palavra a mais ou a menos)
+      if (melhor && nota >= 0.6) {
+        const iguais = (a, b) => a !== undefined && b !== undefined && norm(a) === norm(b);
+        const d = melhor.length === palavras.length ? 0 : [0, -1, 1].find((x) => iguais(melhor[k - 1 + x], palavras[k - 1]) || iguais(melhor[k + 1 + x], palavras[k + 1])) ?? 0;
+        const w = melhor[k + d];
+        const pref = /^[^\p{L}*]*/u.exec(t)[0];
+        const suf = /[^\p{L}*]*$/u.exec(t)[0];
+        if (w && !w.includes('*')) return pref + w.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '') + suf;
+      }
+      return palavraEscondida(t) || t;
+    }).join('');
+  });
+}
 export function gravacaoOficial(mesmas, duracao = 0) {
   const grupos = [];
   for (const r of mesmas) {
@@ -625,7 +678,9 @@ export function gravacaoOficial(mesmas, duracao = 0) {
   }
   const nota = (g) => g.itens.length * 10 + (g.itens.some((r) => !aoVivo(r)) ? 5 : 0) + (duracao > 0 && Math.abs(g.d - duracao) <= 4 ? 1 : 0);
   const melhor = grupos.reduce((x, y) => (nota(y) > nota(x) ? y : x));
-  return melhor.itens.find((r) => !aoVivo(r)) || melhor.itens[0];
+  // (a letra sem as palavras escondidas com asteriscos, quando há uma: a música explícita aparece como é cantada)
+  return melhor.itens.find((r) => !aoVivo(r) && !censurada(r.syncedLyrics)) || melhor.itens.find((r) => !censurada(r.syncedLyrics))
+    || melhor.itens.find((r) => !aoVivo(r)) || melhor.itens[0];
 }
 
 // Letra simples -> ChordPro: estrofes separadas por linha em branco; as partes saem sozinhas (partesDosBlocos):

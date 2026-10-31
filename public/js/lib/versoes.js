@@ -12,7 +12,8 @@ export function mesmaSincronia(pares, tolerancia = 0.8) {
     Number.isFinite(audio) && Number.isFinite(video) && Math.abs(audio - video) <= tolerancia);
 }
 // outra gravação da mesma música (o tempo do LRCLIB não vale) ou outra edição dela
-const OUTRA_GRAVACAO = /\b(live|ao vivo|en vivo|cover|karaoke|instrumental|remix|sped up|slowed|nightcore|acustic[oa]|acoustic|reverb|8d|playback|versao|version|edit)\b/;
+// (e a versão limpa, com os palavrões cortados: o modo música toca a gravação como ela é)
+const OUTRA_GRAVACAO = /\b(live|ao vivo|en vivo|cover|karaoke|instrumental|remix|sped up|slowed|nightcore|acustic[oa]|acoustic|reverb|8d|playback|versao|version|edit|clean|censored|radio edit)\b/;
 // sem a voz (o modo música é a gravação cantada, para a letra acompanhar): a base, o instrumental, o karaokê, os
 // multitracks e as versões só num instrumento; no título ou no nome do canal
 const SEM_VOZ = /\b(instrumentals?|instrumentais|karaoke|playback|pb|base|bases|backing( track)?|minus one|sem voz|no vocals?|without vocals?|off vocal|vocal removed|fundo musical|multitracks?|stems?|beat|type beat|piano|violao|guitarra|guitar|teclado|sax|saxofone|flauta|violino|cello|8 ?bit|music box|lofi|lo fi)\b/;

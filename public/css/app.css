@@ -4123,3 +4123,8 @@ html.pp.tablet body.com-player:not(.painel-recolhido):not(.com-letra-cheia) .pl-
 .artista-mini { display: inline-grid; place-items: center; width: 17px; height: 17px; margin: 0 5px 0 2px; vertical-align: -4px; overflow: hidden; border-radius: 50%; color: var(--muted); flex: none; }
 .artista-mini img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .artista-mini .sem-foto-artista { width: 100%; height: 100%; }
+/* o que está sendo preparado ao abrir a música da busca (embaixo do nome, na linha tocada) */
+.track .s .preparando { color: var(--accent-ink); font-weight: 600; animation: preparando-pulsa 1.4s ease-in-out infinite; }
+@keyframes preparando-pulsa { 50% { opacity: 0.55; } }
+/* o "E" de explícita (como no Spotify): um quadradinho com a letra, antes do artista */
+.selo-e { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-right: 5px; border-radius: 3px; background: color-mix(in srgb, var(--text) 62%, transparent); color: var(--bg, #121212); font-size: 10px; font-weight: 800; line-height: 1; vertical-align: 0; flex: none; }

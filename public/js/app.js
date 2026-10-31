@@ -1,6 +1,6 @@
 import { db, youtubeId } from './store.js';
 import { esc, renderSong } from './render.js';
-import { definirMeta, semInvisiveis, soAcordes, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasCantadas, partesCantadas, capoDaCifra, capoDaObservacao, organizarPartes } from './chordpro.js';
+import { definirMeta, semInvisiveis, soAcordes, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasCantadas, partesCantadas, capoDaCifra, capoDaObservacao, organizarPartes, parteEmIngles } from './chordpro.js';
 import { icon, iconeMenu, logo, logoLumen } from './icons.js';
 import { diagramaSvg } from './acordes.js';
 import { htmlMusica, htmlRepertorio, imprimir } from './pdf.js';
@@ -24,7 +24,7 @@ import { apagarAudio, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } f
 import { escolherAudio, mesmaSincronia, paresPelaDuracao, paresPelaLegenda, paresPelasLetras, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
 import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { embaralharIndices, moverIndice } from './lib/fila.js';
-import { audioDbDoArtista, audioDoVideo, buscarYoutube, legendasDoVideo, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { audioDbDoArtista, audioDoVideo, buscarYoutube, legendasDoVideo, semCensura, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.31-371';
+export const APP_VERSAO = '2026.10.31-375';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1091,6 +1091,7 @@ function trocarVideoDaMusica(song, url) {
   const salva = db.saveSong(mud);
   player.trocouVideo(salva);
   acertarVersoes(salva, null, { pedido: true });
+  reatarSincronia(salva);
   // (a capa pelo quadro do vídeo, nas músicas sem capa: a nova, nas listas à vista)
   const capaDepois = capa(salva).match(/src="([^"]+)"/)?.[1] || '';
   if (capaAntes && capaDepois && capaAntes !== capaDepois) trocarCapaNaTela(capaAntes, capaDepois.replace(/&amp;/g, '&'));
@@ -1098,6 +1099,40 @@ function trocarVideoDaMusica(song, url) {
   if (location.hash === `#/musica/${salva.id}` && !document.body.classList.contains('musica-na-letra')) route();
   toast(url ? 'Vídeo trocado' : 'Vídeo removido');
   return salva;
+}
+// Depois de trocar a música (o áudio) ou o vídeo, a letra sincronizada ficava presa à versão de antes: ela parava de
+// acompanhar e, às vezes, sumia (a sincronia só vale no que toca). Agora ela é refeita para a versão nova (o LRCLIB ou a
+// NetEase respondem em segundos); enquanto isso fica a letra normal
+function reatarSincronia(song) {
+  const s = song?.id === 'previa' ? preview : db.song(song?.id);
+  if (!s || !midiaDe(s)) return;
+  const sinc = s.sincronia;
+  if (sinc?.tempos?.length && sinc.video === videoDaLetra(s)) return;
+  tentouSincronizar.delete(midiaDe(s));
+  tentouSincronizar.add(midiaDe(s));
+  void sincronizarMusica(s).then((r) => { if (r === 'erro') tentouSincronizar.delete(midiaDe(s)); });
+}
+// Trocar a música ou o vídeo da música aberta da busca (a prévia), sem salvar na biblioteca. Antes o "Trocar música"
+// do Tocando agora salvava a música na hora (mesmo cancelando a escolha)
+function trocarNaPrevia(tipo, url) {
+  if (!preview) return;
+  const novo = url ? youtubeId(url) : '';
+  if (tipo === 'audio') {
+    const durA = duracoesDaBusca.get(novo) || 0;
+    const durV = duracoesDaBusca.get(preview.youtube) || 0;
+    preview.versoes = novo ? { video: preview.youtube || '', audio: novo, duracao: durA, pares: durA && durV ? paresPelaDuracao(durV, durA) : [[0, 0]] } : undefined;
+  } else {
+    preview.content = definirMeta(preview.content, 'youtube', url);
+    preview.youtube = novo;
+    const vs = preview.versoes;
+    const durV = duracoesDaBusca.get(novo) || 0;
+    preview.versoes = vs?.audio && novo && vs.audio !== novo ? { video: novo, audio: vs.audio, duracao: vs.duracao, pares: durV && vs.duracao ? paresPelaDuracao(durV, vs.duracao) : [[0, 0]] } : undefined;
+  }
+  if (!preview.versoes) delete preview.versoes;
+  guardarPrevia();
+  player.trocouVideo(preview);
+  if (versoesDe(preview)?.audio) void acertarVersoes(preview, null, { pedido: true });
+  reatarSincronia(preview);
 }
 function trocarAudioDaMusica(song, url) {
   const s = db.song(song.id);
@@ -1125,6 +1160,7 @@ function trocarAudioDaMusica(song, url) {
   // o clipe não muda; no modo música, ele passa para a nova faixa de áudio.
   player.trocouVideo(salva);
   if (novo && salva.youtube) acertarVersoes(salva, null, { pedido: true });
+  reatarSincronia(salva);
   const capaDepois = capa(salva).match(/src="([^"]+)"/)?.[1] || '';
   if (capaAntes && capaDepois && capaAntes !== capaDepois) trocarCapaNaTela(capaAntes, capaDepois.replace(/&amp;/g, '&'));
   toast(url ? 'Música trocada' : 'Versão música removida');
@@ -1419,7 +1455,8 @@ const player = (() => {
     porTexto($('.pl-fixo small', el), atual.artista || '');
     // só o artista (e a parte da missa): o tempo fica na barra de tempo (no celular ele ia junto do artista e cortava o
     // nome, "3:17 / 3:…"; a barrinha de progresso embaixo já mostra quanto falta)
-    porTexto($('.pl-txt small', el), [atual.parte, atual.artista].filter(Boolean).join(' · '));
+    // (com o "E" de explícita antes, como no Spotify)
+    porHtml($('.pl-txt small', el), seloExplicita(atual.titulo, atual.artista) + esc([atual.parte, atual.artista].filter(Boolean).join(' · ')));
     // música sem vídeo: o play é o de sempre; tocando nele (ou na pílula "Escolher um vídeo"), escolhe um vídeo do YouTube
     el.querySelectorAll('.pl-play').forEach((b) => { porHtml(b, icon(estado === 'tocando' && !atual.semVideo ? 'pause' : 'play', 20)); b.title = atual.semVideo ? 'Escolher um vídeo para tocar' : ''; });
     // a bolinha de salva (na barrinha recolhida do tablet): ✓ se a música está na biblioteca, + se não
@@ -1903,7 +1940,7 @@ const semLinhasDeAcordes = (sinc) => {
     // cifra e a marcação entra onde a parte muda (a frase sem par fica na parte de antes)
     const partes = song ? partesCantadas(song.content).map((p) => ({ ...p, linhas: p.linhas.map(linhaSemCifra).filter(Boolean) })).filter((p) => p.linhas.length) : [];
     const daCifra = partes.flatMap((p) => p.linhas);
-    const linhas = sinc ? sinc.linhas : daCifra;
+    const linhas = sinc ? semCensura(sinc.linhas, daCifra) : daCifra;
     const parteDaLinha = partes.flatMap((p, n) => p.linhas.map(() => n));
     const casadas = linhas === daCifra ? daCifra.map((_, i) => i) : casarLinhas(linhas, daCifra);
     const marcas = new Map();
@@ -1913,7 +1950,7 @@ const semLinhasDeAcordes = (sinc) => {
       const n = parteDaLinha[i];
       // a parte muda (ou o refrão recomeça pela primeira linha dele)
       if (n !== parteAntes || ((i === 0 || parteDaLinha[i - 1] !== n) && casadas[k - 1] !== i)) {
-        const nome = partes[n].nome;
+        const nome = parteEmIngles(partes[n].nome); // (sempre em inglês: Verse, Chorus, Pre-Chorus…)
         if (nome && !/^verse$/i.test(nome)) marcas.set(k, nome);
       }
       parteAntes = n;
@@ -1944,7 +1981,7 @@ const semLinhasDeAcordes = (sinc) => {
           // (só a falha da internet tenta de novo, e depois de um tempo: antes, o "não tem" apagava a marca e o
           // desenho logo abaixo pedia de novo, sem parar; o LRCLIB passava a recusar (429) e outras músicas, que têm a
           // letra sincronizada, ficavam sem ela)
-          if (r === 'erro') setTimeout(() => tentouSincronizar.delete(chaveSync), 60e3);
+          if (r === 'erro') setTimeout(() => { tentouSincronizar.delete(chaveSync); letraDe = ''; desenharLetra(); }, 8000);
           letraDe = '';
           desenharLetra();
         });
@@ -3536,12 +3573,14 @@ const semLinhasDeAcordes = (sinc) => {
     if (b.dataset.pl === 'expandir') painelCheio(!document.body.classList.contains('painel-cheio'));
     if (b.dataset.pl === 'trocar') {
       // A mesma busca escolhe a faixa de áudio ou o clipe, conforme o modo atual do player.
-      const s = db.song(atual?.songId) || (daPrevia() ? salvarDaPrevia() : null);
+      // (a música da busca, ainda não salva, troca sem ir para a biblioteca)
+      const s = db.song(atual?.songId) || (daPrevia() ? preview : null);
       if (!s) { toast('Salve a música na biblioteca para trocar a versão'); return; }
       const tipo = comCapa ? 'audio' : 'video';
       escolherVideo(s, tipo).then((url) => {
         if (url === null) return;
-        if (tipo === 'audio') trocarAudioDaMusica(s, url);
+        if (s.id === 'previa') trocarNaPrevia(tipo, url);
+        else if (tipo === 'audio') trocarAudioDaMusica(s, url);
         else trocarVideoDaMusica(s, url);
       });
     }
@@ -3891,7 +3930,7 @@ function indicadores(s) {
 
 const linhaMusica = (s, extra = '') => `
   <li class="track clickable" data-id="${s.id}" style="grid-template-columns:auto 1fr auto">
-    ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}<span class="artista-mini${s.fotoArtista ? ' com-foto' : ''}" data-artista-mini>${s.fotoArtista ? `<img src="${esc(s.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
+    ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${seloExplicita(s.title, s.artist)}${indicadores(s)}<span class="artista-mini${s.fotoArtista ? ' com-foto' : ''}" data-artista-mini>${s.fotoArtista ? `<img src="${esc(s.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
 
 // Escolhe uma música: da biblioteca ou procurando na internet (Cifra Club, cantos da missa, letras,
 // vídeos do YouTube). O que vem da internet é salvo na biblioteca. Devolve o id, 'nova' ou null.
@@ -3955,6 +3994,17 @@ async function pickSong() {
 async function salvarDaInternet(tipo, item) {
   const ja = db.songBySource(item.cifra || item.letra?.url || item.url);
   if (ja) return ja.id;
+  // a mesma música aberta agora (a prévia): salva como ela está, com a letra que aparece, a sincronia e as duas
+  // versões. Antes ela era trazida de novo da internet e, se o Cifra Club falhasse naquela hora, a música salva
+  // ficava sem letra ("Não achei a letra")
+  const fonteItem = item.cifra || item.letra?.url || '';
+  if (preview && preview.source && fonteItem && preview.source === fonteItem && linhasDeLetra(preview.content) >= 2) {
+    const salvaJa = db.saveSong({ content: preview.content, source: preview.source, transpose: preview.transpose || 0, capo: preview.capo || capoDaCifra(preview.content),
+      ...(item.fotoArtista || preview.fotoArtista ? { fotoArtista: item.fotoArtista || preview.fotoArtista } : {}),
+      ...(preview.sincronia ? { sincronia: preview.sincronia } : {}), ...(preview.versoes ? { versoes: preview.versoes } : {}) });
+    if (player.atual?.songId === 'previa') player.atualizar({ songId: salvaJa.id, href: `#/musica/${salvaJa.id}` });
+    return salvaJa.id;
+  }
   toast('Trazendo a música…');
   let r;
   try {
@@ -3975,6 +4025,8 @@ async function salvarDaInternet(tipo, item) {
   const yt = youtubeId(renderSong(content).meta.youtube);
   const prevValida = daPrevia && (!yt || youtubeId(renderSong(daPrevia.content).meta.youtube) === yt);
   if (prevValida && !yt && daPrevia.youtube) content = definirMeta(content, 'youtube', `https://www.youtube.com/watch?v=${daPrevia.youtube}`);
+  // (veio sem letra — o site falhou agora —, mas a prévia desta música tem: fica a da prévia)
+  if (prevValida && linhasDeLetra(content) < 2 && linhasDeLetra(daPrevia.content) >= 2) content = daPrevia.content;
   const salva = db.saveSong({ content: prevValida ? (letraPelaSincronia(content, daPrevia.sincronia) || content) : content, source: r.source, capo: capoDaCifra(content), ...(item.fotoArtista ? { fotoArtista: item.fotoArtista } : {}),
     ...(prevValida && daPrevia.sincronia ? { sincronia: daPrevia.sincronia } : {}), ...(prevValida && daPrevia.versoes ? { versoes: daPrevia.versoes } : {}) });
   // sem a sincronia ainda: procura agora, em segundo plano (para a música já ficar com a letra sincronizada, também
@@ -4698,8 +4750,15 @@ async function abrirMusica(dados, back, el) {
   else toast('Trazendo a música…');
   try {
     // vídeo da busca: primeiro descobre qual música é (para vir com a cifra e a letra dela)
-    const r = await trazerMusica(dados.video && !dados.cifra && !dados.letra ? await musicaDoVideo(dados.video) : dados);
-    await abrirPrevia(r.content, r.source, back, r.video);
+    // (o que está sendo preparado aparece embaixo do nome, na linha tocada)
+    const sub = el?.querySelector('.s');
+    const subAntes = sub?.innerHTML;
+    const aoPreparar = (txt) => { if (sub?.isConnected) { sub.innerHTML = `<span class="preparando">${esc(txt)}</span>`; } };
+    aoPreparar('Trazendo a cifra e a letra…');
+    try {
+      const r = await trazerMusica(dados.video && !dados.cifra && !dados.letra ? await musicaDoVideo(dados.video) : dados);
+      await abrirPrevia(r.content, r.source, back, r.video, aoPreparar);
+    } finally { if (sub?.isConnected) sub.innerHTML = subAntes; }
   } catch (e) {
     abrirNoTocando = false;
     toast('Não consegui trazer: ' + e.message);
@@ -4742,7 +4801,7 @@ async function videoDaMusica(titulo, artista, source) {
   return vs.find((v) => videoCombina(v.titulo, titulo)) || null;
 }
 
-async function abrirPrevia(content, source, back, videoJa = null) {
+async function abrirPrevia(content, source, back, videoJa = null, aoPreparar = null) {
   const novo = { id: 'previa', content, source, transpose: 0, capo: capoDaCifra(content), back }; // capo da cifra (Cifra Club)
   let m = renderSong(novo.content).meta;
   if (!youtubeId(m.youtube) && !String(source || '').startsWith('cnbb:')) {
@@ -4815,10 +4874,12 @@ async function abrirPrevia(content, source, back, videoJa = null) {
   // Enquanto carrega, também as duas versões (o áudio oficial e o clipe) e onde cada trecho cantado está em cada uma
   // (o casamento pelo som), para a troca entre música e vídeo já ir ao ponto certo desde o primeiro toque. Com limite:
   // passando dele, a música abre e o resto termina em segundo plano
-  // (espera curta: o navegador só deixa a música começar a tocar sozinha por poucos segundos depois do toque da pessoa;
-  // esperando mais, ela abria e não tocava nada. O que não chegar a tempo entra sozinho logo depois, já tocando)
+  // A música só abre com tudo pronto: a versão de música (o áudio oficial), o clipe e a letra sincronizada. Espera até
+  // achar (com limite de 15 s, para nunca ficar presa); o que não chegar a tempo entra sozinho logo depois
   const versoesProntas = novo.youtube ? descobrirVersoes(novo).catch(() => null) : Promise.resolve(null);
-  await Promise.all([noMaximo(preparo, 3500, 'demorou'), noMaximo(versoesProntas, 3500, null), noMaximo(buscaCapaDaPrevia, 2000, '').then(aplicarCapaDaPrevia)]);
+  aoPreparar?.('Procurando a música, o clipe e a letra sincronizada…');
+  void versoesProntas.then(() => { if (preview === novo && !novo.sincronia) aoPreparar?.('Sincronizando a letra…'); });
+  await Promise.all([noMaximo(preparo, 15000, 'demorou'), noMaximo(versoesProntas, 15000, null), noMaximo(buscaCapaDaPrevia, 2000, '').then(aplicarCapaDaPrevia)]);
   if (preview !== novo) return;
   if (jaNaPrevia) route(); else location.hash = '#/musica/previa';
 }
@@ -5186,6 +5247,11 @@ function jsonp(url, tempo = 8000) {
 // achar lá, no iTunes, pela música com o mesmo título e o mesmo artista. '' se nenhum tiver. O último valor fica
 // guardado no aparelho (vale sem internet)
 const capasOficiais = new Map();
+// Se a música é explícita (como o "E" do Spotify): o Deezer e o iTunes dizem, na mesma busca da capa. Fica guardado no
+// aparelho, junto com a capa; a letra continua inteira (só o selo indica)
+const marcarExplicita = (k, sim) => { void comUltimoValor('explicita', k, Promise.resolve(sim ? 'sim' : 'nao')); };
+const explicitaConhecida = (titulo, artista) => { const k = chaveDaCapa(titulo, artista); return Boolean(k) && ultimoValorDoArtista('explicita', k) === 'sim'; };
+const seloExplicita = (titulo, artista) => (explicitaConhecida(titulo, artista) ? '<span class="selo-e" title="Explícita" aria-label="Explícita">E</span>' : '');
 const artistaDaCapa = (artista) => String(artista || '').split(/\s*(?:,|&| e | feat\.? | ft\.? | part\.? | x )\s*/i)[0].trim();
 const chaveDaCapa = (titulo, artista) => {
   const t = normalizar(tituloLimpo(titulo));
@@ -5209,10 +5275,11 @@ function capaOficial(titulo, artista) {
       const exata = (tit) => normalizar(tit || '') === t;
       const ds = (dz?.data || []).filter((x) => mesmaMusica(x.title, x.artist?.name) && x.album?.cover_xl);
       const d = ds.find((x) => exata(x.title)) || ds[0];
-      if (d) return d.album.cover_xl;
+      if (d) { marcarExplicita(k, Boolean(d.explicit_lyrics)); return d.album.cover_xl; }
       const it = await jsonp(`https://itunes.apple.com/search?term=${encodeURIComponent(`${a} ${tituloLimpo(titulo)}`)}&entity=song&limit=15`);
       const ms = (it?.results || []).filter((x) => mesmaMusica(x.trackName, x.artistName) && x.artworkUrl100);
       const m = ms.find((x) => exata(x.trackName)) || ms[0];
+      if (m) marcarExplicita(k, ['explicit', 'cleaned'].includes(m.trackExplicitness)); // ("cleaned": a versão limpa de uma explícita)
       return m ? m.artworkUrl100.replace(/\/\d+x\d+(bb)?\.(jpg|png)$/, '/600x600bb.jpg') : '';
     })().catch(() => '');
     capasOficiais.set(k, busca.then((url) => {
@@ -5457,7 +5524,7 @@ const indicadoresWeb = (r) => {
 };
 const linhaMusicaWeb = (r, i, extra = '') => `
   <li class="track clickable" data-web="musica" data-midia-index="${i}" data-i="${i}" style="grid-template-columns:auto 1fr auto">
-    ${capa({ titulo: r.titulo, capa: r.capa || r.video?.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${indicadoresWeb(r)}<span class="artista-mini" data-artista-mini>${r.fotoArtista ? `<img src="${esc(r.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(r.artista || '')}${r.video?.duracao ? ` · ${esc(r.video.duracao)}` : ''}</div></div>
+    ${capa({ titulo: r.titulo, capa: r.capa || r.video?.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${seloExplicita(r.titulo, r.artista)}${indicadoresWeb(r)}<span class="artista-mini" data-artista-mini>${r.fotoArtista ? `<img src="${esc(r.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(r.artista || '')}${r.video?.duracao ? ` · ${esc(r.video.duracao)}` : ''}</div></div>
     <span class="acts">${extra}${botaoSalvar({ titulo: r.titulo, artista: r.artista, cifra: r.cifra || '', letra: r.letra?.url || '', video: r.video, fotoArtista: r.fotoArtista || '' }, 'mini')}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 
 // Busca vazia: as músicas católicas mais procuradas agora no Cifra Club — as mais tocadas de cada um dos
@@ -9068,17 +9135,11 @@ function viewSong(id, ctx = {}) {
   // A opção acompanha o modo ativo: trocar música altera só o áudio; trocar vídeo altera só o clipe.
   const tipoMidiaAtiva = () => player.modoMusica ? 'audio' : 'video';
   const salvarMidia = (url, tipo) => {
-    if (tipo === 'audio') {
-      if (isPreview) {
-        const novo = url ? youtubeId(url) : '';
-        preview.versoes = novo ? { video: preview.youtube || '', audio: novo, duracao: duracoesDaBusca.get(novo) || 0, pares: [[0, 0]] } : undefined;
-      } else trocarAudioDaMusica(song, url);
-      if (isPreview) toast(url ? 'Música escolhida' : 'Versão música removida');
-    } else {
-      const content = definirMeta(song.content, 'youtube', url);
-      if (isPreview) preview.content = content; else db.saveSong({ ...db.song(song.id), content });
-      toast(url ? 'Vídeo escolhido' : 'Vídeo removido');
-    }
+    if (isPreview) {
+      trocarNaPrevia(tipo, url);
+      toast(tipo === 'audio' ? (url ? 'Música escolhida' : 'Versão música removida') : (url ? 'Vídeo escolhido' : 'Vídeo removido'));
+    } else if (tipo === 'audio') trocarAudioDaMusica(song, url);
+    else trocarVideoDaMusica(song, url);
     route();
     if (url && tipo === 'video') setTimeout(() => $('#btn-play')?.click(), 50);
   };
@@ -11492,7 +11553,16 @@ function prepararMusicaAoAbrir(song) {
   tentouSincronizar.delete(chave);
   tentouSincronizar.add(chave);
   // (o LRCLIB não espera a descoberta do áudio oficial: a letra vem assim que ele responder)
-  const sincroniaPromise = sincronizarMusica(song, { audioPromise });
+  // (a internet falhou: tenta de novo logo, duas vezes, em vez de deixar para depois)
+  const tentar = async () => {
+    let r = await sincronizarMusica(song, { audioPromise });
+    for (let vez = 1; r === 'erro' && vez <= 2; vez++) {
+      await new Promise((ok) => setTimeout(ok, 1500 * vez));
+      r = await sincronizarMusica(song.id === 'previa' ? (preview || song) : (db.song(song.id) || song), { audioPromise });
+    }
+    return r;
+  };
+  const sincroniaPromise = tentar();
   return sincroniaPromise.then((resultado) => {
     const atual = song.id === 'previa' ? preview : db.song(song.id);
     const valida = atual?.youtube
@@ -11685,7 +11755,7 @@ async function casarNoAparelho(audioId, videoId) {
 }
 // guarda a sincronia na música (a salva ou a prévia da busca) e o Tocando agora passa a acompanhar
 // quantas linhas cantadas a cifra (ou a letra) da música tem
-const linhasDeLetra = (content) => { try { return partesCantadas(content || '').flatMap((p) => p.linhas).map(linhaSemCifra).filter(Boolean).length; } catch { return 0; } };
+const linhasDeLetra = (content) => { try { return partesCantadas(content || '').flatMap((p) => p.linhas).map(linhaSemCifra).filter(Boolean).length; } catch { return Infinity; } };
 // A música sem letra no texto (o Cifra Club só com os acordes, o "Não achei a letra"), mas com a letra sincronizada
 // do LRCLIB: a letra entra no texto dela, em estrofes (separadas onde o canto para por 4 s ou mais), com os mesmos
 // dados (vídeo, capa, tom). Antes a busca mostrava a letra (a da sincronia) e a música salva/baixada ficava sem
@@ -11703,6 +11773,8 @@ function letraPelaSincronia(content, sinc) {
   return novo;
 }
 function guardarSincronia(song, sinc) {
+  // (as palavras escondidas com asteriscos pela fonte da letra voltam a ser as cantadas, pela letra da própria música)
+  if (sinc?.linhas?.length) { try { sinc = { ...sinc, linhas: semCensura(sinc.linhas, linhasDaLetra(song.content || '')) }; } catch { /* fica como veio */ } }
   song.sincronia = sinc;
   const comLetra = letraPelaSincronia(song.content, sinc);
   if (comLetra) song.content = comLetra;

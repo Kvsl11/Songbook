@@ -97,6 +97,7 @@ export function parseChordPro(src) {
         continue;
       }
       if (name === 'c' || name === 'comment' || name === 'ci' || name === 'comment_italic') {
+        if (ehInfoDaCifra(value)) continue; // (afinação, capotraste, batida… não aparecem)
         ensure().lines.push({ kind: 'comment', text: value });
         continue;
       }
@@ -108,7 +109,11 @@ export function parseChordPro(src) {
       if (current && !current.explicit) current = null;
       continue;
     }
+    if (ehInfoDaCifra(line)) continue; // (afinação, capotraste, batida, créditos… não são letra nem cifra)
     const sec = ensure();
+    // (linha de acordes com parênteses soltos guardada como texto: vira acordes, como as outras)
+    const soltos = sec.type !== 'tab' && linhaDeAcordesSoltos(line);
+    if (soltos) { sec.lines.push({ kind: 'lyrics', segments: soltos.trim().split(/\s+/).map((x) => (isChord(x) ? { chord: x, text: ' ' } : { chord: null, text: `${x} ` })) }); continue; }
     if (sec.type === 'tab') { sec.lines.push({ kind: 'text', text: line }); continue; }
     sec.lines.push({ kind: 'lyrics', segments: splitChordLine(line) });
   }
@@ -142,6 +147,18 @@ export function isChordOnlyLine(line) {
   return ok === tokens.length && tokens.some(isChord);
 }
 
+// Linha de acordes com parênteses soltos ("( Am ) C", "G C ( D )", "(Am)  C"): os parênteses (acorde de passagem ou
+// opcional) saem, cada um trocado por espaço (os acordes continuam na mesma coluna, em cima da sílaba). Antes a linha
+// não era reconhecida como acordes e aparecia como se fosse letra. null se não for uma linha só de acordes
+const tirarParenteses = (linha) => linha.replace(/\S+/g, (tok) => (isChord(tok) || MARCA_NA_LINHA.test(tok) ? tok
+  : tok.replace(/^[([]+/, (m) => ' '.repeat(m.length)).replace(/[)\]]+$/, (m) => ' '.repeat(m.length))));
+export function linhaDeAcordesSoltos(linha) {
+  const s = semInvisiveis(String(linha || ''));
+  if (!/[()]/.test(s) || /\[[^\]]*\]/.test(s)) return null;
+  const t = tirarParenteses(s);
+  return t.trim() && isChordOnlyLine(t) ? t : null;
+}
+
 // "( C  Em  G  Bm )" — sequência de acordes entre parênteses (passagem, introdução de uma parte):
 // devolve os acordes, para virar uma linha de acordes de verdade, ou null
 export function acordesEntreParenteses(texto) {
@@ -173,7 +190,8 @@ export function chordsOverLyricsToChordPro(text) {
   const lines = semInvisiveis(text).replace(/\r\n?/g, '\n').split('\n');
   const out = [];
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const line = linhaDeAcordesSoltos(lines[i]) ?? lines[i];
+    if (lines[i + 1] !== undefined) lines[i + 1] = linhaDeAcordesSoltos(lines[i + 1]) ?? lines[i + 1];
     const header = /^\s*\[?(intro|refr[ãa]o|coro|ponte|final|solo|estrofe|verso|pr[ée]-?refr[ãa]o|chorus|verse|bridge|pre-?chorus|outro)(\s+\d+)?\]?:?\s*(.*)$/i.exec(line);
     if (header && (!header[3] || isChordOnlyLine(header[3]))) {
       out.push(`{comment: ${parteEmIngles(header[1] + (header[2] || ''))}}`);
@@ -378,12 +396,13 @@ const semAcordes = (l) => l.replace(/\[[^\]]*\]/g, '');
 const MARCAS_DE_REPETIR = /\b(\d+\s*x|x\s*\d+|bis)\b/gi;
 export const soAcordes = (l) => {
   if (ehDiretiva(l)) return false;
+  if (linhaDeAcordesSoltos(l)) return true;
   if (/\[[^\]]*\]/.test(l)) return !/[\p{L}\d]/u.test(semAcordes(l).replace(MARCAS_DE_REPETIR, ''));
   return /^\s*\(.*\)\s*$/.test(l) && Boolean(acordesEntreParenteses(l));
 };
 
 export function letraDe(src) {
-  return String(src || '').replace(/\r\n?/g, '\n').split('\n').filter((l) => !soAcordes(l)).map((l) => (ehDiretiva(l) ? l : semAcordes(l))).join('\n');
+  return String(src || '').replace(/\r\n?/g, '\n').split('\n').filter((l) => !soAcordes(l) && (ehDiretiva(l) || !ehInfoDaCifra(l))).map((l) => (ehDiretiva(l) ? l : semAcordes(l))).join('\n');
 }
 
 // recoloca os acordes da linha original numa versão editada do texto
@@ -501,6 +520,22 @@ export function capoDaObservacao(src) {
 // Linha entre parênteses: é observação ("(2x)", "(bis)", "(só as mulheres)", "(solo)") ou é letra
 // cantada (o eco/segunda voz, "(Você não está sozinho)"), que continua a música e fica do tamanho normal
 const OBSERVACAO = /^\d+\s*x$|^x\s*\d+$|\b\d+\s*(x|vezes)\b|\bbis\b|repet|refr[ãa]o|\bcoro\b|chorus|\bverse\b|\bbridge\b|\brepeat\b|solo|intro|instrumental|\bfinal\b|\bfim\b|todos|homens|mulheres|crian[çc]as|vozes|\bs[óo]\s|falad|declama|pausa|ad lib|capo|\btom\b|bateria|viol[ãa]o|teclado|guitarra|palmas|ministro|presidente|assembleia|solista|dueto|un[íi]ssono|acelera|devagar|lento|fade|ponte|estrofe|pr[ée]-?refr|riff|base|dedilhado|interl[úu]dio|^\W*$/i;
+// As informações da cifra que não são cantadas e vinham no meio da letra (do Cifra Club e de cifras coladas): a
+// afinação, o capotraste, o tom, a batida, o riff, o dedilhado, o solo, as observações, os créditos (composição,
+// contribuição, revisões) e o "Versão simplificada". Uma linha assim sai da letra e da cifra (o tom e o capotraste
+// já aparecem nos botões da música). Para não tirar letra de verdade, o rótulo precisa vir com ":" ou "-" logo
+// depois (até 30 letras), menos nas frases que só existem na cifra ("Capotraste na 2ª casa", "Meio tom abaixo")
+// (as palavras que só existem na cifra aceitam um complemento antes dos dois-pontos: "Afinação (meio tom abaixo):";
+// as que também aparecem em letras — "Tom", "Base", "Solo", "Autor da vida: …" — só com os dois-pontos logo depois)
+const INFO_CERTA = /^\s*[([]?\s*(afina[çc][ãa]o|tuning|capotraste|capo|(sugest[ãa]o de )?batida|dedilhado|riff|intro(du[çc][ãa]o)?|interl[úu]dio|obs(erva[çc][ãa]o|\.)?|composi[çc][ãa]o|compositor(es|a)?|contribui[çc][ãa]o|colabora[çc][ãa]o|revis(ão|ões|ao|oes)|letra e cifra|cifrad[ao] por|cifra feita por|transcri[çc][ãa]o|cr[ée]ditos|tablatura|bpm|andamento|arranjo|produ[çc][ãa]o|strumming|written by|enviad[ao] por)\b[^:：\n]{0,30}?\s*[:：–—]/i;
+const INFO_RISCO = /^\s*[([]?\s*(tom|key|base|solo|autor(es|a)?|vers[ãa]o|cifra|acordes|tab|ritmo|levada|chords?|e-?mail|instagram|youtube)\s*[:：]/i;
+const INFO_SOLTA = /^\s*[([]?\s*(vers[ãa]o simplificada|vers[ãa]o completa|cifra (simplificada|completa)|capotraste\b.*|afina[çc][ãa]o\b.*|(meio )?tom abaixo|(meio )?tom acima|afina[çc][ãa]o padr[ãa]o|parte \d+ de \d+|sem capotraste|tom original|(com )?capo\s*\d+.*)\s*[)\]]?\s*$/i;
+export const ehInfoDaCifra = (texto) => {
+  // ("[Tom: G]" inteiro entre colchetes é a informação, não um acorde)
+  const inteiro = /^\s*\[([^\]]*[:：][^\]]*)\]\s*$/.exec(String(texto || ''))?.[1];
+  const t = (inteiro ?? String(texto || '').replace(/\[[^\]]*\]/g, '')).replace(/\s+/g, ' ').trim();
+  return Boolean(t) && (INFO_CERTA.test(t) || INFO_RISCO.test(t) || INFO_SOLTA.test(t));
+};
 export const ehObservacao = (texto) => OBSERVACAO.test(String(texto || '').trim()) || ehInstrumental(texto); // acordes entre parênteses também
 
 // Nomes das partes sempre em inglês (Intro, Verse 1, Pre-Chorus, Chorus, Bridge, Outro…), venham do Cifra Club
@@ -508,17 +543,23 @@ export const ehObservacao = (texto) => OBSERVACAO.test(String(texto || '').trim(
 const ORDINAIS = { primeira: 1, segunda: 2, terceira: 3, quarta: 4, quinta: 5, sexta: 6, 'sétima': 7, setima: 7, oitava: 8, nona: 9, 'décima': 10, decima: 10 };
 const NOMES_EM_INGLES = [
   [/^(pr[ée]|pre)\s*-?\s*(refr[ãa]o|coro|chorus)$/i, 'Pre-Chorus'],
+  [/^(p[óo]s|post)\s*-?\s*(refr[ãa]o|coro|chorus)$/i, 'Post-Chorus'],
+  [/^(refr[ãa]o|coro|chorus)\s+final$|^final\s+(refr[ãa]o|chorus)$/i, 'Final Chorus'],
+  [/^(ponte|interl[úu]dio)\s+instrumental$|^instrumental$/i, 'Instrumental'],
   [/^(refr[ãa]o|coro|chorus)$/i, 'Chorus'],
   [/^(ponte|bridge)$/i, 'Bridge'],
-  [/^(estrofe|verso|verse|parte)$/i, 'Verse'],
+  [/^(estrofe|estrofes|verso|versos|verse|parte|primeira|segunda|terceira)$/i, 'Verse'],
   [/^(intro|introdu[çc][ãa]o)$/i, 'Intro'],
-  [/^(final|finaliza[çc][ãa]o|encerramento|outro)$/i, 'Outro'],
+  [/^(final|finaliza[çc][ãa]o|encerramento|outro|coda|fim)$/i, 'Outro'],
+  [/^(tag|gancho|hook)$/i, 'Tag'],
   [/^(interl[úu]dio|interlude)$/i, 'Interlude'],
   [/^solo$/i, 'Solo'],
   [/^(repetir|repete|repeat)\s+(o\s+)?(refr[ãa]o|coro|chorus)$/i, 'Repeat Chorus'],
 ];
 const nomeConhecido = (nome) => {
-  const t = String(nome || '').trim().replace(/\s+/g, ' ').replace(/:$/, '');
+  // (sem as marcas de repetição — "Refrão 2x", "Refrão (bis)" —, que não fazem parte do nome)
+  const t = String(nome || '').trim().replace(/\s+/g, ' ').replace(/:$/, '')
+    .replace(/\s*[-–(]?\s*(\d+\s*x|x\s*\d+|bis|\d+\s*vezes)\s*\)?\s*$/i, '').trim();
   const ord = /^(\p{L}+)\s+parte$/iu.exec(t); // "Primeira Parte" -> Verse 1
   if (ord && ORDINAIS[ord[1].toLowerCase()]) return `Verse ${ORDINAIS[ord[1].toLowerCase()]}`;
   const m = /^(.*?)(?:\s*(\d+))?$/.exec(t);
@@ -567,7 +608,8 @@ export function doEditor(texto) {
     aberta = null;
   };
   for (const bruta of linhas) {
-    const linha = bruta.replace(/\s+$/, '');
+    // (a passagem inteira entre parênteses, "( C Em G Bm )", continua no caminho dela, mais abaixo)
+    const linha = ((/^\s*\(([^()]+)\)\s*$/.test(bruta) ? null : linhaDeAcordesSoltos(bruta)) ?? bruta).replace(/\s+$/, '');
     if (/^\s*\{.*\}\s*$/.test(linha)) {
       // ChordPro escrito à mão continua valendo
       if (/^\s*\{\s*(start_of_|so[cvbt]\s*[:}]|end_of_|eo[cvbt]\s*[:}]|chorus\s*[:}])/i.test(linha)) fechar();
@@ -646,7 +688,7 @@ export function paraEditor(src) {
 // A IA recebe só as linhas da letra, numeradas, e devolve onde começa cada parte. O app só coloca
 // as marcações ([Refrão], [Estrofe 2]…): nenhuma palavra ou acorde é alterado.
 const NOMES_PARTE = { refrao: 'Chorus', estrofe: 'Verse', ponte: 'Bridge', 'pre-refrao': 'Pre-Chorus', intro: 'Intro', final: 'Outro' };
-const ehLinhaDeLetra = (l) => { const p = /^\s*\(([^()]*)\)\s*$/.exec(l); return l.trim() && !ehDiretiva(l) && !soAcordes(l) && !(p && ehObservacao(p[1])); };
+const ehLinhaDeLetra = (l) => { const p = /^\s*\(([^()]*)\)\s*$/.exec(l); return l.trim() && !ehDiretiva(l) && !soAcordes(l) && !(p && ehObservacao(p[1])) && !ehInfoDaCifra(l); };
 
 export function linhasDaLetra(src) {
   return paraEditor(src).split('\n').filter(ehLinhaDeLetra).map((l) => semAcordes(l).replace(/\s+/g, ' ').trim());
