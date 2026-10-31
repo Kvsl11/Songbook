@@ -4,6 +4,17 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 364, data: '2026-10-31', titulo: 'Capas sem piscar, letra sincronizada mais certeira e fila melhor',
+    itens: [
+      { tipo: 'correcao', texto: 'Na Busca, as fotos dos artistas e as capas já aparecem na versão atual, sem mostrar antes a foto antiga e trocar em seguida. A página do artista usa a mesma foto.' },
+      { tipo: 'melhoria', texto: 'A letra sincronizada é encontrada em mais músicas: o nome do artista e o título escritos de outro jeito (Pe./Padre, Ministério, feat.) também valem, e sem achar o áudio oficial vale a letra feita para o próprio clipe.' },
+      { tipo: 'melhoria', texto: 'A música abre mesmo sem letra sincronizada (sem esperar demais), e embaixo do nome aparece se ela está sincronizada, procurando ou sem sincronização.' },
+      { tipo: 'correcao', texto: 'A música salva ou baixada leva junto a letra sincronizada (e a própria letra, quando a cifra não tinha), como em Company, do Justin Bieber.' },
+      { tipo: 'correcao', texto: 'Trocar entre música e videoclipe vai para o ponto certo com mais frequência mesmo sem baixar (pelas letras sincronizadas das duas versões), e a barra não pula mais para o fim durante a troca.' },
+      { tipo: 'melhoria', texto: 'Fila: sem o botão de aleatório repetido (ele fica no player), com a duração de cada música e com a alça visível; segure a música e arraste para mudar a ordem.' },
+    ],
+  },
+  {
     versao: 363, data: '2026-10-31', titulo: 'Correção na inicialização do aplicativo',
     itens: [
       { tipo: 'correcao', texto: 'Corrigida uma expressão inválida que impedia o Songbook de iniciar. O salvamento da foto do artista também foi conectado corretamente ao cadastro da música.' },
@@ -60,15 +71,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'Mapas antigos são recalibrados com o novo algoritmo. Se uma comparação falhar temporariamente, trocar de modo permite tentar novamente em vez de bloquear novas tentativas.' },
     ],
   },
-  {
-    versao: 354, data: '2026-10-30', titulo: 'Capa original carregada ao abrir a música',
-    itens: [
-      { tipo: 'correcao', texto: 'A busca pela capa oficial do álbum ou single agora começa junto com a preparação do áudio e da letra, sem depender da sincronização LRCLIB. Quando a imagem chega depois da abertura, a capa da tela e do player é atualizada sem reiniciar a música. Falhas temporárias na busca não ficam guardadas como ausência definitiva de capa.' },
-    ],
-  },
-
-
-
 ];
 
 // as versões que a pessoa ainda não viu (mais nova primeiro); sem nenhuma vista ainda, só a atual

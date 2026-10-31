@@ -18,3 +18,17 @@ test('move uma faixa sem alterar a lista original', () => {
 test('embaralhamento sem faixa atual também mantém todos os índices', () => {
   assert.deepEqual(embaralharIndices([3, 1, 2], null, () => 0.5).sort(), [1, 2, 3]);
 });
+
+test('a fila não tem o aleatório (fica no player), mostra a alça e arrasta segurando a música', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const ini = app.indexOf('const abrirFila = () => {');
+  const fim = app.indexOf('// "Conectar" (como no Spotify)', ini);
+  const fila = app.slice(ini, fim);
+  assert.doesNotMatch(fila, /data-fila-aleatorio/);
+  assert.match(fila, /icon\('grip', 20\)/);
+  assert.doesNotMatch(app, /grip-vertical/);
+  assert.match(fila, /setTimeout\(\(\) => \{ const sg = segurando;/);
+  assert.match(fila, /touchmove', \(e\) => \{ if \(arrastando\) e\.preventDefault\(\); \}, \{ passive: false \}/);
+  assert.match(app, /const duracaoNaFila = \(s\) =>/);
+});

@@ -397,6 +397,32 @@ const mesmoTitulo = (a, b) => { const A = tituloComparavel(a); return !!A && A =
 // mesmo artista: um nome contém o outro ("Martín Valverde, Guilherme de Sá" é de "Martin Valverde")
 const mesmoArtista = (a, b) => { const A = normalize(a); const B = normalize(b); return !!A && !!B && (` ${A} `.includes(` ${B} `) || ` ${B} `.includes(` ${A} `)); };
 
+// Para a letra sincronizada, o título e o artista com mais tolerância (o mesmo canto vem escrito de jeitos
+// diferentes no Cifra Club, no YouTube e no LRCLIB): sem o "feat." do título, sem "&"/"and", e o artista sem os
+// prefixos ("Padre", "Pe.", "Frei", "Ministério", "Comunidade Católica", "Banda"…). Antes, "Pe. Fábio de Melo" não era
+// "Padre Fábio de Melo", e a música que tem a letra sincronizada no LRCLIB ficava sem ela
+const tituloSinc = (t) => tituloComparavel(String(t || '').replace(/\s+(feat|ft|part|com|with)\.?\s.+$/i, ''))
+  .replace(/\b(e|and)\b/g, ' ').replace(/\s+/g, ' ').trim();
+export const mesmoTituloSinc = (a, b) => {
+  const A = tituloSinc(a);
+  const B = tituloSinc(b);
+  if (!A || !B) return false;
+  if (A === B) return true;
+  // "Deus Está Aqui" × "Deus Está Aqui Noites Traiçoeiras": um começa pelo outro (com pelo menos 2 palavras)
+  const [curto, longo] = A.length <= B.length ? [A, B] : [B, A];
+  return curto.split(' ').length >= 2 && ` ${longo} `.startsWith(` ${curto} `);
+};
+const PREFIXO_ARTISTA = /^(padre|pe|frei|fr|irma|ir|dom|diacono|monsenhor|mons|pastor|pr|ministerio|min|comunidade catolica|comunidade|banda|grupo|coral|the)\s+/;
+const nomesDoArtista = (a) => String(a || '').split(/\s*(?:,|;|&|\/|\s(?:feat|ft|part|com|with|x|e|and)\.?\s)\s*/i)
+  .map((x) => normalize(x).replace(/[^a-z0-9]+/g, ' ').trim()).filter(Boolean)
+  .flatMap((x) => { let y = x; while (PREFIXO_ARTISTA.test(y)) y = y.replace(PREFIXO_ARTISTA, ''); return y && y !== x ? [x, y] : [x]; });
+export const mesmoArtistaSinc = (a, b) => {
+  if (mesmoArtista(a, b)) return true;
+  const A = nomesDoArtista(a);
+  const B = nomesDoArtista(b);
+  return A.some((x) => B.some((y) => x.length >= 3 && y.length >= 3 && (x === y || ` ${x} `.includes(` ${y} `) || ` ${y} `.includes(` ${x} `))));
+};
+
 // Letra de reserva quando a página do Letras não abre (ou a música não está lá): LRCLIB pelo título e
 // artista, depois só pelo título, e o Vagalume. Só aceita a letra da música com o mesmo título.
 export async function letraReserva({ titulo = '', artista = '' } = {}, fetchImpl) {
@@ -458,7 +484,7 @@ export function sincroniaDoLrc(lrc, duracao = 0) {
 export async function letraSincronizada(
   { titulo = '', artista = '', duracao = 0 } = {},
   fetchImpl,
-  { espera = 1500, timeout = 10000, tentativas = 4 } = {},
+  { espera = 1500, timeout = 10000, tentativas = 4, preferirDuracao = false } = {},
 ) {
   const t = String(titulo || '').trim();
   const a = String(artista || '').trim();
@@ -483,22 +509,36 @@ export async function letraSincronizada(
   };
   // O LRCLIB pede consultas sequenciais para evitar limite de requisições (429).
   // Para assim que encontra a gravação sincronizada correta; só amplia a busca se necessário.
-  const consultas = [
+  // (o artista principal sozinho também: "Justin Bieber, Fulano" não acha nada pelo nome inteiro)
+  const principal = nomesDoArtista(a)[0] && String(a).split(/\s*(?:,|;|&|\/|\s(?:feat|ft|part|com|with|x)\.?\s)\s*/i)[0].trim();
+  const tSemFeat = t.replace(/\s*[([]?\s*\b(feat|ft|part|com|with)\.?\s.+$/i, '').trim() || t;
+  const consultas = [...new Set([
     a && `track_name=${encodeURIComponent(t)}&artist_name=${encodeURIComponent(a)}`,
+    principal && principal !== a && `track_name=${encodeURIComponent(tSemFeat)}&artist_name=${encodeURIComponent(principal)}`,
     `q=${encodeURIComponent(`${t} ${a}`.trim())}`,
     `track_name=${encodeURIComponent(t)}`,
-  ].filter(Boolean);
-  const corresponde = (r) =>
-    r.syncedLyrics && !r.instrumental && mesmoTitulo(r.trackName, t) && (!a || mesmoArtista(r.artistName, a));
+    tSemFeat !== t && `track_name=${encodeURIComponent(tSemFeat)}`,
+  ].filter(Boolean))];
+  const comLetra = (r) => r.syncedLyrics && !r.instrumental;
+  const corresponde = (r) => comLetra(r) && mesmoTitulo(r.trackName, t) && (!a || mesmoArtista(r.artistName, a));
+  // (a segunda peneira, mais tolerante: o mesmo título escrito de outro jeito e o artista com outro prefixo)
+  const parecida = (r) => comLetra(r) && mesmoTituloSinc(r.trackName, t) && (!a || mesmoArtistaSinc(r.artistName, a));
   let mesmas = [];
+  let parecidas = [];
   for (let i = 0; i < consultas.length; i++) {
     const lista = await pedir(consultas[i]).catch(() => null);
-    if (Array.isArray(lista)) mesmas = lista.filter(corresponde);
+    if (Array.isArray(lista)) {
+      mesmas = lista.filter(corresponde);
+      if (!parecidas.length) parecidas = lista.filter(parecida);
+    }
     if (mesmas.length) break;
     if (i + 1 < consultas.length) await new Promise((ok) => setTimeout(ok, 350));
   }
+  if (!mesmas.length) mesmas = parecidas;
   if (mesmas.length) {
-    const oficial = gravacaoOficial(mesmas, duracao);
+    // preferirDuracao: sem o áudio oficial no YouTube, a letra feita para esta duração (a do clipe), se houver
+    const naDuracao = preferirDuracao && duracao > 0 ? mesmas.filter((r) => r.duration > 0 && Math.abs(r.duration - duracao) <= 3) : [];
+    const oficial = gravacaoOficial(naDuracao.length ? naDuracao : mesmas, duracao);
     const bate = !(duracao > 0) || !(oficial.duration > 0) || Math.abs(oficial.duration - duracao) <= 4;
     const sinc = sincroniaDoLrc(oficial.syncedLyrics, oficial.duration || duracao);
     if (sinc.linhas.length >= 2) return { ...sinc, fonte: 'lrclib', id: oficial.id, duracao: oficial.duration || 0, ...(bate ? {} : { ajustar: true }) };

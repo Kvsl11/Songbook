@@ -529,3 +529,28 @@ test('audioDoVideo: ignora identificadores inválidos sem consultar a rede', asy
   assert.equal(chamadas, 0);
 });
 
+
+test('LRCLIB: acha a letra sincronizada com o artista escrito de outro jeito ("Pe." × "Padre", feat.)', async () => {
+  const { mesmoArtistaSinc, mesmoTituloSinc } = await import('../public/js/lib/web.js');
+  assert.ok(mesmoArtistaSinc('Pe. Fábio de Melo', 'Padre Fábio de Melo'));
+  assert.ok(mesmoArtistaSinc('Ministério Amor e Adoração', 'Amor e Adoração'));
+  assert.ok(mesmoArtistaSinc('Justin Bieber, Daniel Caesar', 'Justin Bieber'));
+  assert.ok(!mesmoArtistaSinc('Justin Bieber', 'Justin Timberlake'));
+  assert.ok(mesmoTituloSinc('Peaches (feat. Daniel Caesar)', 'Peaches'));
+  assert.ok(mesmoTituloSinc('Deus Está Aqui', 'Deus Está Aqui - Noites Traiçoeiras'));
+  assert.ok(!mesmoTituloSinc('Company', 'Company Man'));
+  const lrc = '[00:10.00] Can we we keep\n[00:14.00] keep each other company';
+  const lista = [{ id: 7, trackName: 'Company', artistName: 'Pe. Fulano de Tal', duration: 208, syncedLyrics: lrc }];
+  const r = await letraSincronizada({ titulo: 'Company', artista: 'Padre Fulano de Tal', duracao: 208 }, async () => ({ ok: true, status: 200, json: async () => lista }), { espera: 1 });
+  assert.equal(r.id, 7);
+});
+
+test('LRCLIB: preferirDuracao escolhe a letra feita para a duração do clipe', async () => {
+  const lrc = '[00:04.91] I need the tears\n[00:08.18] to fall';
+  const r = (id, duration) => ({ id, trackName: 'Tears', artistName: 'Sabrina Carpenter', duration, syncedLyrics: lrc });
+  const lista = [r(1, 160), r(2, 160), r(3, 304)];
+  const resp = async () => ({ ok: true, status: 200, json: async () => lista });
+  const clipe = await letraSincronizada({ titulo: 'Tears', artista: 'Sabrina Carpenter', duracao: 304 }, resp, { preferirDuracao: true });
+  assert.equal(clipe.id, 3);
+  assert.equal(clipe.ajustar, undefined);
+});
