@@ -554,3 +554,25 @@ test('LRCLIB: preferirDuracao escolhe a letra feita para a duração do clipe', 
   assert.equal(clipe.id, 3);
   assert.equal(clipe.ajustar, undefined);
 });
+
+test('letra sincronizada: com o LRCLIB fora do ar (502), vai logo para a NetEase', async () => {
+  const { lrcSemCreditos } = await import('../public/js/lib/web.js');
+  assert.equal(lrcSemCreditos('[00:00.00] 作词 : Fulano\n[00:00.50]Company\n[00:02.31]Can we we keep\n[00:05.00]keep each other company', { titulo: 'Company' }),
+    '[00:02.31]Can we we keep\n[00:05.00]keep each other company');
+  const pedidos = [];
+  const lrc = '[00:00.00] 作词 : X\n[00:02.31]Can we we keep\n[00:06.00]keep each other company\n[00:10.00]Linha tres\n[00:14.00]Linha quatro';
+  const texto = (o) => ({ ok: true, status: 200, text: async () => JSON.stringify(o) });
+  const fetchImpl = async (url) => {
+    pedidos.push(url);
+    if (url.includes('lrclib.net')) return { ok: false, status: 502, json: async () => ({}) };
+    if (url.includes('/search/get')) return texto({ result: { songs: [{ id: 9, name: 'Company', artists: [{ name: 'Justin Bieber' }], duration: 208120 }] } });
+    if (url.includes('/song/lyric')) return texto({ lrc: { lyric: lrc } });
+    return { ok: false, status: 404 };
+  };
+  const r = await letraSincronizada({ titulo: 'Company', artista: 'Justin Bieber', duracao: 208 }, fetchImpl, { espera: 1 });
+  assert.equal(r.fonte, 'netease');
+  assert.equal(r.linhas[0], 'Can we we keep');
+  assert.equal(r.tempos[0].inicio, 2.31);
+  // (o LRCLIB fora do ar: duas tentativas e desiste das outras consultas)
+  assert.equal(pedidos.filter((u) => u.includes('lrclib')).length, 2);
+});

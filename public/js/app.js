@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.31-370';
+export const APP_VERSAO = '2026.10.31-371';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1519,6 +1519,7 @@ const player = (() => {
     // Sem o download: o próprio clipe, andando, num player do YouTube mudo, sem controles e sem receber toques (escondido
     // atrás da capa, com zoom para cortar as bordas). Ele só aparece depois de uns segundos tocando (o YouTube mostra o
     // título no começo) e some ao pausar (ele mostraria os botões); toca do meio do clipe (evita abertura e créditos)
+    const CANVAS_ONLINE = false;
     let yt = null; // { f (iframe), estado, tempo, em, duracao, visto }
     const ytCmd = (func, args = []) => yt?.f.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
     const aoMsgYt = (e) => {
@@ -1700,7 +1701,9 @@ const player = (() => {
           }
         }
         // sem o download (com internet): o clipe andando pelo YouTube, mudo
-        if ((!caixa || !reserva) && navigator.onLine && /^[\w-]{11}$/.test(quer)) { montarOnline(quer); return; }
+        // (sem o download, ficam os quadros do clipe passando: um segundo player do YouTube tocando junto, para a capa
+        // andar, pesava no celular e atrapalhava o player da música, que às vezes nem começava)
+        if ((!caixa || !reserva) && CANVAS_ONLINE && navigator.onLine && /^[\w-]{11}$/.test(quer)) { montarOnline(quer); return; }
         if (!caixa || !reserva) { de = ''; return; }
         fundo.append(caixa, reserva);
         relogio = setInterval(acompanhar, 180);
@@ -2534,27 +2537,12 @@ const semLinhasDeAcordes = (sinc) => {
     if (!vs || vs.casadas || vs.porLetra || vs.diferentes) return true;
     return (vs.pares || []).every(([a, v]) => Math.abs(v - a) <= 2);
   };
-  let alinhando = 0;
   let ultimaTroca = null; // { para: 'video' | 'audio', t (o ponto de onde saiu), em } (para acertar se o casamento chegar)
   const mudarModo = () => {
     if (atual?.soMusica) return; // (só música: não há outro vídeo da mesma gravação)
-    if (alinhando) return; // (esperando o casamento: o segundo toque não troca de novo)
-    // só a estimativa: espera o casamento pelo som (já começou ao abrir a música) por alguns segundos, com o botão
-    // mostrando que está acertando; chegando, troca no ponto certo; senão, troca pela estimativa e acerta quando chegar
-    const s = musicaTocando();
-    if (atual?.audio && atual.video && !atual.semVideo && s && !paresConfiaveis()) {
-      const minha = ++alinhando;
-      el.classList.add('alinhando-versoes');
-      const bt = $('.pl-troca', el);
-      if (bt) porHtml(bt, '<span class="spin"></span><span>Acertando a posição…</span>');
-      noMaximo(acertarVersoes(s, null, { pedido: true }), 9000).then(() => {
-        if (minha !== alinhando) return;
-        alinhando = 0;
-        el.classList.remove('alinhando-versoes');
-        mudarModoAgora();
-      });
-      return;
-    }
+    // a troca é sempre na hora, com o melhor mapa que já se tem; se ainda é só a estimativa, o casamento continua em
+    // segundo plano e, chegando, leva ao ponto certo (a partir do ponto de onde saiu). Antes ela esperava até 9 s
+    // (com o botão girando) toda vez que o casamento não vinha
     mudarModoAgora();
   };
   const mudarModoAgora = () => {
@@ -4827,14 +4815,10 @@ async function abrirPrevia(content, source, back, videoJa = null) {
   // Enquanto carrega, também as duas versões (o áudio oficial e o clipe) e onde cada trecho cantado está em cada uma
   // (o casamento pelo som), para a troca entre música e vídeo já ir ao ponto certo desde o primeiro toque. Com limite:
   // passando dele, a música abre e o resto termina em segundo plano
-  const versoesProntas = (async () => {
-    if (!novo.youtube) return;
-    await descobrirVersoes(novo).catch(() => null);
-    if (preview !== novo) return;
-    const vs = versoesDe(preview);
-    if (vs?.audio && vs.video && !vs.casadas && !vs.diferentes) await acertarVersoes(preview);
-  })().catch(() => null);
-  await Promise.all([noMaximo(preparo, 9000, 'demorou'), noMaximo(versoesProntas, 20000, null), noMaximo(buscaCapaDaPrevia, 2500, '').then(aplicarCapaDaPrevia)]);
+  // (espera curta: o navegador só deixa a música começar a tocar sozinha por poucos segundos depois do toque da pessoa;
+  // esperando mais, ela abria e não tocava nada. O que não chegar a tempo entra sozinho logo depois, já tocando)
+  const versoesProntas = novo.youtube ? descobrirVersoes(novo).catch(() => null) : Promise.resolve(null);
+  await Promise.all([noMaximo(preparo, 3500, 'demorou'), noMaximo(versoesProntas, 3500, null), noMaximo(buscaCapaDaPrevia, 2000, '').then(aplicarCapaDaPrevia)]);
   if (preview !== novo) return;
   if (jaNaPrevia) route(); else location.hash = '#/musica/previa';
 }
