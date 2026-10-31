@@ -4799,6 +4799,45 @@ function fotoDoArtista(nome, slug = '') {
   }
   return comUltimoValor('foto', nome, fotosArtistas.get(k));
 }
+
+// Completa as linhas de busca e da biblioteca sem bloquear a renderização:
+// capa oficial do single/álbum + foto real do artista. As imagens manuais salvas nunca são substituídas.
+function enriquecerLinhasMusicais(container, itens, { busca = false } = {}) {
+  if (!container || !Array.isArray(itens)) return;
+  itens.forEach((item, i) => {
+    const linha = container.querySelector(`[data-midia-index="${i}"]`);
+    if (!linha) return;
+    const titulo = item.title || item.titulo || '';
+    const artista = item.artist || item.artista || '';
+    if (!titulo || !artista) return;
+    const avatar = linha.querySelector('[data-artista-mini]');
+    if (avatar) {
+      fotoDoArtista(artista, item.slug || '').then((url) => {
+        if (!url || !avatar.isConnected) return;
+        avatar.innerHTML = `<img src="${esc(url)}" alt="" loading="lazy">`;
+        avatar.classList.add('com-foto');
+      }).catch(() => {});
+    }
+    // Nas buscas, a capa do álbum é preferida à miniatura do vídeo ou à foto do artista.
+    // Na biblioteca, respeita a capa escolhida manualmente pela pessoa.
+    if (busca || capaTrocavel(item.cover || item.capa || '')) {
+      capaOficial(titulo, artista).then((url) => {
+        if (!url || !linha.isConnected) return;
+        const box = linha.querySelector('.cover');
+        if (!box) return;
+        const img = box.querySelector('img') || document.createElement('img');
+        img.src = url;
+        img.alt = titulo;
+        img.loading = 'lazy';
+        if (!img.isConnected) box.replaceChildren(img);
+        if (busca) {
+          item.capa = url;
+          item.cover = url;
+        }
+      }).catch(() => {});
+    }
+  });
+}
 // o Deezer não libera a leitura direta (CORS), mas responde em JSONP: um <script> com a resposta
 let jsonpN = 0;
 function jsonp(url, tempo = 8000) {
@@ -5079,8 +5118,8 @@ const indicadoresWeb = (r) => {
   return sinais ? `<span class="ind">${sinais}</span>` : '';
 };
 const linhaMusicaWeb = (r, i, extra = '') => `
-  <li class="track clickable" data-web="musica" data-i="${i}" style="grid-template-columns:auto 1fr auto">
-    ${capa({ titulo: r.titulo, capa: r.capa || r.video?.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${indicadoresWeb(r)}${esc(r.artista || '')}${r.video?.duracao ? ` · ${esc(r.video.duracao)}` : ''}</div></div>
+  <li class="track clickable" data-web="musica" data-midia-index="${i}" data-i="${i}" style="grid-template-columns:auto 1fr auto">
+    ${capa({ titulo: r.titulo, capa: r.capa || r.video?.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${indicadoresWeb(r)}<span class="artista-mini" data-artista-mini>${semFotoArtista(14)}</span>${esc(r.artista || '')}${r.video?.duracao ? ` · ${esc(r.video.duracao)}` : ''}</div></div>
     <span class="acts">${extra}${botaoSalvar({ titulo: r.titulo, artista: r.artista, cifra: r.cifra || '', letra: r.letra?.url || '', video: r.video }, 'mini')}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 
 // Busca vazia: as músicas católicas mais procuradas agora no Cifra Club — as mais tocadas de cada um dos
@@ -5205,6 +5244,7 @@ function viewSearch() {
           if (!vivo('mu-res')) return;
           achados.musica = lista;
           $('#mu-res').innerHTML = lista.length ? `<ul class="tracks tracks-grade">${lista.map((r, i) => linhaMusicaWeb(r, i)).join('')}</ul>` : '<p class="muted">Nenhuma música encontrada.</p>';
+          enriquecerLinhasMusicais($('#mu-res'), lista, { busca: true });
         };
         buscarTudo(term, filtro === 'musicas' ? 25 : 8, filtro === 'musicas' ? 15 : 6).then(mostrar)
           .catch((e) => vivo('mu-res') && erro('mu-res', 'Não consegui buscar músicas: ' + e.message));
@@ -5941,6 +5981,11 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
       <button class="btn small danger solid" id="sel-excluir">${icon('trash', 15)} Excluir</button></div>
     <button class="fab" ${selecionando ? 'hidden' : ''} aria-label="${ehPl ? 'Nova playlist' : ehRep ? 'Novo repertório' : 'Nova música'}">${icon('plus', 24)}<span>${ehPl ? 'Nova playlist' : ehRep ? 'Novo repertório' : 'Nova música'}</span></button>`;
   const lib = $('#lib');
+  if (!ehRep) {
+    const linhas = [...lib.querySelectorAll('.lib-item')];
+    linhas.forEach((li, i) => { li.dataset.midiaIndex = String(i); });
+    enriquecerLinhasMusicais(lib, itens, { busca: false });
+  }
   $('.fab').onclick = () => (ehRep ? novoRepertorio(ehPl ? 'playlist' : '') : (location.hash = '#/editar/novo'));
   $('#lib-novo-rep')?.addEventListener('click', () => novoRepertorio());
   $('#lib-nova-pl')?.addEventListener('click', () => novoRepertorio('playlist'));
