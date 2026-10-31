@@ -28,7 +28,8 @@ test('a fila não tem o aleatório (fica no player) e arrasta segurando qualquer
   assert.doesNotMatch(fila, /data-fila-aleatorio/);
   assert.doesNotMatch(fila, /data-arrastar|icon\('grip/);
   assert.match(fila, /setTimeout\(\(\) => \{ const sg = segurando; if \(sg\) comecarArrasto/);
-  assert.match(fila, /translateY\(\$\{alvo\}px\) scale\(1\.03\)/);
+  assert.match(fila, /translateY\(\$\{alvo\}px\)`/);
+  assert.match(fila, /icon\('reordenar', 20\)/);
   // escolher pela fila desliga o aleatório; desativado, o botão nunca aparece ligado
   assert.match(fila, /if \(aleatorio\) \{ aleatorio = false;/);
   assert.match(app, /const ligado = aleatorio && !bA\.disabled;/);
