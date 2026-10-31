@@ -242,3 +242,19 @@ test('a busca não entra na música sem videoclipe e letra sincronizada confirma
   assert.match(app.slice(preparar, bloquear), /novo\.sincronia\?\.fonte === 'lrclib'/);
   assert.match(app, /if \(r !== 'ok'\) tentouSincronizar\.delete\(chaveSync\)/);
 });
+
+
+test('a letra sincronizada que termina depois de salvar a prévia também é persistida na biblioteca', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const salvar = app.indexOf('const salvarDaPrevia = () =>');
+  const fimSalvar = app.indexOf('// tirar da biblioteca sem parar a música', salvar);
+  const guardar = app.indexOf('function guardarSincronia(song, sinc)');
+  assert.ok(salvar >= 0 && fimSalvar > salvar && guardar > 0);
+  const rotinaSalvar = app.slice(salvar, fimSalvar);
+  const rotinaGuardar = app.slice(guardar, app.indexOf('// a conversa fica guardada', guardar));
+  assert.match(rotinaSalvar, /preview\.salvaId = salva\.id/);
+  assert.match(rotinaGuardar, /preview\.salvaId && db\.song\(preview\.salvaId\)/);
+  assert.match(rotinaGuardar, /db\.updateSong\(salva\.id, \{ sincronia: sinc \}\)/);
+  assert.ok(rotinaSalvar.indexOf('const salva = ja || db.saveSong') < rotinaSalvar.indexOf('preview.salvaId = salva.id'),
+    'o vínculo deve apontar para a música efetivamente salva');
+});

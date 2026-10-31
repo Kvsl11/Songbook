@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 358, data: '2026-10-30', titulo: 'Letra sincronizada preservada ao salvar',
+    itens: [
+      { tipo: 'correcao', texto: 'Se a letra sincronizada terminar de carregar depois que a música for salva na biblioteca, ela também será gravada na música salva. A ordem entre tocar em Salvar e a resposta do LRCLIB não faz mais a sincronia desaparecer.' },
+    ],
+  },
+  {
     versao: 357, data: '2026-10-30', titulo: 'Fila de reprodução reorganizável',
     itens: [
       { tipo: 'melhoria', texto: 'O aleatório agora embaralha a ordem real da fila, que também pode ser reorganizada arrastando as músicas com o dedo ou o mouse. A seleção por teclado também permite mover faixas.' },

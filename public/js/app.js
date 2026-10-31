@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.30-357';
+export const APP_VERSAO = '2026.10.30-358';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -3183,6 +3183,9 @@ const semLinhasDeAcordes = (sinc) => {
         db.updateSong(ja.id, { ...(preview.versoes ? { versoes: preview.versoes, versoesConferidas: true } : {}), ...(preview.sincronia ? { sincronia: preview.sincronia } : {}) });
       }
       const salva = ja || db.saveSong({ content: preview.content, source: preview.source, transpose: preview.transpose || 0, capo: preview.capo || 0, ...(preview.sincronia ? { sincronia: preview.sincronia } : {}), ...(preview.versoes ? { versoes: preview.versoes } : {}) });
+      // A prévia continua podendo terminar a sincronização depois deste clique. Guarda o ID para
+      // que guardarSincronia também atualize a cópia persistida, sem depender da ordem das respostas.
+      preview.salvaId = salva.id;
       api.atualizar({ songId: salva.id, href: `#/musica/${salva.id}` });
       toast(ja ? 'Já estava na biblioteca' : 'Salva na biblioteca');
       // na página da música (escondida atrás do Tocando agora), só o endereço muda: ir para ele redesenhava a página
@@ -11154,7 +11157,15 @@ async function casarNoAparelho(audioId, videoId) {
 // guarda a sincronia na música (a salva ou a prévia da busca) e o Tocando agora passa a acompanhar
 function guardarSincronia(song, sinc) {
   song.sincronia = sinc;
-  if (song.id === 'previa') { if (preview) preview.sincronia = sinc; } else if (db.song(song.id)) db.updateSong(song.id, { sincronia: sinc });
+  if (song.id === 'previa') {
+    if (preview) {
+      preview.sincronia = sinc;
+      // Se a pessoa salvou a prévia enquanto o LRCLIB ainda estava respondendo, a sincronia
+      // chega depois do db.saveSong. Mantém o vínculo e grava também na música da biblioteca.
+      const salva = preview.salvaId && db.song(preview.salvaId);
+      if (salva) db.updateSong(salva.id, { sincronia: sinc });
+    }
+  } else if (db.song(song.id)) db.updateSong(song.id, { sincronia: sinc });
   player.atualizar({});
   // quem está mostrando esta música (a página dela, o Tocando agora) passa a usar a sincronia na hora, mesmo com a
   // música já tocando: antes só pegava ao sair e voltar para a música
