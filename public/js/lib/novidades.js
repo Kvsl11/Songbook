@@ -66,12 +66,6 @@ export const NOVIDADES = [
     ],
   },
   {
-    versao: 349, data: '2026-10-30', titulo: 'Busca LRCLIB mais resistente a variações',
-    itens: [
-      { tipo: 'correcao', texto: 'A consulta de letras sincronizadas ganhou mais tempo e novas tentativas. Se a busca exata não localizar a gravação, o Songbook procura pelo título e confirma o artista antes de aceitar a letra.' },
-    ],
-  },
-  {
     versao: 348, data: '2026-10-30', titulo: 'Sincronização confirmada antes de abrir a música',
     itens: [
       { tipo: 'correcao', texto: 'A busca agora identifica primeiro a gravação de áudio e só depois consulta o LRCLIB com a duração correta. A música só abre quando o videoclipe e a letra sincronizada são confirmados; tentativas sem correspondência podem ser refeitas.' },
