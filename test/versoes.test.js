@@ -271,3 +271,11 @@ test('a foto do artista acompanha o salvamento e é persistida para a biblioteca
   assert.match(app, /db\.updateSong\(item\.id, \{ fotoArtista: foto \}\)/);
   assert.match(app, /s\.fotoArtista \? `<img src=/);
 });
+
+
+test('a expressão de busca da foto do artista é JavaScript válido e o salvamento repassa a foto', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  assert.match(app, /fotoDoArtista\(novo\.artist, \/cifraclub\\\.com\\\.br\\\/\(\[\^\/?#\]\+\)\/\)/);
+  assert.doesNotMatch(app, /cifraclub\\\\\\\\\.com/);
+  assert.match(app, /video, fotoArtista: item\.fotoArtista \|\| ''/);
+});
