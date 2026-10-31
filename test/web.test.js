@@ -577,3 +577,14 @@ test('letra sincronizada: com o LRCLIB fora do ar (502), vai logo para a NetEase
   // (o LRCLIB fora do ar: duas tentativas e desiste das outras consultas)
   assert.equal(pedidos.filter((u) => u.includes('lrclib')).length, 2);
 });
+
+test('letra sem censura: as palavras escondidas voltam pela letra da música ou pelas mais comuns', async () => {
+  const { semCensura, censurada, gravacaoOficial } = await import('../public/js/lib/web.js');
+  assert.deepEqual(semCensura(["My 'give a ****s' are on vacation", 'This is sh*t', "Oh f***in' hell", 'Nada escondido'], ['My "give a fucks" are on vacation']),
+    ["My 'give a fucks' are on vacation", 'This is shit', "Oh fuckin' hell", 'Nada escondido']);
+  assert.ok(censurada('give a ****s') && censurada('sh*t') && !censurada('5 * 3'));
+  // entre as letras da mesma gravação, a sem censura
+  const lrc = (x) => `[00:01.00] ${x}\n[00:05.00] b`;
+  const r = gravacaoOficial([{ id: 1, trackName: 'Espresso', duration: 175, syncedLyrics: lrc('give a ****s') }, { id: 2, trackName: 'Espresso', duration: 175, syncedLyrics: lrc('give a fucks') }], 175);
+  assert.equal(r.id, 2);
+});

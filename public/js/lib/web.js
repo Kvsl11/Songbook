@@ -602,6 +602,7 @@ export async function letraSincronizadaNetease({ titulo = '', artista = '', dura
   // (com a duração conhecida, a da mesma gravação primeiro)
   if (duracao > 0) candidatas.sort((x, y) => Math.abs(x.duracao - duracao) - Math.abs(y.duracao - duracao));
   const letras = candidatas.slice(0, 3).map((c) => jsonSemCors(`${NETEASE}/song/lyric?id=${c.id}&lv=1`, { fetchImpl }));
+  let censuradaReserva = null;
   for (const [k, c] of candidatas.slice(0, 3).entries()) {
     const j = await letras[k];
     const lrc = lrcSemCreditos(j?.lrc?.lyric || '', { titulo: t, artista: a });
@@ -609,15 +610,65 @@ export async function letraSincronizadaNetease({ titulo = '', artista = '', dura
     if (sinc.linhas.length < 4) continue;
     const bate = !(duracao > 0) || !(c.duracao > 0) || Math.abs(c.duracao - duracao) <= 4;
     if (!bate && preferirDuracao) continue;
-    return { ...sinc, fonte: 'netease', id: `ne:${c.id}`, duracao: c.duracao || 0, ...(bate ? {} : { ajustar: true }) };
+    const r = { ...sinc, fonte: 'netease', id: `ne:${c.id}`, duracao: c.duracao || 0, ...(bate ? {} : { ajustar: true }) };
+    // (a letra com palavras escondidas fica de reserva: outra versão pode ter a letra inteira)
+    if (censurada(lrc)) { censuradaReserva ||= r; continue; }
+    return r;
   }
-  return null;
+  return censuradaReserva;
 }
 // A gravação oficial entre as letras da mesma música no LRCLIB: a duração que mais aparece (até 2 s de diferença; as
 // coletâneas repetem a do álbum), de preferência não ao vivo; no empate, a da duração do vídeo. Antes valia a letra
 // com a duração do vídeo, e uma feita para o videoclipe (como a de "Tears", de 304 s, contra 160 s da gravação) fazia
 // o clipe passar por gravação: a música não ganhava o áudio oficial e a letra saía fora do tempo
 const aoVivo = (r) => /\b(ao vivo|live|ac[uú]stico|acoustic)\b/i.test(`${r.trackName || ''} ${r.albumName || ''}`);
+// a letra com palavras escondidas por asteriscos ("give a ****s", "f**k")
+export const censurada = (t) => /\*{2,}|\p{L}\*+\p{L}?/u.test(String(t || ''));
+// As palavras escondidas por asteriscos voltam a ser as cantadas: pela letra da própria música (a da cifra, que vem
+// inteira), na linha mais parecida, a palavra no mesmo lugar; sem ela, as mais comuns pelas letras que sobraram
+// ("f**k", "sh*t"…). As que não dá para saber ficam como estão
+const PALAVRAS_ESCONDIDAS = [[/^f[*u]{1}[*c]{1}[*k]{1}$|^f\*\*\*$|^f\*ck$|^f\*\*k$/i, 'fuck'], [/^sh\*t$|^s\*\*t$|^s\*it$/i, 'shit'], [/^b\*tch$|^b\*\*ch$|^b\*\*\*h$|^b\*\*\*\*$/i, 'bitch'],
+  [/^d\*mn$|^d\*\*n$/i, 'damn'], [/^a\*\*$/i, 'ass'], [/^p\*ssy$|^p\*\*\*y$/i, 'pussy'], [/^d\*ck$|^d\*\*k$/i, 'dick'], [/^h\*ll$/i, 'hell']];
+const palavraEscondida = (tok) => {
+  const m = /^([^\p{L}*]*)([\p{L}*']+?)((?:in'?|ing|ed|er|s)?)([^\p{L}*]*)$/u.exec(tok);
+  if (!m || !m[2].includes('*')) return null;
+  const achada = PALAVRAS_ESCONDIDAS.find(([re]) => re.test(m[2]));
+  return achada ? m[1] + (m[2][0] === m[2][0].toUpperCase() && /\p{L}/u.test(m[2][0]) ? achada[1][0].toUpperCase() + achada[1].slice(1) : achada[1]) + m[3] + m[4] : null;
+};
+export function semCensura(linhas, letraDaMusica = []) {
+  const norm = (w) => normalize(w).replace(/[^a-z0-9]/g, '');
+  const daMusica = (letraDaMusica || []).map((l) => String(l).split(/\s+/).filter(Boolean));
+  return (linhas || []).map((linha) => {
+    if (!censurada(linha)) return linha;
+    const toks = linha.split(/(\s+)/);
+    const palavras = toks.filter((t) => t.trim());
+    // a linha da música mais parecida (as palavras que não estão escondidas), do mesmo tamanho (±1)
+    const visiveis = new Set(palavras.filter((w) => !w.includes('*')).map(norm));
+    let melhor = null;
+    let nota = 0;
+    for (const ws of daMusica) {
+      if (Math.abs(ws.length - palavras.length) > 1 || ws.some((w) => w.includes('*'))) continue;
+      const n = ws.filter((w) => visiveis.has(norm(w))).length / Math.max(1, visiveis.size);
+      if (n > nota) { nota = n; melhor = ws; }
+    }
+    let k = -1;
+    return toks.map((t) => {
+      if (!t.trim()) return t;
+      k++;
+      if (!t.includes('*')) return t;
+      // pela música: a palavra no mesmo lugar (ou na vizinha, se a linha tem uma palavra a mais ou a menos)
+      if (melhor && nota >= 0.6) {
+        const iguais = (a, b) => a !== undefined && b !== undefined && norm(a) === norm(b);
+        const d = melhor.length === palavras.length ? 0 : [0, -1, 1].find((x) => iguais(melhor[k - 1 + x], palavras[k - 1]) || iguais(melhor[k + 1 + x], palavras[k + 1])) ?? 0;
+        const w = melhor[k + d];
+        const pref = /^[^\p{L}*]*/u.exec(t)[0];
+        const suf = /[^\p{L}*]*$/u.exec(t)[0];
+        if (w && !w.includes('*')) return pref + w.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '') + suf;
+      }
+      return palavraEscondida(t) || t;
+    }).join('');
+  });
+}
 export function gravacaoOficial(mesmas, duracao = 0) {
   const grupos = [];
   for (const r of mesmas) {
@@ -627,7 +678,9 @@ export function gravacaoOficial(mesmas, duracao = 0) {
   }
   const nota = (g) => g.itens.length * 10 + (g.itens.some((r) => !aoVivo(r)) ? 5 : 0) + (duracao > 0 && Math.abs(g.d - duracao) <= 4 ? 1 : 0);
   const melhor = grupos.reduce((x, y) => (nota(y) > nota(x) ? y : x));
-  return melhor.itens.find((r) => !aoVivo(r)) || melhor.itens[0];
+  // (a letra sem as palavras escondidas com asteriscos, quando há uma: a música explícita aparece como é cantada)
+  return melhor.itens.find((r) => !aoVivo(r) && !censurada(r.syncedLyrics)) || melhor.itens.find((r) => !censurada(r.syncedLyrics))
+    || melhor.itens.find((r) => !aoVivo(r)) || melhor.itens[0];
 }
 
 // Letra simples -> ChordPro: estrofes separadas por linha em branco; as partes saem sozinhas (partesDosBlocos):

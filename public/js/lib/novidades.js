@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 375, data: '2026-10-31', titulo: 'Músicas explícitas com o selo E, e a letra inteira',
+    itens: [
+      { tipo: 'melhoria', texto: 'As músicas explícitas ganham o selo “E” (como no Spotify) nos cartões da busca, da biblioteca e no Tocando agora.' },
+      { tipo: 'correcao', texto: 'A letra sincronizada não esconde mais palavras com asteriscos (“give a ****s”): entre as letras disponíveis vem a sem censura, e as palavras escondidas voltam a ser as cantadas pela letra da própria música. A versão de música escolhida também evita a “clean”, com os palavrões cortados.' },
+    ],
+  },
+  {
     versao: 374, data: '2026-10-31', titulo: 'Letra sincronizada antes de entrar, acordes certos e partes em inglês',
     itens: [
       { tipo: 'melhoria', texto: 'A música da busca só abre com a versão de música, o clipe e a letra sincronizada prontos (embaixo do nome aparece o que está sendo preparado; no máximo 15 s). A letra sincronizada vem bem mais rápido: a reserva (NetEase) é procurada junto com o LRCLIB, pelos serviços ao mesmo tempo, e uma falha da internet é tentada de novo na hora.' },
@@ -66,13 +73,6 @@ export const NOVIDADES = [
     versao: 366, data: '2026-10-31', titulo: 'Fila como a do Spotify',
     itens: [
       { tipo: 'melhoria', texto: 'Cada música da fila tem os três tracinhos (≡) à direita, indicando que dá para mudar a posição. Segurando a música, ela fica com o fundo mais claro e acompanha o dedo, o lugar onde vai cair fica vazio e as outras deslizam para abrir espaço.' },
-    ],
-  },
-  {
-    versao: 365, data: '2026-10-31', titulo: 'Fila: arrastar pelo card inteiro',
-    itens: [
-      { tipo: 'melhoria', texto: 'Na fila, segure qualquer parte da música e arraste para mudar a ordem (sem a alça): o card sobe, acompanha o dedo e as outras músicas abrem espaço deslizando.' },
-      { tipo: 'correcao', texto: 'Escolher uma música pela fila desliga o aleatório, e o botão volta ao normal (não fica mais azul e apagado ao mesmo tempo).' },
     ],
   },
 ];

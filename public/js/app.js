@@ -24,7 +24,7 @@ import { apagarAudio, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } f
 import { escolherAudio, mesmaSincronia, paresPelaDuracao, paresPelaLegenda, paresPelasLetras, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
 import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { embaralharIndices, moverIndice } from './lib/fila.js';
-import { audioDbDoArtista, audioDoVideo, buscarYoutube, legendasDoVideo, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { audioDbDoArtista, audioDoVideo, buscarYoutube, legendasDoVideo, semCensura, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.31-374';
+export const APP_VERSAO = '2026.10.31-375';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1455,7 +1455,8 @@ const player = (() => {
     porTexto($('.pl-fixo small', el), atual.artista || '');
     // só o artista (e a parte da missa): o tempo fica na barra de tempo (no celular ele ia junto do artista e cortava o
     // nome, "3:17 / 3:…"; a barrinha de progresso embaixo já mostra quanto falta)
-    porTexto($('.pl-txt small', el), [atual.parte, atual.artista].filter(Boolean).join(' · '));
+    // (com o "E" de explícita antes, como no Spotify)
+    porHtml($('.pl-txt small', el), seloExplicita(atual.titulo, atual.artista) + esc([atual.parte, atual.artista].filter(Boolean).join(' · ')));
     // música sem vídeo: o play é o de sempre; tocando nele (ou na pílula "Escolher um vídeo"), escolhe um vídeo do YouTube
     el.querySelectorAll('.pl-play').forEach((b) => { porHtml(b, icon(estado === 'tocando' && !atual.semVideo ? 'pause' : 'play', 20)); b.title = atual.semVideo ? 'Escolher um vídeo para tocar' : ''; });
     // a bolinha de salva (na barrinha recolhida do tablet): ✓ se a música está na biblioteca, + se não
@@ -1939,7 +1940,7 @@ const semLinhasDeAcordes = (sinc) => {
     // cifra e a marcação entra onde a parte muda (a frase sem par fica na parte de antes)
     const partes = song ? partesCantadas(song.content).map((p) => ({ ...p, linhas: p.linhas.map(linhaSemCifra).filter(Boolean) })).filter((p) => p.linhas.length) : [];
     const daCifra = partes.flatMap((p) => p.linhas);
-    const linhas = sinc ? sinc.linhas : daCifra;
+    const linhas = sinc ? semCensura(sinc.linhas, daCifra) : daCifra;
     const parteDaLinha = partes.flatMap((p, n) => p.linhas.map(() => n));
     const casadas = linhas === daCifra ? daCifra.map((_, i) => i) : casarLinhas(linhas, daCifra);
     const marcas = new Map();
@@ -3929,7 +3930,7 @@ function indicadores(s) {
 
 const linhaMusica = (s, extra = '') => `
   <li class="track clickable" data-id="${s.id}" style="grid-template-columns:auto 1fr auto">
-    ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}<span class="artista-mini${s.fotoArtista ? ' com-foto' : ''}" data-artista-mini>${s.fotoArtista ? `<img src="${esc(s.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
+    ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${seloExplicita(s.title, s.artist)}${indicadores(s)}<span class="artista-mini${s.fotoArtista ? ' com-foto' : ''}" data-artista-mini>${s.fotoArtista ? `<img src="${esc(s.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
 
 // Escolhe uma música: da biblioteca ou procurando na internet (Cifra Club, cantos da missa, letras,
 // vídeos do YouTube). O que vem da internet é salvo na biblioteca. Devolve o id, 'nova' ou null.
@@ -5246,6 +5247,11 @@ function jsonp(url, tempo = 8000) {
 // achar lá, no iTunes, pela música com o mesmo título e o mesmo artista. '' se nenhum tiver. O último valor fica
 // guardado no aparelho (vale sem internet)
 const capasOficiais = new Map();
+// Se a música é explícita (como o "E" do Spotify): o Deezer e o iTunes dizem, na mesma busca da capa. Fica guardado no
+// aparelho, junto com a capa; a letra continua inteira (só o selo indica)
+const marcarExplicita = (k, sim) => { void comUltimoValor('explicita', k, Promise.resolve(sim ? 'sim' : 'nao')); };
+const explicitaConhecida = (titulo, artista) => { const k = chaveDaCapa(titulo, artista); return Boolean(k) && ultimoValorDoArtista('explicita', k) === 'sim'; };
+const seloExplicita = (titulo, artista) => (explicitaConhecida(titulo, artista) ? '<span class="selo-e" title="Explícita" aria-label="Explícita">E</span>' : '');
 const artistaDaCapa = (artista) => String(artista || '').split(/\s*(?:,|&| e | feat\.? | ft\.? | part\.? | x )\s*/i)[0].trim();
 const chaveDaCapa = (titulo, artista) => {
   const t = normalizar(tituloLimpo(titulo));
@@ -5269,10 +5275,11 @@ function capaOficial(titulo, artista) {
       const exata = (tit) => normalizar(tit || '') === t;
       const ds = (dz?.data || []).filter((x) => mesmaMusica(x.title, x.artist?.name) && x.album?.cover_xl);
       const d = ds.find((x) => exata(x.title)) || ds[0];
-      if (d) return d.album.cover_xl;
+      if (d) { marcarExplicita(k, Boolean(d.explicit_lyrics)); return d.album.cover_xl; }
       const it = await jsonp(`https://itunes.apple.com/search?term=${encodeURIComponent(`${a} ${tituloLimpo(titulo)}`)}&entity=song&limit=15`);
       const ms = (it?.results || []).filter((x) => mesmaMusica(x.trackName, x.artistName) && x.artworkUrl100);
       const m = ms.find((x) => exata(x.trackName)) || ms[0];
+      if (m) marcarExplicita(k, ['explicit', 'cleaned'].includes(m.trackExplicitness)); // ("cleaned": a versão limpa de uma explícita)
       return m ? m.artworkUrl100.replace(/\/\d+x\d+(bb)?\.(jpg|png)$/, '/600x600bb.jpg') : '';
     })().catch(() => '');
     capasOficiais.set(k, busca.then((url) => {
@@ -5517,7 +5524,7 @@ const indicadoresWeb = (r) => {
 };
 const linhaMusicaWeb = (r, i, extra = '') => `
   <li class="track clickable" data-web="musica" data-midia-index="${i}" data-i="${i}" style="grid-template-columns:auto 1fr auto">
-    ${capa({ titulo: r.titulo, capa: r.capa || r.video?.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${indicadoresWeb(r)}<span class="artista-mini" data-artista-mini>${r.fotoArtista ? `<img src="${esc(r.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(r.artista || '')}${r.video?.duracao ? ` · ${esc(r.video.duracao)}` : ''}</div></div>
+    ${capa({ titulo: r.titulo, capa: r.capa || r.video?.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${seloExplicita(r.titulo, r.artista)}${indicadoresWeb(r)}<span class="artista-mini" data-artista-mini>${r.fotoArtista ? `<img src="${esc(r.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(r.artista || '')}${r.video?.duracao ? ` · ${esc(r.video.duracao)}` : ''}</div></div>
     <span class="acts">${extra}${botaoSalvar({ titulo: r.titulo, artista: r.artista, cifra: r.cifra || '', letra: r.letra?.url || '', video: r.video, fotoArtista: r.fotoArtista || '' }, 'mini')}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 
 // Busca vazia: as músicas católicas mais procuradas agora no Cifra Club — as mais tocadas de cada um dos
@@ -11766,6 +11773,8 @@ function letraPelaSincronia(content, sinc) {
   return novo;
 }
 function guardarSincronia(song, sinc) {
+  // (as palavras escondidas com asteriscos pela fonte da letra voltam a ser as cantadas, pela letra da própria música)
+  if (sinc?.linhas?.length) { try { sinc = { ...sinc, linhas: semCensura(sinc.linhas, linhasDaLetra(song.content || '')) }; } catch { /* fica como veio */ } }
   song.sincronia = sinc;
   const comLetra = letraPelaSincronia(song.content, sinc);
   if (comLetra) song.content = comLetra;
