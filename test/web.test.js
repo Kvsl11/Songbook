@@ -587,4 +587,31 @@ test('letra sem censura: as palavras escondidas voltam pela letra da música ou 
   const lrc = (x) => `[00:01.00] ${x}\n[00:05.00] b`;
   const r = gravacaoOficial([{ id: 1, trackName: 'Espresso', duration: 175, syncedLyrics: lrc('give a ****s') }, { id: 2, trackName: 'Espresso', duration: 175, syncedLyrics: lrc('give a fucks') }], 175);
   assert.equal(r.id, 2);
+  // a versão limpa (de rádio), com outra palavra no lugar do palavrão, não passa pela letra inteira
+  const limpa = gravacaoOficial([{ id: 3, trackName: 'Espresso', duration: 175, syncedLyrics: lrc("My 'give a ****s' are on vacation") }, { id: 4, trackName: 'Espresso', duration: 175, syncedLyrics: lrc("My 'give a damns' are on vacation") }], 175);
+  assert.equal(limpa.id, 3);
+});
+
+test('letra como é cantada: a versão limpa volta a ter o palavrão da música, na letra e na cifra', async () => {
+  const { semCensura, edicaoLimpa, cifraComoCantada } = await import('../public/js/lib/web.js');
+  // a letra sincronizada da versão de rádio, com a cifra explícita (com hífens)
+  assert.deepEqual(semCensura(["My 'give a damns' are on vacation", "That's that me, espresso"], ['My give-a-fucks are on vacation', "That's that me espresso"]),
+    ["My 'give a fucks' are on vacation", "That's that me, espresso"]);
+  // os asteriscos não viram a palavra da versão limpa que está na cifra
+  assert.deepEqual(semCensura(["My 'give a ****s' are on vacation"], ['My give a damns are on vacation']), ["My 'give a fucks' are on vacation"]);
+  assert.ok(edicaoLimpa(["My 'give a damns' are on vacation"], ["My 'give a ****s' are on vacation"]));
+  assert.ok(!edicaoLimpa(["My 'give a fucks' are on vacation"], ["My 'give a ****s' are on vacation"]));
+  // a cifra com a versão limpa passa a ter a palavra cantada, sem mexer nos acordes
+  assert.equal(cifraComoCantada('{title: Espresso}\n[Am7]My give a [Dm7]damns are on vacation', ["My 'give a fucks' are on vacation"]),
+    '{title: Espresso}\n[Am7]My give a [Dm7]fucks are on vacation');
+  // (frase diferente em mais de uma palavra, ou sem palavrão: fica como está)
+  assert.deepEqual(semCensura(['My give a damn about you'], ['I give a fuck about it']), ['My give a damn about you']);
+});
+
+test('cifra: o acorde sobre a sílaba curta avança por cima da letra seguinte, sem abrir buraco', async () => {
+  const { renderSong } = await import('../public/js/render.js');
+  const html = renderSong("That's that m[Am7]e, espres[Dm7]so\n[G]a[C]h").html;
+  assert.match(html, /chunk solto pode-soltar"><span class="chord">Am7/);
+  // o último acorde da linha (sem letra depois) e os acordes colados continuam ocupando o espaço deles
+  assert.doesNotMatch(html, /solto[^"]*"><span class="chord">(Dm7|G|C)</);
 });

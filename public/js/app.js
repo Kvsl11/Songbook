@@ -1,5 +1,5 @@
 import { db, youtubeId } from './store.js';
-import { esc, renderSong } from './render.js';
+import { esc, renderSong, soltarAcordes } from './render.js';
 import { definirMeta, semInvisiveis, soAcordes, paraEditor, doEditor, completarCifra, temCifra, chordsOverLyricsToChordPro, chordProToChordsOverLyrics, toChordPro, transposeChordPro, transposeKey, transposeChord, looksLikeChordPro, isChordOnlyLine, letraDe, aplicarLetra, linhasDaLetra, linhasCantadas, partesCantadas, capoDaCifra, capoDaObservacao, organizarPartes, parteEmIngles } from './chordpro.js';
 import { icon, iconeMenu, logo, logoLumen } from './icons.js';
 import { diagramaSvg } from './acordes.js';
@@ -24,7 +24,7 @@ import { apagarAudio, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } f
 import { escolherAudio, mesmaSincronia, paresPelaDuracao, paresPelaLegenda, paresPelasLetras, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
 import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { embaralharIndices, moverIndice } from './lib/fila.js';
-import { audioDbDoArtista, audioDoVideo, buscarYoutube, legendasDoVideo, semCensura, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { audioDbDoArtista, audioDoVideo, buscarYoutube, legendasDoVideo, semCensura, cifraComoCantada, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.31-376';
+export const APP_VERSAO = '2026.10.31-377';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1047,11 +1047,11 @@ function infoDoVideo(id) {
 
 // "Canvas" (como no Spotify) sem tocar o vídeo: quadros de verdade do clipe, que o YouTube publica como
 // imagens (de vários pontos do vídeo), passando com zoom lento e troca suave. Sem anúncio, sem botões
-// do player e com poucos dados. 'hd' = quadros em alta (nem todo vídeo tem); 'sd' = 640x480, com
-// faixas pretas em cima e embaixo (o CSS corta). O tipo é descoberto uma vez e fica salvo na música.
+// do player e com poucos dados. 'hd' = quadros em alta (nem todo vídeo tem); 'sd' = 640x480 (e o hqdefault,
+// 480x360), com faixas pretas em cima e embaixo (o CSS corta, classe "lb"). O tipo é descoberto uma vez e fica salvo na música.
 const QUADROS = { hd: ['maxres1', 'maxres2', 'maxres3', 'maxresdefault'], sd: ['sd1', 'sd2', 'sd3', 'hqdefault'] };
 function htmlQuadros(id, tipo = 'sd') {
-  return QUADROS[tipo].map((q, n) => `<img class="q ${tipo === 'sd' && q !== 'hqdefault' ? 'lb' : ''}" style="--n:${n}" src="https://i.ytimg.com/vi/${esc(id)}/${q}.jpg" alt="" ${n ? 'loading="lazy"' : ''}>`).join('');
+  return QUADROS[tipo].map((q, n) => `<img class="q ${tipo === 'sd' ? 'lb' : ''}" style="--n:${n}" src="https://i.ytimg.com/vi/${esc(id)}/${q}.jpg" alt="" ${n ? 'loading="lazy"' : ''}>`).join('');
 }
 // tem quadros em alta? (quando não tem, o YouTube devolve uma imagem cinza de 120x90)
 function tipoDosQuadros(id) {
@@ -2058,6 +2058,7 @@ const semLinhasDeAcordes = (sinc) => {
     const capo = song.capo || 0;
     const r = renderSong(song.content, { transpose, capo, key: song.key || '' });
     box.innerHTML = `<div class="song lyrics-mode with-chords">${r.html}</div>`;
+    soltarAcordes(box);
     $('.pl-tom', el).innerHTML = `<small>Tom</small>${esc(r.key || (transpose ? (transpose > 0 ? '+' : '') + transpose : '—'))}`;
     $('.pl-capo', el).innerHTML = `<small>Capo</small>${capo || '—'}`;
     // com a letra sincronizada, a linha cantada acende também na cifra
@@ -8882,6 +8883,7 @@ function viewSong(id, ctx = {}) {
     // Cifra e Letra usam o mesmo painel estilo Spotify; na Cifra os acordes aparecem por cima
     songEl.classList.add('lyrics-mode');
     songEl.classList.toggle('with-chords', comCifra);
+    if (comCifra) soltarAcordes(songEl);
     $('#tools').classList.toggle('sem-cifra', !comCifra);
     const tomAtual = tomBase ? transposeKey(tomBase, transpose) : '';
     $('#key').innerHTML = `<small>Tom</small>${tomAtual ? esc(tomAtual) : (transpose ? (transpose > 0 ? '+' : '') + transpose : '—')}`;
@@ -11803,7 +11805,11 @@ function guardarSincronia(song, sinc) {
   // (as palavras escondidas com asteriscos pela fonte da letra voltam a ser as cantadas, pela letra da própria música)
   if (sinc?.linhas?.length) { try { sinc = { ...sinc, linhas: semCensura(sinc.linhas, linhasDaLetra(song.content || '')) }; } catch { /* fica como veio */ } }
   song.sincronia = sinc;
-  const comLetra = letraPelaSincronia(song.content, sinc);
+  // (e a cifra com a versão limpa, "give a damns", passa a ter a palavra cantada pela gravação que toca, como a letra)
+  let comLetra = letraPelaSincronia(song.content, sinc);
+  if (!comLetra && sinc?.linhas?.length) {
+    try { const cantada = cifraComoCantada(song.content || '', sinc.linhas); if (cantada !== song.content) { comLetra = cantada; song.content = cantada; } } catch { /* fica como está */ }
+  }
   if (comLetra) song.content = comLetra;
   if (song.id === 'previa') { if (preview) { preview.sincronia = sinc; if (comLetra) preview.content = comLetra; } }
   else if (db.song(song.id)) db.updateSong(song.id, { sincronia: sinc, ...(comLetra ? { content: comLetra } : {}) });

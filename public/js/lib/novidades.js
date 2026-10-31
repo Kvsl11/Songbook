@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 377, data: '2026-10-31', titulo: 'Letra como é cantada, cifra sem buracos e capa sem faixas pretas',
+    itens: [
+      { tipo: 'correcao', texto: 'A letra sincronizada não vem mais da versão de rádio (“give a damns” no lugar de “give a fucks”, em Espresso): fica a letra da gravação que toca, e a Letra e a Cifra mostram as mesmas palavras cantadas.' },
+      { tipo: 'melhoria', texto: 'Na cifra, o acorde sobre uma sílaba curta (“m[Am7]e”, “l[Am7]ike”) não abre mais um buraco no meio da frase: ele passa por cima da letra seguinte, sem encostar no próximo acorde.' },
+      { tipo: 'correcao', texto: 'Na capa animada sem o download, os quadros do clipe não mostram mais as faixas pretas em cima e embaixo, que pareciam o degradê falhando.' },
+    ],
+  },
+  {
     versao: 376, data: '2026-10-31', titulo: 'A música entra com a letra já sincronizada',
     itens: [
       { tipo: 'correcao', texto: 'A música da busca não entra mais antes da letra sincronizada: quando um serviço da letra falha por um instante, o app tenta de novo até achar (ou ter certeza de que não há); antes desistia depois de duas tentativas e a letra aparecia segundos depois de entrar.' },
@@ -67,13 +75,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'A música aberta (da busca, da biblioteca, de um repertório) começa na versão da música, com a capa e a letra sincronizada, e não no vídeo. No vídeo não há letra, e por isso parecia que a sincronia não funcionava.' },
       { tipo: 'melhoria', texto: 'A capa animada funciona sem baixar a música: passam os quadros do clipe; nas músicas baixadas, o próprio vídeo.' },
-    ],
-  },
-  {
-    versao: 367, data: '2026-10-31', titulo: 'Letra sincronizada de volta, e mais rápida',
-    itens: [
-      { tipo: 'correcao', texto: 'A letra sincronizada voltou: o app só perguntava ao LRCLIB depois de achar o áudio oficial e a duração do vídeo no YouTube, por serviços que andam fora do ar, e a letra demorava minutos ou nunca vinha. Agora o LRCLIB é consultado na hora e a letra aparece em poucos segundos.' },
-      { tipo: 'melhoria', texto: 'Enquanto o áudio oficial é procurado, a letra já acompanha o vídeo; quando ele é encontrado, ela passa para ele com os tempos exatos. Se a posição for estimada, aparece “Letra sincronizada (aproximada)”.' },
     ],
   },
 ];

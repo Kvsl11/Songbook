@@ -391,6 +391,8 @@ a.chip.sm { cursor: pointer; }
 .song.lyrics-mode.with-chords .lyrics-only .palavra { display: inline; }
 .song .chord { color: var(--chord); font-weight: 800; font-size: 0.86em; min-height: 1.25em; padding-right: 0.4em; }
 .song.no-chords .chord, .song .lyrics-only .chord { display: none; }
+/* o acorde sobre uma sílaba curta avança por cima da letra seguinte, em vez de abrir um buraco na frase (render.js) */
+.song .chunk.solto > .chord, .song.lyrics-mode.with-chords .chunk.solto > .chord { width: 0; min-width: 0; padding-right: 0; overflow: visible; white-space: nowrap; }
 .song.no-chords .line.chords-only { display: none; }
 .song .lyric { min-height: 1.3em; }
 .song .comment { color: var(--muted); font-style: italic; margin: 2px 0; }
@@ -1095,13 +1097,24 @@ body.performance .convite-instalar { display: none; }
 }
 /* imagem do clipe, desfocada, por trás (aparece enquanto o vídeo está escondido) */
 .canvas-fundo .canvas-img { position: absolute; inset: -30px; width: calc(100% + 60px); height: calc(100% + 60px); object-fit: cover; filter: blur(22px) saturate(1.2); opacity: 0.85; }
+/* (o hqdefault também tem as faixas pretas: cortadas do mesmo jeito, para não escurecer as bordas enquanto os quadros chegam) */
+.canvas-fundo .canvas-img { --lb-w: calc(max(100cqw, 183cqh) + 60px); inset: auto; left: calc((100cqw - var(--lb-w)) / 2); top: calc((100cqh - var(--lb-w) * 0.75) / 2);
+  width: var(--lb-w); height: calc(var(--lb-w) * 0.75); }
 /* quadros do clipe passando com zoom lento e troca suave (4 quadros, ~6 s cada, em repetição) */
 .quadros img.q {
   position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0;
   animation: quadro 24s linear infinite; animation-delay: calc(var(--n) * 6s - 0.01s); will-change: opacity, transform;
 }
-/* quadros 640x480 de vídeos 16:9 têm faixas pretas em cima e embaixo: a imagem é esticada para fora */
-.quadros img.q.lb { top: -17%; height: 134%; }
+/* quadros 640x480 (e o hqdefault, 480x360) de vídeos 16:9 têm faixas pretas em cima e embaixo (12,5% da altura cada).
+   A imagem inteira (4:3) é dimensionada pela parte do meio, sem as faixas: essa parte (com uma folga para a borda
+   borrada do JPEG) cobre sempre a área toda, seja ela larga ou alta. Antes a imagem só era esticada 17% para fora e,
+   numa área alta (o Tocando agora no celular), o object-fit encaixava pela altura e as faixas ficavam bem na borda */
+.quadros { container-type: size; }
+.quadros img.q.lb {
+  --lb-w: max(100cqw, 183cqh); /* largura em que o miolo sem faixas (73% de 3/4 da largura) cobre a altura */
+  left: calc((100cqw - var(--lb-w)) / 2); top: calc((100cqh - var(--lb-w) * 0.75) / 2);
+  width: var(--lb-w); height: calc(var(--lb-w) * 0.75);
+}
 @keyframes quadro {
   0% { opacity: 0; transform: scale(1.06) translate(1%, 0); }
   5% { opacity: 1; }

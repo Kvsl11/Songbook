@@ -613,6 +613,9 @@ export async function letraSincronizadaNetease({ titulo = '', artista = '', dura
     const r = { ...sinc, fonte: 'netease', id: `ne:${c.id}`, duracao: c.duracao || 0, ...(bate ? {} : { ajustar: true }) };
     // (a letra com palavras escondidas fica de reserva: outra versão pode ter a letra inteira)
     if (censurada(lrc)) { censuradaReserva ||= r; continue; }
+    // (a sem asteriscos que é a versão limpa, de rádio, com outras palavras no lugar dos palavrões, como a de uma
+    // coletânea com "give a damns": fica a censurada, da gravação explícita, e as palavras voltam pela letra da música)
+    if (censuradaReserva && edicaoLimpa(r.linhas, censuradaReserva.linhas)) continue;
     return r;
   }
   return censuradaReserva;
@@ -627,7 +630,7 @@ export const censurada = (t) => /\*{2,}|\p{L}\*+\p{L}?/u.test(String(t || ''));
 // As palavras escondidas por asteriscos voltam a ser as cantadas: pela letra da própria música (a da cifra, que vem
 // inteira), na linha mais parecida, a palavra no mesmo lugar; sem ela, as mais comuns pelas letras que sobraram
 // ("f**k", "sh*t"…). As que não dá para saber ficam como estão
-const PALAVRAS_ESCONDIDAS = [[/^f[*u]{1}[*c]{1}[*k]{1}$|^f\*\*\*$|^f\*ck$|^f\*\*k$/i, 'fuck'], [/^sh\*t$|^s\*\*t$|^s\*it$/i, 'shit'], [/^b\*tch$|^b\*\*ch$|^b\*\*\*h$|^b\*\*\*\*$/i, 'bitch'],
+const PALAVRAS_ESCONDIDAS = [[/^f[*u]{1}[*c]{1}[*k]{1}$|^f\*\*\*$|^f\*ck$|^f\*\*k$|^\*{4}$/i, 'fuck'], [/^sh\*t$|^s\*\*t$|^s\*it$/i, 'shit'], [/^b\*tch$|^b\*\*ch$|^b\*\*\*h$|^b\*\*\*\*$/i, 'bitch'],
   [/^d\*mn$|^d\*\*n$/i, 'damn'], [/^a\*\*$/i, 'ass'], [/^p\*ssy$|^p\*\*\*y$/i, 'pussy'], [/^d\*ck$|^d\*\*k$/i, 'dick'], [/^h\*ll$/i, 'hell']];
 const palavraEscondida = (tok) => {
   const m = /^([^\p{L}*]*)([\p{L}*']+?)((?:in'?|ing|ed|er|s)?)([^\p{L}*]*)$/u.exec(tok);
@@ -635,11 +638,85 @@ const palavraEscondida = (tok) => {
   const achada = PALAVRAS_ESCONDIDAS.find(([re]) => re.test(m[2]));
   return achada ? m[1] + (m[2][0] === m[2][0].toUpperCase() && /\p{L}/u.test(m[2][0]) ? achada[1][0].toUpperCase() + achada[1].slice(1) : achada[1]) + m[3] + m[4] : null;
 };
-export function semCensura(linhas, letraDaMusica = []) {
-  const norm = (w) => normalize(w).replace(/[^a-z0-9]/g, '');
+// os palavrões de verdade (o que a versão explícita canta) e as palavras que a versão limpa ("clean", de rádio) põe no
+// lugar deles ("give a damns" no lugar de "give a fucks"; "stuff" no de "shit")
+const EXPLICITA = /^(mother)?f+u+c+k+\w*$|^shit\w*$|^bullshit\w*$|^bitch\w*$|^ass(hole)?s?$|^dick(s|head\w*)?$|^puss(y|ies)$|^cunts?$/;
+const LIMPA = /^(damn\w*|darn\w*|dang\w*|heck\w*|freak\w*|frick\w*|frig\w*|fudge\w*|flip\w*|stuff\w*|crap\w*|junk|hell|butt|witch\w*|chick\w*)$/;
+const normPalavra = (w) => normalize(w).replace(/[^a-z0-9]/g, '');
+const ehExplicita = (w) => EXPLICITA.test(normPalavra(w));
+// palavras de uma linha, com o que fica entre elas (espaços e hífens: "give-a-fucks" e "give a fucks" são a mesma)
+const pedacos = (l) => String(l).split(/([\s\-‐–]+)/);
+// A linha da versão limpa que tem, na letra da própria música, a mesma linha com um palavrão no lugar de uma palavra
+// (todas as outras iguais): fica a palavra cantada, a da música. Também serve ao contrário (a cifra com a versão
+// limpa e a letra sincronizada com a explícita): quem chama decide qual lado é "a música"
+function trocaComoNaMusica(linha, daMusica) {
+  const ps = pedacos(linha);
+  const ws = ps.filter((_, i) => i % 2 === 0 && ps[i] !== '');
+  if (ws.length < 3) return null;
+  const nw = ws.map(normPalavra);
+  for (const outra of daMusica) {
+    const ow = pedacos(outra).filter((x, i) => i % 2 === 0 && x !== '');
+    if (ow.length !== ws.length) continue;
+    const dif = ow.map((w, i) => (normPalavra(w) === nw[i] ? -1 : i)).filter((i) => i >= 0);
+    if (dif.length !== 1) continue;
+    const i = dif[0];
+    if (!ehExplicita(ow[i]) || ehExplicita(ws[i])) continue;
+    return { i, palavra: ow[i].replace(/^[^\p{L}0-9]+|[^\p{L}0-9]+$/gu, '') };
+  }
+  return null;
+}
+// troca a palavra de número i (contando só as palavras: `ehPalavra` diz quais pedaços são), com a pontuação e a
+// maiúscula de antes
+function trocarPalavra(ps, ehPalavra, i, w) {
+  let k = -1;
+  return ps.map((x, j) => {
+    if (!ehPalavra(x, j)) return x;
+    k++;
+    if (k !== i) return x;
+    const pref = /^[^\p{L}0-9]*/u.exec(x)[0];
+    const suf = /[^\p{L}0-9]*$/u.exec(x.slice(pref.length))[0];
+    const meio = x.slice(pref.length, x.length - suf.length);
+    return pref + (/^\p{Lu}/u.test(meio) ? w[0].toUpperCase() + w.slice(1) : w) + suf;
+  }).join('');
+}
+function comoNaMusica(linha, daMusica) {
+  const t = trocaComoNaMusica(linha, daMusica);
+  return t ? trocarPalavra(pedacos(linha), (x, j) => j % 2 === 0 && x !== '', t.i, t.palavra) : linha;
+}
+// A cifra (ChordPro) com a versão limpa e a letra sincronizada (a da gravação que toca) com o palavrão: a cifra passa a
+// ter a palavra cantada, sem mexer nos acordes. Devolve o texto igual quando não há o que trocar
+export function cifraComoCantada(content, linhasCantadas = []) {
+  const cantadas = (linhasCantadas || []).map(String).filter((l) => !censurada(l));
+  if (!cantadas.some((l) => pedacos(l).some(ehExplicita))) return content;
+  return String(content || '').split('\n').map((l) => {
+    if (/^\s*\{/.test(l) || !/\p{L}/u.test(l.replace(/\[[^\]]*\]/g, ''))) return l;
+    const t = trocaComoNaMusica(l.replace(/\[[^\]]*\]/g, ''), cantadas);
+    if (!t) return l;
+    const ps = l.split(/(\[[^\]]*\]|[\s\-‐–]+)/);
+    const ehPalavra = (x, j) => j % 2 === 0 && x !== '';
+    // (um acorde no meio da palavra a parte em duas: aí não dá para saber qual pedaço trocar e fica como está)
+    if (ps.filter(ehPalavra).length !== pedacos(l.replace(/\[[^\]]*\]/g, '')).filter((x, j) => j % 2 === 0 && x !== '').length) return l;
+    return trocarPalavra(ps, ehPalavra, t.i, t.palavra);
+  }).join('\n');
+}
+// A letra da versão limpa no lugar da explícita: as linhas sem asteriscos da letra `limpa` têm, onde a `censurada`
+// esconde um palavrão, outra palavra ("give a damns" contra "give a ****s"). Aí a censurada é a da gravação que toca
+// (a explícita), e as palavras escondidas voltam pela letra da música
+export function edicaoLimpa(limpa = [], censurada = []) {
+  const antes = (censurada || []).map(String);
+  const depois = semCensura(antes, (limpa || []).map(String), { comoVier: true });
+  return antes.some((l, n) => {
+    if (!/\*/.test(l)) return false;
+    const a = l.split(/(\s+)/);
+    const b = depois[n].split(/(\s+)/);
+    return a.length === b.length && a.some((t, i) => t.includes('*') && !b[i].includes('*') && !ehExplicita(b[i]));
+  });
+}
+export function semCensura(linhas, letraDaMusica = [], { comoVier = false } = {}) {
+  const norm = normPalavra;
   const daMusica = (letraDaMusica || []).map((l) => String(l).split(/\s+/).filter(Boolean));
   return (linhas || []).map((linha) => {
-    if (!censurada(linha)) return linha;
+    if (!censurada(linha)) return comoVier ? linha : comoNaMusica(linha, letraDaMusica || []);
     const toks = linha.split(/(\s+)/);
     const palavras = toks.filter((t) => t.trim());
     // a linha da música mais parecida (as palavras que não estão escondidas), do mesmo tamanho (±1)
@@ -663,7 +740,9 @@ export function semCensura(linhas, letraDaMusica = []) {
         const w = melhor[k + d];
         const pref = /^[^\p{L}*]*/u.exec(t)[0];
         const suf = /[^\p{L}*]*$/u.exec(t)[0];
-        if (w && !w.includes('*')) return pref + w.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '') + suf;
+        // (a palavra da versão limpa na letra da música, como "damns" no lugar de "****s", só quando não dá para
+        // saber o palavrão pelas letras que sobraram)
+        if (w && !w.includes('*') && !(!comoVier && LIMPA.test(normPalavra(w)) && palavraEscondida(t))) return pref + w.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '') + suf;
       }
       return palavraEscondida(t) || t;
     }).join('');
@@ -679,7 +758,11 @@ export function gravacaoOficial(mesmas, duracao = 0) {
   const nota = (g) => g.itens.length * 10 + (g.itens.some((r) => !aoVivo(r)) ? 5 : 0) + (duracao > 0 && Math.abs(g.d - duracao) <= 4 ? 1 : 0);
   const melhor = grupos.reduce((x, y) => (nota(y) > nota(x) ? y : x));
   // (a letra sem as palavras escondidas com asteriscos, quando há uma: a música explícita aparece como é cantada)
-  return melhor.itens.find((r) => !aoVivo(r) && !censurada(r.syncedLyrics)) || melhor.itens.find((r) => !censurada(r.syncedLyrics))
+  // (mas não a versão limpa, com outras palavras no lugar dos palavrões escondidos pela censurada)
+  const linhasLrc = (r) => String(r.syncedLyrics || '').split('\n').map((l) => l.replace(/^(\s*\[[^\]]*\])+/, '').trim()).filter(Boolean);
+  const censuradas = melhor.itens.filter((r) => censurada(r.syncedLyrics));
+  const inteira = (r) => !censurada(r.syncedLyrics) && !censuradas.some((c) => edicaoLimpa(linhasLrc(r), linhasLrc(c)));
+  return melhor.itens.find((r) => !aoVivo(r) && inteira(r)) || melhor.itens.find(inteira)
     || melhor.itens.find((r) => !aoVivo(r)) || melhor.itens[0];
 }
 
