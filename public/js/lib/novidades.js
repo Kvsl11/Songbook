@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 361, data: '2026-10-30', titulo: 'Troca independente da música e do vídeo',
+    itens: [
+      { tipo: 'melhoria', texto: 'No modo música, a busca substitui somente a faixa de áudio; no modo vídeo, substitui somente o clipe. As duas versões ficam separadas e a escolha não sobrescreve a outra.' },
+    ],
+  },
+  {
     versao: 360, data: '2026-10-30', titulo: 'A música abre mesmo quando a sincronização falha',
     itens: [
       { tipo: 'correcao', texto: 'Uma falha temporária na busca da letra sincronizada não bloqueia mais a abertura da música nem mostra o aviso repetido. A letra continua disponível, e o Songbook pode tentar sincronizá-la novamente depois.' },
@@ -58,12 +64,6 @@ export const NOVIDADES = [
     versao: 352, data: '2026-10-30', titulo: 'Download de áudio e videoclipe sem cortes',
     itens: [
       { tipo: 'correcao', texto: 'Com “Áudio e vídeo” ativado, o Songbook mantém o videoclipe mesmo quando ele é uma gravação diferente do áudio oficial. Se um dos arquivos falhar, o download fica parcial e informa qual arquivo faltou, permitindo completar depois.' },
-    ],
-  },
-  {
-    versao: 351, data: '2026-10-30', titulo: 'Conexão mais estável com o servidor e YouTube',
-    itens: [
-      { tipo: 'correcao', texto: 'A descoberta do servidor é revalidada e pode se recuperar de falhas temporárias. O acompanhamento de tarefas tolera oscilações de gateway, e transferências interrompidas podem ser retomadas. O yt-dlp ganhou mais tentativas para falhas temporárias do YouTube.' },
     ],
   },
 
