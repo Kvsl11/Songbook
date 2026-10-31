@@ -240,3 +240,15 @@ test('a busca abre a música mesmo quando a sincronização automática não enc
   assert.doesNotMatch(app.slice(preparar, navegar), /openDialog|Não foi possível sincronizar/);
   assert.match(app, /if \(r !== 'ok'\) tentouSincronizar\.delete\(chaveSync\)/);
 });
+
+test('trocar música e trocar vídeo alteram versões independentes', async () => {
+  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const audio = app.slice(app.indexOf('function trocarAudioDaMusica'), app.indexOf('function escolherVideo'));
+  const video = app.slice(app.indexOf('function trocarVideoDaMusica'), app.indexOf('function trocarAudioDaMusica'));
+  assert.match(audio, /audio:\s*novo/);
+  assert.match(audio, /video:\s*s\.youtube/);
+  assert.doesNotMatch(audio, /definirMeta\(.*youtube/);
+  assert.match(video, /definirMeta\(s\.content, 'youtube', url\)/);
+  assert.match(app, /const tipo = comCapa \? 'audio' : 'video'/);
+  assert.match(app, /escolherVideo\(song, tipo\)/);
+});
