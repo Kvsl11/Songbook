@@ -467,6 +467,41 @@ test('canalDosResultados: com vários verificados do mesmo nome, o que tem mais 
   assert.equal(canalDosResultados(json, 'Kemuel').inscritos, 3190000);
 });
 
+test('capaAudioDb: busca a capa do álbum da faixa exata e valida artista e título', async () => {
+  const { capaAudioDb } = await import('../public/js/lib/web.js');
+  const pedidos = [];
+  const fetchImpl = async (url) => {
+    pedidos.push(url);
+    if (url.includes('searchtrack.php')) return {
+      ok: true,
+      json: async () => ({ track: [{
+        strTrack: 'Company', strArtist: 'Justin Bieber', strAlbum: 'Purpose',
+        strMusicBrainzAlbumID: 'release-group-id', idAlbum: '123',
+      }] }),
+    };
+    if (url.includes('album-mb.php')) return {
+      ok: true,
+      json: async () => ({ album: [{ strArtist: 'Justin Bieber', strAlbum: 'Purpose', strAlbumThumb: 'https://images.example/purpose.jpg' }] }),
+    };
+    throw new Error('pedido inesperado: ' + url);
+  };
+  assert.equal(await capaAudioDb('Company', 'Justin Bieber', fetchImpl), 'https://images.example/purpose.jpg');
+  assert.equal(pedidos.length, 2);
+  assert.match(pedidos[0], /searchtrack\.php/);
+  assert.match(pedidos[1], /album-mb\.php/);
+});
+
+test('capaAudioDb: não aceita capa de outra faixa ou artista', async () => {
+  const { capaAudioDb } = await import('../public/js/lib/web.js');
+  let chamadas = 0;
+  const fetchImpl = async () => {
+    chamadas++;
+    return { ok: true, json: async () => ({ track: [{ strTrack: 'Company (Live)', strArtist: 'Outro artista', idAlbum: '123' }] }) };
+  };
+  assert.equal(await capaAudioDb('Company', 'Justin Bieber', fetchImpl), '');
+  assert.equal(chamadas, 1);
+});
+
 test('artistaDaAudioDb: os seguidores no Spotify, as fotos e a biografia, só do artista com o mesmo nome', async () => {
   const { artistaDaAudioDb } = await import('../public/js/lib/web.js');
   const json = { artists: [{ strArtist: 'Aline Barros', intFollowers: '5724931', strArtistThumb: 'https://r2.theaudiodb.com/a.jpg', strArtistFanart: 'http://r2.theaudiodb.com/b.jpg', strArtistFanart2: null, strArtistLogo: 'https://r2.theaudiodb.com/logo.png', strBiographyPT: 'Cantora.' }] };
