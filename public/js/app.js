@@ -4564,7 +4564,7 @@ async function abrirPrevia(content, source, back, videoJa = null) {
     ? capaOficial(novo.title, novo.artist).catch(() => '')
     : Promise.resolve('');
   const buscaFotoDaPrevia = novo.title && novo.artist
-    ? fotoDoArtista(novo.artist, /cifraclub\\.com\\.br\\/([^/?#]+)/.exec(source || '')?.[1] || '').catch(() => '')
+    ? fotoDoArtista(novo.artist, /cifraclub\.com\.br\/([^/?#]+)/.exec(source || '')?.[1] || '').catch(() => '')
     : Promise.resolve('');
   void buscaFotoDaPrevia.then((url) => {
     if (!url || preview !== novo) return;
