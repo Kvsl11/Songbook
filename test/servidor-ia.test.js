@@ -84,3 +84,14 @@ test('servidor: a descoberta de conexão não fica presa ao primeiro resultado',
   assert.match(app, /carregamentoServidor = null/);
   assert.match(app, /cache: 'no-store'/);
 });
+
+test('casarLinhas: o 2º refrão cantado vai para o 2º refrão escrito, mesmo longe da linha de antes', () => {
+  const refrao = ['Say you cant sleep baby I know', 'Thats that me espresso'];
+  const estrofe = (n) => Array.from({ length: 12 }, (_, i) => `estrofe ${n} linha ${i} com palavras diferentes ${n * 100 + i}`);
+  // (uma parte escrita que a gravação não canta, entre os dois refrões: o 2º fica longe da última linha cantada)
+  const tela = [...refrao, ...estrofe(1), ...estrofe(2), ...refrao];
+  const cantadas = [...refrao, ...estrofe(1), ...refrao];
+  assert.deepEqual(casarLinhas(cantadas, tela).slice(-2), [26, 27]);
+  // (escrito uma vez só: o refrão que volta casa com o do começo)
+  assert.deepEqual(casarLinhas([...refrao, ...estrofe(1), ...refrao], [...refrao, ...estrofe(1)]).slice(-2), [0, 1]);
+});

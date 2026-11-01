@@ -2118,11 +2118,13 @@ const semLinhasDeAcordes = (sinc) => {
     $('.pl-tom', el).innerHTML = `<small>Tom</small>${esc(r.key || (transpose ? (transpose > 0 ? '+' : '') + transpose : '—'))}`;
     $('.pl-capo', el).innerHTML = `<small>Capo</small>${capo || '—'}`;
     // com a letra sincronizada, a linha cantada acende também na cifra
-    const sinc = song.sincronia?.fonte === 'lrclib' && song.sincronia.video === videoDaLetra(song) ? song.sincronia : null;
-    if (sinc) {
+    // (as mesmas frases da letra, na mesma ordem dos tempos: sem as linhas só de acordes e sem os asteriscos. Antes
+    // eram as da sincronia guardada, com as linhas só de acordes que a letra tira: a partir delas, a frase k da cifra
+    // não era a k dos tempos, e acendia a linha errada)
+    if (tempos && linhasDaLetra.length === tempos.length) {
       const linhasTela = [...box.querySelectorAll('.line:not(.chords-only)')];
       const textos = linhasTela.map((l) => [...l.querySelectorAll('.lyric')].map((x) => x.textContent).join(''));
-      mapaCifra = casarLinhas(sinc.linhas, textos).map((i) => (i >= 0 ? linhasTela[i] : null));
+      mapaCifra = casarLinhas(linhasDaLetra, textos).map((i) => (i >= 0 ? linhasTela[i] : null));
     }
   };
   // só a letra (na tela toda), para ler: sem o nome e a barra de baixo (compartilhar, tempo, play);

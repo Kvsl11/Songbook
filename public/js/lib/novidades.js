@@ -4,8 +4,9 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
-    versao: 379, data: '2026-11-01', titulo: 'Barra parada no anúncio também no modo vídeo',
+    versao: 379, data: '2026-11-01', titulo: 'Cifra acompanhando a música certa e barra parada no anúncio do vídeo',
     itens: [
+      { tipo: 'correcao', texto: 'Na Cifra, a linha acesa volta a ser a que está sendo cantada: quando a letra sincronizada tinha uma linha só de acordes (como “( Am7 )”), a cifra passava a acender a linha errada dali em diante. E o refrão escrito duas vezes acende no lugar certo da segunda vez, sem voltar para o primeiro.' },
       { tipo: 'correcao', texto: 'No modo vídeo, a barra de reprodução não anda mais durante o anúncio: o clipe que toca mudo junto da música passava o anúncio escondido, e o app guardava a duração do anúncio como a do clipe; ao mudar para o vídeo, o anúncio não era mais reconhecido.' },
     ],
   },

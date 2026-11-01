@@ -252,13 +252,17 @@ export function casarLinhas(cantadas, naTela) {
       const efetiva = s - (k === ultima ? 0.12 : 0.025 * (k - ultima - 1));
       if (efetiva > nota) { nota = efetiva; melhor = k; }
     }
-    // 2º: em qualquer lugar (o refrão que volta lá do começo), a mais parecida (empate: a primeira)
-    if (melhor < 0) {
-      for (let k = 0; k < tela.length; k++) {
+    // 2º: mais adiante (o refrão escrito de novo mais para baixo, longe da linha de antes), a mais parecida; 3º: em
+    // qualquer lugar (o refrão que volta lá do começo). Empate: a primeira. (Antes valia logo a primeira de toda a
+    // cifra, e o 2º refrão cantado voltava para o 1º escrito)
+    const procurar = (de, ate) => {
+      for (let k = de; k < ate; k++) {
         const s = parecenca(p, tela[k]);
         if (s >= 0.7 && s > nota) { nota = s; melhor = k; }
       }
-    }
+    };
+    if (melhor < 0) procurar(ultima + 1, tela.length);
+    if (melhor < 0) procurar(0, tela.length);
     if (melhor >= 0) ultima = melhor;
     return melhor;
   });
