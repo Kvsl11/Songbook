@@ -1652,7 +1652,7 @@ const player = (() => {
       relogio = setInterval(() => {
         if (!yt || !atual) return;
         const visivel = !fundo.hidden && !el.hidden && !el.classList.contains('letra-cheia') && fundo.getClientRects().length > 0;
-        const tocar = visivel && estado === 'tocando';
+        const tocar = visivel;
         if (tocar && yt.estado !== 1 && yt.estado !== 3) { ytCmd('mute'); ytCmd('playVideo'); }
         if (!tocar && yt.estado === 1) ytCmd('pauseVideo');
         // (aparece depois de 2,5 s tocando: o título do YouTube já sumiu)
@@ -1742,7 +1742,8 @@ const player = (() => {
     const acompanhar = () => {
       if (!caixa || !atual) return;
       const visivel = !fundo.hidden && !el.hidden && !el.classList.contains('letra-cheia') && fundo.getClientRects().length > 0;
-      const tocar = visivel && estado === 'tocando';
+      // (como o Canvas do Spotify: continua andando com a música pausada; só para fora da tela)
+      const tocar = visivel;
       if (tocar && caixa.paused) caixa.play().catch(() => {});
       if (!tocar && !caixa.paused) caixa.pause();
       if (tocar && trechos.length && !troca) {
@@ -11620,8 +11621,10 @@ async function sincronizarMusica(song, { noVideo = '', audioPromise = null } = {
     // 3. o vídeo que toca (o clipe), pela duração que já se sabe dele
     const clipe = agora().youtube;
     const durClipe = Number(agora().duracao) || player.duracaoDe(clipe) || (player.atual?.youtube === clipe && player.duracao) || 0;
-    if (!vs?.audio && durClipe > 0 && mesmaDuracao(durClipe, durLrc)) {
-      guardarSincronia(alvo(), naGravacao(clipe)); // (o vídeo é a própria gravação)
+    // (o vídeo é a própria gravação; com um "áudio oficial" de outra duração, foi a busca que confundiu os dois)
+    const audioDeOutraDuracao = vs?.audio && !ehArquivo(vs.audio) && durLrc > 0 && Number(vs.duracao) > 0 && !mesmaDuracao(Number(vs.duracao), durLrc);
+    if (durClipe > 0 && mesmaDuracao(durClipe, durLrc) && (!vs?.audio || audioDeOutraDuracao)) {
+      letraNoProprioVideo(alvo(), naGravacao(clipe));
       return 'ok';
     }
     // provisória no clipe (a letra já aparece e acompanha), enquanto o áudio oficial é procurado
@@ -11678,8 +11681,11 @@ async function melhorarSincronia(song, previaOriginal, { lrc, descoberta, titulo
     // sem o áudio oficial: o clipe, pela duração dele (a letra feita para ele, ou a da gravação no deslocamento)
     const durClipe = player.duracaoDe(s.youtube) || await duracaoDaMusica(s).catch(() => 0);
     s = agora();
-    if (!s || exata(s) || versoesDe(s)?.audio || !(durClipe > 0)) return;
-    if (mesmaDuracao(durClipe, durLrc)) { guardarSincronia(s, naGravacao(s.youtube)); return; }
+    if (!s || exata(s) || !(durClipe > 0)) return;
+    // (o "áudio oficial" guardado é de outra duração e o vídeo da música é a gravação: era ele o áudio)
+    const vs2 = versoesDe(s);
+    if (mesmaDuracao(durClipe, durLrc) && (!vs2?.audio || (durLrc > 0 && !ehArquivo(vs2.audio)))) { letraNoProprioVideo(s, naGravacao(s.youtube)); return; }
+    if (vs2?.audio) return;
     const doClipe = await letraSincronizada({ titulo, artista, duracao: durClipe }, undefined, { ...OPÇÕES_LRCLIB_RÁPIDAS, preferirDuracao: true }).catch(() => null);
     s = agora();
     if (!s || exata(s) || versoesDe(s)?.audio) return;
@@ -11793,6 +11799,9 @@ async function descobrirVersoes(song) {
       if (!atual || atual.youtube !== video || versoesDe(atual)?.audio) return null;
       const durClipe = (player.atual?.youtube === video && player.duracao)
         || await duracaoDaMusica(atual).catch(() => 0);
+      // (o vídeo da música já tem a duração da gravação da letra e o achado não: o vídeo é o áudio, e o achado é outra
+      // versão, não o áudio oficial)
+      if (duracao > 0 && durClipe > 0 && mesmaDuracao(durClipe, duracao) && !mesmaDuracao(Number(achado.segundos) || 0, duracao)) return null;
       guardarVersoes(atual, {
         video, audio: achado.id, duracao: achado.segundos,
         pares: paresPelaDuracao(durClipe, achado.segundos),
@@ -11805,6 +11814,17 @@ async function descobrirVersoes(song) {
   })();
   descobrindoVersoes.set(chave, tarefa);
   return tarefa;
+}
+// O vídeo da música é a própria gravação (o áudio oficial, da duração da letra), e não o clipe: a letra fica nele. Antes,
+// a busca do áudio oficial às vezes achava outra versão (o clipe, um ao vivo) e a guardava como o "áudio", com o vídeo da
+// música no papel de clipe; a letra, de outra duração, não cabia em nenhum dos dois e sumia (como em Company)
+function letraNoProprioVideo(s, sinc) {
+  if (!s?.youtube) return;
+  const vs = versoesDe(s);
+  if (vs?.audio && vs.audio !== s.youtube && !ehArquivo(vs.audio)) {
+    guardarVersoes(s, { video: s.youtube, audio: s.youtube, duracao: Number(sinc.duracao) || Number(s.duracao) || 0, pares: [[0, 0]], casadas: true, casamento: CASAMENTO });
+  }
+  guardarSincronia(s, { ...sinc, video: s.youtube });
 }
 // as duas versões da música (o clipe e o áudio oficial) ficam guardadas nela; o player passa a usá-las na hora
 function guardarVersoes(song, versoes) {
