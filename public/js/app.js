@@ -1054,7 +1054,7 @@ const REVISOES = [
   // v390: nas músicas da missa, a foto do artista achada só pelo nome, de quem não é com certeza do meio católico (o
   // "José Alves" de "Salve Rainha" com a foto de um cantor de funk), sai: fica o desenho do app
   { rev: 3, fotosLiturgia: true, quais: (s) => Boolean(s.fotoArtista) && ehDaLiturgia(s) && !confiavelNaLiturgia(s.artist) },
-  // v394: os cantos que o Montar repertório já tinha trazido (da liturgia, e que só estão em repertórios da missa
+  // v395: os cantos que o Montar repertório já tinha trazido (da liturgia, e que só estão em repertórios da missa
   // montados pelo app, "Missa 01/11/2026 – …") ficam só no repertório: saem das Músicas da biblioteca
   { rev: 4, soNoRepertorio: true, quais: (s) => !s.soNoRepertorio && ehDaLiturgia(s) && soEmMissasMontadas(s.id) },
 ];
