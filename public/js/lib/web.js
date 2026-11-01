@@ -514,6 +514,10 @@ export async function letraSincronizada(
         if (![429, 500, 502, 503, 504].includes(res.status)) throw new Error(`LRCLIB respondeu ${res.status}`);
       } catch (e) {
         if (/LRCLIB respondeu|fora do ar/.test(e.message) || vez + 1 >= tentativas) throw e;
+        // (no navegador, o 502 do LRCLIB fora do ar vem sem a permissão de CORS e chega como erro de rede: duas falhas
+        // seguidas também contam como fora do ar. Antes cada consulta tentava 4 vezes, e a reserva só entrava depois de
+        // uns 30 s; a música abria sem a letra)
+        if (vez >= 1 && (typeof navigator === 'undefined' || navigator.onLine !== false)) { lrclibForaAte = Date.now() + 20e3; throw new Error('LRCLIB fora do ar'); }
       }
       if (vez + 1 < tentativas) await new Promise((ok) => setTimeout(ok, espera * (vez + 1)));
     }

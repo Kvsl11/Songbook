@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.11.01-380';
+export const APP_VERSAO = '2026.11.01-381';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -4041,18 +4041,21 @@ function indicadores(s) {
   if (c === undefined) { c = temCifra(s.content || ''); memoCifra.set(s.content, c); }
   // a tonalidade (o chip ao lado) já diz que tem cifra: o # só aparece numa cifra sem tom
   if (s.key) c = false;
-  const tem = (ic, t) => `<span class="ind-i" title="${t}" aria-label="${t}">${icon(ic, 11)}</span>`;
-  // baixada (toca sem internet): a setinha verde, como no Spotify
-  const baixada = s.baixado ? `<span class="ind-i ind-baixada" title="Baixada" aria-label="Baixada">${icon('baixada', 12)}</span>`
-    : baixando.has(s.id) ? `<span class="ind-i ind-baixando" title="Baixando" aria-label="Baixando">${icon('baixar', 12)}</span>` : '';
+  const tem = (ic, t) => `<span class="ind-i" title="${t}" aria-label="${t}">${icon(ic, 14)}</span>`;
+  // Como nas listas do Spotify: a setinha verde (baixada), o "E" (explícita), a cifra e o vídeo com o nome "Vídeo",
+  // e um "•" antes do artista
+  const baixada = s.baixado ? `<span class="ind-i ind-baixada" title="Baixada" aria-label="Baixada">${icon('baixada', 15)}</span>`
+    : baixando.has(s.id) ? `<span class="ind-i ind-baixando" title="Baixando" aria-label="Baixando">${icon('baixar', 15)}</span>` : '';
   // (o vídeo que é outra gravação, na música sem clipe, não conta: ela é só música)
   const video = s.youtube && !versoesDe(s)?.diferentes;
-  return c || video || baixada ? `<span class="ind">${baixada}${c ? tem('chord', 'Tem cifra') : ''}${video ? tem('youtube', 'Tem vídeo') : ''}</span>` : '';
+  const e = seloExplicita(s.title, s.artist);
+  if (!(c || video || baixada || e)) return '';
+  return `<span class="ind">${baixada}${e}${c ? tem('chord', 'Tem cifra') : ''}${video ? `${tem('videoclipe', 'Tem vídeo')}<span class="ind-txt">Vídeo</span><span class="ind-sep">•</span>` : ''}</span>`;
 }
 
 const linhaMusica = (s, extra = '') => `
   <li class="track clickable" data-id="${s.id}" style="grid-template-columns:auto 1fr auto">
-    ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${seloExplicita(s.title, s.artist)}${indicadores(s)}<span class="artista-mini${s.fotoArtista ? ' com-foto' : ''}" data-artista-mini>${s.fotoArtista ? `<img src="${esc(s.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
+    ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}<span class="artista-mini${s.fotoArtista ? ' com-foto' : ''}" data-artista-mini>${s.fotoArtista ? `<img src="${esc(s.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
 
 // Escolhe uma música: da biblioteca ou procurando na internet (Cifra Club, cantos da missa, letras,
 // vídeos do YouTube). O que vem da internet é salvo na biblioteca. Devolve o id, 'nova' ou null.
@@ -5319,7 +5322,13 @@ async function prepararMidiaBusca(itens) {
 function porSeloExplicita(linha, titulo, artista) {
   if (!linha?.isConnected || !explicitaConhecida(titulo, artista)) return;
   const s = linha.querySelector('.info .s');
-  if (s && !s.querySelector('.selo-e')) s.insertAdjacentHTML('afterbegin', seloExplicita(titulo, artista));
+  if (!s || s.querySelector('.selo-e')) return;
+  // (no lugar dele: depois da setinha de baixada, antes da cifra e do vídeo)
+  const ind = s.querySelector('.ind');
+  const baixada = ind?.querySelector('.ind-baixada, .ind-baixando');
+  if (baixada) baixada.insertAdjacentHTML('afterend', seloExplicita(titulo, artista));
+  else if (ind) ind.insertAdjacentHTML('afterbegin', seloExplicita(titulo, artista));
+  else s.insertAdjacentHTML('afterbegin', seloExplicita(titulo, artista));
 }
 function enriquecerLinhasMusicais(container, itens, { busca = false } = {}) {
   if (!container || !Array.isArray(itens)) return;
@@ -6501,7 +6510,7 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
         <div class="info"><div class="t">${esc(s.name)}</div><div class="s">${tipoDoSet(s)} · ${fmtData(s.date)} · ${resumoRepertorio(s)}</div></div>
         <span class="acts">${s.items.length ? (ehPlaylist(s) ? `<button class="icon-btn" data-tocar-set="${s.id}" aria-label="Ouvir">${icon('play', 16)}</button>` : `<a class="icon-btn" href="#/repertorio/${s.id}/0" aria-label="Tocar">${icon('play', 16)}</a>`) : ''}${lixeira(s.id, s.name)}</span></li>`
     : (s) => `<li class="track clickable lib-item" data-k="${s.id}">${marca(s.id)}${capa(s)}
-        <div class="info"><div class="t">${esc(s.title)}</div><div class="s">${seloExplicita(s.title, s.artist)}${indicadores(s)}${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>
+        <div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>
         <span class="acts">${s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : ''}${botaoMais(s.title)}</span></li>`;
   const vazio = ehRep
     ? ehPl ? `<div class="empty"><div class="bubble">${icon('disc', 32)}</div><h3>Crie sua primeira playlist</h3><p>Playlists são para ouvir: as músicas tocam uma atrás da outra no player. Em Buscar → Missas completas, crie a da missa de hoje.</p>
@@ -11702,6 +11711,7 @@ async function melhorarSincronia(song, previaOriginal, { lrc, descoberta, titulo
 function prepararMusicaAoAbrir(song) {
   const chave = midiaDe(song);
   if (!chave) return Promise.resolve('nada');
+  if (recuperarSincronia(song)) song = (song.id === 'previa' ? preview : db.song(song.id)) || song;
   const audioPromise = song.youtube && !song.audioProprio && !versoesDe(song)?.audio
     ? descobrirVersoes(song)
     : Promise.resolve(versoesDe(song));
@@ -11826,6 +11836,21 @@ function letraNoProprioVideo(s, sinc) {
   }
   guardarSincronia(s, { ...sinc, video: s.youtube });
 }
+// A letra exata que estava no vídeo da música, quando o áudio oficial achado depois é a mesma gravação (a mesma duração
+// da letra): ela passa para o áudio, que é onde a letra é procurada. Antes ela ficava presa no vídeo e deixava de valer;
+// a letra só voltava se o LRCLIB respondesse de novo (e, com ele fora do ar, a música ficava sem letra, como Company)
+function recuperarSincronia(song) {
+  const s0 = song?.sincronia;
+  const vs = versoesDe(song);
+  if (!s0?.tempos?.length || s0.fonte !== 'lrclib' || s0.provisoria || !vs?.audio || ehArquivo(vs.audio)) return false;
+  if (s0.video === vs.audio || s0.video !== vs.video) return false;
+  const durLetra = Number(s0.duracao) || Number(song.duracao) || 0;
+  if (!(durLetra > 0) || !(Number(vs.duracao) > 0) || !mesmaDuracao(durLetra, Number(vs.duracao))) return false;
+  guardarSincronia(song, { ...s0, video: vs.audio });
+  return true;
+}
+// (as músicas que já ficaram sem a letra assim voltam a ter, logo ao abrir o app)
+setTimeout(() => { for (const s of db.songs()) { try { recuperarSincronia(s); } catch { /* segue */ } } }, 1500);
 // as duas versões da música (o clipe e o áudio oficial) ficam guardadas nela; o player passa a usá-las na hora
 function guardarVersoes(song, versoes) {
   song.versoes = versoes;
@@ -11835,7 +11860,7 @@ function guardarVersoes(song, versoes) {
   if (s0?.fonte === 'lrclib' && s0.provisoria && versoes?.audio && !ehArquivo(versoes.audio) && s0.video === versoes.video && mesmaDuracao(Number(versoes.duracao) || 0, Number(s0.duracao) || 0)) {
     const { provisoria, aproximada, desloc, ...resto } = s0;
     guardarSincronia(song.id === 'previa' ? preview : db.song(song.id) || song, { ...resto, video: versoes.audio, tempos: deslocarTempos(s0.tempos, -(desloc || 0)) });
-  }
+  } else recuperarSincronia(song.id === 'previa' ? preview : db.song(song.id) || song);
   player.versoes(song);
 }
 // O alinhamento entre a faixa e o videoclipe é calculado localmente no aparelho; não usa IA/servidor.

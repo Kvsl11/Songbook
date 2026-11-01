@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 381, data: '2026-11-01', titulo: 'A letra não se perde mais e fichas da biblioteca como no Spotify',
+    itens: [
+      { tipo: 'correcao', texto: 'A letra sincronizada não some mais ao abrir a música (como em Company): quando o app acha o áudio oficial da mesma gravação, a letra que já estava na música passa junto para ele, em vez de precisar ser procurada de novo. As músicas que já tinham perdido a letra assim voltam a ter.' },
+      { tipo: 'correcao', texto: 'Com o serviço de letras fora do ar, a letra vem logo da reserva: antes o app insistia uns 30 segundos antes de tentar outro lugar.' },
+      { tipo: 'melhoria', texto: 'As fichas da biblioteca ficam como no Spotify: a setinha verde de baixada, o “E” de explícita e o ícone de vídeo com o nome “Vídeo”, separados do artista por um “•”.' },
+    ],
+  },
+  {
     versao: 380, data: '2026-11-01', titulo: 'Letra que não some, selo E na biblioteca e capa animada sempre andando',
     itens: [
       { tipo: 'correcao', texto: 'A letra sincronizada não some mais quando o vídeo da música já é o próprio áudio (como em Company): o app achava outra versão (o clipe, um ao vivo) e trocava os papéis dos dois. Agora ele reconhece qual é o áudio pela duração da letra.' },
@@ -66,15 +74,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'O “Trocar música” no Tocando agora não salva mais a música na biblioteca sozinho (salvava até cancelando).' },
       { tipo: 'correcao', texto: 'Depois de trocar a música ou o vídeo, a letra sincronizada é refeita para a versão nova; antes ela ficava presa à de antes, parava de acompanhar e às vezes sumia.' },
       { tipo: 'correcao', texto: 'Salvar a música aberta da busca guarda exatamente a que está na tela, com a letra; antes ela era trazida de novo e, se o site falhasse naquela hora, ficava salva sem letra.' },
-    ],
-  },
-  {
-    versao: 371, data: '2026-10-31', titulo: 'Música toca de novo ao abrir e troca na hora',
-    itens: [
-      { tipo: 'correcao', texto: 'A música aberta pela busca volta a tocar: a abertura esperava demais (até 20 s) e o navegador não deixava mais começar sozinha. Agora ela abre em poucos segundos e o resto chega já tocando.' },
-      { tipo: 'correcao', texto: 'Trocar entre música e vídeo é sempre na hora, sem o “Acertando a posição…”; quando o ponto certo é descoberto depois, ele é corrigido sozinho.' },
-      { tipo: 'correcao', texto: 'A letra sincronizada tem uma reserva: o LRCLIB está fora do ar, e a letra vem da NetEase (em ~2 s). O app também percebe logo quando o LRCLIB cai, em vez de insistir por 30 s.' },
-      { tipo: 'correcao', texto: 'Sem o download, a capa animada volta a ser os quadros do clipe passando: o clipe tocando junto pelo YouTube atrapalhava o player.' },
     ],
   },
 ];
