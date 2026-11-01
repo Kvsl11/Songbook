@@ -6131,8 +6131,11 @@ function verFotos(urls, inicio = 0) {
     e.preventDefault();
     zoomEm(zoom.s * Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0018)), e.clientX, e.clientY);
   }, { passive: false });
+  // (o clique duplo é o do mouse: no celular e no tablet, os dois toques já ampliam no toque, e o navegador ainda manda
+  // um clique duplo depois deles, que desfazia o zoom na hora)
+  let tipoDoDedo = '';
   v.addEventListener('dblclick', (e) => {
-    if (e.target.closest('[data-vf]')) return;
+    if (e.target.closest('[data-vf]') || (tipoDoDedo && tipoDoDedo !== 'mouse')) return;
     if (zoom.s > 1) semZoom(); else zoomEm(2.5, e.clientX, e.clientY, true);
   });
   // os dedos na tela (e o mouse): um dedo passa as fotos ou anda pela ampliada; dois, a pinça
@@ -6144,6 +6147,7 @@ function verFotos(urls, inicio = 0) {
   let inicioToque = null;
   const meio = () => { const [a, b] = [...dedos.values()]; return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) || 1 }; };
   v.addEventListener('pointerdown', (e) => {
+    tipoDoDedo = e.pointerType;
     if (e.target.closest('[data-vf]') || (e.pointerType === 'mouse' && e.button !== 0)) return;
     dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (dedos.size === 2) {

@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 394, data: '2026-11-01', titulo: 'Dois toques ampliam a foto no celular e no tablet',
+    itens: [
+      { tipo: 'correcao', texto: 'Nas fotos do artista em tela cheia, dois toques no celular e no tablet voltam a ampliar a foto (e dois toques de novo voltam ao normal): o navegador mandava também um clique duplo, o do computador, que desfazia o zoom na hora.' },
+    ],
+  },
+  {
     versao: 393, data: '2026-11-01', titulo: 'Zoom nas fotos do artista e sem os quadros de clipes',
     itens: [
       { tipo: 'novo', texto: 'Nas fotos do artista em tela cheia, dá para dar zoom: no celular e no tablet, abrindo os dois dedos (ou com dois toques); no computador, com a roda do mouse (ou clique duplo). Ampliada, a foto anda com o dedo ou arrastando o mouse; dois toques voltam ao tamanho normal.' },
@@ -67,13 +73,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'A música salva que ficou sem a letra sincronizada (ou sem o áudio oficial) procura de novo, sozinha. A letra que você sincronizou à mão não é mexida.' },
       { tipo: 'novo', texto: 'No ⋯ do Tocando agora, “Diagnóstico da música” mostra o que está guardado na música (a letra, o áudio oficial, o download) e o que o player está mostrando. “Copiar” leva o texto para colar numa conversa, e “Consertar agora” procura de novo a letra e o áudio oficial e confere o download, na hora.' },
       { tipo: 'correcao', texto: 'Com o clipe baixado, a capa animada entra direto no vídeo andando: antes aparecia por um instante uma imagem parada do clipe (a do YouTube) e só depois o vídeo.' },
-    ],
-  },
-  {
-    versao: 384, data: '2026-11-01', titulo: 'Capa animada já entra andando e a letra não some mais',
-    itens: [
-      { tipo: 'correcao', texto: 'A capa animada (o clipe baixado atrás do Tocando agora) já aparece andando: antes surgia um quadro parado por um instante e só depois os trechos começavam a rolar. A troca de um trecho para o outro também entra já em movimento.' },
-      { tipo: 'correcao', texto: 'A letra e a capa animada não somem mais do Tocando agora depois de fechar a letra na tela toda numa música aberta pela busca (ao tocar ou baixar, ela é salva na biblioteca e o app se perdia no endereço dela).' },
     ],
   },
 ];
