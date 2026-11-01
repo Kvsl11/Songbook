@@ -1948,7 +1948,12 @@ const player = (() => {
       }
     };
     return {
-      async montar(q) {
+      // o clipe desta música está baixado (em vídeo) e a capa animada vai tocar ele
+      vaiTocarArquivo(q) {
+        const b = q && db.prefs().videoFundo !== false && !db.prefs().economiaDados && baixadoDe(q);
+        return Boolean(b && String(b.tipo).startsWith('video'));
+      },
+      async montar(q, { semArquivo = () => {} } = {}) {
         const quer = q && db.prefs().videoFundo !== false && !db.prefs().economiaDados ? q : '';
         if (quer === de) {
           // o fundo foi redesenhado (ex.: chegou a capa oficial) com o mesmo vídeo: os mesmos vídeos voltam para ele, já
@@ -1988,7 +1993,9 @@ const player = (() => {
         // (sem o download, ficam os quadros do clipe passando: um segundo player do YouTube tocando junto, para a capa
         // andar, pesava no celular e atrapalhava o player da música, que às vezes nem começava)
         if ((!caixa || !reserva) && CANVAS_ONLINE && navigator.onLine && /^[\w-]{11}$/.test(quer)) { montarOnline(quer); return; }
-        if (!caixa || !reserva) { de = ''; return; }
+        if (!caixa || !reserva) { de = ''; semArquivo(); return; }
+        // (o arquivo não abre: ficam as imagens do clipe)
+        caixa.addEventListener('error', () => { if (vez === montagem) semArquivo(); }, { once: true });
         fundo.append(caixa, reserva);
         relogio = setInterval(acompanhar, 180);
       },
@@ -2053,10 +2060,18 @@ const player = (() => {
       // usada em outro lugar" (a sessão velha ainda contava) e não tocava mais
       [...mini.childNodes].forEach((n) => { if (n !== tela) n.remove(); });
       if (semCapa) mini.insertAdjacentHTML('afterbegin', icon('music', 72));
-      fundo.innerHTML = q ? htmlQuadros(q, (song && renderSong(song.content).meta.x_canvas) || 'sd') : '';
-      // todos os quadros já carregados (com "lazy", o quadro que chegava no meio da rolagem aparecia de repente)
-      fundo.querySelectorAll('img[loading]').forEach((img) => { img.loading = 'eager'; });
-      canvas.montar(q);
+      // com o clipe baixado, a capa animada é o próprio arquivo: as imagens paradas do YouTube não entram antes dele (elas
+      // apareciam por um instante e só então o vídeo entrava por cima). Sem o arquivo (ou se ele não abrir), elas ficam
+      const tipoQuadros = (song && renderSong(song.content).meta.x_canvas) || 'sd';
+      const porQuadros = () => {
+        if (!q || fundo.querySelector('img.q')) return;
+        fundo.insertAdjacentHTML('afterbegin', htmlQuadros(q, tipoQuadros));
+        // todos os quadros já carregados (com "lazy", o quadro que chegava no meio da rolagem aparecia de repente)
+        fundo.querySelectorAll('img[loading]').forEach((img) => { img.loading = 'eager'; });
+      };
+      fundo.innerHTML = '';
+      if (!canvas.vaiTocarArquivo(q)) porQuadros();
+      canvas.montar(q, { semArquivo: porQuadros });
     }
     mini.classList.toggle('capa-yt', (capa || barra) && capaYt);
     // a capa pequena ao lado do nome, no modo vídeo e no modo música (no modo música, em cima ficam as cenas do clipe)
