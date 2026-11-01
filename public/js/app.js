@@ -906,10 +906,9 @@ async function guardarImagensDaMusica(song) {
   const dele = artista ? await Promise.all([fotoDoArtista(artista, slug).catch(() => ''), descricaoDoArtista(artista).catch(() => null), deezerDoArtista(artista).catch(() => null),
     canalGuardado(artista).catch(() => null), audioDbGuardado(artista).catch(() => null)]) : [];
   const [fotoA, info, dz, canal, adb] = dele;
-  const fotosVideos = canal?.id ? await fotosDosVideosGuardadas(artista, canal.id).catch(() => []) : [];
   const urls = [song.cover, ...yts.flatMap((y) => [`https://i.ytimg.com/vi/${y}/hqdefault.jpg`, `https://i.ytimg.com/vi/${y}/mqdefault.jpg`]),
     ...paginasDaPartitura(song.content), mxlDaPartitura(song.content),
-    fotoA, info?.foto, dz?.foto, canal?.foto, ...(adb?.fotos || []), ...(fotosVideos || [])].filter((u) => u && typeof u === 'string' && !/^data:/.test(u));
+    fotoA, info?.foto, dz?.foto, canal?.foto, ...(adb?.fotos || [])].filter((u) => u && typeof u === 'string' && !/^data:/.test(u));
   const c = await caches.open(CACHE_BAIXADOS);
   await Promise.all(urls.map(async (u) => {
     try {
@@ -6259,7 +6258,8 @@ async function abrirSobreArtista({ nome, slug = '' }) {
     canalGuardado(nome).catch(() => null), audioDbGuardado(nome).catch(() => null)]);
   if (!tela.isConnected) return;
   // as fotos (sem repetir): a do cartão, a do canal do YouTube, as da TheAudioDB (a principal e as de fundo), a do
-  // Deezer e a da Wikipédia; depois chegam os quadros dos vídeos do próprio canal dele (até 10 ao todo)
+  // Deezer e a da Wikipédia; depois chegam as do artigo da Wikipédia em que ele aparece (até 12 ao todo). Os quadros dos
+  // vídeos do canal dele não entram: são cenas de clipe, com o "VEVO" e o título escritos por cima, e não fotos dele
   // (sem repetir: a mesma foto vem de vários lugares — o canal do YouTube, a TheAudioDB, o Deezer em dois tamanhos —
   // com endereços diferentes; ela é reconhecida pelo endereço, sem o tamanho, e pela impressão da própria imagem, e fica
   // a maior. O Michael Jackson vinha com a mesma foto três vezes)
@@ -6271,7 +6271,8 @@ async function abrirSobreArtista({ nome, slug = '' }) {
     caixaFotos.querySelector('.sa-sem-foto')?.remove();
     for (const u of lista) {
       const k = u && chaveDaFoto(u);
-      if (!k || vistas.has(k) || naTela() >= 12) continue;
+      // (o quadro de um vídeo do YouTube não é foto do artista)
+      if (!k || vistas.has(k) || naTela() >= 12 || /ytimg\.com\/vi(_webp)?\//.test(u)) continue;
       vistas.add(k);
       const img = new Image();
       img.alt = '';
@@ -6304,10 +6305,8 @@ async function abrirSobreArtista({ nome, slug = '' }) {
     const todas = [...caixaFotos.querySelectorAll('img')];
     verFotos(todas.map((x) => x.currentSrc || x.src), todas.indexOf(img));
   });
-  // mais fotos: as do artigo da Wikipédia em que ele aparece (com o nome dele no arquivo) e os quadros dos vídeos do
-  // próprio canal dele
+  // mais fotos: as do artigo da Wikipédia em que ele aparece (com o nome dele no arquivo)
   fotosDaWikipediaGuardadas(nome).then((l) => { if (tela.isConnected && l?.length) porFotos(l); }).catch(() => {});
-  if (canal?.id) fotosDosVideosGuardadas(nome, canal.id).then((l) => { if (tela.isConnected && l) porFotos(l); });
   // os números grandes (como os ouvintes do Spotify): os seguidores no Spotify (pela TheAudioDB), os inscritos no
   // canal do YouTube e os fãs no Deezer, os que houver
   const num = (n, rotulo) => `<div><b>${n.toLocaleString('pt-BR')}</b><small>${rotulo}</small></div>`;

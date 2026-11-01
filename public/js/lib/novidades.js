@@ -4,9 +4,10 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
-    versao: 393, data: '2026-11-01', titulo: 'Zoom nas fotos do artista',
+    versao: 393, data: '2026-11-01', titulo: 'Zoom nas fotos do artista e sem os quadros de clipes',
     itens: [
       { tipo: 'novo', texto: 'Nas fotos do artista em tela cheia, dá para dar zoom: no celular e no tablet, abrindo os dois dedos (ou com dois toques); no computador, com a roda do mouse (ou clique duplo). Ampliada, a foto anda com o dedo ou arrastando o mouse; dois toques voltam ao tamanho normal.' },
+      { tipo: 'correcao', texto: 'O “Sobre o artista” não mostra mais quadros de clipes (com o “VEVO” e o título escritos por cima, como os do Michael Jackson): ficam só as fotos do artista.' },
     ],
   },
   {
