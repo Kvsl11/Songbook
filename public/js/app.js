@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.10.31-378';
+export const APP_VERSAO = '2026.11.01-379';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -2266,6 +2266,7 @@ const semLinhasDeAcordes = (sinc) => {
     const f = $('iframe', tela);
     anuncio = false;
     montadoEm = performance.now();
+    conhecerDuracao(atual.youtube);
     f.addEventListener('load', () => { ouvirAnuncio(f); f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'); ouvirAnuncio(f); });
     reouvir = () => { f.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'); ouvirAnuncio(f); };
     tela.hidden = false;
@@ -2289,18 +2290,31 @@ const semLinhasDeAcordes = (sinc) => {
   const ouvirAnuncio = (f) => f?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'addEventListener', args: ['onAdStateChange'] }), '*');
   // a duração que já se sabe do vídeo que toca (a que ele mesmo informou antes, a da versão de música, a da letra
   // sincronizada dele ou a da música): um "vídeo" bem mais curto que ela, logo no começo, é o anúncio
-  const duracaoEsperada = () => {
-    const id = atual?.youtube;
+  // (de todas as que se sabem, a maior: a menor pode ser a de um anúncio guardada por engano — o clipe que toca mudo
+  // junto da música passa o anúncio dele escondido, e a duração do anúncio ficava como a do clipe; aí, no modo vídeo,
+  // o anúncio não era mais reconhecido e a barra andava)
+  const duracaoEsperadaDe = (id) => {
     if (!id) return 0;
-    const s = atual.songId ? (atual.songId === 'previa' ? preview : db.song(atual.songId)) : null;
+    const s = atual?.songId ? (atual.songId === 'previa' ? preview : db.song(atual.songId)) : null;
     const vs = s && versoesDe(s);
-    return duracoes.get(id) || (vs && id === vs.audio && Number(vs.duracao)) || (s?.sincronia?.video === id && Number(s.sincronia.duracao))
-      || (s?.youtube === id && Number(s.duracao)) || 0;
+    return Math.max(duracoes.get(id) || 0, duracoesReais.get(id) || 0, duracoesDaBusca.get(id) || 0,
+      (vs && id === vs.audio && Number(vs.duracao)) || 0, (s?.sincronia?.video === id && Number(s.sincronia.duracao)) || 0,
+      (s?.youtube === id && Number(s.duracao)) || 0);
   };
-  const pareceAnuncio = (info) => {
-    if (!(info.duration > 0) || performance.now() - montadoEm > 150000) return false;
-    const esperada = duracaoEsperada();
-    return esperada > 30 && info.duration < esperada * 0.7;
+  const duracaoEsperada = () => duracaoEsperadaDe(atual?.youtube);
+  const pareceAnuncioDe = (id, dur) => {
+    const esperada = duracaoEsperadaDe(id);
+    return dur > 0 && esperada > 30 && dur < esperada * 0.7;
+  };
+  const pareceAnuncio = (info) => performance.now() - montadoEm <= 150000 && pareceAnuncioDe(atual?.youtube, info.duration);
+  // a duração vista de um vídeo: fica a maior (o anúncio é mais curto que a música; a de um anúncio não apaga a dela)
+  const duracaoVista = (id, d) => { if (id && d > 0 && !pareceAnuncioDe(id, d)) duracoes.set(id, Math.max(duracoes.get(id) || 0, d)); };
+  // sem nenhuma duração conhecida do vídeo (um clipe que nunca tocou): é perguntada uma vez, para reconhecer o anúncio
+  const duracoesReais = new Map();
+  const conhecerDuracao = (id) => {
+    if (!id || ehArquivo(id) || duracoesReais.has(id) || duracaoEsperadaDe(id) > 30) return;
+    duracoesReais.set(id, 0);
+    duracaoDoVideo(id).then((d) => { if (d > 0) duracoesReais.set(id, d); }).catch(() => {});
   };
   // O que toca do próprio aparelho, sem o YouTube: o áudio da pessoa e os downloads (como no Spotify). { chave, video }
   // (a chave do arquivo guardado; video: o download é o vídeo, que aparece no lugar do clipe), ou null: o YouTube.
@@ -2513,6 +2527,7 @@ const semLinhasDeAcordes = (sinc) => {
     const f = document.createElement('iframe');
     f.className = 'pl-reserva';
     f.dataset.yt = outra;
+    conhecerDuracao(outra);
     f.src = ytEmbed(outra, { autoplay: false });
     f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
     f.title = '';
@@ -2533,7 +2548,8 @@ const semLinhasDeAcordes = (sinc) => {
       const info = (typeof e.data === 'string' ? JSON.parse(e.data) : e.data)?.info;
       if (typeof info?.playerState === 'number') rs.estado = info.playerState;
       if (typeof info?.currentTime === 'number') { rs.tempo = info.currentTime; rs.em = performance.now(); }
-      if (typeof info?.duration === 'number' && info.duration > 0) { rs.duracao = info.duration; if (r.dataset.yt) duracoes.set(r.dataset.yt, info.duration); }
+      // (a sombra também passa o anúncio dela: a duração dele não vale para o vídeo)
+      if (typeof info?.duration === 'number' && info.duration > 0 && !pareceAnuncioDe(r.dataset.yt, info.duration)) { rs.duracao = info.duration; duracaoVista(r.dataset.yt, info.duration); }
     } catch { /* outra mensagem */ }
   });
   // A outra versão toca junto, sem volume, no mesmo ponto da música (a sombra): a troca é só cruzar os volumes, sem
@@ -2615,6 +2631,7 @@ const semLinhasDeAcordes = (sinc) => {
     marcaTempo = performance.now();
     anuncio = false; // (o outro vídeo pode ter o anúncio dele: conferido de novo)
     montadoEm = performance.now();
+    conhecerDuracao(id);
     // a barra já vai direto para o ponto certo da outra versão: a duração dela, se já se sabe (a desta vez, a das
     // versões ou a da música); sem saber, fica a de antes até o vídeo dizer. Antes ela zerava, e a barra voltava ao
     // começo e depois pulava para o ponto (parecia travada)
@@ -3075,7 +3092,7 @@ const semLinhasDeAcordes = (sinc) => {
       }
       if (usarTempo) { tempo = info.currentTime; marcaTempo = performance.now(); }
       if (typeof info.duration === 'number' && info.duration > 0 && !outroVideo) {
-        duracoes.set(atual.youtube, info.duration);
+        duracaoVista(atual.youtube, info.duration);
         if (Math.round(info.duration) !== Math.round(duracao)) {
           duracao = info.duration;
           guardarDuracao(atual?.youtube, duracao);
