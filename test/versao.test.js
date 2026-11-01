@@ -2,15 +2,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-// o número da versão mostrado no app tem que ser o mesmo do service worker (que é o que atualiza o app de verdade):
-// antes ficou parado em 149 enquanto o app já estava na 158
-test('versão: a do app (APP_VERSAO) acompanha a do service worker', async () => {
-  const sw = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
-  const app = await readFile(new URL('../public/js/app.js', import.meta.url), 'utf8');
-  const doSw = /const VERSION = 'songbook-v(\d+)'/.exec(sw)?.[1];
-  const doApp = /export const APP_VERSAO = '[\d.]+-(\d+)'/.exec(app)?.[1];
-  assert.ok(doSw && doApp);
-  assert.equal(doApp, doSw, `APP_VERSAO (${doApp}) diferente do sw.js (${doSw}): mude os dois juntos`);
+// o número da versão mostrado no app: a data da versão (a do Brasil) e quantas versões o mês já teve, recomeçando do 1 a
+// cada mês. O número de verdade (o do sw.js) continua subindo; as Novidades já conferem que ele é o da primeira delas
+test('versão: a mostrada no app tem a data e o número da versão no mês', async () => {
+  const { NOVIDADES, PRIMEIRA_DO_MES, APP_VERSAO, versaoMostrada } = await import('../public/js/lib/novidades.js');
+  const atual = NOVIDADES[0];
+  assert.match(atual.data, /^\d{4}-\d{2}-\d{2}$/);
+  const mes = atual.data.slice(0, 7);
+  assert.ok(PRIMEIRA_DO_MES[mes], `mês novo (${mes}): acrescente em PRIMEIRA_DO_MES (lib/novidades.js) o número da primeira versão dele`);
+  assert.ok(PRIMEIRA_DO_MES[mes] <= atual.versao);
+  assert.equal(APP_VERSAO, versaoMostrada(atual.versao, atual.data));
+  assert.equal(versaoMostrada(383, '2026-10-31'), '2026.10.31-383');
+  // (as versões das Novidades em ordem, e as datas nunca voltando)
+  NOVIDADES.forEach((n, i) => { if (i) { assert.ok(n.versao < NOVIDADES[i - 1].versao); assert.ok(n.data <= NOVIDADES[i - 1].data); } });
 });
 
 // cada versão publicada tem as notas de atualização (a tela Novidades e o aviso no sininho): a primeira da lista é

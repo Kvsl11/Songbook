@@ -4158,3 +4158,6 @@ dialog.lista-menu.lista-fila .fila-dica { margin: 10px 20px 2px; }
   html:not(.pp) #player .pl-play svg { width: 18px; height: 18px; }
   html:not(.pp) #player .pl-lado .icon-btn svg { width: 19px; height: 19px; }
 }
+/* o mini player do tablet não rola por dentro: o conteúdo passa 12 px da altura dele e, minimizando o painel rolado para
+   baixo, ele ficava rolado esses 12 px (a capinha, o nome e o andamento subiam e eram cortados na borda de cima) */
+html.tablet body.painel-recolhido #player { overflow: clip; }

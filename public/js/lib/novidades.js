@@ -1,10 +1,17 @@
 // O que mudou em cada versão do app, em palavras de quem usa. A primeira da lista é a versão atual (a mesma do
 // VERSION do sw.js: um teste confere). As mudanças ficam disponíveis na tela Novidades.
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }. Ficam só as 10 últimas versões (um teste confere):
-// ao escrever uma nova, apague a mais antiga.
+// ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
-    versao: 383, data: '2026-11-01', titulo: 'Player com os botões do Spotify, fila no rodapé e puxar para abrir',
+    versao: 384, data: '2026-10-31', titulo: 'Mini player do tablet sem a capinha cortada e a versão com a data certa',
+    itens: [
+      { tipo: 'correcao', texto: 'No tablet, a capinha do vídeo, o nome e o andamento do mini player não sobem mais nem ficam cortados na borda de cima: minimizando o Tocando agora rolado para baixo, o mini player ficava rolado por dentro.' },
+      { tipo: 'correcao', texto: 'A versão mostrada nos Ajustes e nas Novidades tem a data do Brasil (antes vinha a do dia seguinte, perto da meia-noite), e o número do fim conta as versões do mês: recomeça do 1 a cada mês novo.' },
+    ],
+  },
+  {
+    versao: 383, data: '2026-10-31', titulo: 'Player com os botões do Spotify, fila no rodapé e puxar para abrir',
     itens: [
       { tipo: 'melhoria', texto: 'Os botões do player ficam com o jeito dos do Spotify, no celular, no tablet e no computador: aleatório, voltar, pular, repetir, o play, a fila, o painel e os botões da Letra.' },
       { tipo: 'melhoria', texto: 'A fila sobe do rodapé, como o menu dos três pontinhos (com a alça para puxar), em vez de abrir no meio da tela.' },
@@ -13,13 +20,13 @@ export const NOVIDADES = [
     ],
   },
   {
-    versao: 382, data: '2026-11-01', titulo: 'O mesmo ícone de vídeo em todo o app',
+    versao: 382, data: '2026-10-31', titulo: 'O mesmo ícone de vídeo em todo o app',
     itens: [
       { tipo: 'melhoria', texto: 'O botão “Mudar para vídeo” do Tocando agora e os menus usam o mesmo ícone de vídeo das fichas da biblioteca (o quadro com o play, como no Spotify).' },
     ],
   },
   {
-    versao: 381, data: '2026-11-01', titulo: 'A letra não se perde mais e fichas da biblioteca como no Spotify',
+    versao: 381, data: '2026-10-31', titulo: 'A letra não se perde mais e fichas da biblioteca como no Spotify',
     itens: [
       { tipo: 'correcao', texto: 'A letra sincronizada não some mais ao abrir a música (como em Company): quando o app acha o áudio oficial da mesma gravação, a letra que já estava na música passa junto para ele, em vez de precisar ser procurada de novo. As músicas que já tinham perdido a letra assim voltam a ter.' },
       { tipo: 'correcao', texto: 'Com o serviço de letras fora do ar, a letra vem logo da reserva: antes o app insistia uns 30 segundos antes de tentar outro lugar.' },
@@ -27,7 +34,7 @@ export const NOVIDADES = [
     ],
   },
   {
-    versao: 380, data: '2026-11-01', titulo: 'Letra que não some, selo E na biblioteca e capa animada sempre andando',
+    versao: 380, data: '2026-10-31', titulo: 'Letra que não some, selo E na biblioteca e capa animada sempre andando',
     itens: [
       { tipo: 'correcao', texto: 'A letra sincronizada não some mais quando o vídeo da música já é o próprio áudio (como em Company): o app achava outra versão (o clipe, um ao vivo) e trocava os papéis dos dois. Agora ele reconhece qual é o áudio pela duração da letra.' },
       { tipo: 'correcao', texto: 'O selo “E” das músicas explícitas aparece também na lista da biblioteca, sem precisar abrir a música.' },
@@ -35,7 +42,7 @@ export const NOVIDADES = [
     ],
   },
   {
-    versao: 379, data: '2026-11-01', titulo: 'Cifra acompanhando a música certa e barra parada no anúncio do vídeo',
+    versao: 379, data: '2026-10-31', titulo: 'Cifra acompanhando a música certa e barra parada no anúncio do vídeo',
     itens: [
       { tipo: 'correcao', texto: 'Na Cifra, a linha acesa volta a ser a que está sendo cantada: quando a letra sincronizada tinha uma linha só de acordes (como “( Am7 )”), a cifra passava a acender a linha errada dali em diante. E o refrão escrito duas vezes acende no lugar certo da segunda vez, sem voltar para o primeiro.' },
       { tipo: 'correcao', texto: 'No modo vídeo, a barra de reprodução não anda mais durante o anúncio: o clipe que toca mudo junto da música passava o anúncio escondido, e o app guardava a duração do anúncio como a do clipe; ao mudar para o vídeo, o anúncio não era mais reconhecido.' },
@@ -69,15 +76,20 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'A letra sincronizada não esconde mais palavras com asteriscos (“give a ****s”): entre as letras disponíveis vem a sem censura, e as palavras escondidas voltam a ser as cantadas pela letra da própria música. A versão de música escolhida também evita a “clean”, com os palavrões cortados.' },
     ],
   },
-  {
-    versao: 374, data: '2026-10-31', titulo: 'Letra sincronizada antes de entrar, acordes certos e partes em inglês',
-    itens: [
-      { tipo: 'melhoria', texto: 'A música da busca só abre com a versão de música, o clipe e a letra sincronizada prontos (embaixo do nome aparece o que está sendo preparado; no máximo 15 s). A letra sincronizada vem bem mais rápido: a reserva (NetEase) é procurada junto com o LRCLIB, pelos serviços ao mesmo tempo, e uma falha da internet é tentada de novo na hora.' },
-      { tipo: 'correcao', texto: 'Linhas de acordes com parênteses soltos, como “( Am ) C” ou “G C ( D )”, aparecem como acordes, e não mais como se fossem letra (também nas músicas já salvas).' },
-      { tipo: 'correcao', texto: 'Os nomes das partes ficam sempre em inglês (Verse, Chorus, Pre-Chorus, Bridge, Outro…), também na letra do Tocando agora, que mostrava “Refrão”, “Primeira Parte”.' },
-    ],
-  },
 ];
+
+// A primeira versão de cada mês. O número mostrado ("2026.10.31-383") é a data da versão e quantas versões o mês já
+// teve: recomeça do 1 quando o mês vira. O número de verdade (o do sw.js, que atualiza o app) continua subindo sempre.
+// Ao publicar a primeira versão de um mês novo, acrescente aqui o mês com o número dela (um teste confere).
+// (outubro de 2026: o app começou nele, na versão 1)
+export const PRIMEIRA_DO_MES = { '2026-10': 1 };
+export function versaoMostrada(versao, data) {
+  const d = String(data || '');
+  const primeira = PRIMEIRA_DO_MES[d.slice(0, 7)] ?? 1;
+  return `${d.replaceAll('-', '.')}-${Number(versao) - primeira + 1}`;
+}
+// a versão do app como aparece nos Ajustes e nas Novidades
+export const APP_VERSAO = versaoMostrada(NOVIDADES[0].versao, NOVIDADES[0].data);
 
 // as versões que a pessoa ainda não viu (mais nova primeiro); sem nenhuma vista ainda, só a atual
 export function novidadesNaoVistas(vista) {
