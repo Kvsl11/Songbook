@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 385, data: '2026-11-01', titulo: 'As músicas salvas se consertam sozinhas',
+    itens: [
+      { tipo: 'novo', texto: 'Quando o app corrige algo que fica guardado na música (a letra sincronizada, o áudio oficial, o download), as músicas que você já tinha salvo e baixado passam pela correção sozinhas, em segundo plano: não precisa mais tirar a música, apagar o download e baixar de novo.' },
+      { tipo: 'correcao', texto: 'O download que sumiu do aparelho ou ficou estragado (o vídeo que não abria) é baixado de novo sozinho, assim que o servidor estiver ligado, sem pedir nada.' },
+      { tipo: 'correcao', texto: 'A música salva que ficou sem a letra sincronizada (ou sem o áudio oficial) procura de novo, sozinha. A letra que você sincronizou à mão não é mexida.' },
+    ],
+  },
+  {
     versao: 384, data: '2026-11-01', titulo: 'Capa animada já entra andando e a letra não some mais',
     itens: [
       { tipo: 'correcao', texto: 'A capa animada (o clipe baixado atrás do Tocando agora) já aparece andando: antes surgia um quadro parado por um instante e só depois os trechos começavam a rolar. A troca de um trecho para o outro também entra já em movimento.' },
@@ -67,13 +75,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'A música da busca não entra mais antes da letra sincronizada: quando um serviço da letra falha por um instante, o app tenta de novo até achar (ou ter certeza de que não há); antes desistia depois de duas tentativas e a letra aparecia segundos depois de entrar.' },
       { tipo: 'melhoria', texto: 'A letra sincronizada começa a ser procurada no toque na música, junto com a cifra e o vídeo, e a música espera também a versão de música certa para a letra (a de mesma duração).' },
-    ],
-  },
-  {
-    versao: 375, data: '2026-10-31', titulo: 'Músicas explícitas com o selo E, e a letra inteira',
-    itens: [
-      { tipo: 'melhoria', texto: 'As músicas explícitas ganham o selo “E” (como no Spotify) nos cartões da busca, da biblioteca e no Tocando agora.' },
-      { tipo: 'correcao', texto: 'A letra sincronizada não esconde mais palavras com asteriscos (“give a ****s”): entre as letras disponíveis vem a sem censura, e as palavras escondidas voltam a ser as cantadas pela letra da própria música. A versão de música escolhida também evita a “clean”, com os palavrões cortados.' },
     ],
   },
 ];

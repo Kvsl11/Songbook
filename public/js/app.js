@@ -20,7 +20,7 @@ import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } fro
 import { NOVIDADES } from './lib/novidades.js';
 import { baseDoServidor, baixarArquivoDoServidor, cabecalhos, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, dataDaPergunta, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
-import { apagarAudio, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } from './audios.js';
+import { apagarAudio, chavesDosAudios, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } from './audios.js';
 import { escolherAudio, mesmaSincronia, paresPelaDuracao, paresPelaLegenda, paresPelasLetras, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
 import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { embaralharIndices, moverIndice } from './lib/fila.js';
@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.11.01-384';
+export const APP_VERSAO = '2026.11.01-385';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -881,7 +881,7 @@ async function baixarAgora(id) {
 
   if (!db.song(id)) return;
   const tamanho = Object.values(arquivos).reduce((a, x) => a + (x.tamanho || 0), 0);
-  db.updateSong(id, { baixado: { arquivos, tamanho, em: Date.now() } });
+  db.updateSong(id, { baixado: { arquivos, tamanho, em: Date.now() }, rebaixar: undefined });
   // A música fica pronta assim que áudio/vídeo forem guardados. Capas, fotos,
   // biografia e outros dados do artista são enriquecimento offline em segundo
   // plano: uma API lenta não deve segurar o download principal.
@@ -924,12 +924,13 @@ async function removerDownload(song) {
   const s = db.song(song.id);
   if (!s?.baixado) return;
   const yts = Object.keys(s.baixado.arquivos || {});
-  db.updateSong(s.id, { baixado: null });
+  db.updateSong(s.id, { baixado: null, rebaixar: undefined });
   await Promise.all(yts.filter((y) => !baixadoDe(y)).map((y) => apagarAudio(chaveBaixada(y)).catch(() => {})));
   avisarDownloads();
 }
 async function removerTodosDownloads() {
   for (const s of db.songs().filter((x) => x.baixado)) await removerDownload(s);
+  for (const s of db.songs().filter((x) => x.rebaixar)) db.updateSong(s.id, { rebaixar: undefined });
   if ('caches' in window) await caches.delete(CACHE_BAIXADOS).catch(() => {});
 }
 // o botão de baixar (a seta no círculo, como no Spotify): vazio, baixando (com a porcentagem) ou baixada (cheio)
@@ -1028,6 +1029,149 @@ window.addEventListener('songbook:downloads', () => {
   });
   document.querySelectorAll('[data-baixar]').forEach((b) => { const s = db.song(b.dataset.baixar); if (s) b.outerHTML = botaoBaixar(s, [...b.classList].filter((c) => !['icon-btn', 'btn-baixar', 'baixada', 'baixando'].includes(c)).join(' ')); });
 });
+
+
+// ---------------------------------------------------------------- revisão das músicas salvas
+// Quando uma versão do app corrige algo que fica GUARDADO na música (a letra sincronizada, as versões de áudio e clipe,
+// os arquivos baixados), as músicas que já estavam na biblioteca e no aparelho são revisadas sozinhas, em segundo plano:
+// a pessoa não precisa tirar a música, apagar o download e baixar de novo. Cada música guarda a última revisão por que
+// passou (song.revisao); as que estão atrás passam pelas que faltam, uma de cada vez.
+// AO CORRIGIR ALGO ASSIM: acrescente uma revisão no fim da lista, dizendo o que refazer:
+//   letra: confere a letra sincronizada (a que falta ou ficou presa a outra versão é procurada de novo; a sincronizada
+//          à mão pela pessoa não é mexida)
+//   versoes: procura o áudio oficial das músicas que ainda não têm
+//   arquivos: confere os downloads (o arquivo que sumiu do aparelho, o que não abre, o que ficou faltando) e baixa de
+//             novo só esses
+//   rebaixar: 'video' | 'audio' | true — baixa de novo esses arquivos de todas as músicas baixadas (quando o próprio
+//             download mudou: a qualidade, o formato…)
+//   quais(song): opcional, só as músicas em que a correção faz diferença
+const REVISOES = [
+  // v385: a primeira, para todas: a letra que faltava, o áudio oficial que não foi achado e os downloads incompletos,
+  // apagados pelo sistema ou com o arquivo estragado (o vídeo que não abria)
+  { rev: 1, letra: true, versoes: true, arquivos: true },
+];
+const REVISAO_MUSICAS = REVISOES[REVISOES.length - 1].rev;
+const revisando = new Set();
+const sincOkDe = (x) => x?.sincronia?.fonte === 'lrclib' && x.sincronia.video === videoDaLetra(x) && x.sincronia.tempos?.length && !x.sincronia.provisoria;
+// pode baixar sem perguntar (como o "Baixar ao salvar"): com o servidor ligado e fora dos dados móveis (ou liberados)
+const podeBaixarSozinho = async () => {
+  if (!navigator.onLine || (navigator.connection?.type === 'cellular' && !db.prefs().baixarDadosMoveis)) return false;
+  await carregarServidor().catch(() => {});
+  return Boolean(servidorIA().url);
+};
+// o arquivo baixado abre neste aparelho? true, false (não abre: estragado) ou null (não deu para saber a tempo)
+function abreNoAparelho(blob) {
+  return new Promise((ok) => {
+    const url = URL.createObjectURL(blob);
+    const v = document.createElement('video');
+    let feito = false;
+    const fim = (r) => { if (feito) return; feito = true; clearTimeout(t); v.removeAttribute('src'); v.load(); URL.revokeObjectURL(url); ok(r); };
+    const t = setTimeout(() => fim(null), 15000);
+    v.muted = true;
+    v.preload = 'metadata';
+    v.onloadedmetadata = () => fim(Number.isFinite(v.duration) && v.duration > 0 ? true : v.duration === Infinity ? null : false);
+    // (só o erro de arquivo estragado conta; o formato que este navegador não toca não é culpa do arquivo)
+    // (o 4 também vem do arquivo cortado ou corrompido: conta quando o navegador diz que toca esse tipo)
+    v.onerror = () => fim(v.error?.code === 3 || (v.error?.code === 4 && blob.type && v.canPlayType(blob.type)) ? false : null);
+    v.src = url;
+  });
+}
+// tira o arquivo (de todas as músicas que o usam) para ele ser baixado de novo
+async function esquecerArquivo(yt) {
+  for (const x of db.songs()) {
+    if (!x.baixado?.arquivos?.[yt]) continue;
+    const arquivos = { ...x.baixado.arquivos };
+    delete arquivos[yt];
+    // (rebaixar: era baixada e fica marcada para baixar de novo, mesmo se o servidor só ligar outro dia)
+    db.updateSong(x.id, { baixado: Object.keys(arquivos).length ? { ...x.baixado, arquivos, tamanho: Object.values(arquivos).reduce((a, f) => a + (f.tamanho || 0), 0) } : null, rebaixar: true });
+  }
+  await apagarAudio(chaveBaixada(yt)).catch(() => {});
+}
+// true: a música passou por tudo; false: falta algo que só dá com internet ou com o servidor (tenta na próxima vez)
+async function revisarMusica(id, pendentes, chaves) {
+  let s = db.song(id);
+  if (!s) return true;
+  const quer = (k) => pendentes.find((r) => r[k] && (!r.quais || r.quais(s)))?.[k];
+  let completa = true;
+  // a letra sincronizada (a feita à mão pela pessoa fica como está)
+  if (quer('letra') && midiaDe(s) && !(s.sincronia && s.sincronia.fonte !== 'lrclib')) {
+    try { recuperarSincronia(s); } catch { /* segue */ }
+    s = db.song(id);
+    if (s && !sincOkDe(s)) {
+      if (!navigator.onLine) completa = false;
+      else {
+        const r = await noMaximo(sincronizarMusica(s), 45000, 'demorou');
+        if (r === 'erro' || r === 'demorou') completa = false;
+      }
+    }
+  }
+  s = db.song(id);
+  if (!s) return true;
+  // o áudio oficial que ainda não foi achado
+  if (quer('versoes') && s.youtube && !s.audioProprio && !versoesDe(s)?.audio) {
+    if (!navigator.onLine) completa = false;
+    else await noMaximo(descobrirVersoes(s), 45000).catch(() => {});
+  }
+  s = db.song(id);
+  if (!s?.baixado && !s?.rebaixar) return completa;
+  // os downloads: o arquivo que sumiu do aparelho ou que não abre sai da lista, para ser baixado de novo
+  const rebaixar = quer('rebaixar');
+  if (quer('arquivos') || rebaixar) {
+    for (const [yt, info] of Object.entries(s.baixado?.arquivos || {})) {
+      const ehVideo = String(info?.tipo || '').startsWith('video');
+      let estragado = !chaves.has(chaveBaixada(yt)) || (rebaixar === true || (rebaixar === 'video' && ehVideo) || (rebaixar === 'audio' && !ehVideo));
+      if (!estragado) {
+        const blob = await lerAudio(chaveBaixada(yt)).catch(() => null);
+        estragado = !blob?.size || (await abreNoAparelho(blob)) === false;
+      }
+      if (estragado) { await esquecerArquivo(yt); chaves.delete(chaveBaixada(yt)); }
+    }
+  }
+  s = db.song(id);
+  // e baixa o que falta (era baixada: mesmo a que ficou sem arquivo nenhum volta a baixar)
+  if (s && precisaBaixar(s)) {
+    if (!(await podeBaixarSozinho())) return false;
+    await baixarMusica(s, { perguntou: true });
+  } else if (s?.rebaixar) db.updateSong(id, { rebaixar: undefined });
+  return completa;
+}
+let revisaoRodando = false;
+async function revisarMusicasSalvas() {
+  if (revisaoRodando || document.visibilityState !== 'visible') return;
+  revisaoRodando = true;
+  try {
+    const atrasadas = db.songs().filter((s) => (Number(s.revisao) || 0) < REVISAO_MUSICAS || s.rebaixar);
+    if (!atrasadas.length) return;
+    const chaves = await chavesDosAudios().catch(() => null);
+    if (!chaves) return;
+    // (as baixadas primeiro: são as que a pessoa quer sem internet)
+    atrasadas.sort((a, b) => Number(Boolean(b.baixado)) - Number(Boolean(a.baixado)));
+    for (const s0 of atrasadas) {
+      if (!db.song(s0.id) || revisando.has(s0.id)) continue;
+      // (não disputa a internet com a música que a pessoa abriu agora)
+      if (player.atual?.songId === s0.id) continue;
+      revisando.add(s0.id);
+      try {
+        const feitas = Number(s0.revisao) || 0;
+        const pendentes = REVISOES.filter((r) => r.rev > feitas);
+        if (!pendentes.length) pendentes.push({ rev: REVISAO_MUSICAS }); // (só o download que ficou para baixar de novo)
+        const ok = await revisarMusica(s0.id, pendentes, chaves).catch(() => false);
+        // (os downloads que entraram na fila contam como feitos: se falharem, ficam incompletos e a próxima revisão,
+        // ou a própria pessoa, completa)
+        if (ok && db.song(s0.id)) db.updateSong(s0.id, { revisao: REVISAO_MUSICAS });
+      } finally { revisando.delete(s0.id); }
+      // uma de cada vez, com folga: o app continua leve enquanto revisa
+      await new Promise((ok) => setTimeout(ok, 1500));
+      if (document.visibilityState !== 'visible') break;
+    }
+  } finally { revisaoRodando = false; }
+}
+// um pouco depois de abrir o app (e de novo ao voltar para ele, com internet): segue de onde parou
+setTimeout(() => void revisarMusicasSalvas(), 20000);
+window.addEventListener('online', () => setTimeout(() => void revisarMusicasSalvas(), 5000));
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(() => void revisarMusicasSalvas(), 8000); });
+// a música salva agora já nasce revisada (ela passa pelo que é feito ao salvar e ao baixar)
+window.addEventListener('songbook:nova-musica', (e) => { if (db.song(e.detail.id)) db.updateSong(e.detail.id, { revisao: REVISAO_MUSICAS }); });
 
 // endereço do player do YouTube embutido (enablejsapi permite pausar/tocar pelo botão verde)
 function ytEmbed(id, { inicio = 0, autoplay = true } = {}) {
