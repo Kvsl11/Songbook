@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 387, data: '2026-11-01', titulo: 'Mini player do celular como o do Spotify e a letra que não some',
+    itens: [
+      { tipo: 'melhoria', texto: 'No celular, o mini player fica mais limpo, como o do Spotify: a capa, o nome e o artista e, à direita, só ouvir em outro aparelho, o ✓ da biblioteca e tocar/pausar, com a linha do andamento fina embaixo. Aleatório, voltar, pular e repetir ficam no Tocando agora, e fechar o player fica no ⋯ dele.' },
+      { tipo: 'novo', texto: 'Numa playlist ou repertório, passar o dedo no mini player para a esquerda vai para a próxima música, e para a direita volta para a anterior.' },
+      { tipo: 'correcao', texto: 'O cartão da letra não some mais do Tocando agora quando a cifra guardada não tem a letra e a letra sincronizada é de outra versão da música (o clipe ou outro áudio): ela aparece, mesmo sem acompanhar.' },
+    ],
+  },
+  {
     versao: 386, data: '2026-11-01', titulo: 'Mini player do tablet sem a capinha cortada e a versão com a data certa',
     itens: [
       { tipo: 'correcao', texto: 'No tablet, a capinha do vídeo, o nome e o andamento do mini player não sobem mais nem ficam cortados na borda de cima: minimizando o Tocando agora rolado para baixo, o mini player ficava rolado por dentro.' },
@@ -71,12 +79,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'A letra sincronizada não vem mais da versão de rádio (“give a damns” no lugar de “give a fucks”, em Espresso): fica a letra da gravação que toca, e a Letra e a Cifra mostram as mesmas palavras cantadas.' },
       { tipo: 'melhoria', texto: 'Na cifra, o acorde sobre uma sílaba curta (“m[Am7]e”, “l[Am7]ike”) não abre mais um buraco no meio da frase: ele passa por cima da letra seguinte, sem encostar no próximo acorde.' },
       { tipo: 'correcao', texto: 'Enquanto passa o anúncio do YouTube, a barra de reprodução, o tempo e a letra ficam parados: eles só começam a andar quando a música começa a tocar.' },
-    ],
-  },
-  {
-    versao: 377, data: '2026-10-31', titulo: 'Capa animada sem as faixas pretas',
-    itens: [
-      { tipo: 'correcao', texto: 'Na capa animada das músicas não baixadas, os quadros do clipe não mostram mais as faixas pretas em cima e embaixo (as das miniaturas do YouTube e as dos clipes filmados como cinema): cada imagem é medida e ampliada só o bastante para elas ficarem de fora.' },
     ],
   },
 ];
