@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.11.01-383';
+export const APP_VERSAO = '2026.11.01-384';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1578,6 +1578,7 @@ const player = (() => {
     let relogio = 0;
     let url = '';
     let montagem = 0;
+    let carregando = false;
     let troca = false;
     let preparo = 0;
     const preparacoes = new WeakMap();
@@ -1614,6 +1615,41 @@ const player = (() => {
       v.setAttribute('playsinline', '');
       v.className = 'pl-canvas';
       return v;
+    };
+    // Espera o vídeo estar de fato andando (dois quadros apresentados com o tempo avançando), para nunca revelar um
+    // quadro parado que só depois começa a rolar. false: não andou a tempo (o acompanhamento tenta de novo)
+    const andando = (v, limite = 900) => new Promise((resolve) => {
+      let feito = false;
+      const fim = (ok) => { if (!feito) { feito = true; clearTimeout(t); resolve(ok); } };
+      const t = setTimeout(() => fim(false), limite);
+      if (typeof v.requestVideoFrameCallback !== 'function') {
+        const inicio = v.currentTime;
+        const ver = () => { if (feito) return; if (!v.paused && v.currentTime > inicio + 0.05) fim(true); else setTimeout(ver, 40); };
+        ver();
+        return;
+      }
+      let antes = -1;
+      let n = 0;
+      const quadro = (_, meta) => {
+        if (feito) return;
+        if (antes >= 0 && meta.mediaTime > antes) n++;
+        antes = meta.mediaTime;
+        if (n >= 2) fim(true); else v.requestVideoFrameCallback(quadro);
+      };
+      v.requestVideoFrameCallback(quadro);
+    });
+    // A primeira imagem: só entra já no ponto do primeiro trecho e andando
+    const revelar = async (v) => {
+      if (v !== caixa || v.dataset.revelando === '1' || v.classList.contains('pronto') || v.dataset.posto !== '1') return;
+      v.dataset.revelando = '1';
+      try {
+        if (v.paused) await v.play();
+        const ok = await andando(v);
+        if (!ok || v !== caixa) return;
+        v.classList.add('pronto');
+        medirFaixas(v);
+        preparar((k + 1) % trechos.length);
+      } catch { /* o acompanhamento tenta de novo */ } finally { v.dataset.revelando = ''; }
     };
     // Sem o download: o próprio clipe, andando, num player do YouTube mudo, sem controles e sem receber toques (escondido
     // atrás da capa, com zoom para cortar as bordas). Ele só aparece depois de uns segundos tocando (o YouTube mostra o
@@ -1671,6 +1707,8 @@ const player = (() => {
       clearInterval(relogio);
       relogio = 0;
       preparo++;
+      montagem++;
+      carregando = false;
       troca = false;
       [caixa, reserva].forEach((v) => { if (v) { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); } });
       caixa = null;
@@ -1732,6 +1770,11 @@ const player = (() => {
       if (!caixa || !reserva || reserva.dataset.pronto !== '1') { troca = false; return; }
       const anterior = caixa;
       const seguinte = reserva;
+      // o próximo trecho entra já andando (antes entrava pausado e só começava a rolar depois): o atual segue na tela
+      // até lá
+      try { if (seguinte.paused) await seguinte.play(); } catch { /* tenta de novo no próximo ciclo */ }
+      const ok = !seguinte.paused && await andando(seguinte, 700);
+      if (!ok || anterior !== caixa || seguinte !== reserva) { troca = false; return; }
       k = proximo;
       // As duas camadas se cruzam; nunca se revela um vídeo no meio do seek.
       seguinte.classList.add('pronto');
@@ -1752,51 +1795,48 @@ const player = (() => {
       const tocar = visivel;
       if (tocar && caixa.paused) caixa.play().catch(() => {});
       if (!tocar && !caixa.paused) caixa.pause();
+      if (tocar && trechos.length && !caixa.classList.contains('pronto')) { revelar(caixa); return; }
       if (tocar && trechos.length && !troca) {
         const falta = trechos[k] + DURA - caixa.currentTime;
         if (falta <= 2.2 && reserva?.dataset.pronto !== '1') preparar((k + 1) % trechos.length);
-        if (falta <= 0.08 || caixa.currentTime < trechos[k] - 0.5) irAoTrecho(k + 1);
+        // (um pouco antes do fim: o próximo precisa de um instante para começar a andar)
+        if (falta <= 0.35 || caixa.currentTime < trechos[k] - 0.5) irAoTrecho(k + 1);
       }
     };
     return {
       async montar(q) {
         const quer = q && db.prefs().videoFundo !== false && !db.prefs().economiaDados ? q : '';
-        if (quer === de && (caixa?.isConnected || yt?.f.isConnected || !quer)) return;
+        if (quer === de) {
+          // o fundo foi redesenhado (ex.: chegou a capa oficial) com o mesmo vídeo: os mesmos vídeos voltam para ele, já
+          // andando (recriar fazia piscar e mostrar um quadro parado antes de rolar)
+          if (quer && caixa && reserva && !caixa.isConnected) { fundo.append(caixa, reserva); return; }
+          if (caixa?.isConnected || yt?.f.isConnected || !quer || carregando) return;
+        }
         tirar();
         if (!quer) return;
         de = quer;
         const vez = ++montagem;
         const baixado = baixadoDe(quer);
         if (baixado && String(baixado.tipo).startsWith('video')) {
-          const blob = await lerAudio(chaveBaixada(quer)).catch(() => null);
+          carregando = true;
+          const blob = await lerAudio(chaveBaixada(quer)).catch(() => null).finally(() => { if (vez === montagem) carregando = false; });
           if (vez !== montagem) return;
           if (blob) {
             url = URL.createObjectURL(blob);
             caixa = videoNovo();
             reserva = videoNovo();
-            caixa.addEventListener('seeked', () => medirFaixas(), { once: false });
-            caixa.addEventListener('loadedmetadata', () => {
-              if (!caixa) return;
-              const d = caixa.duration;
+            // (os ouvintes falam do próprio vídeo: um vídeo já tirado não mexe no que entrou no lugar dele)
+            const v = caixa;
+            v.addEventListener('seeked', () => { if (v === caixa) medirFaixas(v); });
+            v.addEventListener('loadedmetadata', () => {
+              if (v !== caixa) return;
+              const d = v.duration;
               trechos = Number.isFinite(d) && d > 20 ? PONTOS.map((f) => Math.max(0, Math.min(d - DURA, f * d))) : [0];
               k = 0;
-              // Não revelar o início do arquivo: a primeira imagem só entra depois do seek e da decodificação.
-              const inicial = trechos[0];
-              caixa.addEventListener('seeked', async () => {
-                if (!caixa) return;
-                try {
-                  await caixa.play();
-                  if (typeof caixa.requestVideoFrameCallback === 'function') {
-                    await new Promise((resolve) => caixa.requestVideoFrameCallback(() => resolve()));
-                  } else {
-                    await new Promise((resolve) => setTimeout(resolve, 100));
-                  }
-                  if (caixa) { caixa.classList.add('pronto'); medirFaixas(); }
-                } catch { /* o acompanhamento tenta iniciar quando o player estiver tocando */ }
-              }, { once: true });
-              caixa.currentTime = inicial;
-              if (reserva.readyState >= 1) preparar((k + 1) % trechos.length);
-              else reserva.addEventListener('loadedmetadata', () => preparar((k + 1) % trechos.length), { once: true });
+              // Não revelar o início do arquivo: a primeira imagem só entra depois do seek, já andando. A reserva só se
+              // prepara depois (dois vídeos decodificando juntos no começo travavam o primeiro num quadro parado)
+              v.addEventListener('seeked', () => { if (v === caixa) { v.dataset.posto = '1'; revelar(v); } }, { once: true });
+              v.currentTime = trechos[0];
             }, { once: true });
           }
         }
@@ -2179,10 +2219,31 @@ const semLinhasDeAcordes = (sinc) => {
   };
   // muda o endereço da página da música (salvou ou tirou da biblioteca) sem desenhar a página de novo; fechando o
   // Tocando agora, ainda sai dela
+  // (o replaceState só troca a entrada de cima do histórico: com a letra na tela toda, o Tocando agora ou o "Sobre o
+  // artista" abertos, as entradas de baixo ficam com o endereço antigo. Fechando, o voltar caía nelas, o endereço
+  // mudava e a página era desenhada de novo: o Tocando agora fechava e reabria sem a letra e sem a capa animada. A troca
+  // fica guardada para acertar o endereço dessas entradas quando o voltar chega nelas, sem desenhar nada)
+  let enderecoTrocado = null; // { de, para }
+  let hashIgnorado = '';
   const trocarEndereco = (hash) => {
     if (sobrePagina === location.hash) sobrePagina = hash;
+    if (location.hash !== hash) enderecoTrocado = { de: location.hash, para: hash };
     history.replaceState(history.state, '', hash);
   };
+  window.addEventListener('popstate', () => {
+    if (!enderecoTrocado || location.hash !== enderecoTrocado.de) return;
+    const { para } = enderecoTrocado;
+    hashIgnorado = para;
+    if (sobrePagina === location.hash) sobrePagina = para;
+    history.replaceState(history.state, '', para);
+    setTimeout(() => { if (hashIgnorado === para) hashIgnorado = ''; }, 500);
+  });
+  // (no próprio window, os ouvintes de captura vêm antes dos outros: o roteador nem fica sabendo)
+  window.addEventListener('hashchange', (e) => {
+    if (hashIgnorado && location.hash === hashIgnorado) { hashIgnorado = ''; e.stopImmediatePropagation(); return; }
+    // foi para outra página de verdade: a troca antiga não vale mais
+    if (enderecoTrocado && location.hash !== enderecoTrocado.de && location.hash !== enderecoTrocado.para) enderecoTrocado = null;
+  }, true);
   // fecha a tela da música: sai da página dela, de volta para a lista (a página antiga não aparece no caminho)
   const fecharMusica = () => {
     letraDaPagina = false;
