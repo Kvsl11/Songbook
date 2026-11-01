@@ -1054,7 +1054,15 @@ const REVISOES = [
   // v390: nas músicas da missa, a foto do artista achada só pelo nome, de quem não é com certeza do meio católico (o
   // "José Alves" de "Salve Rainha" com a foto de um cantor de funk), sai: fica o desenho do app
   { rev: 3, fotosLiturgia: true, quais: (s) => Boolean(s.fotoArtista) && ehDaLiturgia(s) && !confiavelNaLiturgia(s.artist) },
+  // v395: os cantos que o Montar repertório já tinha trazido (da liturgia, e que só estão em repertórios da missa
+  // montados pelo app, "Missa 01/11/2026 – …") ficam só no repertório: saem das Músicas da biblioteca
+  { rev: 4, soNoRepertorio: true, quais: (s) => !s.soNoRepertorio && ehDaLiturgia(s) && soEmMissasMontadas(s.id) },
 ];
+// (o canto está em algum repertório, e todos eles são os da missa montados pelo app)
+function soEmMissasMontadas(id) {
+  const sets = db.sets().filter((st) => st.items.some((it) => it.songId === id));
+  return sets.length > 0 && sets.every((st) => /^(Ouvir · )?Missa \d{2}\/\d{2}\/\d{4} – /.test(st.name || ''));
+}
 const REVISAO_MUSICAS = REVISOES[REVISOES.length - 1].rev;
 const revisando = new Set();
 const sincOkDe = (x) => x?.sincronia?.fonte === 'lrclib' && x.sincronia.video === videoDaLetra(x) && x.sincronia.tempos?.length && !x.sincronia.provisoria;
@@ -1107,6 +1115,7 @@ async function revisarMusica(id, pendentes, chaves) {
     s = db.song(id);
   }
   if (quer('fotosLiturgia') && s.fotoArtista) { db.updateSong(id, { fotoArtista: undefined }); s = db.song(id); }
+  if (quer('soNoRepertorio')) { db.updateSong(id, { soNoRepertorio: true }); s = db.song(id); }
   // a letra sincronizada (a feita à mão pela pessoa fica como está)
   if (quer('letra') && midiaDe(s) && !(s.sincronia && s.sincronia.fonte !== 'lrclib')) {
     try { recuperarSincronia(s); } catch { /* segue */ }
@@ -1690,7 +1699,7 @@ const player = (() => {
     // música sem vídeo: o play é o de sempre; tocando nele (ou na pílula "Escolher um vídeo"), escolhe um vídeo do YouTube
     el.querySelectorAll('.pl-play').forEach((b) => { porHtml(b, icon(estado === 'tocando' && !atual.semVideo ? 'pause' : 'play', 20)); b.title = atual.semVideo ? 'Escolher um vídeo para tocar' : ''; });
     // a bolinha de salva (na barrinha recolhida do tablet): ✓ se a música está na biblioteca, + se não
-    const salva = Boolean(atual.songId && db.song(atual.songId));
+    const salva = Boolean(atual.songId && db.song(atual.songId) && !db.song(atual.songId).soNoRepertorio);
     const bs = $('.pl-salva', el);
     if (bs.hidden || bs.classList.contains('salva') !== salva) {
       bs.hidden = false;
@@ -3707,6 +3716,8 @@ const semLinhasDeAcordes = (sinc) => {
     f.push('', '[Versões]');
     if (vs) f.push(`clipe ${vs.video || '-'} · áudio ${vs.audio || '-'} (${seg(vs.duracao)}) · casadas: ${sim(vs.casadas)} · pela letra: ${sim(vs.porLetra)} · diferentes: ${sim(vs.diferentes)} · pares: ${vs.pares?.length || 0}`);
     else f.push('sem áudio oficial guardado');
+    // (os pontos que ligam o áudio ao clipe, segundo no áudio → segundo no clipe: para conferir a troca entre os dois)
+    if (vs?.pares?.length > 1) f.push(`pares (áudio→clipe): ${vs.pares.map(([x, y]) => `${Math.round(x)}→${Math.round(y)}`).join(' ')}`);
     f.push('', '[Download]');
     const arqs = Object.entries(song?.baixado?.arquivos || {});
     if (!arqs.length) f.push(song?.rebaixar ? 'sem arquivos (marcada para baixar de novo)' : 'não baixada');
@@ -3946,6 +3957,7 @@ const semLinhasDeAcordes = (sinc) => {
       if (ja && (preview.versoes || preview.sincronia)) {
         db.updateSong(ja.id, { ...(preview.versoes ? { versoes: preview.versoes, versoesConferidas: true } : {}), ...(preview.sincronia ? { sincronia: preview.sincronia } : {}) });
       }
+      if (ja?.soNoRepertorio) db.updateSong(ja.id, { soNoRepertorio: undefined }); // (só do repertório: agora é da biblioteca)
       const salva = ja || db.saveSong({ content: preview.content, source: preview.source, transpose: preview.transpose || 0, capo: preview.capo || 0, ...(preview.sincronia ? { sincronia: preview.sincronia } : {}), ...(preview.versoes ? { versoes: preview.versoes } : {}), ...(preview.fotoArtista ? { fotoArtista: preview.fotoArtista } : {}) });
       api.atualizar({ songId: salva.id, href: `#/musica/${salva.id}` });
       toast(ja ? 'Já estava na biblioteca' : 'Salva na biblioteca');
@@ -3989,7 +4001,9 @@ const semLinhasDeAcordes = (sinc) => {
       // salva: adicionar a um repertório (como o ✓ do Spotify); não salva: salva ali mesmo, sem precisar abrir a música
       // (a música aberta da busca fica guardada na sessão; um vídeo solto, sem cifra, abre a música para salvar)
       // salva: tocar de novo tira da biblioteca (como no Spotify); adicionar a um repertório fica nos ⋮
-      if (atual.songId && db.song(atual.songId)) tirarDoPlayer(db.song(atual.songId));
+      // (o canto que só estava no repertório da missa: passa a ser da biblioteca)
+      if (atual.songId && db.song(atual.songId)?.soNoRepertorio) { db.updateSong(atual.songId, { soNoRepertorio: undefined }); desenhar(); toast('Salva na biblioteca'); }
+      else if (atual.songId && db.song(atual.songId)) tirarDoPlayer(db.song(atual.songId));
       // (também a música sem vídeo e a que veio de um vídeo da busca)
       else if (daPrevia()) salvarDaPrevia();
       else if (atual.href && location.hash !== atual.href) location.hash = atual.href;
@@ -6355,7 +6369,7 @@ function musicaSalva({ titulo = '', artista = '', cifra = '', letra = '' } = {})
     || db.songs().find((s) => normalizar(s.title) === normalizar(tituloLimpo(titulo)) && (!artista || mesmoNome(s.artist, artista))) || null;
 }
 const botaoSalvar = (item, cls = '') => {
-  const salva = musicaSalva(item);
+  const salva = musicaSalva(item) && !musicaSalva(item).soNoRepertorio;
   const v = item.video;
   return `<button class="salvar-btn ${cls}${salva ? ' salva' : ''}" data-salvar data-titulo="${esc(item.titulo || '')}" data-artista="${esc(item.artista || '')}" data-cifra="${esc(item.cifra || '')}" data-letra="${esc(item.letra || '')}" data-foto-artista="${esc(item.fotoArtista || '')}"${v ? ` data-video="${esc(v.id || '')}" data-video-titulo="${esc(v.titulo || '')}" data-canal="${esc(v.canal || '')}"` : ''}
     aria-pressed="${!!salva}" aria-label="${salva ? 'Na biblioteca (tocar para tirar)' : 'Salvar na biblioteca'}" title="${salva ? 'Na sua biblioteca — tocar para tirar' : 'Salvar na biblioteca'}">${icon(salva ? 'check' : 'plus', 16)}</button>`;
@@ -6386,6 +6400,7 @@ document.addEventListener('click', async (e) => {
   if (b.disabled) return;
   const item = { titulo: b.dataset.titulo, artista: b.dataset.artista, cifra: b.dataset.cifra, letra: b.dataset.letra, fotoArtista: b.dataset.fotoArtista || '' };
   const salva = musicaSalva(item);
+  if (salva?.soNoRepertorio) { db.updateSong(salva.id, { soNoRepertorio: undefined }); marcarSalvar(b, true); toast('Salva na biblioteca'); return; }
   if (salva) { if (await tirarDaBiblioteca(salva)) marcarSalvar(b, false); return; }
   b.disabled = true;
   b.innerHTML = '<span class="spin"></span>';
@@ -6490,7 +6505,7 @@ function viewSearch() {
     }
     const meu = ++seq;
     const t = normalizar(term);
-    const locais = db.songs().filter((s) => normalizar(s.title + ' ' + s.artist + ' ' + s.content).includes(t)).slice(0, filtro === 'biblioteca' ? 50 : 6);
+    const locais = db.songs().filter((s) => !s.soNoRepertorio && normalizar(s.title + ' ' + s.artist + ' ' + s.content).includes(t)).slice(0, filtro === 'biblioteca' ? 50 : 6);
     const blocos = [];
     if (mostra('biblioteca') && (locais.length || filtro === 'biblioteca')) blocos.push(`<div class="shelf-head"><h2>Na sua biblioteca</h2></div>${locais.length ? `<ul class="tracks">${locais.map((s) => linhaMusica(s, s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '')).join('')}</ul>` : '<p class="muted">Nada na biblioteca.</p>'}`);
     if (mostra('artistas')) blocos.push(caixa('ar-res', 'Artistas'));
@@ -7223,7 +7238,8 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
   setTint('#2b3d4f');
   setHeader('Sua biblioteca');
   // Músicas primeiro (é o que mais se abre); cada filtro mostra quantos itens tem
-  const todas = db.songs();
+  // (os cantos que o Montar repertório trouxe ficam só no repertório)
+  const todas = db.songs().filter((x) => !x.soNoRepertorio);
   const sets = db.sets();
   const ehPropria = (x) => !/^https?:|^cnbb:/.test(x.source || '');
   const temPartitura = (x) => x.partitura?.pautas?.length || mxlDaPartitura(x.content) || paginasDaPartitura(x.content).length;
@@ -7233,7 +7249,7 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
   if (!FILTROS.some(([k]) => k === filtro)) filtro = 'musicas';
   const ehRep = filtro === 'repertorios' || filtro === 'playlists';
   const ehPl = filtro === 'playlists';
-  let songs = db.songs();
+  let songs = todas;
   if (filtro === 'video') songs = songs.filter((s) => s.youtube);
   if (filtro === 'proprias') songs = songs.filter(ehPropria);
   if (filtro === 'partitura') songs = songs.filter(temPartitura);
@@ -10254,8 +10270,10 @@ function viewSong(id, ctx = {}) {
 
   const salvarPrevia = () => {
     const existing = db.songBySource(song.source);
+    const soNoRep = existing?.soNoRepertorio;
+    if (soNoRep) db.updateSong(existing.id, { soNoRepertorio: undefined });
     const saved = existing || db.saveSong({ content: song.content, source: song.source, transpose, capo });
-    toast(existing ? 'Já estava na biblioteca' : 'Salva na biblioteca');
+    toast(existing && !soNoRep ? 'Já estava na biblioteca' : 'Salva na biblioteca');
     return saved;
   };
   // salvar / tirar da biblioteca (a página continua a mesma: vira a música salva, ou volta a ser só da busca)
@@ -11674,7 +11692,8 @@ async function montarRepertorio(missa, sel, data, { btn = $('#montar'), tipo = '
       if (!song) {
         try {
           const s = await songFromChoice(p, v, lit);
-          song = db.saveSong({ content: s.content, source: s.source });
+          // (fica só no repertório: não entra nas Músicas da biblioteca; veja tirarSoltas, no store)
+          song = db.saveSong({ content: s.content, source: s.source, soNoRepertorio: true });
         } catch {
           falhas.push(p.nome);
           continue;

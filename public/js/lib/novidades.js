@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 395, data: '2026-11-01', titulo: 'Cantos do repertório fora da biblioteca e troca de vídeo mais certa',
+    itens: [
+      { tipo: 'correcao', texto: 'A troca entre a música e o vídeo (e o contrário) cai no ponto certo também nos clipes longos com o refrão repetido (como Speed Demon): um trecho que o app tinha achado na outra vez do refrão no clipe fazia a troca, só ali, ir para o lugar errado. Vale também para as músicas já baixadas.' },
+      { tipo: 'melhoria', texto: 'Os cantos que o “Montar repertório” traz (a missa do dia) ficam só no repertório: não aparecem mais nas Músicas da biblioteca. Para guardar um deles na biblioteca, toque no + dele. Apagado o repertório (ou tirado o canto dele), o canto sai do aparelho. Os que já tinham sido trazidos assim também saem das Músicas.' },
+    ],
+  },
+  {
     versao: 394, data: '2026-11-01', titulo: 'Dois toques ampliam a foto no celular e no tablet',
     itens: [
       { tipo: 'correcao', texto: 'Nas fotos do artista em tela cheia, dois toques no celular e no tablet voltam a ampliar a foto (e dois toques de novo voltam ao normal): o navegador mandava também um clique duplo, o do computador, que desfazia o zoom na hora.' },
@@ -63,16 +70,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'No tablet, a capinha do vídeo, o nome e o andamento do mini player não sobem mais nem ficam cortados na borda de cima: minimizando o Tocando agora rolado para baixo, o mini player ficava rolado por dentro.' },
       { tipo: 'correcao', texto: 'A versão mostrada nos Ajustes e nas Novidades tem a data do Brasil (antes vinha a do dia seguinte, perto da meia-noite), e o número do fim conta as versões do mês: recomeça do 1 a cada mês novo.' },
-    ],
-  },
-  {
-    versao: 385, data: '2026-11-01', titulo: 'As músicas salvas se consertam sozinhas',
-    itens: [
-      { tipo: 'novo', texto: 'Quando o app corrige algo que fica guardado na música (a letra sincronizada, o áudio oficial, o download), as músicas que você já tinha salvo e baixado passam pela correção sozinhas, em segundo plano: não precisa mais tirar a música, apagar o download e baixar de novo.' },
-      { tipo: 'correcao', texto: 'O download que sumiu do aparelho ou ficou estragado (o vídeo que não abria) é baixado de novo sozinho, assim que o servidor estiver ligado, sem pedir nada.' },
-      { tipo: 'correcao', texto: 'A música salva que ficou sem a letra sincronizada (ou sem o áudio oficial) procura de novo, sozinha. A letra que você sincronizou à mão não é mexida.' },
-      { tipo: 'novo', texto: 'No ⋯ do Tocando agora, “Diagnóstico da música” mostra o que está guardado na música (a letra, o áudio oficial, o download) e o que o player está mostrando. “Copiar” leva o texto para colar numa conversa, e “Consertar agora” procura de novo a letra e o áudio oficial e confere o download, na hora.' },
-      { tipo: 'correcao', texto: 'Com o clipe baixado, a capa animada entra direto no vídeo andando: antes aparecia por um instante uma imagem parada do clipe (a do YouTube) e só depois o vídeo.' },
     ],
   },
 ];
