@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 384, data: '2026-11-01', titulo: 'Capa animada já entra andando e a letra não some mais',
+    itens: [
+      { tipo: 'correcao', texto: 'A capa animada (o clipe baixado atrás do Tocando agora) já aparece andando: antes surgia um quadro parado por um instante e só depois os trechos começavam a rolar. A troca de um trecho para o outro também entra já em movimento.' },
+      { tipo: 'correcao', texto: 'A letra e a capa animada não somem mais do Tocando agora depois de fechar a letra na tela toda numa música aberta pela busca (ao tocar ou baixar, ela é salva na biblioteca e o app se perdia no endereço dela).' },
+    ],
+  },
+  {
     versao: 383, data: '2026-11-01', titulo: 'Player com os botões do Spotify, fila no rodapé e puxar para abrir',
     itens: [
       { tipo: 'melhoria', texto: 'Os botões do player ficam com o jeito dos do Spotify, no celular, no tablet e no computador: aleatório, voltar, pular, repetir, o play, a fila, o painel e os botões da Letra.' },
@@ -67,14 +74,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'melhoria', texto: 'As músicas explícitas ganham o selo “E” (como no Spotify) nos cartões da busca, da biblioteca e no Tocando agora.' },
       { tipo: 'correcao', texto: 'A letra sincronizada não esconde mais palavras com asteriscos (“give a ****s”): entre as letras disponíveis vem a sem censura, e as palavras escondidas voltam a ser as cantadas pela letra da própria música. A versão de música escolhida também evita a “clean”, com os palavrões cortados.' },
-    ],
-  },
-  {
-    versao: 374, data: '2026-10-31', titulo: 'Letra sincronizada antes de entrar, acordes certos e partes em inglês',
-    itens: [
-      { tipo: 'melhoria', texto: 'A música da busca só abre com a versão de música, o clipe e a letra sincronizada prontos (embaixo do nome aparece o que está sendo preparado; no máximo 15 s). A letra sincronizada vem bem mais rápido: a reserva (NetEase) é procurada junto com o LRCLIB, pelos serviços ao mesmo tempo, e uma falha da internet é tentada de novo na hora.' },
-      { tipo: 'correcao', texto: 'Linhas de acordes com parênteses soltos, como “( Am ) C” ou “G C ( D )”, aparecem como acordes, e não mais como se fossem letra (também nas músicas já salvas).' },
-      { tipo: 'correcao', texto: 'Os nomes das partes ficam sempre em inglês (Verse, Chorus, Pre-Chorus, Bridge, Outro…), também na letra do Tocando agora, que mostrava “Refrão”, “Primeira Parte”.' },
     ],
   },
 ];
