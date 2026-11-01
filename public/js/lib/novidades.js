@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 382, data: '2026-11-01', titulo: 'O mesmo ícone de vídeo em todo o app',
+    itens: [
+      { tipo: 'melhoria', texto: 'O botão “Mudar para vídeo” do Tocando agora e os menus usam o mesmo ícone de vídeo das fichas da biblioteca (o quadro com o play, como no Spotify).' },
+    ],
+  },
+  {
     versao: 381, data: '2026-11-01', titulo: 'A letra não se perde mais e fichas da biblioteca como no Spotify',
     itens: [
       { tipo: 'correcao', texto: 'A letra sincronizada não some mais ao abrir a música (como em Company): quando o app acha o áudio oficial da mesma gravação, a letra que já estava na música passa junto para ele, em vez de precisar ser procurada de novo. As músicas que já tinham perdido a letra assim voltam a ter.' },
@@ -66,14 +72,6 @@ export const NOVIDADES = [
     versao: 373, data: '2026-10-31', titulo: 'Só a letra na letra, sem afinação nem créditos',
     itens: [
       { tipo: 'correcao', texto: 'Afinação, capotraste, tom, sugestão de batida, riff, dedilhado, solo, observações e créditos (composição, contribuição, revisões) não aparecem mais no meio da letra nem da cifra, também nas músicas já salvas: na Letra fica só o que se canta; na Cifra, os acordes com a letra.' },
-    ],
-  },
-  {
-    versao: 372, data: '2026-10-31', titulo: 'A letra não some mais ao trocar a música ou salvar',
-    itens: [
-      { tipo: 'correcao', texto: 'O “Trocar música” no Tocando agora não salva mais a música na biblioteca sozinho (salvava até cancelando).' },
-      { tipo: 'correcao', texto: 'Depois de trocar a música ou o vídeo, a letra sincronizada é refeita para a versão nova; antes ela ficava presa à de antes, parava de acompanhar e às vezes sumia.' },
-      { tipo: 'correcao', texto: 'Salvar a música aberta da busca guarda exatamente a que está na tela, com a letra; antes ela era trazida de novo e, se o site falhasse naquela hora, ficava salva sem letra.' },
     ],
   },
 ];
