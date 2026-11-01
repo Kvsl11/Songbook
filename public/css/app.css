@@ -1380,9 +1380,14 @@ body.performance #song.lyrics-mode { background: var(--painel); padding-bottom: 
 .barra-sel[hidden] { display: none; }
 
 /* indicadores pequenos nas listas: tem cifra / tem vídeo */
-.ind { display: inline-flex; gap: 3px; margin-right: 6px; vertical-align: -2px; }
-.ind-i { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 5px; background: color-mix(in srgb, var(--text) 9%, transparent); color: var(--muted); }
-.ind-i svg { width: 11px; height: 11px; }
+/* a segunda linha das fichas, como no Spotify: ícones soltos (sem caixinha), "Vídeo" e um "•" antes do artista */
+.ind { display: inline-flex; align-items: center; gap: 5px; margin-right: 0; vertical-align: -3px; flex: none; }
+.ind-i { display: inline-grid; place-items: center; width: 15px; height: 15px; color: var(--muted); flex: none; }
+.ind-i svg { width: 14px; height: 14px; }
+.ind-i.ind-baixada svg, .ind-i.ind-baixando svg { width: 15px; height: 15px; }
+.ind .selo-e { margin-right: 0; }
+.ind-txt { color: var(--muted); }
+.ind-sep { color: var(--muted); margin-left: 1px; }
 
 /* hinários e formação (Junior Música Católica): tudo abre no app */
 .fonte-sec { background: var(--surface); border-radius: 12px; padding: 14px; margin-bottom: 12px; }

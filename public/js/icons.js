@@ -33,6 +33,8 @@ const P = {
   library: '<path d="M4 3v18M9 3v18"/><path d="M14 4l5 16"/>',
   external: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14L21 3"/>',
   video: '<rect x="2" y="5" width="15" height="14" rx="2"/><path d="M17 10l5-3v10l-5-3z"/>',
+  // o vídeo da segunda linha das fichas (como o do Spotify: um quadro com o play dentro)
+  videoclipe: '<rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M10 9.2v5.6l4.6-2.8z" fill="currentColor" stroke-width="1.4" stroke-linejoin="round"/>',
   lumen: '<path d="M7.25 3A2.25 2.25 0 0 1 9.5 5.25V15.5H17.25A2.25 2.25 0 0 1 17.25 20H7.25A2.25 2.25 0 0 1 5 17.75V5.25A2.25 2.25 0 0 1 7.25 3Z" fill="currentColor" stroke="none"/><path d="M15.75 2.5C16.05 5.8 17.45 7.2 20.75 7.5 17.45 7.8 16.05 9.2 15.75 12.5 15.45 9.2 14.05 7.8 10.75 7.5 14.05 7.2 15.45 5.8 15.75 2.5Z" fill="currentColor" stroke="none"/>',
   onda: '<path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/>',
   enviar: '<path d="M12 19V5M5 12l7-7 7 7"/>',
