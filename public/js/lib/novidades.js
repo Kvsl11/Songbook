@@ -4,11 +4,17 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
-    versao: 389, data: '2026-11-01', titulo: 'Artistas certos nas músicas da missa, capas na Liturgia e sem a foto do violão',
+    versao: 390, data: '2026-11-01', titulo: 'Artistas certos nas músicas da missa, capas na Liturgia e fotos em tela cheia',
     itens: [
       { tipo: 'correcao', texto: 'Nas músicas da missa (acervo litúrgico, Hinário e textos da CNBB, Cindy Ferrarezi, Músicas para Missa), o “Sobre o artista” e os créditos não trazem mais a foto e a história de um xará famoso (o “José Alves” de Salve Rainha vinha com um cantor de funk): a foto e a apresentação vêm só de quem é com certeza do meio católico — Padre, Frei, Irmã, Dom, Ministério, Comunidade, procurados com o título por extenso (“Pe. Zezinho” → “Padre Zezinho”), e os artistas católicos conhecidos. Os outros ficam com o desenho do app. As fotos erradas já guardadas saem sozinhas.' },
       { tipo: 'melhoria', texto: 'Na Liturgia, os cantos sem capa ganham a imagem do vídeo do canto (a mesma que aparece ao abrir) e, até ela chegar, um desenho do momento da missa na cor litúrgica do dia: a porta da Entrada, a estrela do Glória, a lira do Salmo, o cálice das Oferendas, a hóstia da Comunhão.' },
+      { tipo: 'novo', texto: 'No “Sobre o artista”, tocar numa foto abre ela em tela cheia, inteira: passe o dedo para o lado para ver as outras (no computador, as setas da tela ou do teclado) e puxe para baixo, toque no X ou use o voltar para fechar.' },
       { tipo: 'melhoria', texto: 'O ícone de partitura nas listas fica cinza, como os de cifra e vídeo.' },
+    ],
+  },
+  {
+    versao: 389, data: '2026-11-01', titulo: 'Sem a foto do violão para quem não tem foto',
+    itens: [
       { tipo: 'correcao', texto: 'Quem não tem foto (como o “Belief” nos créditos de Perfect) fica com o desenho do app, a pessoa com a nota, em vez da foto de um violão: era a imagem que o Cifra Club põe no lugar da foto de quem não tem. As músicas que já tinham guardado essa imagem também passam a mostrar o desenho.' },
       { tipo: 'correcao', texto: 'Um nome que existe no Deezer de vários artistas pouco conhecidos (ou só parecido, como “Belief Defect” para “Belief”) não traz mais a foto de outra pessoa: fica o desenho.' },
     ],
@@ -72,14 +78,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'A letra sincronizada não some mais ao abrir a música (como em Company): quando o app acha o áudio oficial da mesma gravação, a letra que já estava na música passa junto para ele, em vez de precisar ser procurada de novo. As músicas que já tinham perdido a letra assim voltam a ter.' },
       { tipo: 'correcao', texto: 'Com o serviço de letras fora do ar, a letra vem logo da reserva: antes o app insistia uns 30 segundos antes de tentar outro lugar.' },
       { tipo: 'melhoria', texto: 'As fichas da biblioteca ficam como no Spotify: a setinha verde de baixada, o “E” de explícita e o ícone de vídeo com o nome “Vídeo”, separados do artista por um “•”.' },
-    ],
-  },
-  {
-    versao: 380, data: '2026-10-31', titulo: 'Letra que não some, selo E na biblioteca e capa animada sempre andando',
-    itens: [
-      { tipo: 'correcao', texto: 'A letra sincronizada não some mais quando o vídeo da música já é o próprio áudio (como em Company): o app achava outra versão (o clipe, um ao vivo) e trocava os papéis dos dois. Agora ele reconhece qual é o áudio pela duração da letra.' },
-      { tipo: 'correcao', texto: 'O selo “E” das músicas explícitas aparece também na lista da biblioteca, sem precisar abrir a música.' },
-      { tipo: 'melhoria', texto: 'A capa animada continua andando com a música pausada, como no Spotify.' },
     ],
   },
 ];

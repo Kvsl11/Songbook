@@ -1052,7 +1052,7 @@ const REVISOES = [
   // v389: a imagem que o site põe no lugar da foto que não tem (o violão do Cifra Club) guardada como a foto do artista
   // ou a capa da música sai (fica o desenho do app, ou a foto de verdade que for achada)
   { rev: 2, fotos: true, quais: (s) => ehImagemPadrao(s.fotoArtista) || ehImagemPadrao(s.cover) },
-  // v389: nas músicas da missa, a foto do artista achada só pelo nome, de quem não é com certeza do meio católico (o
+  // v390: nas músicas da missa, a foto do artista achada só pelo nome, de quem não é com certeza do meio católico (o
   // "José Alves" de "Salve Rainha" com a foto de um cantor de funk), sai: fica o desenho do app
   { rev: 3, fotosLiturgia: true, quais: (s) => Boolean(s.fotoArtista) && ehDaLiturgia(s) && !confiavelNaLiturgia(s.artist) },
 ];
@@ -5952,6 +5952,96 @@ function deezerDoArtista(nome) {
 // a tela "Sobre o artista" (o "ver mais" do cartão, como no Spotify): as fotos dele passando para o lado, os fãs, a
 // apresentação inteira e os atalhos (as músicas e os álbuns dele no app, a página na Wikipédia). Abre por cima de
 // tudo; o voltar (o do celular também) fecha
+// As fotos em tela cheia (tocando numa foto do "Sobre o artista"), inteiras, no fundo preto: passam para o lado com o
+// dedo (celular e tablet) ou com as setas, na tela e no teclado (computador); puxar para baixo, o X, o Esc ou o voltar
+// fecham (o voltar fecha só as fotos)
+function verFotos(urls, inicio = 0) {
+  if (!urls.length) return;
+  document.querySelector('.ver-fotos')?.remove();
+  let i = Math.max(0, Math.min(urls.length - 1, inicio));
+  const v = document.createElement('div');
+  v.className = 'ver-fotos';
+  v.setAttribute('role', 'dialog');
+  v.setAttribute('aria-label', 'Fotos');
+  v.innerHTML = `<div class="vf-trilho">${urls.map((u) => `<div class="vf-foto"><img src="${esc(u)}" alt="" draggable="false"></div>`).join('')}</div>
+    <button class="icon-btn vf-fechar" data-vf="fechar" aria-label="Fechar" title="Fechar">${icon('x', 24)}</button>
+    ${urls.length > 1 ? `<button class="icon-btn vf-seta vf-ant" data-vf="ant" aria-label="Foto anterior" title="Anterior (←)">${icon('back', 26)}</button>
+    <button class="icon-btn vf-seta vf-prox" data-vf="prox" aria-label="Próxima foto" title="Próxima (→)">${icon('next', 26)}</button>
+    <div class="vf-conta" aria-live="polite"></div>` : ''}`;
+  document.body.append(v);
+  const trilho = $('.vf-trilho', v);
+  const ir = (n, animado = true) => {
+    i = Math.max(0, Math.min(urls.length - 1, n));
+    trilho.style.transition = animado ? 'transform 0.28s ease' : 'none';
+    trilho.style.transform = `translateX(${-i * 100}%)`;
+    v.style.setProperty('--fundo', 1);
+    const c = $('.vf-conta', v);
+    if (c) c.textContent = `${i + 1} / ${urls.length}`;
+    const a = $('.vf-ant', v);
+    const p = $('.vf-prox', v);
+    if (a) a.disabled = i === 0;
+    if (p) p.disabled = i === urls.length - 1;
+  };
+  ir(i, false);
+  history.pushState({ ...history.state, fotos: true }, '');
+  let fechada = false;
+  const tirar = () => {
+    if (fechada) return;
+    fechada = true;
+    window.removeEventListener('popstate', tirar);
+    document.removeEventListener('keydown', teclas, true);
+    v.classList.add('saindo');
+    setTimeout(() => v.remove(), 160);
+  };
+  const fechar = () => { if (history.state?.fotos) history.back(); else tirar(); };
+  window.addEventListener('popstate', tirar);
+  const teclas = (e) => {
+    if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); ir(i + 1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); ir(i - 1); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fechar(); }
+  };
+  document.addEventListener('keydown', teclas, true);
+  v.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-vf]');
+    if (b?.dataset.vf === 'fechar') fechar();
+    else if (b?.dataset.vf === 'ant') ir(i - 1);
+    else if (b?.dataset.vf === 'prox') ir(i + 1);
+  });
+  // o dedo: para o lado, a foto anda junto e passa (com resistência nas pontas); para baixo, ela desce e fecha
+  let toque = null;
+  v.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('[data-vf]') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    toque = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, eixo: '' };
+  });
+  v.addEventListener('pointermove', (e) => {
+    if (!toque || e.pointerId !== toque.id) return;
+    const dx = e.clientX - toque.x;
+    const dy = e.clientY - toque.y;
+    if (!toque.eixo && Math.hypot(dx, dy) > 8) toque.eixo = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (toque.eixo === 'x') {
+      const ponta = (i === 0 && dx > 0) || (i === urls.length - 1 && dx < 0);
+      trilho.style.transition = 'none';
+      trilho.style.transform = `translateX(calc(${-i * 100}% + ${ponta ? dx / 3 : dx}px))`;
+    } else if (toque.eixo === 'y' && dy > 0) {
+      trilho.style.transition = 'none';
+      trilho.style.transform = `translateX(${-i * 100}%) translateY(${dy}px)`;
+      v.style.setProperty('--fundo', Math.max(0.35, 1 - dy / 400));
+    }
+  });
+  const soltar = (e) => {
+    if (!toque || e.pointerId !== toque.id) return;
+    const dx = e.clientX - toque.x;
+    const dy = e.clientY - toque.y;
+    const rapido = (performance.now() - toque.t) < 280;
+    const { eixo } = toque;
+    toque = null;
+    if (eixo === 'x' && e.type === 'pointerup' && (Math.abs(dx) > v.clientWidth * 0.18 || (rapido && Math.abs(dx) > 40))) ir(i + (dx < 0 ? 1 : -1));
+    else if (eixo === 'y' && e.type === 'pointerup' && dy > 120) fechar();
+    else ir(i);
+  };
+  v.addEventListener('pointerup', soltar);
+  v.addEventListener('pointercancel', soltar);
+}
 async function abrirSobreArtista({ nome, slug = '' }) {
   document.querySelector('.sobre-artista')?.remove();
   const tela = document.createElement('section');
@@ -5962,8 +6052,14 @@ async function abrirSobreArtista({ nome, slug = '' }) {
     <div class="sa-fotos"></div><div class="sa-numeros" hidden></div><div class="sa-texto"><div class="loading-note"><span class="spin"></span>Carregando…</div></div><div class="sa-links"></div>`;
   document.body.append(tela);
   history.pushState({ ...history.state, sobreArtista: true }, '');
-  const fechar = () => { tela.classList.add('saindo'); setTimeout(() => tela.remove(), 180); };
-  window.addEventListener('popstate', fechar, { once: true });
+  // (o voltar que só fecha uma foto aberta em tela cheia volta para esta tela: ela continua)
+  const fechar = () => {
+    if (history.state?.sobreArtista) return;
+    window.removeEventListener('popstate', fechar);
+    tela.classList.add('saindo');
+    setTimeout(() => tela.remove(), 180);
+  };
+  window.addEventListener('popstate', fechar);
   tela.querySelector('[data-sa="voltar"]').onclick = () => history.back();
   const [info, dz, foto, canal, adb] = await Promise.all([descricaoDoArtista(nome), deezerDoArtista(nome), fotoDoArtista(nome, slug).catch(() => ''),
     canalGuardado(nome).catch(() => null), audioDbGuardado(nome).catch(() => null)]);
@@ -5981,6 +6077,13 @@ async function abrirSobreArtista({ nome, slug = '' }) {
   };
   porFotos([foto, canal?.foto && !(await ehFotoGenerica(canal.foto)) ? canal.foto : '', ...(adb?.fotos || []), dz?.foto, info?.foto]);
   if (!vistas.size) caixaFotos.innerHTML = `<div class="sa-sem-foto">${semFotoArtista(120)}</div>`;
+  // tocar numa foto: ela abre em tela cheia, e dá para passar para as outras
+  caixaFotos.addEventListener('click', (e) => {
+    const img = e.target.closest('img');
+    if (!img) return;
+    const todas = [...caixaFotos.querySelectorAll('img')];
+    verFotos(todas.map((x) => x.currentSrc || x.src), todas.indexOf(img));
+  });
   if (canal?.id) fotosDosVideosGuardadas(nome, canal.id).then((l) => { if (tela.isConnected && l) porFotos(l); });
   // os números grandes (como os ouvintes do Spotify): os seguidores no Spotify (pela TheAudioDB), os inscritos no
   // canal do YouTube e os fãs no Deezer, os que houver

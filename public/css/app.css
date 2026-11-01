@@ -4198,3 +4198,24 @@ html.tablet body.painel-recolhido #player { overflow: clip; }
     linear-gradient(150deg, color-mix(in srgb, var(--lit-cor, #6b5a22) 85%, #000), color-mix(in srgb, var(--lit-cor, #6b5a22) 35%, #000)); }
 .cover.lit-capa svg { width: 22px; height: 22px; stroke-width: 1.8; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.35)); }
 .cover.lit-capa img, .opcao .cover img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+/* as fotos do artista em tela cheia: inteiras, no fundo preto, uma ao lado da outra (o trilho anda com o dedo ou as setas) */
+.sa-fotos img { cursor: zoom-in; }
+.ver-fotos { --fundo: 1; position: fixed; inset: 0; z-index: 300; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
+  background: rgb(0 0 0 / var(--fundo)); animation: vf-entra 0.2s ease-out; }
+.ver-fotos.saindo { animation: vf-sai 0.16s ease-in forwards; }
+@keyframes vf-entra { from { opacity: 0; } }
+@keyframes vf-sai { to { opacity: 0; } }
+.vf-trilho { display: flex; height: 100%; will-change: transform; }
+.vf-foto { flex: 0 0 100%; display: grid; place-items: center; height: 100%; padding: calc(56px + env(safe-area-inset-top)) 0 calc(56px + env(safe-area-inset-bottom)); box-sizing: border-box; }
+.vf-foto img { max-width: 100%; max-height: 100%; object-fit: contain; -webkit-user-drag: none; pointer-events: none; }
+.ver-fotos .icon-btn { position: absolute; display: grid; place-items: center; color: #fff; background: rgb(0 0 0 / 0.5); border-radius: 50%; }
+.vf-fechar { top: calc(12px + env(safe-area-inset-top)); right: 12px; width: 44px; height: 44px; }
+.vf-seta { top: 50%; translate: 0 -50%; width: 52px; height: 52px; transition: opacity 0.2s, background 0.2s; }
+.vf-seta:hover:not(:disabled) { background: rgb(255 255 255 / 0.18); }
+.vf-seta:disabled { opacity: 0.2; cursor: default; }
+.vf-ant { left: 16px; }
+.vf-prox { right: 16px; }
+.vf-conta { position: absolute; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); translate: -50% 0; padding: 4px 12px; border-radius: 999px;
+  background: rgb(0 0 0 / 0.55); color: #fff; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* (no celular e no tablet, o dedo passa as fotos: as setas ficam só onde há mouse) */
+@media (hover: none) { .vf-seta { display: none; } }
