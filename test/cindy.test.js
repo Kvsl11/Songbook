@@ -40,6 +40,10 @@ test('lê as abas do repertório da missa', () => {
 });
 
 test('gera os títulos de busca a partir da liturgia', () => {
+  // festa: também o nome curto que a Cindy usa no título
+  assert.deepEqual(titulosAlvo({ data_extenso: 'Segunda-feira, 2 de Novembro de 2026', celebracao: 'Comemoração de Todos os Fiéis Defuntos', ano: 'Ano A' }).map((a) => a.consulta),
+    ['Comemoração de Todos os Fiéis Defuntos', 'Fiéis Defuntos']);
+  assert.deepEqual(titulosAlvo({ data_extenso: 'Domingo, 1 de Novembro de 2026', celebracao: 'Todos os Santos', ano: 'Ano A' }).map((a) => a.consulta), ['Todos os Santos']);
   assert.deepEqual(titulosAlvo({ data_extenso: 'Domingo, 18 de Outubro de 2026', celebracao: '29º Domingo do Tempo Comum', ano: 'Ano A' }).map((a) => a.consulta), ['29º Domingo']);
   assert.deepEqual(titulosAlvo({ data_extenso: 'Sexta-feira, 16 de Outubro de 2026', celebracao: '28ª Semana do Tempo Comum', semana: '28ª Semana do Tempo Comum' }).map((a) => a.alvo),
     ['6ª Feira da 28ª Semana do Tempo Comum']);

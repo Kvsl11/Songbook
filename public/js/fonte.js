@@ -14,12 +14,14 @@ const VALIDADE = 12 * 3600e3;
 // a liturgia de uma data não muda: vale por mais tempo (e fica guardada para o modo offline)
 const VALIDADE_LITURGIA = 5 * 864e5;
 const MAX_ITENS = 140;
-const validade = (chave) => (/^(missa|lit):/.test(chave) ? VALIDADE_LITURGIA : VALIDADE);
+// missa sem o repertório da Cindy (ainda não publicado, ou não achado por versões antigas do app): vale só 12 h,
+// para buscar de novo
+const validade = (chave, v) => (/^(missa|lit):/.test(chave) && !(chave.startsWith('missa:') && !v?.repertorio) ? VALIDADE_LITURGIA : VALIDADE);
 
 function lerCache(chave) {
   try {
     const item = JSON.parse(localStorage.getItem(PREFIXO + chave) || 'null');
-    return item && Date.now() - item.t < validade(chave) ? item.v : null;
+    return item && Date.now() - item.t < validade(chave, item.v) ? item.v : null;
   } catch {
     return null;
   }

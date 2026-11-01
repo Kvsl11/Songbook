@@ -77,7 +77,13 @@ export function titulosAlvo(lit) {
   const alvos = [];
   const dom = /(\d+)º\s+Domingo/i.exec(cel);
   if (dom) alvos.push({ consulta: `${dom[1]}º Domingo`, alvo: `${cel} ${lit.ano || ''}`.trim(), tipo: 'domingo' });
-  else if (!/semana/i.test(cel) && cel) alvos.push({ consulta: cel.replace(/,.*$/, ''), alvo: `${cel.replace(/,.*$/, '')} ${lit.ano || ''}`.trim(), tipo: 'festa' });
+  else if (!/semana/i.test(cel) && cel) {
+    const nome = cel.replace(/,.*$/, '');
+    alvos.push({ consulta: nome, alvo: `${nome} ${lit.ano || ''}`.trim(), tipo: 'festa' });
+    // a Cindy costuma usar o nome curto: "Comemoração de Todos os Fiéis Defuntos" -> "Fiéis Defuntos"
+    const curto = nome.replace(/^(comemoração|solenidade|festa|memória)\s+d[eoa]s?\s+/i, '').replace(/^tod[oa]s\s+[oa]s\s+/i, '');
+    if (curto !== nome && curto.split(' ').length >= 2) alvos.push({ consulta: curto, alvo: curto, tipo: 'festa' });
+  }
   const semana = /(\d+)ª\s+Semana\s+(d[oa]\s+.+)$/i.exec(lit.semana || cel);
   if (dia !== 'domingo' && semana && DIAS[dia]) {
     alvos.push({ consulta: `${DIAS[dia]} da ${semana[1]}ª Semana`, alvo: `${DIAS[dia]} da ${semana[1]}ª Semana ${semana[2]}`, tipo: 'semana' });
@@ -118,8 +124,14 @@ function rank(posts, alvo) {
 export async function buscarRepertorio(lit, fetchImpl) {
   const tentativas = [];
   for (const { consulta, alvo, tipo } of titulosAlvo(lit)) {
-    const posts = await wpPosts({ search: consulta, categories: CATEGORIAS.repertorio, per_page: 20, _fields: 'id,date,link,title' }, fetchImpl);
-    const candidatos = rank(posts, alvo);
+    // busca só no título: a busca normal olha também o texto, e as missas da semana que citam
+    // "todos" e "santos" empurram o repertório da festa para fora da primeira página
+    let candidatos = [];
+    for (const colunas of ['post_title', undefined]) {
+      const posts = await wpPosts({ search: consulta, search_columns: colunas, categories: CATEGORIAS.repertorio, per_page: 20, _fields: 'id,date,link,title' }, fetchImpl);
+      candidatos = rank(posts, alvo);
+      if (candidatos.length) break;
+    }
     tentativas.push({ consulta, alvo, tipo, candidatos });
     if (candidatos.length) return { consulta, alvo, tipo, candidatos, tentativas };
   }
