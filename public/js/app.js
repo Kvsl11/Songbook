@@ -17,7 +17,7 @@ import {
 import { corCss, corDominante } from './lib/cores.js';
 import { carregarPiano, midiDaFrequencia, notaDePiano, pianoPronto } from './lib/piano.js';
 import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } from './lib/alinhamento.js';
-import { NOVIDADES } from './lib/novidades.js';
+import { NOVIDADES, APP_VERSAO, versaoMostrada } from './lib/novidades.js';
 import { baseDoServidor, baixarArquivoDoServidor, cabecalhos, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, dataDaPergunta, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
 import { apagarAudio, chavesDosAudios, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } from './audios.js';
@@ -144,8 +144,8 @@ document.addEventListener('error', (e) => {
   img.replaceWith(document.createRange().createContextualFragment(icon('music', 24)));
 }, true);
 
-// a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.11.01-385';
+// a versão mostrada no app (Ajustes e o aviso de atualização): vem das Novidades (a data e o número dela no mês)
+export { APP_VERSAO };
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -13408,7 +13408,7 @@ function viewNovidades(versao) {
   view.innerHTML = `<h2 class="greet">Novidades do app</h2>
     <p class="muted nv-intro">O que foi corrigido e melhorado em cada atualização. Você está na versão ${esc(APP_VERSAO)}.</p>
     <div class="nv-lista">${NOVIDADES.map((n) => `<section class="nv-versao${String(n.versao) === String(versao) ? ' destaque' : ''}" id="nv-${n.versao}">
-      <div class="nv-cab"><span class="chip sm">versão ${n.versao}</span><small>${esc(data(n.data))}</small></div>
+      <div class="nv-cab"><span class="chip sm">versão ${esc(versaoMostrada(n.versao, n.data))}</span><small>${esc(data(n.data))}</small></div>
       <h3>${esc(n.titulo)}</h3>
       <ul>${n.itens.map((it) => { const [nome, ic] = TIPO_NOVIDADE[it.tipo] || TIPO_NOVIDADE.melhoria; return `<li data-tipo="${it.tipo}"><span class="nv-ic">${icon(ic, 14)}</span><span><b>${nome}</b> ${esc(it.texto)}</span></li>`; }).join('')}</ul>
     </section>`).join('')}</div>`;

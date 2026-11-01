@@ -13,6 +13,8 @@ plano. Nunca mexa no que a pessoa escolheu à mão (por exemplo, a sincronia com
 Correções só de comportamento da tela (o que não fica guardado) não precisam de revisão.
 
 ## A cada versão
-- Suba `VERSION` em `public/sw.js` e `APP_VERSAO` em `public/js/app.js`.
-- Escreva o que mudou em `public/js/lib/novidades.js` (a primeira entrada é a versão atual; ficam só as 10 últimas).
+- Suba `VERSION` em `public/sw.js` (o número sempre sobe).
+- Escreva o que mudou em `public/js/lib/novidades.js`, com a data do Brasil (a primeira entrada é a versão atual; ficam
+  só as 10 últimas). A versão mostrada no app (`APP_VERSAO`) sai dali: a data e o número da versão no mês. Na primeira
+  versão de um mês novo, acrescente o mês em `PRIMEIRA_DO_MES`.
 - `npm test` precisa passar.
