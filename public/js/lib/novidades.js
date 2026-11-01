@@ -4,8 +4,9 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
-    versao: 394, data: '2026-11-01', titulo: 'Dois toques ampliam a foto no celular e no tablet',
+    versao: 394, data: '2026-11-01', titulo: 'Cantos do repertório fora da biblioteca e dois toques para ampliar a foto',
     itens: [
+      { tipo: 'melhoria', texto: 'Os cantos que o “Montar repertório” traz (a missa do dia) ficam só no repertório: não aparecem mais nas Músicas da biblioteca. Para guardar um deles na biblioteca, toque no + dele. Apagado o repertório (ou tirado o canto dele), o canto sai do aparelho. Os que já tinham sido trazidos assim também saem das Músicas.' },
       { tipo: 'correcao', texto: 'Nas fotos do artista em tela cheia, dois toques no celular e no tablet voltam a ampliar a foto (e dois toques de novo voltam ao normal): o navegador mandava também um clique duplo, o do computador, que desfazia o zoom na hora.' },
     ],
   },
