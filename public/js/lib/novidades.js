@@ -9,6 +9,7 @@ export const NOVIDADES = [
       { tipo: 'novo', texto: 'Quando o app corrige algo que fica guardado na música (a letra sincronizada, o áudio oficial, o download), as músicas que você já tinha salvo e baixado passam pela correção sozinhas, em segundo plano: não precisa mais tirar a música, apagar o download e baixar de novo.' },
       { tipo: 'correcao', texto: 'O download que sumiu do aparelho ou ficou estragado (o vídeo que não abria) é baixado de novo sozinho, assim que o servidor estiver ligado, sem pedir nada.' },
       { tipo: 'correcao', texto: 'A música salva que ficou sem a letra sincronizada (ou sem o áudio oficial) procura de novo, sozinha. A letra que você sincronizou à mão não é mexida.' },
+      { tipo: 'novo', texto: 'No ⋯ do Tocando agora, “Diagnóstico da música” mostra o que está guardado na música (a letra, o áudio oficial, o download) e o que o player está mostrando. “Copiar” leva o texto para colar numa conversa, e “Consertar agora” procura de novo a letra e o áudio oficial e confere o download, na hora.' },
       { tipo: 'correcao', texto: 'Com o clipe baixado, a capa animada entra direto no vídeo andando: antes aparecia por um instante uma imagem parada do clipe (a do YouTube) e só depois o vídeo.' },
     ],
   },

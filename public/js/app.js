@@ -1135,6 +1135,16 @@ async function revisarMusica(id, pendentes, chaves) {
   } else if (s?.rebaixar) db.updateSong(id, { rebaixar: undefined });
   return completa;
 }
+// "Consertar agora" (no diagnóstico): a letra é procurada de novo mesmo que a guardada pareça certa (a feita à mão fica),
+// e passa pelo resto da revisão (o áudio oficial que falta e os arquivos baixados)
+async function consertarMusica(id) {
+  const s = db.song(id);
+  if (!s) return;
+  if (midiaDe(s) && navigator.onLine && !(s.sincronia && s.sincronia.fonte !== 'lrclib')) await noMaximo(sincronizarMusica(s), 45000, 'demorou');
+  const chaves = await chavesDosAudios().catch(() => new Set());
+  const ok = await revisarMusica(id, REVISOES, chaves).catch(() => false);
+  if (ok && db.song(id)) db.updateSong(id, { revisao: REVISAO_MUSICAS });
+}
 let revisaoRodando = false;
 async function revisarMusicasSalvas() {
   if (revisaoRodando || document.visibilityState !== 'visible') return;
@@ -3630,12 +3640,14 @@ const semLinhasDeAcordes = (sinc) => {
       (atual.artista || ehCifraClub(song?.source || '')) && { valor: 'album', rotulo: 'Ver álbum', ic: 'disc' },
       { valor: 'compartilhar', rotulo: 'Compartilhar', ic: 'share' },
       ytAgora() && { valor: 'youtube', rotulo: 'Abrir no YouTube', ic: 'youtube' },
+      { valor: 'diagnostico', rotulo: 'Diagnóstico da música', ic: 'info' },
       { valor: 'fechar', rotulo: 'Fechar o player', ic: 'x' },
     ].filter(Boolean);
     // no tablet, a folha que sobe do rodapé, numa coluna só, com a capa e o nome em cima (como os ⋯ das listas)
     const capaMenu = capa({ title: atual.titulo || '', cover: song?.cover || (ytDaCapa() ? `https://i.ytimg.com/vi/${ytDaCapa()}/mqdefault.jpg` : '') });
     const v = await escolherNaLista({ menu: ehTablet(), titulo: atual.titulo || 'Tocando agora', cabeca: `${capaMenu}<span class="lista-txt"><b>${esc(atual.titulo || 'Tocando agora')}</b><small>${esc(atual.artista || 'Tocando agora')}</small></span>`, opcoes });
     if (!v || !atual) return;
+    if (v === 'diagnostico') { void abrirDiagnostico(); return; }
     if (v === 'youtube') { window.open(`https://www.youtube.com/watch?v=${ytAgora()}&t=${Math.floor(api.tempoAgora)}s`, '_blank', 'noopener'); return; }
     // o álbum abre como página, já com o "Procurando o álbum…": o Tocando agora na tela toda fecha com a troca (no
     // tablet, o painel continua ao lado)
@@ -3647,6 +3659,73 @@ const semLinhasDeAcordes = (sinc) => {
     el.append(alvoBt);
     alvoBt.click();
     alvoBt.remove();
+  };
+  // Diagnóstico da música tocando (no ⋯): o que está guardado nela e o que o player está mostrando, para descobrir por
+  // que a letra ou a capa animada não aparecem. "Copiar" leva o texto para colar numa conversa; "Consertar agora"
+  // procura de novo a letra, o áudio oficial e confere os arquivos baixados, na hora
+  const textoDiagnostico = async () => {
+    const song = musicaTocando();
+    const sim = (x) => (x ? 'sim' : 'não');
+    const seg = (x) => (Number(x) > 0 ? `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, '0')}` : '?');
+    const vs = song && versoesDe(song);
+    const sc = song?.sincronia;
+    const f = [];
+    f.push(`App ${APP_VERSAO} · ${new Date().toLocaleString('pt-BR')} · ${navigator.onLine ? 'com internet' : 'sem internet'}`);
+    f.push(`Música: ${atual?.titulo || '?'} — ${atual?.artista || '?'} (${atual?.songId || 'sem id'}${song ? '' : ', não encontrada'})`);
+    f.push('', '[Tocando]');
+    f.push(`vídeo agora: ${atual?.youtube || '-'} · clipe: ${atual?.video || '-'} · áudio oficial: ${atual?.audio || '-'}`);
+    f.push(`modo: ${comCapa ? 'música' : 'vídeo'} · emVideo: ${sim(emVideo())} · noClipe: ${sim(noClipe())} · soMusica: ${sim(atual?.soMusica)} · semVideo: ${sim(atual?.semVideo)}`);
+    f.push(`estado: ${estado} · tempo: ${seg(api.tempoAgora)} de ${seg(duracao)} · anúncio: ${sim(anuncio)} · do aparelho: ${local ? sim(true) + (local.video ? ' (vídeo)' : ' (áudio)') : 'não'}`);
+    f.push('', '[Letra]');
+    f.push(`na tela: ${$('.pl-letra', el).hidden ? 'escondida' : 'aparecendo'} · linhas: ${linhasDaLetra.length} · sincronizada no player: ${sim(tempos)}`);
+    if (sc) f.push(`guardada: fonte ${sc.fonte || '?'} · do vídeo ${sc.video || '?'} · ${sc.tempos?.length || 0} tempos · duração ${seg(sc.duracao)}${sc.provisoria ? ' · provisória' : ''}${sc.aproximada ? ' · aproximada' : ''}${sc.desloc ? ` · deslocada ${sc.desloc}s` : ''}`);
+    else f.push('guardada: nenhuma');
+    f.push(`a letra vale para o vídeo: ${song ? videoDaLetra(song) || '-' : '-'} · confere: ${sim(song && sincOkDe(song))}`);
+    f.push('', '[Versões]');
+    if (vs) f.push(`clipe ${vs.video || '-'} · áudio ${vs.audio || '-'} (${seg(vs.duracao)}) · casadas: ${sim(vs.casadas)} · pela letra: ${sim(vs.porLetra)} · diferentes: ${sim(vs.diferentes)} · pares: ${vs.pares?.length || 0}`);
+    else f.push('sem áudio oficial guardado');
+    f.push('', '[Download]');
+    const arqs = Object.entries(song?.baixado?.arquivos || {});
+    if (!arqs.length) f.push(song?.rebaixar ? 'sem arquivos (marcada para baixar de novo)' : 'não baixada');
+    const chaves = await chavesDosAudios().catch(() => new Set());
+    for (const [yt, info] of arqs) {
+      let abre = 'não está no aparelho';
+      if (chaves.has(chaveBaixada(yt))) {
+        const blob = await lerAudio(chaveBaixada(yt)).catch(() => null);
+        const r = blob ? await abreNoAparelho(blob) : false;
+        abre = r === true ? 'abre' : r === false ? 'NÃO abre' : 'não deu para conferir';
+      }
+      f.push(`${yt}: ${info?.tipo || '?'} · ${fmtBytes(info?.tamanho || 0)} · ${abre}`);
+    }
+    if (song) f.push(`falta baixar: ${sim(precisaBaixar(song))} · revisão: ${song.revisao || 0} de ${REVISAO_MUSICAS}`);
+    f.push('', '[Capa animada]');
+    const vids = [...fundo.querySelectorAll('video.pl-canvas')];
+    f.push(`fundo: ${fundo.hidden ? 'escondido' : 'aparecendo'} · clipe baixado no fundo: ${sim(canvas.vaiTocarArquivo(ytDaCapa()))} · vídeos: ${vids.length} (${vids.map((x) => `${x.classList.contains('pronto') ? 'visível' : 'oculto'}${x.paused ? ' parado' : ' andando'}`).join(', ') || '-'}) · imagens do YouTube: ${fundo.querySelectorAll('img.q').length}`);
+    return f.join('\n');
+  };
+  const abrirDiagnostico = async () => {
+    let texto = await textoDiagnostico();
+    await openDialog(`
+      <h3>Diagnóstico da música</h3>
+      <pre class="diag-texto" style="white-space:pre-wrap;font-size:12px;max-height:55vh;overflow:auto;user-select:text;margin:0 0 12px">${esc(texto)}</pre>
+      <div class="acts"><button class="btn ghost" data-consertar>Consertar agora</button><button class="btn ghost" data-copiar>Copiar</button><button class="btn primary" data-ok>Fechar</button></div>`,
+    (dlg, done) => {
+      $('[data-ok]', dlg).onclick = () => done(true);
+      $('[data-copiar]', dlg).onclick = async () => { try { await navigator.clipboard.writeText(texto); toast('Diagnóstico copiado: é só colar na conversa'); } catch { toast('Não consegui copiar: tire um print'); } };
+      $('[data-consertar]', dlg).onclick = async (e) => {
+        const b = e.currentTarget;
+        const song = atual?.songId && db.song(atual.songId);
+        if (!song) { toast('Salve a música na biblioteca para consertar'); return; }
+        b.disabled = true;
+        b.textContent = 'Consertando…';
+        await consertarMusica(song.id).catch(() => {});
+        letraDe = '';
+        desenhar();
+        texto = await textoDiagnostico();
+        if (dlg.open) { $('.diag-texto', dlg).textContent = texto; b.disabled = false; b.textContent = 'Consertar agora'; }
+        toast('Pronto: conferi a letra, o áudio oficial e o download');
+      };
+    });
   };
   // o "Tocando agora" na tela toda (tablet): o botão do canto de cima troca entre expandir e voltar ao painel
   // No celular e no computador a tela toda é o próprio "Tocando agora": o player muda de jeito (html.pp) só enquanto
