@@ -4,6 +4,14 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 380, data: '2026-11-01', titulo: 'Letra que não some, selo E na biblioteca e capa animada sempre andando',
+    itens: [
+      { tipo: 'correcao', texto: 'A letra sincronizada não some mais quando o vídeo da música já é o próprio áudio (como em Company): o app achava outra versão (o clipe, um ao vivo) e trocava os papéis dos dois. Agora ele reconhece qual é o áudio pela duração da letra.' },
+      { tipo: 'correcao', texto: 'O selo “E” das músicas explícitas aparece também na lista da biblioteca, sem precisar abrir a música.' },
+      { tipo: 'melhoria', texto: 'A capa animada continua andando com a música pausada, como no Spotify.' },
+    ],
+  },
+  {
     versao: 379, data: '2026-11-01', titulo: 'Cifra acompanhando a música certa e barra parada no anúncio do vídeo',
     itens: [
       { tipo: 'correcao', texto: 'Na Cifra, a linha acesa volta a ser a que está sendo cantada: quando a letra sincronizada tinha uma linha só de acordes (como “( Am7 )”), a cifra passava a acender a linha errada dali em diante. E o refrão escrito duas vezes acende no lugar certo da segunda vez, sem voltar para o primeiro.' },
@@ -67,13 +75,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'Trocar entre música e vídeo é sempre na hora, sem o “Acertando a posição…”; quando o ponto certo é descoberto depois, ele é corrigido sozinho.' },
       { tipo: 'correcao', texto: 'A letra sincronizada tem uma reserva: o LRCLIB está fora do ar, e a letra vem da NetEase (em ~2 s). O app também percebe logo quando o LRCLIB cai, em vez de insistir por 30 s.' },
       { tipo: 'correcao', texto: 'Sem o download, a capa animada volta a ser os quadros do clipe passando: o clipe tocando junto pelo YouTube atrapalhava o player.' },
-    ],
-  },
-  {
-    versao: 370, data: '2026-10-31', titulo: 'Capa animada andando e troca certa sem o servidor',
-    itens: [
-      { tipo: 'melhoria', texto: 'A capa animada mostra o clipe andando de verdade também nas músicas não baixadas (mudo, sem os botões do YouTube), e não mais imagens paradas.' },
-      { tipo: 'melhoria', texto: 'A troca entre música e vídeo acerta o ponto sem precisar do servidor: as legendas do clipe são casadas com a letra sincronizada (rápido, erro de menos de 1 s) e, quando dá, o próprio celular compara o som das duas versões (pelo Piped ou pelo Invidious). O servidor continua sendo usado quando está ligado.' },
     ],
   },
 ];
