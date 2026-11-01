@@ -51,6 +51,14 @@ const P = {
   music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
   list: '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>',
   cross: '<path d="M12 2v20M6 8h12"/>',
+  // os momentos da missa (nas capas dos cantos que não têm capa): a porta da entrada, o coração do ato penitencial, a
+  // estrela do Glória, a lira do salmo, o cálice das oferendas e a hóstia sobre o cálice da comunhão
+  porta: '<path d="M5 21V10a7 7 0 0 1 14 0v11"/><path d="M3 21h18"/><path d="M12 3.5V21"/>',
+  coracao: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.2 4.2 0 0 1 12 7.1a4.2 4.2 0 0 1 7.5 2.7C19.5 15.4 12 20 12 20z"/>',
+  estrela: '<path d="M12 3l2.6 5.5 6 .8-4.4 4.2 1.1 6L12 16.6l-5.3 2.9 1.1-6-4.4-4.2 6-.8z"/>',
+  lira: '<path d="M7.5 3.5C5 6.5 5 12.5 7.5 16.5h9c2.5-4 2.5-10 0-13"/><path d="M10 6.5v10M14 6.5v10"/><path d="M12 16.5V21M8.5 21h7"/>',
+  calice: '<path d="M7 3h10l-.7 5.4A4.4 4.4 0 0 1 12 12.3a4.4 4.4 0 0 1-4.3-3.9z"/><path d="M12 12.3V19M8.5 21h7"/>',
+  hostia: '<circle cx="12" cy="5.8" r="3"/><path d="M8 11h8l-.6 3.2A3.5 3.5 0 0 1 12 17a3.5 3.5 0 0 1-3.4-2.8z"/><path d="M12 17v2.5M9.5 21h5"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   back: '<path d="M15 18l-6-6 6-6"/>',
   next: '<path d="M9 18l6-6-6-6"/>',

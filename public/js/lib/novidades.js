@@ -4,8 +4,11 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
-    versao: 389, data: '2026-11-01', titulo: 'Sem a foto do violão para quem não tem foto',
+    versao: 389, data: '2026-11-01', titulo: 'Artistas certos nas músicas da missa, capas na Liturgia e sem a foto do violão',
     itens: [
+      { tipo: 'correcao', texto: 'Nas músicas da missa (acervo litúrgico, Hinário e textos da CNBB, Cindy Ferrarezi, Músicas para Missa), o “Sobre o artista” e os créditos não trazem mais a foto e a história de um xará famoso (o “José Alves” de Salve Rainha vinha com um cantor de funk): a foto e a apresentação vêm só de quem é com certeza do meio católico — Padre, Frei, Irmã, Dom, Ministério, Comunidade, procurados com o título por extenso (“Pe. Zezinho” → “Padre Zezinho”), e os artistas católicos conhecidos. Os outros ficam com o desenho do app. As fotos erradas já guardadas saem sozinhas.' },
+      { tipo: 'melhoria', texto: 'Na Liturgia, os cantos sem capa ganham a imagem do vídeo do canto (a mesma que aparece ao abrir) e, até ela chegar, um desenho do momento da missa na cor litúrgica do dia: a porta da Entrada, a estrela do Glória, a lira do Salmo, o cálice das Oferendas, a hóstia da Comunhão.' },
+      { tipo: 'melhoria', texto: 'O ícone de partitura nas listas fica cinza, como os de cifra e vídeo.' },
       { tipo: 'correcao', texto: 'Quem não tem foto (como o “Belief” nos créditos de Perfect) fica com o desenho do app, a pessoa com a nota, em vez da foto de um violão: era a imagem que o Cifra Club põe no lugar da foto de quem não tem. As músicas que já tinham guardado essa imagem também passam a mostrar o desenho.' },
       { tipo: 'correcao', texto: 'Um nome que existe no Deezer de vários artistas pouco conhecidos (ou só parecido, como “Belief Defect” para “Belief”) não traz mais a foto de outra pessoa: fica o desenho.' },
     ],
