@@ -5952,6 +5952,92 @@ function deezerDoArtista(nome) {
 // a tela "Sobre o artista" (o "ver mais" do cartão, como no Spotify): as fotos dele passando para o lado, os fãs, a
 // apresentação inteira e os atalhos (as músicas e os álbuns dele no app, a página na Wikipédia). Abre por cima de
 // tudo; o voltar (o do celular também) fecha
+// a mesma foto em outro tamanho tem o mesmo endereço, a menos do tamanho: o Deezer (500x500 e 1000x1000 com o mesmo
+// código), o YouTube (=s480…), a Wikimedia (a miniatura e o original do mesmo arquivo), a TheAudioDB (/preview)
+function chaveDaFoto(u) {
+  const s = String(u || '');
+  const dz = /dzcdn\.net\/images\/artist\/([0-9a-f]{8,})\//.exec(s)?.[1];
+  if (dz) return `dz:${dz}`;
+  const yt = /(?:ggpht|googleusercontent)\.com\/([^=?]+)/.exec(s)?.[1];
+  if (yt) return `yt:${yt}`;
+  const wm = /wikimedia\.org\/wikipedia\/[a-z]+\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/?]+)/.exec(s)?.[1];
+  if (wm) return `wm:${decodeURIComponent(wm)}`;
+  return s.replace(/\?.*$/, '').replace(/\/preview$/, '');
+}
+// A impressão de uma foto (64 pontos: o quadrado do meio em 9×8, cada ponto mais claro ou mais escuro que o do lado):
+// a mesma foto em outro tamanho ou de outro site dá quase a mesma. A imagem direto (o YouTube, o Deezer e a Wikimedia
+// deixam ler) ou, se o site não deixa, pelo redimensionador público; '' se não der para ler
+const impressoesDeFotos = new Map();
+function impressaoDaFoto(url) {
+  if (!impressoesDeFotos.has(url)) impressoesDeFotos.set(url, (async () => {
+    for (const u of [url, `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=64&h=64&fit=cover&output=png`]) {
+      try {
+        const r = await fetch(u, { mode: 'cors' });
+        if (!r.ok) continue;
+        const bmp = await createImageBitmap(await r.blob());
+        const lado = Math.min(bmp.width, bmp.height);
+        const [sx, sy] = [(bmp.width - lado) / 2, (bmp.height - lado) / 2];
+        // (reduzida aos poucos e com qualidade: direto de 1000 px para 9, o navegador pula pixels e a impressão da mesma
+        // foto saía diferente)
+        let peq = null;
+        try { peq = await createImageBitmap(bmp, sx, sy, lado, lado, { resizeWidth: 36, resizeHeight: 32, resizeQuality: 'high' }); } catch { /* sem o redimensionar: abaixo */ }
+        if (!peq) {
+          let fonte = bmp;
+          let [fx, fy, fl] = [sx, sy, lado];
+          while (fl > 72) {
+            const meio = document.createElement('canvas');
+            meio.width = meio.height = Math.max(36, Math.round(fl / 2));
+            const m = meio.getContext('2d');
+            m.imageSmoothingQuality = 'high';
+            m.drawImage(fonte, fx, fy, fl, fl, 0, 0, meio.width, meio.height);
+            [fonte, fx, fy, fl] = [meio, 0, 0, meio.width];
+          }
+          peq = { fonte, fx, fy, fl };
+        }
+        const c = document.createElement('canvas');
+        c.width = 9;
+        c.height = 8;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.imageSmoothingQuality = 'high';
+        if (peq.fonte) ctx.drawImage(peq.fonte, peq.fx, peq.fy, peq.fl, peq.fl, 0, 0, 9, 8); else ctx.drawImage(peq, 0, 0, 9, 8);
+        const d = ctx.getImageData(0, 0, 9, 8).data;
+        const luz = (x, y) => { const i = (y * 9 + x) * 4; return d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; };
+        let bits = '';
+        for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) bits += luz(x, y) > luz(x + 1, y) ? '1' : '0';
+        return bits;
+      } catch { /* tenta o próximo */ }
+    }
+    return '';
+  })());
+  return impressoesDeFotos.get(url);
+}
+const distanciaDeImpressoes = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++; return n; };
+// as fotos do artigo da Wikipédia do artista: só as fotos (jpg) com o nome inteiro dele no nome do arquivo (os logotipos,
+// as capas, as fotos de outras pessoas e as de lugares e objetos ficam de fora), até 6
+async function fotosDaWikipedia(nome) {
+  const alvo = normalizar(nome);
+  if (alvo.length < 4) return [];
+  // (é foto dele quando o nome do arquivo começa pelo nome dele — "Michael Jackson in 1988", "Michael Jackson with
+  // Grammy Awards" —, sem ser o possessivo: "Michael Jackson's Glove" é a luva dele, e "1993 walk of fame michael
+  // jackson", a estrela da calçada. As de lugares e objetos com o nome dele na frente ficam de fora pelas palavras)
+  const ehFotoDele = (titulo) => {
+    const base = String(titulo || '').replace(/^[^:]+:/, '').replace(/\.[a-z0-9]+$/i, '').replace(/^[\d\s._()-]+/, '');
+    if (!normalizar(base).startsWith(alvo)) return false;
+    if (/^\s*['’]s\b/i.test(base.slice(nome.trim().length))) return false;
+    return !/\b(grave|tomb|t[uú]mulo|star|estrela|statue|est[aá]tua|tussauds|wax|cera|memorial|mural|monument|plaque|house|casa|home|ranch|birthplace|signature|assinatura|licen[cs]e|poster|cartaz|stamp|selo|album|cover|capa|logo|jacket|jaqueta|glove|luva|hat|chap[eé]u|shoes?|sapatos?|costume|fantasia|prints?|car|carro|guitar|guitarra|victims?|v[ií]timas?|trial|julgamento|court|tribunal|mugshot)\b/i.test(base);
+  };
+  for (const lingua of ['en', 'pt']) {
+    try {
+      const r = await fetch(`https://${lingua}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(nome)}&redirects=1&generator=images&gimlimit=60&prop=imageinfo&iiprop=url|size&iiurlwidth=900&format=json&origin=*`).then((x) => x.json());
+      const fotos = Object.values(r?.query?.pages || {})
+        .filter((pg) => /\.jpe?g$/i.test(pg.title || '') && ehFotoDele(pg.title) && (pg.imageinfo?.[0]?.width || 0) >= 400 && pg.imageinfo?.[0]?.thumburl)
+        .map((pg) => pg.imageinfo[0].thumburl);
+      if (fotos.length) return fotos.slice(0, 6);
+    } catch { /* sem internet ou sem página */ }
+  }
+  return [];
+}
+const fotosDaWikipediaGuardadas = (nome) => comUltimoValor('fotoswiki', nome, fotosDaWikipedia(nome));
 // As fotos em tela cheia (tocando numa foto do "Sobre o artista"), inteiras, no fundo preto: passam para o lado com o
 // dedo (celular e tablet) ou com as setas, na tela e no teclado (computador); puxar para baixo, o X, o Esc ou o voltar
 // fecham (o voltar fecha só as fotos)
@@ -6066,14 +6152,40 @@ async function abrirSobreArtista({ nome, slug = '' }) {
   if (!tela.isConnected) return;
   // as fotos (sem repetir): a do cartão, a do canal do YouTube, as da TheAudioDB (a principal e as de fundo), a do
   // Deezer e a da Wikipédia; depois chegam os quadros dos vídeos do próprio canal dele (até 10 ao todo)
+  // (sem repetir: a mesma foto vem de vários lugares — o canal do YouTube, a TheAudioDB, o Deezer em dois tamanhos —
+  // com endereços diferentes; ela é reconhecida pelo endereço, sem o tamanho, e pela impressão da própria imagem, e fica
+  // a maior. O Michael Jackson vinha com a mesma foto três vezes)
   const vistas = new Set();
+  const impressoes = new Map(); // a foto na tela → a impressão dela
   const caixaFotos = tela.querySelector('.sa-fotos');
+  const naTela = () => caixaFotos.querySelectorAll('img').length;
   const porFotos = (lista) => {
-    const novas = [];
-    for (const u of lista) if (u && !vistas.has(u) && vistas.size < 10) { vistas.add(u); novas.push(u); }
     caixaFotos.querySelector('.sa-sem-foto')?.remove();
-    // (a que não abrir ou vier minúscula, a imagem cinza de "sem foto" do YouTube, sai)
-    caixaFotos.insertAdjacentHTML('beforeend', novas.map((u) => `<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()" onload="if (this.naturalWidth < 200) this.remove()">`).join(''));
+    for (const u of lista) {
+      const k = u && chaveDaFoto(u);
+      if (!k || vistas.has(k) || naTela() >= 12) continue;
+      vistas.add(k);
+      const img = new Image();
+      img.alt = '';
+      img.decoding = 'async';
+      // (a que não abrir ou vier minúscula, a imagem cinza de "sem foto" do YouTube, sai)
+      img.onerror = () => img.remove();
+      img.onload = async () => {
+        if (img.naturalWidth < 200) { img.remove(); return; }
+        const h = await impressaoDaFoto(u);
+        if (!h || !img.isConnected) return;
+        for (const [outra, ho] of impressoes) {
+          if (outra === img || !outra.isConnected || distanciaDeImpressoes(h, ho) > 10) continue;
+          // a mesma foto: fica uma só, com a imagem maior
+          if (img.naturalWidth > outra.naturalWidth) outra.src = img.src;
+          img.remove();
+          return;
+        }
+        impressoes.set(img, h);
+      };
+      img.src = u;
+      caixaFotos.append(img);
+    }
   };
   porFotos([foto, canal?.foto && !(await ehFotoGenerica(canal.foto)) ? canal.foto : '', ...(adb?.fotos || []), dz?.foto, info?.foto]);
   if (!vistas.size) caixaFotos.innerHTML = `<div class="sa-sem-foto">${semFotoArtista(120)}</div>`;
@@ -6084,6 +6196,9 @@ async function abrirSobreArtista({ nome, slug = '' }) {
     const todas = [...caixaFotos.querySelectorAll('img')];
     verFotos(todas.map((x) => x.currentSrc || x.src), todas.indexOf(img));
   });
+  // mais fotos: as do artigo da Wikipédia em que ele aparece (com o nome dele no arquivo) e os quadros dos vídeos do
+  // próprio canal dele
+  fotosDaWikipediaGuardadas(nome).then((l) => { if (tela.isConnected && l?.length) porFotos(l); }).catch(() => {});
   if (canal?.id) fotosDosVideosGuardadas(nome, canal.id).then((l) => { if (tela.isConnected && l) porFotos(l); });
   // os números grandes (como os ouvintes do Spotify): os seguidores no Spotify (pela TheAudioDB), os inscritos no
   // canal do YouTube e os fãs no Deezer, os que houver
