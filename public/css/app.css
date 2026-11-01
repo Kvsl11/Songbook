@@ -1607,7 +1607,9 @@ a.source { text-decoration: none; color: inherit; }
 .partitura-btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 999px; text-decoration: none; font-weight: 800; font-size: 13px;
   color: var(--accent-ink); border: 1.5px solid var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); flex: none; }
 .partitura-btn:hover { background: color-mix(in srgb, var(--accent) 24%, transparent); }
-.tag-partitura { color: var(--accent-ink); font-weight: 700; }
+/* (cinza, como os outros ícones das listas: cifra, vídeo, música) */
+.tag-partitura { display: inline-grid; place-items: center; color: var(--muted); font-weight: 600; }
+.tag-partitura svg { width: 14px; height: 14px; }
 .partitura-barra { display: flex; align-items: center; gap: 10px; margin: 4px 0 12px; }
 .partitura-barra b { display: inline-flex; align-items: center; gap: 8px; }
 .partitura-paginas { --zoom: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; overflow-x: auto; padding-bottom: 90px; }
@@ -4189,3 +4191,31 @@ html.tablet body.painel-recolhido #player { overflow: clip; }
   html:not(.tablet):not(.pp) #player .pl-t0, html:not(.tablet):not(.pp) #player .pl-t1 { display: none; }
   html:not(.tablet):not(.pp) #player .pl-prog { height: 2px; border-radius: 1px; background: rgb(255 255 255 / 0.25); }
 }
+/* a capa do canto da missa que não tem capa: o desenho do momento (a porta da entrada, a estrela do Glória, o cálice…)
+   na cor litúrgica do dia, até chegar a imagem do vídeo do canto */
+.cover.lit-capa { display: grid; place-items: center; color: #fff;
+  background: radial-gradient(120% 100% at 25% 15%, color-mix(in srgb, var(--lit-cor, #6b5a22) 70%, #fff 30%), transparent 70%),
+    linear-gradient(150deg, color-mix(in srgb, var(--lit-cor, #6b5a22) 85%, #000), color-mix(in srgb, var(--lit-cor, #6b5a22) 35%, #000)); }
+.cover.lit-capa svg { width: 22px; height: 22px; stroke-width: 1.8; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.35)); }
+.cover.lit-capa img, .opcao .cover img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+/* as fotos do artista em tela cheia: inteiras, no fundo preto, uma ao lado da outra (o trilho anda com o dedo ou as setas) */
+.sa-fotos img { cursor: zoom-in; }
+.ver-fotos { --fundo: 1; position: fixed; inset: 0; z-index: 300; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
+  background: rgb(0 0 0 / var(--fundo)); animation: vf-entra 0.2s ease-out; }
+.ver-fotos.saindo { animation: vf-sai 0.16s ease-in forwards; }
+@keyframes vf-entra { from { opacity: 0; } }
+@keyframes vf-sai { to { opacity: 0; } }
+.vf-trilho { display: flex; height: 100%; will-change: transform; }
+.vf-foto { flex: 0 0 100%; display: grid; place-items: center; height: 100%; padding: calc(56px + env(safe-area-inset-top)) 0 calc(56px + env(safe-area-inset-bottom)); box-sizing: border-box; }
+.vf-foto img { max-width: 100%; max-height: 100%; object-fit: contain; -webkit-user-drag: none; pointer-events: none; }
+.ver-fotos .icon-btn { position: absolute; display: grid; place-items: center; color: #fff; background: rgb(0 0 0 / 0.5); border-radius: 50%; }
+.vf-fechar { top: calc(12px + env(safe-area-inset-top)); right: 12px; width: 44px; height: 44px; }
+.vf-seta { top: 50%; translate: 0 -50%; width: 52px; height: 52px; transition: opacity 0.2s, background 0.2s; }
+.vf-seta:hover:not(:disabled) { background: rgb(255 255 255 / 0.18); }
+.vf-seta:disabled { opacity: 0.2; cursor: default; }
+.vf-ant { left: 16px; }
+.vf-prox { right: 16px; }
+.vf-conta { position: absolute; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); translate: -50% 0; padding: 4px 12px; border-radius: 999px;
+  background: rgb(0 0 0 / 0.55); color: #fff; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* (no celular e no tablet, o dedo passa as fotos: as setas ficam só onde há mouse) */
+@media (hover: none) { .vf-seta { display: none; } }

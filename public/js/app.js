@@ -1052,6 +1052,9 @@ const REVISOES = [
   // v389: a imagem que o site põe no lugar da foto que não tem (o violão do Cifra Club) guardada como a foto do artista
   // ou a capa da música sai (fica o desenho do app, ou a foto de verdade que for achada)
   { rev: 2, fotos: true, quais: (s) => ehImagemPadrao(s.fotoArtista) || ehImagemPadrao(s.cover) },
+  // v390: nas músicas da missa, a foto do artista achada só pelo nome, de quem não é com certeza do meio católico (o
+  // "José Alves" de "Salve Rainha" com a foto de um cantor de funk), sai: fica o desenho do app
+  { rev: 3, fotosLiturgia: true, quais: (s) => Boolean(s.fotoArtista) && ehDaLiturgia(s) && !confiavelNaLiturgia(s.artist) },
 ];
 const REVISAO_MUSICAS = REVISOES[REVISOES.length - 1].rev;
 const revisando = new Set();
@@ -1104,6 +1107,7 @@ async function revisarMusica(id, pendentes, chaves) {
     if (Object.keys(tirar).length) db.updateSong(id, tirar);
     s = db.song(id);
   }
+  if (quer('fotosLiturgia') && s.fotoArtista) { db.updateSong(id, { fotoArtista: undefined }); s = db.song(id); }
   // a letra sincronizada (a feita à mão pela pessoa fica como está)
   if (quer('letra') && midiaDe(s) && !(s.sincronia && s.sincronia.fonte !== 'lrclib')) {
     try { recuperarSincronia(s); } catch { /* segue */ }
@@ -2123,6 +2127,10 @@ const player = (() => {
     const fonte = song?.source && /^https?:/.test(song.source) ? host(song.source) : '';
     const slug = /cifraclub\.com\.br\/([^/?#]+)/.exec(song?.source || '')?.[1];
     const principal = pessoas[0]?.nome || artista;
+    // (a música da missa: a foto e a apresentação só de quem é com certeza do meio católico)
+    const liturgia = ehDaLiturgia(song || atual);
+    const comInfo = Boolean(principal) && (!liturgia || confiavelNaLiturgia(principal));
+    const nomeBusca = liturgia ? nomeReligioso(principal) : principal;
     const detalhes = [
       ['Álbum', meta.album], ['Ano', meta.year], ['Tom', song ? renderSong(song.content).key || song.key : ''],
       [/cifraclub/.test(song?.source || '') ? 'Fonte da cifra' : 'Fonte', fonte ? `<a href="${esc(song.source)}" target="_blank" rel="noopener">${esc(fonte)}</a>` : '', true],
@@ -2137,7 +2145,7 @@ const player = (() => {
     // créditos como o SongDNA do Spotify: as pessoas com a foto e o "Explorar"; embaixo, a lista (com a foto pequena)
     // (a capa: a da música ou, sem ela, a miniatura do vídeo; aberta a página de um artista, o Tocando agora fecha)
     const capaCreditos = (song && capaDaMusica(song)) || (ytDaCapa() ? `https://i.ytimg.com/vi/${ytDaCapa()}/hqdefault.jpg` : '');
-    dadosCreditos = { titulo: titulo || 'Música', artista, capa: capaCreditos, cor: atual?.cor || '', pessoas, detalhes };
+    dadosCreditos = { titulo: titulo || 'Música', artista, capa: capaCreditos, cor: atual?.cor || '', pessoas, detalhes, liturgia };
     if (pessoas.length) cartoes.push(cartaoPessoas({ titulo: titulo || 'Música', pessoas, explorar: 'data-pl="explorar-creditos"', classe: 'pl-cartao ref-pessoas pl-pessoas' }));
     if (pessoas.length || detalhes.length) {
       cartoes.push(`<section class="pl-cartao"><h4>Créditos</h4>
@@ -2153,9 +2161,9 @@ const player = (() => {
     box.innerHTML = cartoes.join('');
     box.hidden = !cartoes.length;
     // (a foto do artista principal pela página dele no Cifra Club, quando a música veio de lá; antes das bolinhas)
-    if (principal) fotoDoArtista(principal, slug);
-    porFotos(box, pessoas);
-    if (principal) fotoDoArtista(principal).then((url) => {
+    if (comInfo) fotoDoArtista(nomeBusca, slug);
+    porFotos(box, pessoas, { liturgia });
+    if (comInfo) fotoDoArtista(nomeBusca).then((url) => {
       const f = $('.pl-extra [data-foto]', el);
       if (!url || !f || extraDe !== chave) return;
       const img = new Image();
@@ -2165,14 +2173,14 @@ const player = (() => {
     // a breve apresentação do artista embaixo do nome (3 linhas; tocando, abre o texto inteiro)
     // (em 3 linhas, com o "ver mais" no fim, como no Spotify: abre a tela "Sobre o artista", com o texto inteiro)
     // (sem a da Wikipédia, a biografia da TheAudioDB; sem nenhuma, só o "ver mais", que abre as fotos e os números)
-    if (principal) Promise.all([descricaoDoArtista(principal), audioDbGuardado(principal).catch(() => null)]).then(([info, adb]) => {
+    if (comInfo) Promise.all([descricaoDoArtista(nomeBusca), audioDbGuardado(nomeBusca).catch(() => null)]).then(([info, adb]) => {
       const bio = $('.pl-extra .pl-artista-bio', el);
       if (!bio || extraDe !== chave) return;
       const texto = (info?.texto || adb?.bio || '').replace(/\s*\n+\s*/g, ' ');
       $('p', bio).textContent = texto;
       bio.classList.toggle('so-mais', !texto);
       bio.hidden = false;
-      bio.onclick = (e) => { e.stopPropagation(); abrirSobreArtista({ nome: principal, slug }); };
+      bio.onclick = (e) => { e.stopPropagation(); abrirSobreArtista({ nome: nomeBusca, slug }); };
     }).catch(() => {});
     if (atual?.youtube) infoDoVideo(atual.youtube).then((v) => {
       if (!v || extraDe !== chave) return;
@@ -5323,7 +5331,7 @@ async function abrirPrevia(content, source, back, videoJa = null, aoPreparar = n
     ? capaOficial(novo.title, novo.artist).catch(() => '')
     : Promise.resolve('');
   const buscaFotoDaPrevia = novo.title && novo.artist
-    ? fotoDoArtista(novo.artist, /cifraclub\.com\.br\/([^/?#]+)/.exec(source || '')?.[1] || '').catch(() => '')
+    ? fotoDaPessoa(novo.artist, { liturgia: ehDaLiturgia(novo), slug: /cifraclub\.com\.br\/([^/?#]+)/.exec(source || '')?.[1] || '' }).catch(() => '')
     : Promise.resolve('');
   void buscaFotoDaPrevia.then((url) => {
     if (!url || preview !== novo) return;
@@ -5529,8 +5537,29 @@ const fotoReal = (url) => (url && typeof url === 'string' && !ehImagemPadrao(url
 const semFotoArtista = (size = 48) => `<span class="sem-foto-artista">${icon('artistaSemFoto', size)}</span>`;
 const avatarDe = (p, i, classe = 'ref-avatar') => `<span class="${classe} sem-foto" data-foto="${i}">${semFotoArtista()}</span>`;
 // a foto de cada pessoa nas bolinhas [data-foto] da caixa (as que não têm foto ficam com as iniciais)
-function porFotos(box, pessoas) {
-  pessoas.forEach((p, i) => fotoDoArtista(p.nome).then((url) => {
+// ---- as músicas da missa (o acervo litúrgico, o Hinário e os textos da CNBB, a Cindy Ferrarezi, o Músicas para Missa)
+// O artista delas costuma ser um compositor ou um padre pouco conhecido, e a foto e a apresentação procuradas só pelo
+// nome achavam um xará famoso ("José Alves", de "Salve Rainha", vinha com a foto e a história de um cantor de funk). Nelas,
+// a foto e a apresentação só vêm de quem é com certeza do meio católico: o nome com o título religioso (Padre, Frei,
+// Irmã, Dom, Ministério, Comunidade…), procurado com o título por extenso ("Pe. Zezinho" → "Padre Zezinho"), e os
+// artistas católicos que o app já conhece. Os outros ficam com o desenho do app (a pessoa com a nota)
+const ehDaLiturgia = (x) => {
+  const s = typeof x === 'string' ? x : [x?.source, x?.fonte, x?.cifra, x?.url].find((v) => typeof v === 'string' && v) || '';
+  return /^(acervo|hinario|cnbb):/.test(s) || /cindyferrarezi\.com|musicasparamissa\.com/.test(s) || ['acervo', 'hinario', 'cnbb', 'mpm', 'cindy'].includes(x?.fonte);
+};
+const TITULO_RELIGIOSO = /^(padre|pe\.?|frei|fr\.|irm[ãa]o?|ir\.|dom|di[áa]cono|monsenhor|mons\.|cardeal|minist[ée]rio|comunidade)\s+\S/i;
+const nomeReligioso = (n) => String(n || '').trim().replace(/^pe\.?\s+/i, 'Padre ').replace(/^fr\.\s+/i, 'Frei ').replace(/^mons\.\s+/i, 'Monsenhor ');
+// (além dos católicos mais ouvidos da Busca, autores de cantos de missa conhecidos sem título religioso)
+const AUTORES_CATOLICOS = ['Cindy Ferrarezi', 'Ziza Fernandes', 'Adriana Arydes', 'Eugênio Jorge'];
+const confiavelNaLiturgia = (n) => Boolean(String(n || '').trim()) && (TITULO_RELIGIOSO.test(String(n).trim())
+  || [...ARTISTAS_CATOLICOS, ...AUTORES_CATOLICOS].some((a) => normalizar(a) === normalizar(n) || normalizar(a) === normalizar(nomeReligioso(n))));
+// a foto de uma pessoa da música: na música da missa, só de quem é confiável (veja acima); '' para ficar o desenho
+function fotoDaPessoa(nome, { liturgia = false, slug = '' } = {}) {
+  if (!liturgia) return fotoDoArtista(nome, slug);
+  return confiavelNaLiturgia(nome) ? fotoDoArtista(nomeReligioso(nome), slug) : Promise.resolve('');
+}
+function porFotos(box, pessoas, { liturgia = false } = {}) {
+  pessoas.forEach((p, i) => fotoDaPessoa(p.nome, { liturgia }).then((url) => {
     if (!url || !box.isConnected) return;
     const img = new Image();
     img.onload = () => box.querySelectorAll(`[data-foto="${i}"]`).forEach((av) => { av.textContent = ''; av.classList.remove('sem-foto'); av.classList.add('com-foto'); av.style.backgroundImage = `url("${url}")`; });
@@ -5576,7 +5605,7 @@ function irParaArtista(nome) {
 }
 // o detalhe (tela toda): a música em cima e todas as pessoas, cada uma com a foto, o nome e todos os papéis; embaixo
 // os detalhes (álbum, ano, tom, de onde veio)
-function explorarCreditos({ titulo, artista, capa, cor, pessoas, detalhes = [], aoIrParaArtista }) {
+function explorarCreditos({ titulo, artista, capa, cor, pessoas, detalhes = [], aoIrParaArtista, liturgia = false }) {
   const dlg = document.createElement('dialog');
   dlg.className = 'creditos-dlg';
   if (cor) dlg.style.setProperty('--cor-creditos', cor);
@@ -5594,7 +5623,7 @@ function explorarCreditos({ titulo, artista, capa, cor, pessoas, detalhes = [], 
   });
   dlg.addEventListener('close', () => dlg.remove());
   dlg.showModal();
-  porFotos(dlg, pessoas);
+  porFotos(dlg, pessoas, { liturgia });
 }
 // O que se sabe de cada artista (a apresentação, as fotos, os seguidores, os fãs, o canal) fica guardado no aparelho,
 // como no Spotify: com internet, cada vez vem o valor atual e ele passa a ser o guardado; sem internet (a música
@@ -5673,7 +5702,8 @@ async function prepararMidiaBusca(itens) {
     if (!titulo || !artista) return;
     const [capa, foto] = await Promise.all([
       capaRapida(titulo, artista).catch(() => ''),
-      fotoRapida(artista, item.slug || '').catch(() => ''),
+      // (música da missa: só a foto de quem é com certeza do meio católico)
+      ehDaLiturgia(item) && !confiavelNaLiturgia(artista) ? '' : fotoRapida(ehDaLiturgia(item) ? nomeReligioso(artista) : artista, item.slug || '').catch(() => ''),
     ]);
     if (capa) { item.capa = capa; item.cover = capa; }
     if (foto) {
@@ -5707,7 +5737,7 @@ function enriquecerLinhasMusicais(container, itens, { busca = false } = {}) {
     const avatar = linha.querySelector('[data-artista-mini]');
     // (a busca já desenha a foto definitiva: trocar de novo seria a piscada)
     if (avatar && !item.fotoArtista) {
-      fotoDoArtista(artista, item.slug || '').then((url) => {
+      fotoDaPessoa(artista, { liturgia: ehDaLiturgia(item), slug: item.slug || '' }).then((url) => {
         if (!url || !avatar.isConnected) return;
         avatar.innerHTML = `<img src="${esc(url)}" alt="" loading="lazy">`;
         avatar.classList.add('com-foto');
@@ -5922,6 +5952,96 @@ function deezerDoArtista(nome) {
 // a tela "Sobre o artista" (o "ver mais" do cartão, como no Spotify): as fotos dele passando para o lado, os fãs, a
 // apresentação inteira e os atalhos (as músicas e os álbuns dele no app, a página na Wikipédia). Abre por cima de
 // tudo; o voltar (o do celular também) fecha
+// As fotos em tela cheia (tocando numa foto do "Sobre o artista"), inteiras, no fundo preto: passam para o lado com o
+// dedo (celular e tablet) ou com as setas, na tela e no teclado (computador); puxar para baixo, o X, o Esc ou o voltar
+// fecham (o voltar fecha só as fotos)
+function verFotos(urls, inicio = 0) {
+  if (!urls.length) return;
+  document.querySelector('.ver-fotos')?.remove();
+  let i = Math.max(0, Math.min(urls.length - 1, inicio));
+  const v = document.createElement('div');
+  v.className = 'ver-fotos';
+  v.setAttribute('role', 'dialog');
+  v.setAttribute('aria-label', 'Fotos');
+  v.innerHTML = `<div class="vf-trilho">${urls.map((u) => `<div class="vf-foto"><img src="${esc(u)}" alt="" draggable="false"></div>`).join('')}</div>
+    <button class="icon-btn vf-fechar" data-vf="fechar" aria-label="Fechar" title="Fechar">${icon('x', 24)}</button>
+    ${urls.length > 1 ? `<button class="icon-btn vf-seta vf-ant" data-vf="ant" aria-label="Foto anterior" title="Anterior (←)">${icon('back', 26)}</button>
+    <button class="icon-btn vf-seta vf-prox" data-vf="prox" aria-label="Próxima foto" title="Próxima (→)">${icon('next', 26)}</button>
+    <div class="vf-conta" aria-live="polite"></div>` : ''}`;
+  document.body.append(v);
+  const trilho = $('.vf-trilho', v);
+  const ir = (n, animado = true) => {
+    i = Math.max(0, Math.min(urls.length - 1, n));
+    trilho.style.transition = animado ? 'transform 0.28s ease' : 'none';
+    trilho.style.transform = `translateX(${-i * 100}%)`;
+    v.style.setProperty('--fundo', 1);
+    const c = $('.vf-conta', v);
+    if (c) c.textContent = `${i + 1} / ${urls.length}`;
+    const a = $('.vf-ant', v);
+    const p = $('.vf-prox', v);
+    if (a) a.disabled = i === 0;
+    if (p) p.disabled = i === urls.length - 1;
+  };
+  ir(i, false);
+  history.pushState({ ...history.state, fotos: true }, '');
+  let fechada = false;
+  const tirar = () => {
+    if (fechada) return;
+    fechada = true;
+    window.removeEventListener('popstate', tirar);
+    document.removeEventListener('keydown', teclas, true);
+    v.classList.add('saindo');
+    setTimeout(() => v.remove(), 160);
+  };
+  const fechar = () => { if (history.state?.fotos) history.back(); else tirar(); };
+  window.addEventListener('popstate', tirar);
+  const teclas = (e) => {
+    if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); ir(i + 1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); ir(i - 1); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fechar(); }
+  };
+  document.addEventListener('keydown', teclas, true);
+  v.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-vf]');
+    if (b?.dataset.vf === 'fechar') fechar();
+    else if (b?.dataset.vf === 'ant') ir(i - 1);
+    else if (b?.dataset.vf === 'prox') ir(i + 1);
+  });
+  // o dedo: para o lado, a foto anda junto e passa (com resistência nas pontas); para baixo, ela desce e fecha
+  let toque = null;
+  v.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('[data-vf]') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    toque = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, eixo: '' };
+  });
+  v.addEventListener('pointermove', (e) => {
+    if (!toque || e.pointerId !== toque.id) return;
+    const dx = e.clientX - toque.x;
+    const dy = e.clientY - toque.y;
+    if (!toque.eixo && Math.hypot(dx, dy) > 8) toque.eixo = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (toque.eixo === 'x') {
+      const ponta = (i === 0 && dx > 0) || (i === urls.length - 1 && dx < 0);
+      trilho.style.transition = 'none';
+      trilho.style.transform = `translateX(calc(${-i * 100}% + ${ponta ? dx / 3 : dx}px))`;
+    } else if (toque.eixo === 'y' && dy > 0) {
+      trilho.style.transition = 'none';
+      trilho.style.transform = `translateX(${-i * 100}%) translateY(${dy}px)`;
+      v.style.setProperty('--fundo', Math.max(0.35, 1 - dy / 400));
+    }
+  });
+  const soltar = (e) => {
+    if (!toque || e.pointerId !== toque.id) return;
+    const dx = e.clientX - toque.x;
+    const dy = e.clientY - toque.y;
+    const rapido = (performance.now() - toque.t) < 280;
+    const { eixo } = toque;
+    toque = null;
+    if (eixo === 'x' && e.type === 'pointerup' && (Math.abs(dx) > v.clientWidth * 0.18 || (rapido && Math.abs(dx) > 40))) ir(i + (dx < 0 ? 1 : -1));
+    else if (eixo === 'y' && e.type === 'pointerup' && dy > 120) fechar();
+    else ir(i);
+  };
+  v.addEventListener('pointerup', soltar);
+  v.addEventListener('pointercancel', soltar);
+}
 async function abrirSobreArtista({ nome, slug = '' }) {
   document.querySelector('.sobre-artista')?.remove();
   const tela = document.createElement('section');
@@ -5932,8 +6052,14 @@ async function abrirSobreArtista({ nome, slug = '' }) {
     <div class="sa-fotos"></div><div class="sa-numeros" hidden></div><div class="sa-texto"><div class="loading-note"><span class="spin"></span>Carregando…</div></div><div class="sa-links"></div>`;
   document.body.append(tela);
   history.pushState({ ...history.state, sobreArtista: true }, '');
-  const fechar = () => { tela.classList.add('saindo'); setTimeout(() => tela.remove(), 180); };
-  window.addEventListener('popstate', fechar, { once: true });
+  // (o voltar que só fecha uma foto aberta em tela cheia volta para esta tela: ela continua)
+  const fechar = () => {
+    if (history.state?.sobreArtista) return;
+    window.removeEventListener('popstate', fechar);
+    tela.classList.add('saindo');
+    setTimeout(() => tela.remove(), 180);
+  };
+  window.addEventListener('popstate', fechar);
   tela.querySelector('[data-sa="voltar"]').onclick = () => history.back();
   const [info, dz, foto, canal, adb] = await Promise.all([descricaoDoArtista(nome), deezerDoArtista(nome), fotoDoArtista(nome, slug).catch(() => ''),
     canalGuardado(nome).catch(() => null), audioDbGuardado(nome).catch(() => null)]);
@@ -5951,6 +6077,13 @@ async function abrirSobreArtista({ nome, slug = '' }) {
   };
   porFotos([foto, canal?.foto && !(await ehFotoGenerica(canal.foto)) ? canal.foto : '', ...(adb?.fotos || []), dz?.foto, info?.foto]);
   if (!vistas.size) caixaFotos.innerHTML = `<div class="sa-sem-foto">${semFotoArtista(120)}</div>`;
+  // tocar numa foto: ela abre em tela cheia, e dá para passar para as outras
+  caixaFotos.addEventListener('click', (e) => {
+    const img = e.target.closest('img');
+    if (!img) return;
+    const todas = [...caixaFotos.querySelectorAll('img')];
+    verFotos(todas.map((x) => x.currentSrc || x.src), todas.indexOf(img));
+  });
   if (canal?.id) fotosDosVideosGuardadas(nome, canal.id).then((l) => { if (tela.isConnected && l) porFotos(l); });
   // os números grandes (como os ouvintes do Spotify): os seguidores no Spotify (pela TheAudioDB), os inscritos no
   // canal do YouTube e os fãs no Deezer, os que houver
@@ -9654,8 +9787,8 @@ function viewSong(id, ctx = {}) {
     ${isPreview ? '' : `<a class="ref-mais" href="#/editar/${song.id}">Editar</a>`}</div>
     ${pessoas.map((p, i) => `<div class="ref-linha"><span class="grow"><b>${esc(p.nome)}</b><small>${esc(p.papeis.join(' • '))}</small></span>${i === 0 ? verArtista : ''}</div>`).join('')}
     ${detalhes.map(([k, v, html]) => `<div class="ref-linha"><span class="grow"><b>${html ? v : esc(v)}</b><small>${esc(k)}</small></span></div>`).join('')}</section>` : '';
-  porFotos($('#creditos'), pessoas);
-  $('#creditos [data-explorar-creditos]')?.addEventListener('click', () => explorarCreditos({ titulo: song.title, artista: song.artist, capa: capaDaMusica(song), cor: corDe(song), pessoas, detalhes }));
+  porFotos($('#creditos'), pessoas, { liturgia: ehDaLiturgia(song) });
+  $('#creditos [data-explorar-creditos]')?.addEventListener('click', () => explorarCreditos({ titulo: song.title, artista: song.artist, capa: capaDaMusica(song), cor: corDe(song), pessoas, detalhes, liturgia: ehDaLiturgia(song) }));
 
   // A opção acompanha o modo ativo: trocar música altera só o áudio; trocar vídeo altera só o clipe.
   const tipoMidiaAtiva = () => player.modoMusica ? 'audio' : 'video';
@@ -11063,7 +11196,9 @@ async function viewLiturgia(data) {
   const passoHTML = (p, num) => {
     if (LEITURAS.includes(p.chave)) return `<span class="step leitura">${icon('book', 18)}</span>`;
     const c = cantoEscolhido(p);
-    return c?.capa ? `<span class="step"><img src="${esc(c.capa)}" alt="" loading="lazy"><em>${num}</em></span>` : `<span class="step">${num}</span>`;
+    if (c?.capa) return `<span class="step"><img src="${esc(c.capa)}" alt="" loading="lazy"><em>${num}</em></span>`;
+    // (o canto escolhido sem capa: o número, e a imagem do vídeo dele quando chegar)
+    return c ? `<span class="step" data-canto-capa data-titulo="${esc(c.titulo)}" data-artista="${esc(c.artista || '')}" data-fonte="${esc(c.url || '')}">${num}</span>` : `<span class="step">${num}</span>`;
   };
   const contaEscolhas = () => Object.values(sel).filter(Boolean).length;
 
@@ -11107,7 +11242,7 @@ async function viewLiturgia(data) {
           ${(p.chordpro || p.cantos.length) ? `<div class="opcoes-titulo">Escolha o canto</div><div class="opcoes">
             <label class="opcao"><input type="radio" name="op-${p.chave}" value="" ${!sel[p.chave] ? 'checked' : ''}><span class="lbl">Nenhum</span></label>
             ${p.chordpro ? `<label class="opcao"><input type="radio" name="op-${p.chave}" value="cnbb" ${sel[p.chave] === 'cnbb' ? 'checked' : ''}><div class="cover gen" style="--h:130">${icon('cross', 18)}</div><span class="lbl">Texto oficial (sem cifra)</span><span class="tag cnbb">CNBB</span><button class="icon-btn" data-ver="cnbb" aria-label="Ver">${icon('next', 18)}</button></label>` : ''}
-            ${ordenarCantos(p.cantos).map((c) => `<label class="opcao"><input type="radio" name="op-${p.chave}" value="${esc(c.url)}" ${sel[p.chave] === c.url ? 'checked' : ''}>${capa({ titulo: c.titulo, capa: c.capa })}<span class="lbl">${esc(c.titulo)}</span>${c.sugestao ? '<span class="tag">busca</span>' : ''}${tagFonte(c)}${c.partitura ? `<span class="tag-partitura" title="Tem partitura">${icon('score', 14)}</span>` : ''}<button class="icon-btn" data-ver="${esc(c.url)}" aria-label="Ver">${icon('next', 18)}</button></label>`).join('')}
+            ${ordenarCantos(p.cantos).map((c) => `<label class="opcao"><input type="radio" name="op-${p.chave}" value="${esc(c.url)}" ${sel[p.chave] === c.url ? 'checked' : ''}>${capaDoCanto(c, p.chave)}<span class="lbl">${esc(c.titulo)}</span>${c.sugestao ? '<span class="tag">busca</span>' : ''}${tagFonte(c)}${c.partitura ? `<span class="tag-partitura" title="Tem partitura">${icon('score', 14)}</span>` : ''}<button class="icon-btn" data-ver="${esc(c.url)}" aria-label="Ver">${icon('next', 18)}</button></label>`).join('')}
           </div>` : ''}
         </div>
       </details>`).join('')}
@@ -11123,6 +11258,9 @@ async function viewLiturgia(data) {
   const atualizaCta = () => { $('#cta-count').textContent = `${contaEscolhas()} cantos escolhidos`; };
   atualizaCta();
 
+  // as capas dos cantos sem capa: a dos passos (o canto escolhido de cada momento) já; as das opções, ao abrir o momento
+  $('#partes').querySelectorAll('summary, details[open]').forEach(porCapasDosCantos);
+  $('#partes').addEventListener('toggle', (e) => { if (e.target.open) porCapasDosCantos(e.target); }, true);
   $('#partes').addEventListener('change', (e) => {
     if (e.target.type !== 'radio') return;
     const det = e.target.closest('.parte');
@@ -11130,6 +11268,7 @@ async function viewLiturgia(data) {
     sel[p.chave] = e.target.value;
     $('.n', det).innerHTML = `<b>${esc(p.nome)}</b>${resumo(p)}`;
     $('summary .step', det).outerHTML = passoHTML(p, numeros[p.chave]);
+    porCapasDosCantos($('summary', det));
     atualizaCta();
   });
   $('#partes').addEventListener('click', async (e) => {
@@ -11196,6 +11335,64 @@ function cadernoDoDia(cadernos, lit, data) {
 }
 const sourceHinario = (cad, i) => `hinario:${cad.id}:${i}`;
 // as partes da missa do dia (com as leituras da CNBB) e, em cada uma, os cantos dos arquivos que combinam com ela
+// ---- as capas dos cantos da missa que não têm capa (o Hinário, o acervo, parte do Músicas para Missa)
+// Até chegar a imagem do vídeo do canto, a capa é o desenho do momento da missa na cor litúrgica do dia (no lugar do
+// quadradinho de uma cor qualquer). A imagem é a do vídeo de referência do canto no YouTube, o mesmo que o app acha ao
+// abrir o canto (com "canto litúrgico" na busca e as palavras do título no nome do vídeo); sem vídeo, fica o desenho.
+// Fica guardada no aparelho (o que não tem vídeo é procurado de novo depois de uma semana)
+const ICONE_DO_MOMENTO = { entrada: 'porta', sinal: 'cross', ato: 'coracao', gloria: 'estrela', salmo: 'lira', sequencia: 'lira', aclamacao: 'book',
+  oferendas: 'calice', santo: 'sparkles', oracao: 'calice', cordeiro: 'cross', comunhao: 'hostia', final: 'enviar' };
+const capaDoCanto = (c, chave) => (c.capa ? capa({ titulo: c.titulo, capa: c.capa })
+  : `<div class="cover lit-capa" data-canto-capa data-titulo="${esc(c.titulo)}" data-artista="${esc(c.artista || '')}" data-fonte="${esc(c.url || '')}">${icon(ICONE_DO_MOMENTO[chave] || 'music', 22)}</div>`);
+const CHAVE_CAPAS_CANTOS = 'songbook.capasCantos';
+let capasCantos = (() => { try { return JSON.parse(localStorage.getItem(CHAVE_CAPAS_CANTOS) || '{}'); } catch { return {}; } })();
+const procurandoCapas = new Map();
+const filaCapasCantos = [];
+let capasAndando = 0;
+function capaDoVideoDoCanto(titulo, artista, fonte) {
+  const k = `${normalizar(tituloLimpo(titulo))}|${normalizar(artista)}|${String(fonte).split(':')[0]}`;
+  const g = capasCantos[k];
+  if (g && (g.id || Date.now() - g.t < 7 * 864e5)) return Promise.resolve(g.id ? `https://i.ytimg.com/vi/${g.id}/mqdefault.jpg` : '');
+  if (!navigator.onLine) return Promise.resolve('');
+  if (!procurandoCapas.has(k)) {
+    procurandoCapas.set(k, new Promise((ok) => {
+      filaCapasCantos.push(async () => {
+        const v = await videoDaMusica(titulo, artista, fonte).catch(() => null);
+        const id = v ? youtubeId(v.url) || v.id || '' : '';
+        capasCantos[k] = { id, t: Date.now() };
+        try { localStorage.setItem(CHAVE_CAPAS_CANTOS, JSON.stringify(capasCantos)); } catch { /* sem espaço: fica na sessão */ }
+        procurandoCapas.delete(k);
+        ok(id ? `https://i.ytimg.com/vi/${id}/mqdefault.jpg` : '');
+      });
+      andarCapas();
+    }));
+  }
+  return procurandoCapas.get(k);
+}
+// (duas buscas por vez: a Liturgia continua leve)
+function andarCapas() {
+  while (capasAndando < 2 && filaCapasCantos.length) {
+    capasAndando++;
+    filaCapasCantos.shift()().finally(() => { capasAndando--; andarCapas(); });
+  }
+}
+// põe as imagens nas capas de desenho que estão dentro de raiz (a imagem só entra depois de carregada)
+function porCapasDosCantos(raiz) {
+  raiz?.querySelectorAll('[data-canto-capa]:not([data-procurada])').forEach((el) => {
+    el.dataset.procurada = '1';
+    capaDoVideoDoCanto(el.dataset.titulo, el.dataset.artista, el.dataset.fonte).then((url) => {
+      if (!url || !el.isConnected) return;
+      const img = new Image();
+      img.alt = '';
+      img.onload = () => {
+        if (!el.isConnected) return;
+        if (el.classList.contains('step')) { const n = el.querySelector('em')?.outerHTML || `<em>${esc(el.textContent.trim())}</em>`; el.innerHTML = ''; el.append(img); el.insertAdjacentHTML('beforeend', n); }
+        else { el.classList.remove('lit-capa'); el.replaceChildren(img); }
+      };
+      img.src = url;
+    });
+  });
+}
 async function missaLiturgica(missa, data) {
   const lit = missa.liturgia;
   const [ac, cadernos] = await Promise.all([acervoClassificado(), carregarHinario()]);
