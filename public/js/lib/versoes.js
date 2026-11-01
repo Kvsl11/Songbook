@@ -76,11 +76,34 @@ export function paresDasSincronias(doAudio, doVideo) {
 // introdução de filme); com o clipe mais curto, o mesmo começo
 export const paresPelaDuracao = (durVideo, durAudio) => [[0, durVideo > durAudio && durAudio > 0 ? Math.round((durVideo - durAudio) * 10) / 10 : 0]];
 
+// Os pares de um trecho achado no lugar errado (o refrão que se repete casado com a outra vez dele no clipe, num clipe
+// longo como Speed Demon): o deslocamento (clipe − áudio) muda de repente e depois volta ao de antes. Uma cena inserida
+// ou um corte mudam o deslocamento e ele fica; esses pares ficam. Os que saem: os que se afastam mais de 1,5 s do
+// deslocamento de antes e, até 60 s depois, voltam a ele. A troca ali caía no lugar errado (às vezes certa, às vezes não)
+export function semPicos(pares) {
+  const ord = (pares || []).filter((p) => Number.isFinite(p?.[0]) && Number.isFinite(p?.[1])).map((p) => [p[0], p[1]])
+    .sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+  if (ord.length < 3) return ord;
+  const d = (p) => p[1] - p[0];
+  const ficam = [ord[0]];
+  for (let i = 1; i < ord.length;) {
+    const base = d(ficam[ficam.length - 1]);
+    if (Math.abs(d(ord[i]) - base) <= 1.5) { ficam.push(ord[i]); i++; continue; }
+    let j = i;
+    while (j < ord.length && Math.abs(d(ord[j]) - base) > 1.5 && ord[j][0] - ord[i][0] <= 60) j++;
+    // (voltou ao deslocamento de antes: o trecho do meio estava no lugar errado)
+    if (j < ord.length && Math.abs(d(ord[j]) - base) <= 1.5 && ord[j][0] - ord[i][0] <= 60 && ord[j][0] > ord[i][0]) { i = j; continue; }
+    ficam.push(ord[i]);
+    i++;
+  }
+  return ficam;
+}
+
 // o tempo no outro lado: cada trecho anda junto com o par de antes (uma cena no meio do clipe muda o deslocamento dali
 // em diante; antes do primeiro par, vale o deslocamento dele)
 function converter(pares, t, de, para) {
   if (!pares?.length) return Math.max(0, t);
-  const ordem = pares
+  const ordem = semPicos(pares)
     .filter((p) => Number.isFinite(p?.[de]) && Number.isFinite(p?.[para]))
     .map((p) => [p[0], p[1]])
     .sort((x, y) => x[de] - y[de] || x[para] - y[para]);

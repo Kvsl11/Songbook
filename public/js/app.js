@@ -3716,6 +3716,8 @@ const semLinhasDeAcordes = (sinc) => {
     f.push('', '[Versões]');
     if (vs) f.push(`clipe ${vs.video || '-'} · áudio ${vs.audio || '-'} (${seg(vs.duracao)}) · casadas: ${sim(vs.casadas)} · pela letra: ${sim(vs.porLetra)} · diferentes: ${sim(vs.diferentes)} · pares: ${vs.pares?.length || 0}`);
     else f.push('sem áudio oficial guardado');
+    // (os pontos que ligam o áudio ao clipe, segundo no áudio → segundo no clipe: para conferir a troca entre os dois)
+    if (vs?.pares?.length > 1) f.push(`pares (áudio→clipe): ${vs.pares.map(([x, y]) => `${Math.round(x)}→${Math.round(y)}`).join(' ')}`);
     f.push('', '[Download]');
     const arqs = Object.entries(song?.baixado?.arquivos || {});
     if (!arqs.length) f.push(song?.rebaixar ? 'sem arquivos (marcada para baixar de novo)' : 'não baixada');

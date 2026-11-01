@@ -349,3 +349,26 @@ test('trocar a música/o vídeo não salva a prévia sozinho e refaz a sincronia
   assert.ok(salvar.indexOf('preview.source === fonteItem') < salvar.indexOf('await trazerMusica('));
   assert.match(app, /catch \{ return Infinity; \}/, 'um erro ao ler a cifra não pode fazer a letra dela ser trocada');
 });
+
+// Speed Demon (clipe longo, com cenas e o refrão repetido): um trecho do áudio casado com a outra vez do refrão no clipe
+// fazia a troca entre a música e o vídeo cair no lugar errado só ali. O pico (o deslocamento que muda e volta) sai; a
+// cena (o deslocamento que muda e fica) continua valendo
+test('pares: o trecho casado no lugar errado sai, a cena inserida fica', async () => {
+  const { semPicos, tempoNoVideo, tempoNoAudio } = await import('../public/js/lib/versoes.js');
+  const pares = [];
+  for (let t = 0; t <= 200; t += 5) {
+    let v = t + 20 + (t >= 100 ? 30 : 0);
+    if (t >= 60 && t <= 70) v += 120; // (o refrão achado 2 min adiante)
+    pares.push([t, v]);
+    if (t === 100) pares.push([100, 120]); // (o começo da cena de 30 s)
+  }
+  const ficam = semPicos(pares);
+  assert.ok(!ficam.some(([a]) => a >= 60 && a <= 70));
+  assert.ok(ficam.some(([a, v]) => a === 100 && v === 120) && ficam.some(([a, v]) => a === 100 && v === 150));
+  assert.equal(tempoNoVideo(pares, 65), 85);
+  assert.equal(tempoNoVideo(pares, 150), 200);
+  assert.equal(tempoNoAudio(pares, 85), 65);
+  // (sem picos, nada muda)
+  const limpos = [[0, 10], [50, 60], [100, 140], [150, 190]];
+  assert.deepEqual(semPicos(limpos), limpos);
+});
