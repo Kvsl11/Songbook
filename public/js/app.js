@@ -5314,6 +5314,12 @@ async function prepararMidiaBusca(itens) {
   return itens;
 }
 
+// põe o "E" na linha já desenhada, quando a música acabou de ser reconhecida como explícita
+function porSeloExplicita(linha, titulo, artista) {
+  if (!linha?.isConnected || !explicitaConhecida(titulo, artista)) return;
+  const s = linha.querySelector('.info .s');
+  if (s && !s.querySelector('.selo-e')) s.insertAdjacentHTML('afterbegin', seloExplicita(titulo, artista));
+}
 function enriquecerLinhasMusicais(container, itens, { busca = false } = {}) {
   if (!container || !Array.isArray(itens)) return;
   itens.forEach((item, i) => {
@@ -5333,8 +5339,15 @@ function enriquecerLinhasMusicais(container, itens, { busca = false } = {}) {
     }
     // Nas buscas, a capa do álbum é preferida à miniatura do vídeo ou à foto do artista.
     // Na biblioteca, respeita a capa escolhida manualmente pela pessoa.
-    if (busca || capaTrocavel(item.cover || item.capa || '')) {
+    // O selo "E" vem na mesma busca da capa: na música com capa própria (que não troca), a busca é feita só para
+    // saber se é explícita, e o selo entra na linha assim que chega (antes só aparecia ao abrir a música)
+    const trocaCapa = busca || capaTrocavel(item.cover || item.capa || '');
+    if (!trocaCapa && explicitaGuardada(titulo, artista) === undefined) {
+      capaOficial(titulo, artista).then(() => porSeloExplicita(linha, titulo, artista)).catch(() => {});
+    }
+    if (trocaCapa) {
       capaOficial(titulo, artista).then((url) => {
+        porSeloExplicita(linha, titulo, artista);
         if (!url || !linha.isConnected) return;
         if (linha.querySelector('.cover img')?.getAttribute('src') === url) return;
         const box = linha.querySelector('.cover');
@@ -5373,7 +5386,8 @@ const capasOficiais = new Map();
 // Se a música é explícita (como o "E" do Spotify): o Deezer e o iTunes dizem, na mesma busca da capa. Fica guardado no
 // aparelho, junto com a capa; a letra continua inteira (só o selo indica)
 const marcarExplicita = (k, sim) => { void comUltimoValor('explicita', k, Promise.resolve(sim ? 'sim' : 'nao')); };
-const explicitaConhecida = (titulo, artista) => { const k = chaveDaCapa(titulo, artista); return Boolean(k) && ultimoValorDoArtista('explicita', k) === 'sim'; };
+const explicitaGuardada = (titulo, artista) => { const k = chaveDaCapa(titulo, artista); return k ? ultimoValorDoArtista('explicita', k) : undefined; };
+const explicitaConhecida = (titulo, artista) => explicitaGuardada(titulo, artista) === 'sim';
 const seloExplicita = (titulo, artista) => (explicitaConhecida(titulo, artista) ? '<span class="selo-e" title="Explícita" aria-label="Explícita">E</span>' : '');
 const artistaDaCapa = (artista) => String(artista || '').split(/\s*(?:,|&| e | feat\.? | ft\.? | part\.? | x )\s*/i)[0].trim();
 const chaveDaCapa = (titulo, artista) => {
@@ -6486,7 +6500,7 @@ function viewLibrary(filtro = 'musicas', { selecionando = false, marcados = new 
         <div class="info"><div class="t">${esc(s.name)}</div><div class="s">${tipoDoSet(s)} · ${fmtData(s.date)} · ${resumoRepertorio(s)}</div></div>
         <span class="acts">${s.items.length ? (ehPlaylist(s) ? `<button class="icon-btn" data-tocar-set="${s.id}" aria-label="Ouvir">${icon('play', 16)}</button>` : `<a class="icon-btn" href="#/repertorio/${s.id}/0" aria-label="Tocar">${icon('play', 16)}</a>`) : ''}${lixeira(s.id, s.name)}</span></li>`
     : (s) => `<li class="track clickable lib-item" data-k="${s.id}">${marca(s.id)}${capa(s)}
-        <div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>
+        <div class="info"><div class="t">${esc(s.title)}</div><div class="s">${seloExplicita(s.title, s.artist)}${indicadores(s)}${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>
         <span class="acts">${s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : ''}${botaoMais(s.title)}</span></li>`;
   const vazio = ehRep
     ? ehPl ? `<div class="empty"><div class="bubble">${icon('disc', 32)}</div><h3>Crie sua primeira playlist</h3><p>Playlists são para ouvir: as músicas tocam uma atrás da outra no player. Em Buscar → Missas completas, crie a da missa de hoje.</p>
