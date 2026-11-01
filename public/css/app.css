@@ -4218,4 +4218,8 @@ html.tablet body.painel-recolhido #player { overflow: clip; }
 .vf-conta { position: absolute; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); translate: -50% 0; padding: 4px 12px; border-radius: 999px;
   background: rgb(0 0 0 / 0.55); color: #fff; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 /* (no celular e no tablet, o dedo passa as fotos: as setas ficam só onde há mouse) */
-@media (hover: none) { .vf-seta { display: none; } }
+/* (as setas só no computador: no celular e no tablet o dedo passa as fotos. Pelo tablet que o app reconhece, pela tela
+   de celular e pelo toque — alguns tablets, com a caneta, dizem que têm "mouse". Com ".ver-fotos" na frente: o
+   ".ver-fotos .icon-btn" de cima, mais forte, mostrava as setas mesmo assim) */
+html.tablet .ver-fotos .vf-seta { display: none; }
+@media (max-width: 899px), (hover: none), (pointer: coarse) { .ver-fotos .vf-seta { display: none; } }

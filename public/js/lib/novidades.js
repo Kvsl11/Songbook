@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 392, data: '2026-11-01', titulo: 'Fotos em tela cheia sem as setas no celular e no tablet',
+    itens: [
+      { tipo: 'melhoria', texto: 'Nas fotos do artista em tela cheia, as setas aparecem só no computador: no celular e no tablet, é só passar o dedo para o lado.' },
+    ],
+  },
+  {
     versao: 391, data: '2026-11-01', titulo: 'Fotos do artista sem repetir, e mais fotos',
     itens: [
       { tipo: 'correcao', texto: 'No “Sobre o artista”, a mesma foto não aparece mais repetida (o Michael Jackson vinha com a mesma foto três vezes, de sites diferentes): ela é reconhecida pela própria imagem e fica uma só, a maior. E vêm mais fotos dele, as do artigo da Wikipédia em que ele aparece.' },
@@ -70,12 +76,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'A fila sobe do rodapé, como o menu dos três pontinhos (com a alça para puxar), em vez de abrir no meio da tela.' },
       { tipo: 'novo', texto: 'Puxar o mini player para cima abre o Tocando agora.' },
       { tipo: 'correcao', texto: 'No tablet, girar a tela não deixa mais o mini player deslocado e cortado (a página ficava com o zoom diminuído).' },
-    ],
-  },
-  {
-    versao: 382, data: '2026-10-31', titulo: 'O mesmo ícone de vídeo em todo o app',
-    itens: [
-      { tipo: 'melhoria', texto: 'O botão “Mudar para vídeo” do Tocando agora e os menus usam o mesmo ícone de vídeo das fichas da biblioteca (o quadro com o play, como no Spotify).' },
     ],
   },
 ];
