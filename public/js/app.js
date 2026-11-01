@@ -906,10 +906,9 @@ async function guardarImagensDaMusica(song) {
   const dele = artista ? await Promise.all([fotoDoArtista(artista, slug).catch(() => ''), descricaoDoArtista(artista).catch(() => null), deezerDoArtista(artista).catch(() => null),
     canalGuardado(artista).catch(() => null), audioDbGuardado(artista).catch(() => null)]) : [];
   const [fotoA, info, dz, canal, adb] = dele;
-  const fotosVideos = canal?.id ? await fotosDosVideosGuardadas(artista, canal.id).catch(() => []) : [];
   const urls = [song.cover, ...yts.flatMap((y) => [`https://i.ytimg.com/vi/${y}/hqdefault.jpg`, `https://i.ytimg.com/vi/${y}/mqdefault.jpg`]),
     ...paginasDaPartitura(song.content), mxlDaPartitura(song.content),
-    fotoA, info?.foto, dz?.foto, canal?.foto, ...(adb?.fotos || []), ...(fotosVideos || [])].filter((u) => u && typeof u === 'string' && !/^data:/.test(u));
+    fotoA, info?.foto, dz?.foto, canal?.foto, ...(adb?.fotos || [])].filter((u) => u && typeof u === 'string' && !/^data:/.test(u));
   const c = await caches.open(CACHE_BAIXADOS);
   await Promise.all(urls.map(async (u) => {
     try {
@@ -6056,7 +6055,7 @@ function verFotos(urls, inicio = 0) {
     <div class="vf-conta" aria-live="polite"></div>` : ''}`;
   document.body.append(v);
   const trilho = $('.vf-trilho', v);
-  const ir = (n, animado = true) => {
+  let ir = (n, animado = true) => {
     i = Math.max(0, Math.min(urls.length - 1, n));
     trilho.style.transition = animado ? 'transform 0.28s ease' : 'none';
     trilho.style.transform = `translateX(${-i * 100}%)`;
@@ -6093,13 +6092,104 @@ function verFotos(urls, inicio = 0) {
     else if (b?.dataset.vf === 'ant') ir(i - 1);
     else if (b?.dataset.vf === 'prox') ir(i + 1);
   });
-  // o dedo: para o lado, a foto anda junto e passa (com resistência nas pontas); para baixo, ela desce e fecha
+  // O zoom: a pinça com dois dedos (celular e tablet), a roda do mouse (computador) ou dois toques / clique duplo; ele
+  // aumenta em volta do ponto entre os dedos (ou do mouse). Ampliada, a foto anda com um dedo ou arrastando o mouse, sem
+  // sair da borda, e passar para o lado e puxar para baixo ficam desligados. Trocando de foto, ela volta ao normal
+  const zoom = { s: 1, x: 0, y: 0 };
+  const imgAtual = () => trilho.children[i]?.querySelector('img');
+  const aplicarZoom = (animado = false) => {
+    const img = imgAtual();
+    if (!img) return;
+    // (a foto não sai da tela: o deslocamento máximo é o que sobra dela para fora, de cada lado)
+    const mx = Math.max(0, (img.offsetWidth * zoom.s - v.clientWidth) / 2);
+    const my = Math.max(0, (img.offsetHeight * zoom.s - v.clientHeight) / 2);
+    zoom.x = Math.max(-mx, Math.min(mx, zoom.x));
+    zoom.y = Math.max(-my, Math.min(my, zoom.y));
+    img.style.transition = animado ? 'transform 0.22s ease' : 'none';
+    img.style.transform = zoom.s === 1 ? '' : `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})`;
+    v.classList.toggle('ampliada', zoom.s > 1);
+  };
+  const semZoom = (animado = true) => { zoom.s = 1; zoom.x = 0; zoom.y = 0; aplicarZoom(animado); };
+  // amplia para a escala s mantendo parado o ponto (px, py) da tela
+  const zoomEm = (s, px, py, animado = false) => {
+    const img = imgAtual();
+    if (!img) return;
+    const r = v.getBoundingClientRect();
+    const cx = px - (r.left + r.width / 2);
+    const cy = py - (r.top + r.height / 2);
+    const novo = Math.max(1, Math.min(5, s));
+    // (o ponto da foto sob o dedo continua sob o dedo)
+    zoom.x = cx - ((cx - zoom.x) * novo) / zoom.s;
+    zoom.y = cy - ((cy - zoom.y) * novo) / zoom.s;
+    zoom.s = novo;
+    if (novo === 1) { zoom.x = 0; zoom.y = 0; }
+    aplicarZoom(animado);
+  };
+  const irAntes = ir;
+  ir = (n, animado = true) => { if (zoom.s !== 1 || imgAtual()?.style.transform) semZoom(false); irAntes(n, animado); };
+  v.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    zoomEm(zoom.s * Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0018)), e.clientX, e.clientY);
+  }, { passive: false });
+  v.addEventListener('dblclick', (e) => {
+    if (e.target.closest('[data-vf]')) return;
+    if (zoom.s > 1) semZoom(); else zoomEm(2.5, e.clientX, e.clientY, true);
+  });
+  // os dedos na tela (e o mouse): um dedo passa as fotos ou anda pela ampliada; dois, a pinça
+  const dedos = new Map();
+  let pinca = null;
+  let arrasto = null;
   let toque = null;
+  let ultimoToque = null; // o último toque curto, parado ({ t, x, y }): o segundo, logo em seguida e no mesmo lugar, amplia
+  let inicioToque = null;
+  const meio = () => { const [a, b] = [...dedos.values()]; return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) || 1 }; };
   v.addEventListener('pointerdown', (e) => {
     if (e.target.closest('[data-vf]') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (dedos.size === 2) {
+      ultimoToque = null;
+      inicioToque = null;
+      // (o segundo dedo: a passada para o lado ou para baixo que começou volta, e começa a pinça)
+      if (toque) { toque = null; irAntes(i); v.style.setProperty('--fundo', 1); }
+      arrasto = null;
+      const m = meio();
+      pinca = { d: m.d, s: zoom.s, x: m.x, y: m.y };
+      return;
+    }
+    if (dedos.size > 2) return;
+    // dois toques rápidos no mesmo lugar (no dedo): amplia ou volta
+    if (e.pointerType !== 'mouse') {
+      const u = ultimoToque;
+      if (u && performance.now() - u.t < 320 && Math.hypot(e.clientX - u.x, e.clientY - u.y) < 40) {
+        ultimoToque = null;
+        inicioToque = null;
+        dedos.delete(e.pointerId);
+        if (zoom.s > 1) semZoom(); else zoomEm(2.5, e.clientX, e.clientY, true);
+        return;
+      }
+      inicioToque = { t: performance.now(), x: e.clientX, y: e.clientY, id: e.pointerId };
+    }
+    if (zoom.s > 1) { arrasto = { x: e.clientX, y: e.clientY, zx: zoom.x, zy: zoom.y, id: e.pointerId }; return; }
     toque = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, eixo: '' };
   });
   v.addEventListener('pointermove', (e) => {
+    if (dedos.has(e.pointerId)) dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinca && dedos.size >= 2) {
+      const m = meio();
+      // (a escala pela distância entre os dedos; o meio dos dedos arrasta junto)
+      zoom.x += m.x - pinca.x;
+      zoom.y += m.y - pinca.y;
+      pinca.x = m.x;
+      pinca.y = m.y;
+      zoomEm(pinca.s * (m.d / pinca.d), m.x, m.y);
+      return;
+    }
+    if (arrasto && e.pointerId === arrasto.id) {
+      zoom.x = arrasto.zx + (e.clientX - arrasto.x);
+      zoom.y = arrasto.zy + (e.clientY - arrasto.y);
+      aplicarZoom();
+      return;
+    }
     if (!toque || e.pointerId !== toque.id) return;
     const dx = e.clientX - toque.x;
     const dy = e.clientY - toque.y;
@@ -6115,6 +6205,23 @@ function verFotos(urls, inicio = 0) {
     }
   });
   const soltar = (e) => {
+    dedos.delete(e.pointerId);
+    // (um toque curto e parado: pode ser o primeiro dos dois toques)
+    const it = inicioToque;
+    inicioToque = null;
+    ultimoToque = it && it.id === e.pointerId && e.type === 'pointerup' && performance.now() - it.t < 250 && Math.hypot(e.clientX - it.x, e.clientY - it.y) < 12
+      ? { t: performance.now(), x: e.clientX, y: e.clientY } : null;
+    if (pinca) {
+      if (dedos.size < 2) {
+        pinca = null;
+        // (quase no tamanho normal: volta a ele; o dedo que ficou na tela continua andando pela foto)
+        if (zoom.s < 1.08) semZoom();
+        const resto = [...dedos.entries()][0];
+        if (resto && zoom.s > 1) arrasto = { x: resto[1].x, y: resto[1].y, zx: zoom.x, zy: zoom.y, id: resto[0] };
+      }
+      return;
+    }
+    if (arrasto && e.pointerId === arrasto.id) { arrasto = null; return; }
     if (!toque || e.pointerId !== toque.id) return;
     const dx = e.clientX - toque.x;
     const dy = e.clientY - toque.y;
@@ -6123,7 +6230,7 @@ function verFotos(urls, inicio = 0) {
     toque = null;
     if (eixo === 'x' && e.type === 'pointerup' && (Math.abs(dx) > v.clientWidth * 0.18 || (rapido && Math.abs(dx) > 40))) ir(i + (dx < 0 ? 1 : -1));
     else if (eixo === 'y' && e.type === 'pointerup' && dy > 120) fechar();
-    else ir(i);
+    else irAntes(i);
   };
   v.addEventListener('pointerup', soltar);
   v.addEventListener('pointercancel', soltar);
@@ -6151,7 +6258,8 @@ async function abrirSobreArtista({ nome, slug = '' }) {
     canalGuardado(nome).catch(() => null), audioDbGuardado(nome).catch(() => null)]);
   if (!tela.isConnected) return;
   // as fotos (sem repetir): a do cartão, a do canal do YouTube, as da TheAudioDB (a principal e as de fundo), a do
-  // Deezer e a da Wikipédia; depois chegam os quadros dos vídeos do próprio canal dele (até 10 ao todo)
+  // Deezer e a da Wikipédia; depois chegam as do artigo da Wikipédia em que ele aparece (até 12 ao todo). Os quadros dos
+  // vídeos do canal dele não entram: são cenas de clipe, com o "VEVO" e o título escritos por cima, e não fotos dele
   // (sem repetir: a mesma foto vem de vários lugares — o canal do YouTube, a TheAudioDB, o Deezer em dois tamanhos —
   // com endereços diferentes; ela é reconhecida pelo endereço, sem o tamanho, e pela impressão da própria imagem, e fica
   // a maior. O Michael Jackson vinha com a mesma foto três vezes)
@@ -6163,7 +6271,8 @@ async function abrirSobreArtista({ nome, slug = '' }) {
     caixaFotos.querySelector('.sa-sem-foto')?.remove();
     for (const u of lista) {
       const k = u && chaveDaFoto(u);
-      if (!k || vistas.has(k) || naTela() >= 12) continue;
+      // (o quadro de um vídeo do YouTube não é foto do artista)
+      if (!k || vistas.has(k) || naTela() >= 12 || /ytimg\.com\/vi(_webp)?\//.test(u)) continue;
       vistas.add(k);
       const img = new Image();
       img.alt = '';
@@ -6196,10 +6305,8 @@ async function abrirSobreArtista({ nome, slug = '' }) {
     const todas = [...caixaFotos.querySelectorAll('img')];
     verFotos(todas.map((x) => x.currentSrc || x.src), todas.indexOf(img));
   });
-  // mais fotos: as do artigo da Wikipédia em que ele aparece (com o nome dele no arquivo) e os quadros dos vídeos do
-  // próprio canal dele
+  // mais fotos: as do artigo da Wikipédia em que ele aparece (com o nome dele no arquivo)
   fotosDaWikipediaGuardadas(nome).then((l) => { if (tela.isConnected && l?.length) porFotos(l); }).catch(() => {});
-  if (canal?.id) fotosDosVideosGuardadas(nome, canal.id).then((l) => { if (tela.isConnected && l) porFotos(l); });
   // os números grandes (como os ouvintes do Spotify): os seguidores no Spotify (pela TheAudioDB), os inscritos no
   // canal do YouTube e os fãs no Deezer, os que houver
   const num = (n, rotulo) => `<div><b>${n.toLocaleString('pt-BR')}</b><small>${rotulo}</small></div>`;

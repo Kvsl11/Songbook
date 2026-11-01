@@ -4223,3 +4223,7 @@ html.tablet body.painel-recolhido #player { overflow: clip; }
    ".ver-fotos .icon-btn" de cima, mais forte, mostrava as setas mesmo assim) */
 html.tablet .ver-fotos .vf-seta { display: none; }
 @media (max-width: 899px), (hover: none), (pointer: coarse) { .ver-fotos .vf-seta { display: none; } }
+/* ampliada (a pinça, a roda do mouse, dois toques): a mãozinha de arrastar no computador */
+.vf-foto img { transform-origin: 50% 50%; will-change: transform; }
+.ver-fotos.ampliada { cursor: grab; }
+.ver-fotos.ampliada:active { cursor: grabbing; }

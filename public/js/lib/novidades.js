@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 393, data: '2026-11-01', titulo: 'Zoom nas fotos do artista e sem os quadros de clipes',
+    itens: [
+      { tipo: 'novo', texto: 'Nas fotos do artista em tela cheia, dá para dar zoom: no celular e no tablet, abrindo os dois dedos (ou com dois toques); no computador, com a roda do mouse (ou clique duplo). Ampliada, a foto anda com o dedo ou arrastando o mouse; dois toques voltam ao tamanho normal.' },
+      { tipo: 'correcao', texto: 'O “Sobre o artista” não mostra mais quadros de clipes (com o “VEVO” e o título escritos por cima, como os do Michael Jackson): ficam só as fotos do artista.' },
+    ],
+  },
+  {
     versao: 392, data: '2026-11-01', titulo: 'Fotos em tela cheia sem as setas no celular e no tablet',
     itens: [
       { tipo: 'melhoria', texto: 'Nas fotos do artista em tela cheia, as setas aparecem só no computador: no celular e no tablet, é só passar o dedo para o lado.' },
@@ -67,15 +74,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'A capa animada (o clipe baixado atrás do Tocando agora) já aparece andando: antes surgia um quadro parado por um instante e só depois os trechos começavam a rolar. A troca de um trecho para o outro também entra já em movimento.' },
       { tipo: 'correcao', texto: 'A letra e a capa animada não somem mais do Tocando agora depois de fechar a letra na tela toda numa música aberta pela busca (ao tocar ou baixar, ela é salva na biblioteca e o app se perdia no endereço dela).' },
-    ],
-  },
-  {
-    versao: 383, data: '2026-10-31', titulo: 'Player com os botões do Spotify, fila no rodapé e puxar para abrir',
-    itens: [
-      { tipo: 'melhoria', texto: 'Os botões do player ficam com o jeito dos do Spotify, no celular, no tablet e no computador: aleatório, voltar, pular, repetir, o play, a fila, o painel e os botões da Letra.' },
-      { tipo: 'melhoria', texto: 'A fila sobe do rodapé, como o menu dos três pontinhos (com a alça para puxar), em vez de abrir no meio da tela.' },
-      { tipo: 'novo', texto: 'Puxar o mini player para cima abre o Tocando agora.' },
-      { tipo: 'correcao', texto: 'No tablet, girar a tela não deixa mais o mini player deslocado e cortado (a página ficava com o zoom diminuído).' },
     ],
   },
 ];
