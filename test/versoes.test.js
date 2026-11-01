@@ -274,7 +274,8 @@ test('a foto do artista acompanha o salvamento e é persistida para a biblioteca
   assert.match(app, /fotoArtista: item\.fotoArtista/);
   assert.match(app, /preview\.fotoArtista \? \{ fotoArtista: preview\.fotoArtista \}/);
   assert.match(app, /db\.updateSong\(item\.id, \{ fotoArtista: foto \}\)/);
-  assert.match(app, /s\.fotoArtista \? `<img src=/);
+  // (a guardada aparece na lista, menos a imagem padrão de site, que não é foto: fotoReal)
+  assert.match(app, /fotoReal\(s\.fotoArtista\) \? `<img src=/);
 });
 
 

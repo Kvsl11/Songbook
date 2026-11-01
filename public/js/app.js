@@ -24,7 +24,7 @@ import { apagarAudio, chavesDosAudios, duracaoDoArquivo, guardarAudio, lerAudio,
 import { escolherAudio, mesmaSincronia, paresPelaDuracao, paresPelaLegenda, paresPelasLetras, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
 import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { embaralharIndices, moverIndice } from './lib/fila.js';
-import { audioDbDoArtista, audioDoVideo, buscarYoutube, legendasDoVideo, semCensura, cifraComoCantada, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
+import { audioDbDoArtista, audioDoVideo, buscarYoutube, ehImagemPadrao, legendasDoVideo, semCensura, cifraComoCantada, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -1049,6 +1049,9 @@ const REVISOES = [
   // v385: a primeira, para todas: a letra que faltava, o áudio oficial que não foi achado e os downloads incompletos,
   // apagados pelo sistema ou com o arquivo estragado (o vídeo que não abria)
   { rev: 1, letra: true, versoes: true, arquivos: true },
+  // v389: a imagem que o site põe no lugar da foto que não tem (o violão do Cifra Club) guardada como a foto do artista
+  // ou a capa da música sai (fica o desenho do app, ou a foto de verdade que for achada)
+  { rev: 2, fotos: true, quais: (s) => ehImagemPadrao(s.fotoArtista) || ehImagemPadrao(s.cover) },
 ];
 const REVISAO_MUSICAS = REVISOES[REVISOES.length - 1].rev;
 const revisando = new Set();
@@ -1093,6 +1096,14 @@ async function revisarMusica(id, pendentes, chaves) {
   if (!s) return true;
   const quer = (k) => pendentes.find((r) => r[k] && (!r.quais || r.quais(s)))?.[k];
   let completa = true;
+  // a foto do artista ou a capa que era a imagem padrão do site
+  if (quer('fotos')) {
+    const tirar = {};
+    if (ehImagemPadrao(s.fotoArtista)) tirar.fotoArtista = undefined;
+    if (ehImagemPadrao(s.cover)) tirar.cover = undefined;
+    if (Object.keys(tirar).length) db.updateSong(id, tirar);
+    s = db.song(id);
+  }
   // a letra sincronizada (a feita à mão pela pessoa fica como está)
   if (quer('letra') && midiaDe(s) && !(s.sincronia && s.sincronia.fonte !== 'lrclib')) {
     try { recuperarSincronia(s); } catch { /* segue */ }
@@ -4407,7 +4418,7 @@ function indicadores(s) {
 
 const linhaMusica = (s, extra = '') => `
   <li class="track clickable" data-id="${s.id}" style="grid-template-columns:auto 1fr auto">
-    ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}<span class="artista-mini${s.fotoArtista ? ' com-foto' : ''}" data-artista-mini>${s.fotoArtista ? `<img src="${esc(s.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
+    ${capa(s)}<div class="info"><div class="t">${esc(s.title)}</div><div class="s">${indicadores(s)}<span class="artista-mini${fotoReal(s.fotoArtista) ? ' com-foto' : ''}" data-artista-mini>${fotoReal(s.fotoArtista) ? `<img src="${esc(s.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(s.artist || (s.source ? host(s.source) : 'Cifra própria'))}</div></div>${extra}</li>`;
 
 // Escolhe uma música: da biblioteca ou procurando na internet (Cifra Club, cantos da missa, letras,
 // vídeos do YouTube). O que vem da internet é salvo na biblioteca. Devolve o id, 'nova' ou null.
@@ -5513,6 +5524,8 @@ function pessoasDosCreditos({ artista = '', titulo = '', compositor = '', letris
 const corDaPessoa = (n) => `hsl(${[...n].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)} 45% 38%)`;
 const papeisCurtos = (p) => p.papeis[0] + (p.papeis.length > 1 ? ` + ${p.papeis.length - 1}` : '');
 // (sem foto: a pessoa com a nota musical, como no Spotify, no lugar das iniciais)
+// a foto, se for foto mesmo ('' para a imagem que o site põe no lugar da que não tem)
+const fotoReal = (url) => (url && typeof url === 'string' && !ehImagemPadrao(url) ? url : '');
 const semFotoArtista = (size = 48) => `<span class="sem-foto-artista">${icon('artistaSemFoto', size)}</span>`;
 const avatarDe = (p, i, classe = 'ref-avatar') => `<span class="${classe} sem-foto" data-foto="${i}">${semFotoArtista()}</span>`;
 // a foto de cada pessoa nas bolinhas [data-foto] da caixa (as que não têm foto ficam com as iniciais)
@@ -5593,11 +5606,12 @@ let guardandoArtistas = 0;
 function comUltimoValor(tipo, nome, promessa) {
   const k = `${tipo}:${normalizar(nome)}`;
   return Promise.resolve(promessa).catch(() => null).then((v) => {
+    if (tipo === 'foto' || tipo === 'capa') v = fotoReal(v);
     const vazio = v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length);
     // (sem nada com internet: não há mesmo, e o guardado sai, como a foto genérica do Deezer guardada antes; sem
     // internet, vale o último valor)
     if (vazio && navigator.onLine && (tipo === 'foto' || tipo === 'capa')) { delete artistasGuardados[k]; return v; }
-    if (vazio) return artistasGuardados[k]?.v ?? v;
+    if (vazio) return (tipo === 'foto' || tipo === 'capa' ? fotoReal(artistasGuardados[k]?.v) : artistasGuardados[k]?.v) ?? v;
     artistasGuardados[k] = { v, t: Date.now() };
     clearTimeout(guardandoArtistas);
     guardandoArtistas = setTimeout(() => {
@@ -5609,7 +5623,7 @@ function comUltimoValor(tipo, nome, promessa) {
     return v;
   });
 }
-const ultimoValorDoArtista = (tipo, nome) => artistasGuardados[`${tipo}:${normalizar(nome)}`]?.v;
+const ultimoValorDoArtista = (tipo, nome) => { const v = artistasGuardados[`${tipo}:${normalizar(nome)}`]?.v; return tipo === 'foto' || tipo === 'capa' ? fotoReal(v) : v; };
 const canalGuardado = (nome) => comUltimoValor('canal', nome, canalDoArtista(nome));
 const audioDbGuardado = (nome) => comUltimoValor('adb', nome, audioDbDoArtista(nome));
 const fotosDosVideosGuardadas = (nome, canal) => comUltimoValor('fotosvideos', nome, fotosDosVideos(nome, canal));
@@ -5621,14 +5635,14 @@ const fotosArtistas = new Map();
 function fotoDoArtista(nome, slug = '') {
   const k = normalizar(nome);
   // a música veio do Cifra Club: o artista é o da página dela (sem adivinhar pelo nome)
-  if (slug && !fotosArtistas.has(k)) fotosArtistas.set(k, fotoDoCanalDeVerdade(nome).then((f) => f || carregarArtista(slug, nome).principal.then((x) => x?.foto || '').catch(() => '')
+  if (slug && !fotosArtistas.has(k)) fotosArtistas.set(k, fotoDoCanalDeVerdade(nome).then((f) => f || carregarArtista(slug, nome).principal.then((x) => fotoReal(x?.foto)).catch(() => '')
     .then((f) => f || buscarArtistasCifraClub(nome).then((l) => l.find((a) => a.slug === slug)?.capa || '').catch(() => ''))
     .then((f) => f || fotoDeezer(nome))));
   if (!fotosArtistas.has(k)) {
     // a busca do Cifra Club nem sempre traz a foto (a do Justice vem vazia): aí vale a da página do artista, a mesma
     // que aparece ao abrir o artista (sem isso, o Deezer trazia a foto de outro artista com o mesmo nome)
     const cifraClub = () => buscarArtistasCifraClub(nome).then((l) => artistaCerto(l, nome)).then((a) => a?.capa
-      || (a?.slug ? carregarArtista(a.slug, a.nome || nome).principal.then((x) => x?.foto || '') : '')).catch(() => '');
+      || (a?.slug ? carregarArtista(a.slug, a.nome || nome).principal.then((x) => fotoReal(x?.foto)) : '')).catch(() => '');
     fotosArtistas.set(k, fotoDoCanalDeVerdade(nome).then((f) => f || cifraClub()).then((f) => f || fotoDeezer(nome)).then((f) => f || fotoWikipedia(nome)));
   }
   return comUltimoValor('foto', nome, fotosArtistas.get(k));
@@ -5789,10 +5803,21 @@ function capaOficial(titulo, artista) {
   }
   return comUltimoValor('capa', k, capasOficiais.get(k));
 }
+// o artista do Deezer com o nome pedido: o de nome igual (o único, ou o que tem mais fãs entre os xarás: o "justice"
+// desconhecido vinha antes do Justice). Vários com o mesmo nome e nenhum conhecido costuma ser outro artista (o "Belief"
+// dos créditos de Perfect vinha com a capa de uma banda de 96 fãs), e um nome só parecido também ("Belief Defect" não é
+// o "Belief"; o parecido, como "Frei Gilson - CMES", vale quando não há o igual e ele é conhecido): aí fica o desenho
+function artistaDeezerCerto(lista, nome) {
+  const fas = (x) => x.nb_fan || 0;
+  const parecidos = (lista || []).filter((x) => mesmoNome(x.name, nome)).sort((x, y) => fas(y) - fas(x));
+  const iguais = parecidos.filter((x) => normalizar(x.name) === normalizar(nome));
+  if (iguais.length) return iguais.length > 1 && fas(iguais[0]) < 1000 ? null : iguais[0];
+  return parecidos[0] && fas(parecidos[0]) >= 1000 ? parecidos[0] : null;
+}
 async function fotoDeezer(nome) {
   const r = await jsonp(`https://api.deezer.com/search/artist?q=${encodeURIComponent(nome)}&limit=5`);
   // com vários do mesmo nome (o "justice" desconhecido vinha antes do Justice), o que tem mais fãs
-  const a = (r?.data || []).filter((x) => mesmoNome(x.name, nome)).sort((x, y) => (y.nb_fan || 0) - (x.nb_fan || 0))[0];
+  const a = artistaDeezerCerto(r?.data, nome);
   // sem foto, o Deezer devolve uma imagem genérica (o endereço fica com "/artist//")
   const foto = a?.picture_medium && !/\/artist\/\//.test(a.picture_medium) ? a.picture_big || a.picture_medium : '';
   return foto && !(await ehFotoVaziaDoDeezer(foto)) ? foto : '';
@@ -5885,7 +5910,7 @@ function deezerDoArtista(nome) {
   const k = normalizar(nome);
   if (!deezerArtistas.has(k)) {
     deezerArtistas.set(k, jsonp(`https://api.deezer.com/search/artist?q=${encodeURIComponent(nome)}&limit=5`).then(async (r) => {
-      const a = (r?.data || []).filter((x) => mesmoNome(x.name, nome)).sort((x, y) => (y.nb_fan || 0) - (x.nb_fan || 0))[0];
+      const a = artistaDeezerCerto(r?.data, nome);
       if (!a) return null;
       const xl = a.picture_xl && !/\/artist\/\//.test(a.picture_xl) ? a.picture_xl : '';
       const foto = xl && !(await ehFotoVaziaDoDeezer(xl)) ? xl : '';
@@ -6023,7 +6048,7 @@ const indicadoresWeb = (r) => {
 };
 const linhaMusicaWeb = (r, i, extra = '') => `
   <li class="track clickable" data-web="musica" data-midia-index="${i}" data-i="${i}" style="grid-template-columns:auto 1fr auto">
-    ${capa({ titulo: r.titulo, capa: r.capa || r.video?.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${seloExplicita(r.titulo, r.artista)}${indicadoresWeb(r)}<span class="artista-mini" data-artista-mini>${r.fotoArtista ? `<img src="${esc(r.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(r.artista || '')}${r.video?.duracao ? ` · ${esc(r.video.duracao)}` : ''}</div></div>
+    ${capa({ titulo: r.titulo, capa: r.capa || r.video?.capa })}<div class="info"><div class="t">${esc(r.titulo)}</div><div class="s">${seloExplicita(r.titulo, r.artista)}${indicadoresWeb(r)}<span class="artista-mini" data-artista-mini>${fotoReal(r.fotoArtista) ? `<img src="${esc(r.fotoArtista)}" alt="" loading="lazy">` : semFotoArtista(14)}</span>${esc(r.artista || '')}${r.video?.duracao ? ` · ${esc(r.video.duracao)}` : ''}</div></div>
     <span class="acts">${extra}${botaoSalvar({ titulo: r.titulo, artista: r.artista, cifra: r.cifra || '', letra: r.letra?.url || '', video: r.video, fotoArtista: r.fotoArtista || '' }, 'mini')}<button class="icon-btn" data-abrir aria-label="Abrir">${icon('next', 18)}</button></span></li>`;
 
 // Busca vazia: as músicas católicas mais procuradas agora no Cifra Club — as mais tocadas de cada um dos
@@ -6305,7 +6330,7 @@ async function viewArtista(slug, nome) {
   // a foto do topo é a mesma das buscas e do player (a definitiva, fotoDoArtista); a da página do Cifra Club (às vezes
   // antiga) só vale quando não há outra. Antes ela entrava primeiro e passava a valer em todo lugar
   const fotoAgora = fotoConhecida(nome);
-  fotoDoArtista(nome || slug, slug).catch(() => '').then(async (f) => f || (await d.principal.catch(() => null))?.foto || '').then((f) => {
+  fotoDoArtista(nome || slug, slug).catch(() => '').then(async (f) => f || fotoReal((await d.principal.catch(() => null))?.foto)).then((f) => {
     if (!f) return;
     foto = f;
     const box = $('#art-foto');

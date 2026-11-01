@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 389, data: '2026-11-01', titulo: 'Sem a foto do violão para quem não tem foto',
+    itens: [
+      { tipo: 'correcao', texto: 'Quem não tem foto (como o “Belief” nos créditos de Perfect) fica com o desenho do app, a pessoa com a nota, em vez da foto de um violão: era a imagem que o Cifra Club põe no lugar da foto de quem não tem. As músicas que já tinham guardado essa imagem também passam a mostrar o desenho.' },
+      { tipo: 'correcao', texto: 'Um nome que existe no Deezer de vários artistas pouco conhecidos (ou só parecido, como “Belief Defect” para “Belief”) não traz mais a foto de outra pessoa: fica o desenho.' },
+    ],
+  },
+  {
     versao: 388, data: '2026-11-01', titulo: 'A letra volta nas músicas em que o clipe é a própria gravação',
     itens: [
       { tipo: 'correcao', texto: 'A letra volta a aparecer no modo música quando o clipe é a própria gravação da música (como em Company): o app guardava o clipe também como a versão de música e o Tocando agora achava que estava no modo vídeo, escondendo a letra. Vale também para as músicas que já estavam baixadas.' },
@@ -70,13 +77,6 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'A letra sincronizada não some mais quando o vídeo da música já é o próprio áudio (como em Company): o app achava outra versão (o clipe, um ao vivo) e trocava os papéis dos dois. Agora ele reconhece qual é o áudio pela duração da letra.' },
       { tipo: 'correcao', texto: 'O selo “E” das músicas explícitas aparece também na lista da biblioteca, sem precisar abrir a música.' },
       { tipo: 'melhoria', texto: 'A capa animada continua andando com a música pausada, como no Spotify.' },
-    ],
-  },
-  {
-    versao: 379, data: '2026-10-31', titulo: 'Cifra acompanhando a música certa e barra parada no anúncio do vídeo',
-    itens: [
-      { tipo: 'correcao', texto: 'Na Cifra, a linha acesa volta a ser a que está sendo cantada: quando a letra sincronizada tinha uma linha só de acordes (como “( Am7 )”), a cifra passava a acender a linha errada dali em diante. E o refrão escrito duas vezes acende no lugar certo da segunda vez, sem voltar para o primeiro.' },
-      { tipo: 'correcao', texto: 'No modo vídeo, a barra de reprodução não anda mais durante o anúncio: o clipe que toca mudo junto da música passava o anúncio escondido, e o app guardava a duração do anúncio como a do clipe; ao mudar para o vídeo, o anúncio não era mais reconhecido.' },
     ],
   },
 ];

@@ -615,3 +615,18 @@ test('cifra: o acorde sobre a sílaba curta avança por cima da letra seguinte, 
   // o último acorde da linha (sem letra depois) e os acordes colados continuam ocupando o espaço deles
   assert.doesNotMatch(html, /solto[^"]*"><span class="chord">(Dm7|G|C)</);
 });
+
+// o artista sem foto no Cifra Club: a página põe no lugar o violão padrão do site ("thumb-art.svg"), que não é foto de
+// ninguém (vinha como a foto do "Belief" nos créditos de Perfect, em vez do desenho do app)
+test('página do artista no Cifra Club: a imagem padrão do site não é a foto do artista', async () => {
+  const { parseArtistaCifraClub, ehImagemPadrao } = await import('../public/js/lib/web.js');
+  const a = parseArtistaCifraClub('<meta property="og:image" content="https://akamai.sscdn.co/cc/img/desktop/thumb-art.svg?v=3"><h1>Belief</h1>', 'belief');
+  assert.equal(a.nome, 'Belief');
+  assert.equal(a.foto, '');
+  assert.ok(ehImagemPadrao('https://akamai.sscdn.co/cc/img/desktop/thumb-art.svg?v=3'));
+  assert.ok(ehImagemPadrao('https://e-cdns-images.dzcdn.net/images/artist//250x250-000000-80-0-0.jpg'));
+  assert.ok(!ehImagemPadrao('https://akamai.sscdn.co/letras/250x250/fotos/7/6/4/6/abc.jpg'));
+  assert.ok(!ehImagemPadrao('https://cdn-images.dzcdn.net/images/artist/2a93a1d9b3b61e2cc823e4dea33667f9/250x250-000000-80-0-0.jpg'));
+  assert.ok(!ehImagemPadrao('https://yt3.ggpht.com/abc=s480-c-k-c0x00ffffff-no-rj'));
+  assert.ok(!ehImagemPadrao(''));
+});

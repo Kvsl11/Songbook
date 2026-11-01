@@ -209,6 +209,11 @@ export async function getCifraClub(url, opcoes = {}) {
   return lerPagina(limpo, (html) => parseCifraClub(html, limpo), { ...opcoes, nome: 'o Cifra Club' });
 }
 
+// As imagens que os sites põem no lugar da foto que não têm: não são foto de ninguém (o violão branco do Cifra Club,
+// "thumb-art.svg", vinha como a foto de quem não tem foto lá, como o "Belief" dos créditos de Perfect). Quem não tem
+// foto fica com o desenho do app (a pessoa com a nota)
+export const ehImagemPadrao = (url) => /sscdn\.co\/(cc|letras)\/img\/|thumb-art|\/images\/artist\/\/|default[-_]?(artist|avatar|profile)|\.svg(\?|#|$)/i.test(String(url || ''));
+
 // ---- artistas do Cifra Club: na busca (t = 1) e a página do artista com as músicas mais tocadas
 export function artistasCifraClub(json) {
   return (json?.response?.docs || [])
@@ -228,11 +233,12 @@ export function parseArtistaCifraClub(html, slug) {
   const capas = new Map();
   for (const m of String(html).replace(/\\"/g, '"').matchAll(/"slug":"([a-z0-9-]+)","thumbs":\{"x1":"([^"]*)"(?:,"x2":"([^"]*)")?/g)) {
     const url = m[3] || m[2];
-    if (url && !capas.has(m[1])) capas.set(m[1], url.replace(/\/\d+x\d+\//, '/250x250/'));
+    if (url && !ehImagemPadrao(url) && !capas.has(m[1])) capas.set(m[1], url.replace(/\/\d+x\d+\//, '/250x250/'));
   }
   const texto = (h) => decodeEntities(String(h).replace(/<[^>]+>/g, '|')).split('|').map((x) => x.trim()).filter(Boolean);
   const nome = texto((/<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html) || [])[1] || '')[0] || '';
-  const foto = (/property="og:image"\s+content="([^"]+)"|content="([^"]+)"\s+property="og:image"/.exec(html) || []).slice(1).find(Boolean) || '';
+  const og = (/property="og:image"\s+content="([^"]+)"|content="([^"]+)"\s+property="og:image"/.exec(html) || []).slice(1).find(Boolean) || '';
+  const foto = ehImagemPadrao(og) ? '' : og;
   const re = new RegExp(`<a[^>]+href="(?:https://www\\.cifraclub\\.com\\.br)?/${slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/([a-z0-9-]+)/"[^>]*>([\\s\\S]*?)</a>`, 'g');
   const musicas = [];
   const vistas = new Set();
