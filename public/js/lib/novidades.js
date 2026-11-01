@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 388, data: '2026-11-01', titulo: 'A letra volta nas músicas em que o clipe é a própria gravação',
+    itens: [
+      { tipo: 'correcao', texto: 'A letra volta a aparecer no modo música quando o clipe é a própria gravação da música (como em Company): o app guardava o clipe também como a versão de música e o Tocando agora achava que estava no modo vídeo, escondendo a letra. Vale também para as músicas que já estavam baixadas.' },
+    ],
+  },
+  {
     versao: 387, data: '2026-11-01', titulo: 'Mini player do celular como o do Spotify e a letra que não some',
     itens: [
       { tipo: 'melhoria', texto: 'No celular, o mini player fica mais limpo, como o do Spotify: a capa, o nome e o artista e, à direita, só ouvir em outro aparelho, o ✓ da biblioteca e tocar/pausar, com a linha do andamento fina embaixo. Aleatório, voltar, pular e repetir ficam no Tocando agora, e fechar o player fica no ⋯ dele.' },
@@ -71,14 +77,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'Na Cifra, a linha acesa volta a ser a que está sendo cantada: quando a letra sincronizada tinha uma linha só de acordes (como “( Am7 )”), a cifra passava a acender a linha errada dali em diante. E o refrão escrito duas vezes acende no lugar certo da segunda vez, sem voltar para o primeiro.' },
       { tipo: 'correcao', texto: 'No modo vídeo, a barra de reprodução não anda mais durante o anúncio: o clipe que toca mudo junto da música passava o anúncio escondido, e o app guardava a duração do anúncio como a do clipe; ao mudar para o vídeo, o anúncio não era mais reconhecido.' },
-    ],
-  },
-  {
-    versao: 378, data: '2026-10-31', titulo: 'Letra como é cantada, cifra sem buracos e barra parada no anúncio',
-    itens: [
-      { tipo: 'correcao', texto: 'A letra sincronizada não vem mais da versão de rádio (“give a damns” no lugar de “give a fucks”, em Espresso): fica a letra da gravação que toca, e a Letra e a Cifra mostram as mesmas palavras cantadas.' },
-      { tipo: 'melhoria', texto: 'Na cifra, o acorde sobre uma sílaba curta (“m[Am7]e”, “l[Am7]ike”) não abre mais um buraco no meio da frase: ele passa por cima da letra seguinte, sem encostar no próximo acorde.' },
-      { tipo: 'correcao', texto: 'Enquanto passa o anúncio do YouTube, a barra de reprodução, o tempo e a letra ficam parados: eles só começam a andar quando a música começa a tocar.' },
     ],
   },
 ];

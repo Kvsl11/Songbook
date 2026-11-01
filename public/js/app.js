@@ -2756,7 +2756,7 @@ const semLinhasDeAcordes = (sinc) => {
   const reservaDe = () => tela.querySelector('iframe.pl-reserva');
   const cmdEm = (f, func, args = []) => f?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
   const outraVersao = () => {
-    if (!atual?.audio || !atual.video || atual.semVideo) return '';
+    if (!atual?.audio || !atual.video || atual.semVideo || atual.audio === atual.video) return '';
     return atual.youtube === atual.audio ? atual.video : atual.youtube === atual.video ? atual.audio : '';
   };
   let trocando = null;
@@ -2950,7 +2950,9 @@ const semLinhasDeAcordes = (sinc) => {
     desenharCapa();
   };
   // tocando o clipe de uma música que tem as duas versões (a letra não acompanha: ela é do áudio)
-  const noClipe = () => Boolean(atual?.audio && atual.youtube === atual.video);
+  // (o clipe que é a própria gravação, guardado como as duas versões — áudio e clipe o mesmo vídeo, como Company —: é uma
+  // versão só, que toca nos dois modos; no modo música ela não é "o clipe" e a letra fica. Antes a letra sumia)
+  const noClipe = () => Boolean(atual?.audio && atual.audio !== atual.video && atual.youtube === atual.video);
   let foiProClipe = -Infinity; // quando trocou para o clipe pela última vez (performance.now)
   // o modo vídeo (o "Mudar para vídeo"): o clipe das duas versões ou, com um vídeo só, o vídeo no lugar da capa
   const emVideo = () => !atual?.soMusica && (noClipe() || Boolean(atual?.youtube && !comCapa && !atual.semVideo && !(ehArquivo(atual.youtube) && !atual.video)));
@@ -3033,10 +3035,10 @@ const semLinhasDeAcordes = (sinc) => {
       if (!item.youtube) { api.fechar(); return; }
       const era = atual.youtube;
       // (o ponto da música: no áudio, quando há as duas versões)
-      const tMusica = atual.audio && era === atual.video ? tempoNoAudio(atual.pares, api.tempoAgora) : api.tempoAgora;
+      const tMusica = atual.audio && atual.audio !== atual.video && era === atual.video ? tempoNoAudio(atual.pares, api.tempoAgora) : api.tempoAgora;
       atual = { ...atual, video: item.video, audio: item.audio, pares: item.pares, soMusica: item.soMusica };
       if (item.youtube === era) { letraDe = ''; desenhar(); return; }
-      const noClipeNovo = Boolean(item.audio && item.youtube === item.video);
+      const noClipeNovo = Boolean(item.audio && item.audio !== item.video && item.youtube === item.video);
       if (noClipeNovo) foiProClipe = performance.now();
       trocarVersao(item.youtube, noClipeNovo ? tempoNoVideo(item.pares, tMusica) : tMusica);
     },
