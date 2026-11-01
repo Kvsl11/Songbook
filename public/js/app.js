@@ -20,7 +20,7 @@ import { acordesDoCampo, cifraDaHarmonia, colocarCifras, harmoniaDosTempos } fro
 import { NOVIDADES, APP_VERSAO, versaoMostrada } from './lib/novidades.js';
 import { baseDoServidor, baixarArquivoDoServidor, cabecalhos, casarLinhas, chamar, chamarComEtapas, erroExplicado, linhaNoTempo, linhaSemCifra } from './lib/servidor-ia.js';
 import { buscarNaWeb, buscarNaWikipedia, criarIndice as criarIndiceDuvidas, hifenizar, pedidoLiturgico, pedidoSugestao, dataDaPergunta, melhoresFrases, pedeCanto, palavras as palavrasDuvida, raiz as raizDuvida, semCifra as textoSemCifra } from './lib/duvidas.js';
-import { apagarAudio, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } from './audios.js';
+import { apagarAudio, chavesDosAudios, duracaoDoArquivo, guardarAudio, lerAudio, limparAudios } from './audios.js';
 import { escolherAudio, mesmaSincronia, paresPelaDuracao, paresPelaLegenda, paresPelasLetras, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
 import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { embaralharIndices, moverIndice } from './lib/fila.js';
@@ -881,7 +881,7 @@ async function baixarAgora(id) {
 
   if (!db.song(id)) return;
   const tamanho = Object.values(arquivos).reduce((a, x) => a + (x.tamanho || 0), 0);
-  db.updateSong(id, { baixado: { arquivos, tamanho, em: Date.now() } });
+  db.updateSong(id, { baixado: { arquivos, tamanho, em: Date.now() }, rebaixar: undefined });
   // A música fica pronta assim que áudio/vídeo forem guardados. Capas, fotos,
   // biografia e outros dados do artista são enriquecimento offline em segundo
   // plano: uma API lenta não deve segurar o download principal.
@@ -924,12 +924,13 @@ async function removerDownload(song) {
   const s = db.song(song.id);
   if (!s?.baixado) return;
   const yts = Object.keys(s.baixado.arquivos || {});
-  db.updateSong(s.id, { baixado: null });
+  db.updateSong(s.id, { baixado: null, rebaixar: undefined });
   await Promise.all(yts.filter((y) => !baixadoDe(y)).map((y) => apagarAudio(chaveBaixada(y)).catch(() => {})));
   avisarDownloads();
 }
 async function removerTodosDownloads() {
   for (const s of db.songs().filter((x) => x.baixado)) await removerDownload(s);
+  for (const s of db.songs().filter((x) => x.rebaixar)) db.updateSong(s.id, { rebaixar: undefined });
   if ('caches' in window) await caches.delete(CACHE_BAIXADOS).catch(() => {});
 }
 // o botão de baixar (a seta no círculo, como no Spotify): vazio, baixando (com a porcentagem) ou baixada (cheio)
@@ -1028,6 +1029,159 @@ window.addEventListener('songbook:downloads', () => {
   });
   document.querySelectorAll('[data-baixar]').forEach((b) => { const s = db.song(b.dataset.baixar); if (s) b.outerHTML = botaoBaixar(s, [...b.classList].filter((c) => !['icon-btn', 'btn-baixar', 'baixada', 'baixando'].includes(c)).join(' ')); });
 });
+
+
+// ---------------------------------------------------------------- revisão das músicas salvas
+// Quando uma versão do app corrige algo que fica GUARDADO na música (a letra sincronizada, as versões de áudio e clipe,
+// os arquivos baixados), as músicas que já estavam na biblioteca e no aparelho são revisadas sozinhas, em segundo plano:
+// a pessoa não precisa tirar a música, apagar o download e baixar de novo. Cada música guarda a última revisão por que
+// passou (song.revisao); as que estão atrás passam pelas que faltam, uma de cada vez.
+// AO CORRIGIR ALGO ASSIM: acrescente uma revisão no fim da lista, dizendo o que refazer:
+//   letra: confere a letra sincronizada (a que falta ou ficou presa a outra versão é procurada de novo; a sincronizada
+//          à mão pela pessoa não é mexida)
+//   versoes: procura o áudio oficial das músicas que ainda não têm
+//   arquivos: confere os downloads (o arquivo que sumiu do aparelho, o que não abre, o que ficou faltando) e baixa de
+//             novo só esses
+//   rebaixar: 'video' | 'audio' | true — baixa de novo esses arquivos de todas as músicas baixadas (quando o próprio
+//             download mudou: a qualidade, o formato…)
+//   quais(song): opcional, só as músicas em que a correção faz diferença
+const REVISOES = [
+  // v385: a primeira, para todas: a letra que faltava, o áudio oficial que não foi achado e os downloads incompletos,
+  // apagados pelo sistema ou com o arquivo estragado (o vídeo que não abria)
+  { rev: 1, letra: true, versoes: true, arquivos: true },
+];
+const REVISAO_MUSICAS = REVISOES[REVISOES.length - 1].rev;
+const revisando = new Set();
+const sincOkDe = (x) => x?.sincronia?.fonte === 'lrclib' && x.sincronia.video === videoDaLetra(x) && x.sincronia.tempos?.length && !x.sincronia.provisoria;
+// pode baixar sem perguntar (como o "Baixar ao salvar"): com o servidor ligado e fora dos dados móveis (ou liberados)
+const podeBaixarSozinho = async () => {
+  if (!navigator.onLine || (navigator.connection?.type === 'cellular' && !db.prefs().baixarDadosMoveis)) return false;
+  await carregarServidor().catch(() => {});
+  return Boolean(servidorIA().url);
+};
+// o arquivo baixado abre neste aparelho? true, false (não abre: estragado) ou null (não deu para saber a tempo)
+function abreNoAparelho(blob) {
+  return new Promise((ok) => {
+    const url = URL.createObjectURL(blob);
+    const v = document.createElement('video');
+    let feito = false;
+    const fim = (r) => { if (feito) return; feito = true; clearTimeout(t); v.removeAttribute('src'); v.load(); URL.revokeObjectURL(url); ok(r); };
+    const t = setTimeout(() => fim(null), 15000);
+    v.muted = true;
+    v.preload = 'metadata';
+    v.onloadedmetadata = () => fim(Number.isFinite(v.duration) && v.duration > 0 ? true : v.duration === Infinity ? null : false);
+    // (só o erro de arquivo estragado conta; o formato que este navegador não toca não é culpa do arquivo)
+    // (o 4 também vem do arquivo cortado ou corrompido: conta quando o navegador diz que toca esse tipo)
+    v.onerror = () => fim(v.error?.code === 3 || (v.error?.code === 4 && blob.type && v.canPlayType(blob.type)) ? false : null);
+    v.src = url;
+  });
+}
+// tira o arquivo (de todas as músicas que o usam) para ele ser baixado de novo
+async function esquecerArquivo(yt) {
+  for (const x of db.songs()) {
+    if (!x.baixado?.arquivos?.[yt]) continue;
+    const arquivos = { ...x.baixado.arquivos };
+    delete arquivos[yt];
+    // (rebaixar: era baixada e fica marcada para baixar de novo, mesmo se o servidor só ligar outro dia)
+    db.updateSong(x.id, { baixado: Object.keys(arquivos).length ? { ...x.baixado, arquivos, tamanho: Object.values(arquivos).reduce((a, f) => a + (f.tamanho || 0), 0) } : null, rebaixar: true });
+  }
+  await apagarAudio(chaveBaixada(yt)).catch(() => {});
+}
+// true: a música passou por tudo; false: falta algo que só dá com internet ou com o servidor (tenta na próxima vez)
+async function revisarMusica(id, pendentes, chaves) {
+  let s = db.song(id);
+  if (!s) return true;
+  const quer = (k) => pendentes.find((r) => r[k] && (!r.quais || r.quais(s)))?.[k];
+  let completa = true;
+  // a letra sincronizada (a feita à mão pela pessoa fica como está)
+  if (quer('letra') && midiaDe(s) && !(s.sincronia && s.sincronia.fonte !== 'lrclib')) {
+    try { recuperarSincronia(s); } catch { /* segue */ }
+    s = db.song(id);
+    if (s && !sincOkDe(s)) {
+      if (!navigator.onLine) completa = false;
+      else {
+        const r = await noMaximo(sincronizarMusica(s), 45000, 'demorou');
+        if (r === 'erro' || r === 'demorou') completa = false;
+      }
+    }
+  }
+  s = db.song(id);
+  if (!s) return true;
+  // o áudio oficial que ainda não foi achado
+  if (quer('versoes') && s.youtube && !s.audioProprio && !versoesDe(s)?.audio) {
+    if (!navigator.onLine) completa = false;
+    else await noMaximo(descobrirVersoes(s), 45000).catch(() => {});
+  }
+  s = db.song(id);
+  if (!s?.baixado && !s?.rebaixar) return completa;
+  // os downloads: o arquivo que sumiu do aparelho ou que não abre sai da lista, para ser baixado de novo
+  const rebaixar = quer('rebaixar');
+  if (quer('arquivos') || rebaixar) {
+    for (const [yt, info] of Object.entries(s.baixado?.arquivos || {})) {
+      const ehVideo = String(info?.tipo || '').startsWith('video');
+      let estragado = !chaves.has(chaveBaixada(yt)) || (rebaixar === true || (rebaixar === 'video' && ehVideo) || (rebaixar === 'audio' && !ehVideo));
+      if (!estragado) {
+        const blob = await lerAudio(chaveBaixada(yt)).catch(() => null);
+        estragado = !blob?.size || (await abreNoAparelho(blob)) === false;
+      }
+      if (estragado) { await esquecerArquivo(yt); chaves.delete(chaveBaixada(yt)); }
+    }
+  }
+  s = db.song(id);
+  // e baixa o que falta (era baixada: mesmo a que ficou sem arquivo nenhum volta a baixar)
+  if (s && precisaBaixar(s)) {
+    if (!(await podeBaixarSozinho())) return false;
+    await baixarMusica(s, { perguntou: true });
+  } else if (s?.rebaixar) db.updateSong(id, { rebaixar: undefined });
+  return completa;
+}
+// "Consertar agora" (no diagnóstico): a letra é procurada de novo mesmo que a guardada pareça certa (a feita à mão fica),
+// e passa pelo resto da revisão (o áudio oficial que falta e os arquivos baixados)
+async function consertarMusica(id) {
+  const s = db.song(id);
+  if (!s) return;
+  if (midiaDe(s) && navigator.onLine && !(s.sincronia && s.sincronia.fonte !== 'lrclib')) await noMaximo(sincronizarMusica(s), 45000, 'demorou');
+  const chaves = await chavesDosAudios().catch(() => new Set());
+  const ok = await revisarMusica(id, REVISOES, chaves).catch(() => false);
+  if (ok && db.song(id)) db.updateSong(id, { revisao: REVISAO_MUSICAS });
+}
+let revisaoRodando = false;
+async function revisarMusicasSalvas() {
+  if (revisaoRodando || document.visibilityState !== 'visible') return;
+  revisaoRodando = true;
+  try {
+    const atrasadas = db.songs().filter((s) => (Number(s.revisao) || 0) < REVISAO_MUSICAS || s.rebaixar);
+    if (!atrasadas.length) return;
+    const chaves = await chavesDosAudios().catch(() => null);
+    if (!chaves) return;
+    // (as baixadas primeiro: são as que a pessoa quer sem internet)
+    atrasadas.sort((a, b) => Number(Boolean(b.baixado)) - Number(Boolean(a.baixado)));
+    for (const s0 of atrasadas) {
+      if (!db.song(s0.id) || revisando.has(s0.id)) continue;
+      // (não disputa a internet com a música que a pessoa abriu agora)
+      if (player.atual?.songId === s0.id) continue;
+      revisando.add(s0.id);
+      try {
+        const feitas = Number(s0.revisao) || 0;
+        const pendentes = REVISOES.filter((r) => r.rev > feitas);
+        if (!pendentes.length) pendentes.push({ rev: REVISAO_MUSICAS }); // (só o download que ficou para baixar de novo)
+        const ok = await revisarMusica(s0.id, pendentes, chaves).catch(() => false);
+        // (os downloads que entraram na fila contam como feitos: se falharem, ficam incompletos e a próxima revisão,
+        // ou a própria pessoa, completa)
+        if (ok && db.song(s0.id)) db.updateSong(s0.id, { revisao: REVISAO_MUSICAS });
+      } finally { revisando.delete(s0.id); }
+      // uma de cada vez, com folga: o app continua leve enquanto revisa
+      await new Promise((ok) => setTimeout(ok, 1500));
+      if (document.visibilityState !== 'visible') break;
+    }
+  } finally { revisaoRodando = false; }
+}
+// um pouco depois de abrir o app (e de novo ao voltar para ele, com internet): segue de onde parou
+setTimeout(() => void revisarMusicasSalvas(), 20000);
+window.addEventListener('online', () => setTimeout(() => void revisarMusicasSalvas(), 5000));
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(() => void revisarMusicasSalvas(), 8000); });
+// a música salva agora já nasce revisada (ela passa pelo que é feito ao salvar e ao baixar)
+window.addEventListener('songbook:nova-musica', (e) => { if (db.song(e.detail.id)) db.updateSong(e.detail.id, { revisao: REVISAO_MUSICAS }); });
 
 // endereço do player do YouTube embutido (enablejsapi permite pausar/tocar pelo botão verde)
 function ytEmbed(id, { inicio = 0, autoplay = true } = {}) {
@@ -1578,6 +1732,7 @@ const player = (() => {
     let relogio = 0;
     let url = '';
     let montagem = 0;
+    let carregando = false;
     let troca = false;
     let preparo = 0;
     const preparacoes = new WeakMap();
@@ -1614,6 +1769,41 @@ const player = (() => {
       v.setAttribute('playsinline', '');
       v.className = 'pl-canvas';
       return v;
+    };
+    // Espera o vídeo estar de fato andando (dois quadros apresentados com o tempo avançando), para nunca revelar um
+    // quadro parado que só depois começa a rolar. false: não andou a tempo (o acompanhamento tenta de novo)
+    const andando = (v, limite = 900) => new Promise((resolve) => {
+      let feito = false;
+      const fim = (ok) => { if (!feito) { feito = true; clearTimeout(t); resolve(ok); } };
+      const t = setTimeout(() => fim(false), limite);
+      if (typeof v.requestVideoFrameCallback !== 'function') {
+        const inicio = v.currentTime;
+        const ver = () => { if (feito) return; if (!v.paused && v.currentTime > inicio + 0.05) fim(true); else setTimeout(ver, 40); };
+        ver();
+        return;
+      }
+      let antes = -1;
+      let n = 0;
+      const quadro = (_, meta) => {
+        if (feito) return;
+        if (antes >= 0 && meta.mediaTime > antes) n++;
+        antes = meta.mediaTime;
+        if (n >= 2) fim(true); else v.requestVideoFrameCallback(quadro);
+      };
+      v.requestVideoFrameCallback(quadro);
+    });
+    // A primeira imagem: só entra já no ponto do primeiro trecho e andando
+    const revelar = async (v) => {
+      if (v !== caixa || v.dataset.revelando === '1' || v.classList.contains('pronto') || v.dataset.posto !== '1') return;
+      v.dataset.revelando = '1';
+      try {
+        if (v.paused) await v.play();
+        const ok = await andando(v);
+        if (!ok || v !== caixa) return;
+        v.classList.add('pronto');
+        medirFaixas(v);
+        preparar((k + 1) % trechos.length);
+      } catch { /* o acompanhamento tenta de novo */ } finally { v.dataset.revelando = ''; }
     };
     // Sem o download: o próprio clipe, andando, num player do YouTube mudo, sem controles e sem receber toques (escondido
     // atrás da capa, com zoom para cortar as bordas). Ele só aparece depois de uns segundos tocando (o YouTube mostra o
@@ -1671,6 +1861,8 @@ const player = (() => {
       clearInterval(relogio);
       relogio = 0;
       preparo++;
+      montagem++;
+      carregando = false;
       troca = false;
       [caixa, reserva].forEach((v) => { if (v) { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); } });
       caixa = null;
@@ -1732,6 +1924,11 @@ const player = (() => {
       if (!caixa || !reserva || reserva.dataset.pronto !== '1') { troca = false; return; }
       const anterior = caixa;
       const seguinte = reserva;
+      // o próximo trecho entra já andando (antes entrava pausado e só começava a rolar depois): o atual segue na tela
+      // até lá
+      try { if (seguinte.paused) await seguinte.play(); } catch { /* tenta de novo no próximo ciclo */ }
+      const ok = !seguinte.paused && await andando(seguinte, 700);
+      if (!ok || anterior !== caixa || seguinte !== reserva) { troca = false; return; }
       k = proximo;
       // As duas camadas se cruzam; nunca se revela um vídeo no meio do seek.
       seguinte.classList.add('pronto');
@@ -1752,51 +1949,53 @@ const player = (() => {
       const tocar = visivel;
       if (tocar && caixa.paused) caixa.play().catch(() => {});
       if (!tocar && !caixa.paused) caixa.pause();
+      if (tocar && trechos.length && !caixa.classList.contains('pronto')) { revelar(caixa); return; }
       if (tocar && trechos.length && !troca) {
         const falta = trechos[k] + DURA - caixa.currentTime;
         if (falta <= 2.2 && reserva?.dataset.pronto !== '1') preparar((k + 1) % trechos.length);
-        if (falta <= 0.08 || caixa.currentTime < trechos[k] - 0.5) irAoTrecho(k + 1);
+        // (um pouco antes do fim: o próximo precisa de um instante para começar a andar)
+        if (falta <= 0.35 || caixa.currentTime < trechos[k] - 0.5) irAoTrecho(k + 1);
       }
     };
     return {
-      async montar(q) {
+      // o clipe desta música está baixado (em vídeo) e a capa animada vai tocar ele
+      vaiTocarArquivo(q) {
+        const b = q && db.prefs().videoFundo !== false && !db.prefs().economiaDados && baixadoDe(q);
+        return Boolean(b && String(b.tipo).startsWith('video'));
+      },
+      async montar(q, { semArquivo = () => {} } = {}) {
         const quer = q && db.prefs().videoFundo !== false && !db.prefs().economiaDados ? q : '';
-        if (quer === de && (caixa?.isConnected || yt?.f.isConnected || !quer)) return;
+        if (quer === de) {
+          // o fundo foi redesenhado (ex.: chegou a capa oficial) com o mesmo vídeo: os mesmos vídeos voltam para ele, já
+          // andando (recriar fazia piscar e mostrar um quadro parado antes de rolar)
+          if (quer && caixa && reserva && !caixa.isConnected) { fundo.append(caixa, reserva); return; }
+          if (caixa?.isConnected || yt?.f.isConnected || !quer || carregando) return;
+        }
         tirar();
         if (!quer) return;
         de = quer;
         const vez = ++montagem;
         const baixado = baixadoDe(quer);
         if (baixado && String(baixado.tipo).startsWith('video')) {
-          const blob = await lerAudio(chaveBaixada(quer)).catch(() => null);
+          carregando = true;
+          const blob = await lerAudio(chaveBaixada(quer)).catch(() => null).finally(() => { if (vez === montagem) carregando = false; });
           if (vez !== montagem) return;
           if (blob) {
             url = URL.createObjectURL(blob);
             caixa = videoNovo();
             reserva = videoNovo();
-            caixa.addEventListener('seeked', () => medirFaixas(), { once: false });
-            caixa.addEventListener('loadedmetadata', () => {
-              if (!caixa) return;
-              const d = caixa.duration;
+            // (os ouvintes falam do próprio vídeo: um vídeo já tirado não mexe no que entrou no lugar dele)
+            const v = caixa;
+            v.addEventListener('seeked', () => { if (v === caixa) medirFaixas(v); });
+            v.addEventListener('loadedmetadata', () => {
+              if (v !== caixa) return;
+              const d = v.duration;
               trechos = Number.isFinite(d) && d > 20 ? PONTOS.map((f) => Math.max(0, Math.min(d - DURA, f * d))) : [0];
               k = 0;
-              // Não revelar o início do arquivo: a primeira imagem só entra depois do seek e da decodificação.
-              const inicial = trechos[0];
-              caixa.addEventListener('seeked', async () => {
-                if (!caixa) return;
-                try {
-                  await caixa.play();
-                  if (typeof caixa.requestVideoFrameCallback === 'function') {
-                    await new Promise((resolve) => caixa.requestVideoFrameCallback(() => resolve()));
-                  } else {
-                    await new Promise((resolve) => setTimeout(resolve, 100));
-                  }
-                  if (caixa) { caixa.classList.add('pronto'); medirFaixas(); }
-                } catch { /* o acompanhamento tenta iniciar quando o player estiver tocando */ }
-              }, { once: true });
-              caixa.currentTime = inicial;
-              if (reserva.readyState >= 1) preparar((k + 1) % trechos.length);
-              else reserva.addEventListener('loadedmetadata', () => preparar((k + 1) % trechos.length), { once: true });
+              // Não revelar o início do arquivo: a primeira imagem só entra depois do seek, já andando. A reserva só se
+              // prepara depois (dois vídeos decodificando juntos no começo travavam o primeiro num quadro parado)
+              v.addEventListener('seeked', () => { if (v === caixa) { v.dataset.posto = '1'; revelar(v); } }, { once: true });
+              v.currentTime = trechos[0];
             }, { once: true });
           }
         }
@@ -1804,7 +2003,9 @@ const player = (() => {
         // (sem o download, ficam os quadros do clipe passando: um segundo player do YouTube tocando junto, para a capa
         // andar, pesava no celular e atrapalhava o player da música, que às vezes nem começava)
         if ((!caixa || !reserva) && CANVAS_ONLINE && navigator.onLine && /^[\w-]{11}$/.test(quer)) { montarOnline(quer); return; }
-        if (!caixa || !reserva) { de = ''; return; }
+        if (!caixa || !reserva) { de = ''; semArquivo(); return; }
+        // (o arquivo não abre: ficam as imagens do clipe)
+        caixa.addEventListener('error', () => { if (vez === montagem) semArquivo(); }, { once: true });
         fundo.append(caixa, reserva);
         relogio = setInterval(acompanhar, 180);
       },
@@ -1869,10 +2070,18 @@ const player = (() => {
       // usada em outro lugar" (a sessão velha ainda contava) e não tocava mais
       [...mini.childNodes].forEach((n) => { if (n !== tela) n.remove(); });
       if (semCapa) mini.insertAdjacentHTML('afterbegin', icon('music', 72));
-      fundo.innerHTML = q ? htmlQuadros(q, (song && renderSong(song.content).meta.x_canvas) || 'sd') : '';
-      // todos os quadros já carregados (com "lazy", o quadro que chegava no meio da rolagem aparecia de repente)
-      fundo.querySelectorAll('img[loading]').forEach((img) => { img.loading = 'eager'; });
-      canvas.montar(q);
+      // com o clipe baixado, a capa animada é o próprio arquivo: as imagens paradas do YouTube não entram antes dele (elas
+      // apareciam por um instante e só então o vídeo entrava por cima). Sem o arquivo (ou se ele não abrir), elas ficam
+      const tipoQuadros = (song && renderSong(song.content).meta.x_canvas) || 'sd';
+      const porQuadros = () => {
+        if (!q || fundo.querySelector('img.q')) return;
+        fundo.insertAdjacentHTML('afterbegin', htmlQuadros(q, tipoQuadros));
+        // todos os quadros já carregados (com "lazy", o quadro que chegava no meio da rolagem aparecia de repente)
+        fundo.querySelectorAll('img[loading]').forEach((img) => { img.loading = 'eager'; });
+      };
+      fundo.innerHTML = '';
+      if (!canvas.vaiTocarArquivo(q)) porQuadros();
+      canvas.montar(q, { semArquivo: porQuadros });
     }
     mini.classList.toggle('capa-yt', (capa || barra) && capaYt);
     // a capa pequena ao lado do nome, no modo vídeo e no modo música (no modo música, em cima ficam as cenas do clipe)
@@ -2179,10 +2388,31 @@ const semLinhasDeAcordes = (sinc) => {
   };
   // muda o endereço da página da música (salvou ou tirou da biblioteca) sem desenhar a página de novo; fechando o
   // Tocando agora, ainda sai dela
+  // (o replaceState só troca a entrada de cima do histórico: com a letra na tela toda, o Tocando agora ou o "Sobre o
+  // artista" abertos, as entradas de baixo ficam com o endereço antigo. Fechando, o voltar caía nelas, o endereço
+  // mudava e a página era desenhada de novo: o Tocando agora fechava e reabria sem a letra e sem a capa animada. A troca
+  // fica guardada para acertar o endereço dessas entradas quando o voltar chega nelas, sem desenhar nada)
+  let enderecoTrocado = null; // { de, para }
+  let hashIgnorado = '';
   const trocarEndereco = (hash) => {
     if (sobrePagina === location.hash) sobrePagina = hash;
+    if (location.hash !== hash) enderecoTrocado = { de: location.hash, para: hash };
     history.replaceState(history.state, '', hash);
   };
+  window.addEventListener('popstate', () => {
+    if (!enderecoTrocado || location.hash !== enderecoTrocado.de) return;
+    const { para } = enderecoTrocado;
+    hashIgnorado = para;
+    if (sobrePagina === location.hash) sobrePagina = para;
+    history.replaceState(history.state, '', para);
+    setTimeout(() => { if (hashIgnorado === para) hashIgnorado = ''; }, 500);
+  });
+  // (no próprio window, os ouvintes de captura vêm antes dos outros: o roteador nem fica sabendo)
+  window.addEventListener('hashchange', (e) => {
+    if (hashIgnorado && location.hash === hashIgnorado) { hashIgnorado = ''; e.stopImmediatePropagation(); return; }
+    // foi para outra página de verdade: a troca antiga não vale mais
+    if (enderecoTrocado && location.hash !== enderecoTrocado.de && location.hash !== enderecoTrocado.para) enderecoTrocado = null;
+  }, true);
   // fecha a tela da música: sai da página dela, de volta para a lista (a página antiga não aparece no caminho)
   const fecharMusica = () => {
     letraDaPagina = false;
@@ -3410,12 +3640,14 @@ const semLinhasDeAcordes = (sinc) => {
       (atual.artista || ehCifraClub(song?.source || '')) && { valor: 'album', rotulo: 'Ver álbum', ic: 'disc' },
       { valor: 'compartilhar', rotulo: 'Compartilhar', ic: 'share' },
       ytAgora() && { valor: 'youtube', rotulo: 'Abrir no YouTube', ic: 'youtube' },
+      { valor: 'diagnostico', rotulo: 'Diagnóstico da música', ic: 'info' },
       { valor: 'fechar', rotulo: 'Fechar o player', ic: 'x' },
     ].filter(Boolean);
     // no tablet, a folha que sobe do rodapé, numa coluna só, com a capa e o nome em cima (como os ⋯ das listas)
     const capaMenu = capa({ title: atual.titulo || '', cover: song?.cover || (ytDaCapa() ? `https://i.ytimg.com/vi/${ytDaCapa()}/mqdefault.jpg` : '') });
     const v = await escolherNaLista({ menu: ehTablet(), titulo: atual.titulo || 'Tocando agora', cabeca: `${capaMenu}<span class="lista-txt"><b>${esc(atual.titulo || 'Tocando agora')}</b><small>${esc(atual.artista || 'Tocando agora')}</small></span>`, opcoes });
     if (!v || !atual) return;
+    if (v === 'diagnostico') { void abrirDiagnostico(); return; }
     if (v === 'youtube') { window.open(`https://www.youtube.com/watch?v=${ytAgora()}&t=${Math.floor(api.tempoAgora)}s`, '_blank', 'noopener'); return; }
     // o álbum abre como página, já com o "Procurando o álbum…": o Tocando agora na tela toda fecha com a troca (no
     // tablet, o painel continua ao lado)
@@ -3427,6 +3659,73 @@ const semLinhasDeAcordes = (sinc) => {
     el.append(alvoBt);
     alvoBt.click();
     alvoBt.remove();
+  };
+  // Diagnóstico da música tocando (no ⋯): o que está guardado nela e o que o player está mostrando, para descobrir por
+  // que a letra ou a capa animada não aparecem. "Copiar" leva o texto para colar numa conversa; "Consertar agora"
+  // procura de novo a letra, o áudio oficial e confere os arquivos baixados, na hora
+  const textoDiagnostico = async () => {
+    const song = musicaTocando();
+    const sim = (x) => (x ? 'sim' : 'não');
+    const seg = (x) => (Number(x) > 0 ? `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, '0')}` : '?');
+    const vs = song && versoesDe(song);
+    const sc = song?.sincronia;
+    const f = [];
+    f.push(`App ${APP_VERSAO} · ${new Date().toLocaleString('pt-BR')} · ${navigator.onLine ? 'com internet' : 'sem internet'}`);
+    f.push(`Música: ${atual?.titulo || '?'} — ${atual?.artista || '?'} (${atual?.songId || 'sem id'}${song ? '' : ', não encontrada'})`);
+    f.push('', '[Tocando]');
+    f.push(`vídeo agora: ${atual?.youtube || '-'} · clipe: ${atual?.video || '-'} · áudio oficial: ${atual?.audio || '-'}`);
+    f.push(`modo: ${comCapa ? 'música' : 'vídeo'} · emVideo: ${sim(emVideo())} · noClipe: ${sim(noClipe())} · soMusica: ${sim(atual?.soMusica)} · semVideo: ${sim(atual?.semVideo)}`);
+    f.push(`estado: ${estado} · tempo: ${seg(api.tempoAgora)} de ${seg(duracao)} · anúncio: ${sim(anuncio)} · do aparelho: ${local ? sim(true) + (local.video ? ' (vídeo)' : ' (áudio)') : 'não'}`);
+    f.push('', '[Letra]');
+    f.push(`na tela: ${$('.pl-letra', el).hidden ? 'escondida' : 'aparecendo'} · linhas: ${linhasDaLetra.length} · sincronizada no player: ${sim(tempos)}`);
+    if (sc) f.push(`guardada: fonte ${sc.fonte || '?'} · do vídeo ${sc.video || '?'} · ${sc.tempos?.length || 0} tempos · duração ${seg(sc.duracao)}${sc.provisoria ? ' · provisória' : ''}${sc.aproximada ? ' · aproximada' : ''}${sc.desloc ? ` · deslocada ${sc.desloc}s` : ''}`);
+    else f.push('guardada: nenhuma');
+    f.push(`a letra vale para o vídeo: ${song ? videoDaLetra(song) || '-' : '-'} · confere: ${sim(song && sincOkDe(song))}`);
+    f.push('', '[Versões]');
+    if (vs) f.push(`clipe ${vs.video || '-'} · áudio ${vs.audio || '-'} (${seg(vs.duracao)}) · casadas: ${sim(vs.casadas)} · pela letra: ${sim(vs.porLetra)} · diferentes: ${sim(vs.diferentes)} · pares: ${vs.pares?.length || 0}`);
+    else f.push('sem áudio oficial guardado');
+    f.push('', '[Download]');
+    const arqs = Object.entries(song?.baixado?.arquivos || {});
+    if (!arqs.length) f.push(song?.rebaixar ? 'sem arquivos (marcada para baixar de novo)' : 'não baixada');
+    const chaves = await chavesDosAudios().catch(() => new Set());
+    for (const [yt, info] of arqs) {
+      let abre = 'não está no aparelho';
+      if (chaves.has(chaveBaixada(yt))) {
+        const blob = await lerAudio(chaveBaixada(yt)).catch(() => null);
+        const r = blob ? await abreNoAparelho(blob) : false;
+        abre = r === true ? 'abre' : r === false ? 'NÃO abre' : 'não deu para conferir';
+      }
+      f.push(`${yt}: ${info?.tipo || '?'} · ${fmtBytes(info?.tamanho || 0)} · ${abre}`);
+    }
+    if (song) f.push(`falta baixar: ${sim(precisaBaixar(song))} · revisão: ${song.revisao || 0} de ${REVISAO_MUSICAS}`);
+    f.push('', '[Capa animada]');
+    const vids = [...fundo.querySelectorAll('video.pl-canvas')];
+    f.push(`fundo: ${fundo.hidden ? 'escondido' : 'aparecendo'} · clipe baixado no fundo: ${sim(canvas.vaiTocarArquivo(ytDaCapa()))} · vídeos: ${vids.length} (${vids.map((x) => `${x.classList.contains('pronto') ? 'visível' : 'oculto'}${x.paused ? ' parado' : ' andando'}`).join(', ') || '-'}) · imagens do YouTube: ${fundo.querySelectorAll('img.q').length}`);
+    return f.join('\n');
+  };
+  const abrirDiagnostico = async () => {
+    let texto = await textoDiagnostico();
+    await openDialog(`
+      <h3>Diagnóstico da música</h3>
+      <pre class="diag-texto" style="white-space:pre-wrap;font-size:12px;max-height:55vh;overflow:auto;user-select:text;margin:0 0 12px">${esc(texto)}</pre>
+      <div class="acts"><button class="btn ghost" data-consertar>Consertar agora</button><button class="btn ghost" data-copiar>Copiar</button><button class="btn primary" data-ok>Fechar</button></div>`,
+    (dlg, done) => {
+      $('[data-ok]', dlg).onclick = () => done(true);
+      $('[data-copiar]', dlg).onclick = async () => { try { await navigator.clipboard.writeText(texto); toast('Diagnóstico copiado: é só colar na conversa'); } catch { toast('Não consegui copiar: tire um print'); } };
+      $('[data-consertar]', dlg).onclick = async (e) => {
+        const b = e.currentTarget;
+        const song = atual?.songId && db.song(atual.songId);
+        if (!song) { toast('Salve a música na biblioteca para consertar'); return; }
+        b.disabled = true;
+        b.textContent = 'Consertando…';
+        await consertarMusica(song.id).catch(() => {});
+        letraDe = '';
+        desenhar();
+        texto = await textoDiagnostico();
+        if (dlg.open) { $('.diag-texto', dlg).textContent = texto; b.disabled = false; b.textContent = 'Consertar agora'; }
+        toast('Pronto: conferi a letra, o áudio oficial e o download');
+      };
+    });
   };
   // o "Tocando agora" na tela toda (tablet): o botão do canto de cima troca entre expandir e voltar ao painel
   // No celular e no computador a tela toda é o próprio "Tocando agora": o player muda de jeito (html.pp) só enquanto

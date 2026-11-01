@@ -27,6 +27,8 @@ export async function guardarAudio(id, arquivo) {
 }
 export const lerAudio = (id) => pedido('readonly', (loja) => loja.get(id));
 export const apagarAudio = (id) => pedido('readwrite', (loja) => loja.delete(id));
+// as chaves dos arquivos guardados (para conferir, sem abrir nenhum, quais existem de verdade)
+export const chavesDosAudios = async () => new Set((await pedido('readonly', (loja) => loja.getAllKeys())) || []);
 // tira os áudios das músicas que já saíram da biblioteca (ficam: os ids em `ficam`)
 export async function limparAudios(ficam) {
   const ids = await pedido('readonly', (loja) => loja.getAllKeys());

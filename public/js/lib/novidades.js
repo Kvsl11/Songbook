@@ -4,10 +4,27 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
-    versao: 384, data: '2026-10-31', titulo: 'Mini player do tablet sem a capinha cortada e a versão com a data certa',
+    versao: 386, data: '2026-11-01', titulo: 'Mini player do tablet sem a capinha cortada e a versão com a data certa',
     itens: [
       { tipo: 'correcao', texto: 'No tablet, a capinha do vídeo, o nome e o andamento do mini player não sobem mais nem ficam cortados na borda de cima: minimizando o Tocando agora rolado para baixo, o mini player ficava rolado por dentro.' },
       { tipo: 'correcao', texto: 'A versão mostrada nos Ajustes e nas Novidades tem a data do Brasil (antes vinha a do dia seguinte, perto da meia-noite), e o número do fim conta as versões do mês: recomeça do 1 a cada mês novo.' },
+    ],
+  },
+  {
+    versao: 385, data: '2026-11-01', titulo: 'As músicas salvas se consertam sozinhas',
+    itens: [
+      { tipo: 'novo', texto: 'Quando o app corrige algo que fica guardado na música (a letra sincronizada, o áudio oficial, o download), as músicas que você já tinha salvo e baixado passam pela correção sozinhas, em segundo plano: não precisa mais tirar a música, apagar o download e baixar de novo.' },
+      { tipo: 'correcao', texto: 'O download que sumiu do aparelho ou ficou estragado (o vídeo que não abria) é baixado de novo sozinho, assim que o servidor estiver ligado, sem pedir nada.' },
+      { tipo: 'correcao', texto: 'A música salva que ficou sem a letra sincronizada (ou sem o áudio oficial) procura de novo, sozinha. A letra que você sincronizou à mão não é mexida.' },
+      { tipo: 'novo', texto: 'No ⋯ do Tocando agora, “Diagnóstico da música” mostra o que está guardado na música (a letra, o áudio oficial, o download) e o que o player está mostrando. “Copiar” leva o texto para colar numa conversa, e “Consertar agora” procura de novo a letra e o áudio oficial e confere o download, na hora.' },
+      { tipo: 'correcao', texto: 'Com o clipe baixado, a capa animada entra direto no vídeo andando: antes aparecia por um instante uma imagem parada do clipe (a do YouTube) e só depois o vídeo.' },
+    ],
+  },
+  {
+    versao: 384, data: '2026-11-01', titulo: 'Capa animada já entra andando e a letra não some mais',
+    itens: [
+      { tipo: 'correcao', texto: 'A capa animada (o clipe baixado atrás do Tocando agora) já aparece andando: antes surgia um quadro parado por um instante e só depois os trechos começavam a rolar. A troca de um trecho para o outro também entra já em movimento.' },
+      { tipo: 'correcao', texto: 'A letra e a capa animada não somem mais do Tocando agora depois de fechar a letra na tela toda numa música aberta pela busca (ao tocar ou baixar, ela é salva na biblioteca e o app se perdia no endereço dela).' },
     ],
   },
   {
@@ -62,27 +79,13 @@ export const NOVIDADES = [
       { tipo: 'correcao', texto: 'Na capa animada das músicas não baixadas, os quadros do clipe não mostram mais as faixas pretas em cima e embaixo (as das miniaturas do YouTube e as dos clipes filmados como cinema): cada imagem é medida e ampliada só o bastante para elas ficarem de fora.' },
     ],
   },
-  {
-    versao: 376, data: '2026-10-31', titulo: 'A música entra com a letra já sincronizada',
-    itens: [
-      { tipo: 'correcao', texto: 'A música da busca não entra mais antes da letra sincronizada: quando um serviço da letra falha por um instante, o app tenta de novo até achar (ou ter certeza de que não há); antes desistia depois de duas tentativas e a letra aparecia segundos depois de entrar.' },
-      { tipo: 'melhoria', texto: 'A letra sincronizada começa a ser procurada no toque na música, junto com a cifra e o vídeo, e a música espera também a versão de música certa para a letra (a de mesma duração).' },
-    ],
-  },
-  {
-    versao: 375, data: '2026-10-31', titulo: 'Músicas explícitas com o selo E, e a letra inteira',
-    itens: [
-      { tipo: 'melhoria', texto: 'As músicas explícitas ganham o selo “E” (como no Spotify) nos cartões da busca, da biblioteca e no Tocando agora.' },
-      { tipo: 'correcao', texto: 'A letra sincronizada não esconde mais palavras com asteriscos (“give a ****s”): entre as letras disponíveis vem a sem censura, e as palavras escondidas voltam a ser as cantadas pela letra da própria música. A versão de música escolhida também evita a “clean”, com os palavrões cortados.' },
-    ],
-  },
 ];
 
 // A primeira versão de cada mês. O número mostrado ("2026.10.31-383") é a data da versão e quantas versões o mês já
 // teve: recomeça do 1 quando o mês vira. O número de verdade (o do sw.js, que atualiza o app) continua subindo sempre.
 // Ao publicar a primeira versão de um mês novo, acrescente aqui o mês com o número dela (um teste confere).
-// (outubro de 2026: o app começou nele, na versão 1)
-export const PRIMEIRA_DO_MES = { '2026-10': 1 };
+// (outubro de 2026: o app começou nele, na versão 1; novembro começou na 384)
+export const PRIMEIRA_DO_MES = { '2026-10': 1, '2026-11': 384 };
 export function versaoMostrada(versao, data) {
   const d = String(data || '');
   const primeira = PRIMEIRA_DO_MES[d.slice(0, 7)] ?? 1;
