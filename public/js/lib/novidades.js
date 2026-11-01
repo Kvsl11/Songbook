@@ -4,6 +4,15 @@
 // ao escrever uma nova, apague a mais antiga.
 export const NOVIDADES = [
   {
+    versao: 383, data: '2026-11-01', titulo: 'Player com os botões do Spotify, fila no rodapé e puxar para abrir',
+    itens: [
+      { tipo: 'melhoria', texto: 'Os botões do player ficam com o jeito dos do Spotify, no celular, no tablet e no computador: aleatório, voltar, pular, repetir, o play, a fila, o painel e os botões da Letra.' },
+      { tipo: 'melhoria', texto: 'A fila sobe do rodapé, como o menu dos três pontinhos (com a alça para puxar), em vez de abrir no meio da tela.' },
+      { tipo: 'novo', texto: 'Puxar o mini player para cima abre o Tocando agora.' },
+      { tipo: 'correcao', texto: 'No tablet, girar a tela não deixa mais o mini player deslocado e cortado (a página ficava com o zoom diminuído).' },
+    ],
+  },
+  {
     versao: 382, data: '2026-11-01', titulo: 'O mesmo ícone de vídeo em todo o app',
     itens: [
       { tipo: 'melhoria', texto: 'O botão “Mudar para vídeo” do Tocando agora e os menus usam o mesmo ícone de vídeo das fichas da biblioteca (o quadro com o play, como no Spotify).' },
@@ -66,12 +75,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'A música da busca só abre com a versão de música, o clipe e a letra sincronizada prontos (embaixo do nome aparece o que está sendo preparado; no máximo 15 s). A letra sincronizada vem bem mais rápido: a reserva (NetEase) é procurada junto com o LRCLIB, pelos serviços ao mesmo tempo, e uma falha da internet é tentada de novo na hora.' },
       { tipo: 'correcao', texto: 'Linhas de acordes com parênteses soltos, como “( Am ) C” ou “G C ( D )”, aparecem como acordes, e não mais como se fossem letra (também nas músicas já salvas).' },
       { tipo: 'correcao', texto: 'Os nomes das partes ficam sempre em inglês (Verse, Chorus, Pre-Chorus, Bridge, Outro…), também na letra do Tocando agora, que mostrava “Refrão”, “Primeira Parte”.' },
-    ],
-  },
-  {
-    versao: 373, data: '2026-10-31', titulo: 'Só a letra na letra, sem afinação nem créditos',
-    itens: [
-      { tipo: 'correcao', texto: 'Afinação, capotraste, tom, sugestão de batida, riff, dedilhado, solo, observações e créditos (composição, contribuição, revisões) não aparecem mais no meio da letra nem da cifra, também nas músicas já salvas: na Letra fica só o que se canta; na Cifra, os acordes com a letra.' },
     ],
   },
 ];
