@@ -145,7 +145,7 @@ document.addEventListener('error', (e) => {
 }, true);
 
 // a versão mostrada no app (Ajustes e o aviso de atualização): o número é o mesmo do VERSION do sw.js (um teste confere)
-export const APP_VERSAO = '2026.11.01-382';
+export const APP_VERSAO = '2026.11.01-383';
 
 // ------------------------------------------------------------------ dicas (tooltips)
 // Ao passar o mouse ou segurar o dedo num botão, mostra o nome da função.
@@ -1445,6 +1445,11 @@ const player = (() => {
   // (só escreve no estilo o que mudou: isto roda a cada quadro, 60 vezes por segundo, e reescrever a posição, o tamanho
   // e o recorte iguais fazia o tablet refazer a tela a cada quadro)
   const poeEstilo = (prop, v) => { if (tela.style[prop] !== v) tela.style[prop] = v; };
+  // No tablet, a tela solta (sem o moveBefore para entrar no mini player) é fixa na janela, e não presa à página: ao girar,
+  // ela ainda ficava um quadro no lugar de antes (fora da tela nova), a página ficava mais larga que a tela, o navegador
+  // diminuía o zoom e não voltava, e o mini player saía do lugar, cortado embaixo
+  const telaFixa = ehTablet();
+  if (telaFixa) tela.classList.add('fixa');
   const seguir = () => {
     quadro = requestAnimationFrame(seguir);
     // o vídeo em tela cheia (o botão do YouTube ou o do vídeo baixado) fica onde está: mudar ele de lugar (ao girar a
@@ -1462,7 +1467,8 @@ const player = (() => {
     if (dentro()) { poeEstilo('visibility', escondida ? 'hidden' : 'visible'); poeEstilo('clipPath', ''); if (tela.classList.contains('no-palco') !== noPalco()) tela.classList.toggle('no-palco', noPalco()); return; }
     const r = a?.isConnected ? a.getBoundingClientRect() : null;
     if (!r || !r.width || !r.height) { poeEstilo('visibility', 'hidden'); return; }
-    const base = tela.parentElement.getBoundingClientRect();
+    // (no tablet a tela solta é fixa na janela: ver o CSS de #pl-tela)
+    const base = telaFixa ? { left: 0, top: 0 } : tela.parentElement.getBoundingClientRect();
     poeEstilo('visibility', escondida ? 'hidden' : 'visible');
     poeEstilo('transform', `translate(${r.left - base.left}px, ${r.top - base.top}px)`);
     poeEstilo('width', r.width + 'px');
@@ -3126,10 +3132,10 @@ const semLinhasDeAcordes = (sinc) => {
   const abrirFila = () => {
     if (!fila()) { toast('Esta música não está numa fila: salve-a na biblioteca ou toque de um repertório'); return; }
     const dlg = document.createElement('dialog');
-    dlg.className = 'lista-dlg lista-fila';
+    // (a folha que sobe do rodapé, com a alça em cima, como a dos ⋮: antes era uma janela no meio da tela)
+    dlg.className = 'lista-dlg lista-menu lista-fila';
     const titulo = () => { const f = fila(); return f?.set ? `Fila · ${f.set.name}` : 'Fila · Biblioteca'; };
-    dlg.innerHTML = `<div class="lista-cab"><h3>${esc(titulo())}</h3>
-      <button class="icon-btn" data-fechar aria-label="Fechar">${icon('x', 20)}</button></div>
+    dlg.innerHTML = `<div class="lista-cab menu-cab"><span class="menu-alca" aria-hidden="true"></span><h3>${esc(titulo())}</h3></div>
       <p class="fila-dica muted">Segure uma música e arraste para mudar a ordem</p>
       <div class="lista-opcoes" role="listbox" aria-label="Músicas na fila"></div>`;
     const lista = $('.lista-opcoes', dlg);
@@ -3298,6 +3304,7 @@ const semLinhasDeAcordes = (sinc) => {
     dlg.addEventListener('close', () => { cancelarSegurar(); cancelAnimationFrame(rolar); dlg.remove(); });
     document.body.append(dlg);
     dlg.showModal();
+    arrastarFolha(dlg);
     // Duração: a que já se sabe; as que faltam, pela internet (três de cada vez), guardadas na música
     const f = fila();
     const faltantes = f.ids.map((id) => db.song(id)).filter((s) => s && !duracaoNaFila(s) && (s.youtube || versoesDe(s)?.audio));
@@ -3545,7 +3552,37 @@ const semLinhasDeAcordes = (sinc) => {
     e.preventDefault();
     pularNaLetra(e.key === 'ArrowRight' ? 1 : -1);
   });
+  // Puxar o mini player para cima abre o "Tocando agora", como no Spotify (no tablet, o painel; no celular, a tela toda)
+  const ehMini = () => (ehTablet() ? document.body.classList.contains('painel-recolhido')
+    : !document.body.classList.contains('painel-cheio') && matchMedia('(max-width: 899px)').matches);
+  let puxada = null;
+  let engolirClique = false;
+  el.addEventListener('pointerdown', (e) => {
+    puxada = null;
+    if (!ehMini() || e.target.closest('.pl-prog') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    puxada = { x: e.clientX, y: e.clientY, id: e.pointerId };
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!puxada || e.pointerId !== puxada.id) return;
+    const dy = e.clientY - puxada.y;
+    // (o card sobe um pouco junto com o dedo)
+    el.style.translate = dy < 0 && Math.abs(dy) > Math.abs(e.clientX - puxada.x) ? `0 ${Math.max(dy, -60) / 2}px` : '';
+  });
+  const soltarPuxada = (e) => {
+    if (!puxada || e.pointerId !== puxada.id) return;
+    const dy = e.clientY - puxada.y;
+    const dx = e.clientX - puxada.x;
+    puxada = null;
+    el.style.translate = '';
+    if (e.type !== 'pointerup' || dy > -40 || Math.abs(dy) < Math.abs(dx) * 1.2 || !ehMini()) return;
+    engolirClique = true; // (o clique que vem depois do arraste não aperta o botão onde o dedo saiu)
+    setTimeout(() => { engolirClique = false; }, 400);
+    if (ehTablet()) { document.body.classList.remove('painel-recolhido'); db.setPref('painelRecolhido', false); } else painelCheio(true);
+  };
+  el.addEventListener('pointerup', soltarPuxada);
+  el.addEventListener('pointercancel', soltarPuxada);
   el.addEventListener('click', (e) => {
+    if (engolirClique) { engolirClique = false; e.stopPropagation(); e.preventDefault(); return; }
     if (e.target.closest('.pl-prog')) return; // a barra do tempo é tratada no toque (abaixo): tocar ou arrastar
     const b = e.target.closest('[data-pl]');
     // tablet: tocar na barrinha recolhida (fora dos botões) abre o painel "Tocando agora"; a tela inteira fica no topo dele

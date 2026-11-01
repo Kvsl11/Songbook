@@ -1348,6 +1348,7 @@ body.performance #player { bottom: calc(env(safe-area-inset-bottom) + 70px); }
    cruzam, no som e na imagem) */
 #pl-tela iframe.pl-reserva { z-index: 0; opacity: 0; pointer-events: none; }
 /* dentro da telinha da página (onde o navegador consegue mover sem recarregar): ocupa a telinha e rola com ela */
+#pl-tela.fixa:not(.na-telinha) { position: fixed; }
 #pl-tela.na-telinha { position: absolute; inset: 0; width: 100% !important; height: 100% !important; transform: none !important; z-index: 1; box-shadow: none; }
 body.editando-cheio #pl-tela { visibility: hidden !important; }
 
@@ -3132,6 +3133,16 @@ html.pp #player .pl-acoes .icon-btn { color: rgb(255 255 255 / 0.9); }
 html.pp #player .pl-play { width: 64px; height: 64px; background: #fff; color: #000; border-radius: 50%; }
 html.pp #player .pl-pulo { display: grid; width: 48px; height: 48px; }
 html.pp #player .pl-modo { width: 44px; height: 44px; }
+/* os controles no tamanho dos do Spotify: aleatório e repetir médios, voltar e pular maiores, o play grande */
+html.pp #player .pl-modo svg { width: 25px; height: 25px; }
+html.pp #player .pl-pulo svg { width: 30px; height: 30px; }
+html.pp #player .pl-play svg { width: 28px; height: 28px; }
+html.pp #player .pl-acoes .icon-btn { width: 44px; height: 44px; }
+html.pp #player .pl-acoes .icon-btn svg { width: 23px; height: 23px; }
+html.pp #player .pl-cab .icon-btn svg { width: 24px; height: 24px; }
+html.pp #player .pl-cab .pl-recolher svg { width: 28px; height: 28px; }
+html.pp #player .pl-letra-cab .icon-btn { width: 38px; height: 38px; border-radius: 50%; background: rgb(0 0 0 / 0.38); color: #fff; }
+html.pp #player .pl-letra-cab .icon-btn svg { width: 18px; height: 18px; }
 /* a letra no painel é só um cartão, da mesma altura sempre: as primeiras linhas (sincronizada, as de agora) somem num
    degradê embaixo; a letra inteira abre no expandir (ou tocando no cartão), na tela toda */
 html.pp #player .pl-letra { order: 8; flex: none; display: flex; flex-direction: column; height: 340px; padding: 16px 18px 0; border-radius: 14px; overflow: hidden; cursor: pointer;
@@ -3140,7 +3151,6 @@ html.pp #player .pl-letra[hidden] { display: none; }
 html.pp #player .pl-letra-cab { display: flex; align-items: center; justify-content: space-between; margin: -4px -6px 8px 0; }
 html.pp #player .pl-letra h3 { margin: 0; font-size: 17px; font-weight: 800; }
 html.pp #player .pl-letra-bts { display: flex; gap: 8px; }
-html.pp #player .pl-letra-cab .icon-btn { width: 34px; height: 34px; background: rgb(0 0 0 / 0.25); }
 /* a letra só rola na vertical: a frase de agora cresce um pouco (scale) e passava da borda, criando uma rolagem de lado;
    as frases quebram a linha antes da borda e a barra de rolagem fica escondida */
 html.pp #player .pl-linhas { flex: 1; min-height: 0; overflow: hidden; scroll-behavior: smooth; scrollbar-width: none;
@@ -3923,9 +3933,10 @@ body:not(.painel-cheio) #player.sem-video { display: none !important; }
 #lit ~ .cta-bar, .cta-bar { border-radius: 20px; }
 :root[data-theme="light"] .lit-semana a.hoje { box-shadow: inset 0 0 0 1.5px var(--accent); }
 
-/* botões sem a "sombra" atrás: a Cifra, o olho (só a letra), a rolagem e o expandir da letra ficam só com o ícone e o
+/* botões sem a "sombra" atrás: a Cifra, o olho (só a letra) e a rolagem ficam (o compartilhar e o expandir do cartão da
+   Letra têm o círculo escuro, como no Spotify) só com o ícone e o
    nome, sem fundo cinza; ligados, ficam brancos e em negrito (desligados, um pouco apagados) */
-#player .pl-ver-cifra, html.pp #player .pl-leitura, html.pp #player .pl-ferr-rolar, html.pp #player .pl-letra-cab .icon-btn {
+#player .pl-ver-cifra, html.pp #player .pl-leitura, html.pp #player .pl-ferr-rolar {
   background: none !important; box-shadow: none !important; color: rgb(255 255 255 / 0.72) !important; font-weight: 700; }
 #player .pl-ver-cifra[aria-pressed="true"], html.pp #player .pl-leitura[aria-pressed="true"], html.pp #player .pl-ferr-rolar[aria-pressed="true"] {
   background: none !important; color: #fff !important; font-weight: 900; }
@@ -4134,3 +4145,16 @@ html.pp.tablet body.com-player:not(.painel-recolhido):not(.com-letra-cheia) .pl-
 @keyframes preparando-pulsa { 50% { opacity: 0.55; } }
 /* o "E" de explícita (como no Spotify): um quadradinho com a letra, antes do artista */
 .selo-e { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-right: 5px; border-radius: 3px; background: color-mix(in srgb, var(--text) 62%, transparent); color: var(--bg, #121212); font-size: 10px; font-weight: 800; line-height: 1; vertical-align: 0; flex: none; }
+/* o mini player recebe o arraste para cima (abre o Tocando agora): o dedo nele não rola a página */
+html.tablet body.painel-recolhido #player { touch-action: none; }
+@media (max-width: 899px) { html:not(.tablet) body:not(.painel-cheio) #player { touch-action: pan-x; } }
+/* a fila na folha do rodapé: as linhas mais juntas que as das ações, com a capa */
+dialog.lista-menu.lista-fila .lista-op { gap: 14px; padding: 8px 12px; }
+dialog.lista-menu.lista-fila .fila-dica { margin: 10px 20px 2px; }
+/* no computador, a barra de baixo com os controles no tamanho dos do Spotify */
+@media (min-width: 900px) {
+  html:not(.pp) #player .pl-modo svg { width: 19px; height: 19px; }
+  html:not(.pp) #player .pl-pulo svg { width: 21px; height: 21px; }
+  html:not(.pp) #player .pl-play svg { width: 18px; height: 18px; }
+  html:not(.pp) #player .pl-lado .icon-btn svg { width: 19px; height: 19px; }
+}

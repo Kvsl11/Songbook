@@ -3,11 +3,14 @@ const P = {
   // mudar de posição (o ≡ das filas): três tracinhos curtos
   reordenar: '<path d="M7 8.5h10M7 12h10M7 15.5h10"/>',
   grip: '<circle cx="9" cy="6" r="1.4" fill="currentColor"/><circle cx="15" cy="6" r="1.4" fill="currentColor"/><circle cx="9" cy="12" r="1.4" fill="currentColor"/><circle cx="15" cy="12" r="1.4" fill="currentColor"/><circle cx="9" cy="18" r="1.4" fill="currentColor"/><circle cx="15" cy="18" r="1.4" fill="currentColor"/>',
-  shuffle: '<path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/>',
-  repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
-  skipBack: '<path d="M19 20L9 12l10-8z" fill="currentColor"/><path d="M5 19V5"/>',
-  skipFwd: '<path d="M5 4l10 8-10 8z" fill="currentColor"/><path d="M19 5v14"/>',
-  queue: '<path d="M3 6h13M3 12h13M3 18h8"/><path d="M17 15v6l4-3z" fill="currentColor"/>',
+  // aleatório, repetir, voltar, pular, play e pause no desenho do Spotify (as setas cruzadas, o laço arredondado, os
+  // triângulos cheios com a barra)
+  shuffle: '<path d="M2.5 6.5h2.8c1.9 0 3.6.9 4.6 2.5l4.2 6.4c1 1.6 2.7 2.6 4.6 2.6h2.3"/><path d="M2.5 17.5h2.8c1.9 0 3.6-.9 4.6-2.5l.3-.5"/><path d="M13.8 9.5l.3-.5c1-1.6 2.7-2.5 4.6-2.5h2.3"/><path d="M18.5 3.5l3 3-3 3"/><path d="M18.5 15l3 3-3 3"/>',
+  repeat: '<path d="M6 17.5H5.5a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3h13a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-6"/><path d="M15 14.5l-3 3 3 3"/>',
+  skipBack: '<rect x="4" y="4" width="2.8" height="16" rx="1" fill="currentColor" stroke="none"/><path d="M20 4.8v14.4a1 1 0 0 1-1.55.83L8.9 12.83a1 1 0 0 1 0-1.66l9.55-7.2A1 1 0 0 1 20 4.8z" fill="currentColor" stroke="none"/>',
+  skipFwd: '<rect x="17.2" y="4" width="2.8" height="16" rx="1" fill="currentColor" stroke="none"/><path d="M4 4.8v14.4a1 1 0 0 0 1.55.83l9.55-7.2a1 1 0 0 0 0-1.66L5.55 3.97A1 1 0 0 0 4 4.8z" fill="currentColor" stroke="none"/>',
+  // a fila (como a do Spotify: a música de agora num quadro e as próximas embaixo)
+  queue: '<rect x="3" y="3.5" width="18" height="6.5" rx="1.6"/><path d="M3 15h18M3 20h18"/>',
   shrink: '<path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
   share: '<circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.7l7.4-4.3M8.3 13.3l7.4 4.3"/>',
@@ -24,7 +27,8 @@ const P = {
   tv: '<rect x="2.5" y="5" width="19" height="12" rx="1.5"/><path d="M8 21h8M2.5 14.5a6 6 0 0 1 4 3M2.5 11.5a9 9 0 0 1 7 6"/>',
   bluetooth: '<path d="M7 7l10 10-5 4V3l5 4L7 17"/>',
   fone: '<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/>',
-  sidebar: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
+  // o painel ao lado (o "Tocando agora" do Spotify: o quadro com a coluna e a setinha)
+  sidebar: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/><path d="M15.5 9.5L13 12l2.5 2.5"/>',
   palette: '<path d="M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.6 0-.9-.7-1.4-.7-2.3 0-1 .8-1.6 1.8-1.6H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10.5" cy="7.5" r="1.2" fill="currentColor"/><circle cx="15" cy="7.5" r="1.2" fill="currentColor"/>',
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-2"/>',
   redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h2"/>',
@@ -67,8 +71,8 @@ const P = {
   trash: '<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
   expand: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>',
-  play: '<path d="M6 4l14 8-14 8z" fill="currentColor"/>',
-  pause: '<path d="M7 4h3v16H7zM14 4h3v16h-3z" fill="currentColor"/>',
+  play: '<path d="M7 4.6v14.8a1.1 1.1 0 0 0 1.66.94l12.2-7.4a1.1 1.1 0 0 0 0-1.88L8.66 3.66A1.1 1.1 0 0 0 7 4.6z" fill="currentColor" stroke="none"/>',
+  pause: '<rect x="5.5" y="3.5" width="4.4" height="17" rx="1.2" fill="currentColor" stroke="none"/><rect x="14.1" y="3.5" width="4.4" height="17" rx="1.2" fill="currentColor" stroke="none"/>',
   som: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19.5 5.5a9 9 0 0 1 0 13"/>',
   mudo: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9.5l5 5M22 9.5l-5 5"/>',
   columns: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/>',
