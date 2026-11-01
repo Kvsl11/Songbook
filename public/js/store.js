@@ -87,6 +87,13 @@ function metaFrom(content) {
   };
 }
 
+// Os cantos que o "Montar repertório" (a missa do dia) trouxe ficam só no repertório (soNoRepertorio): não aparecem nas
+// Músicas da biblioteca. Saindo do último repertório em que estavam (o repertório apagado ou o canto tirado dele), saem
+// do aparelho também; salvos pelo +, passam a ser da biblioteca
+function tirarSoltas() {
+  const usadas = new Set(state.sets.flatMap((st) => st.items.map((it) => it.songId)));
+  state.songs = state.songs.filter((s) => !s.soNoRepertorio || usadas.has(s.id));
+}
 export const db = {
   songs: () => [...state.songs].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')),
   song: (id) => state.songs.find((s) => s.id === id),
@@ -124,11 +131,13 @@ export const db = {
     const full = { items: [], date: new Date().toISOString().slice(0, 10), ...set, id: set.id || uid() };
     const i = state.sets.findIndex((s) => s.id === full.id);
     if (i >= 0) state.sets[i] = full; else state.sets.push(full);
+    tirarSoltas();
     persist();
     return full;
   },
   deleteSet(id) {
     state.sets = state.sets.filter((s) => s.id !== id);
+    tirarSoltas();
     persist();
   },
 
@@ -140,7 +149,7 @@ export const db = {
     persist();
   },
   recent: () => (state.recent || []).map((id) => db.song(id)).filter(Boolean),
-  recentSongs: (n = 12) => [...state.songs].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, n),
+  recentSongs: (n = 12) => state.songs.filter((s) => !s.soNoRepertorio).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, n),
 
   prefs: () => state.prefs,
   setPref(k, v) {
