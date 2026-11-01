@@ -4147,7 +4147,8 @@ html.pp.tablet body.com-player:not(.painel-recolhido):not(.com-letra-cheia) .pl-
 .selo-e { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-right: 5px; border-radius: 3px; background: color-mix(in srgb, var(--text) 62%, transparent); color: var(--bg, #121212); font-size: 10px; font-weight: 800; line-height: 1; vertical-align: 0; flex: none; }
 /* o mini player recebe o arraste para cima (abre o Tocando agora): o dedo nele não rola a página */
 html.tablet body.painel-recolhido #player { touch-action: none; }
-@media (max-width: 899px) { html:not(.tablet) body:not(.painel-cheio) #player { touch-action: pan-x; } }
+/* (no celular também para o lado: passar o dedo vai para a próxima ou a anterior da fila) */
+@media (max-width: 899px) { html:not(.tablet) body:not(.painel-cheio) #player { touch-action: none; } }
 /* a fila na folha do rodapé: as linhas mais juntas que as das ações, com a capa */
 dialog.lista-menu.lista-fila .lista-op { gap: 14px; padding: 8px 12px; }
 dialog.lista-menu.lista-fila .fila-dica { margin: 10px 20px 2px; }
@@ -4161,3 +4162,30 @@ dialog.lista-menu.lista-fila .fila-dica { margin: 10px 20px 2px; }
 /* o mini player do tablet não rola por dentro: o conteúdo passa 12 px da altura dele e, minimizando o painel rolado para
    baixo, ele ficava rolado esses 12 px (a capinha, o nome e o andamento subiam e eram cortados na borda de cima) */
 html.tablet body.painel-recolhido #player { overflow: clip; }
+/* celular: o mini player como o do Spotify — a capa, o nome e o artista e, à direita, só ouvir em outro aparelho, o ✓
+   da biblioteca e tocar/pausar; o andamento é uma linha fina colada embaixo. Aleatório, voltar, pular e repetir ficam
+   no Tocando agora (tocar na barrinha abre ele), e fechar o player fica no ⋯ dele */
+@media (max-width: 899px) {
+  html:not(.tablet):not(.pp) #player { grid-template-columns: auto minmax(0, 1fr) auto auto auto; grid-template-areas: "video info lado salva play";
+    border-radius: 8px; padding-right: 6px; }
+  html:not(.tablet):not(.pp) #player .pl-video { margin: 8px 0 8px 8px; border-radius: 4px; }
+  html:not(.tablet):not(.pp) #player.capa-na-barra:not(.grande) .pl-video { width: 44px; }
+  html:not(.tablet):not(.pp) #player .pl-info { padding: 8px 6px 8px 10px; }
+  html:not(.tablet):not(.pp) #player .pl-txt b { font-size: 14px; font-weight: 700; }
+  html:not(.tablet):not(.pp) #player .pl-txt small { font-size: 13px; }
+  html:not(.tablet):not(.pp) #player .pl-ctrl > :not(.pl-play) { display: none; }
+  html:not(.tablet):not(.pp) #player .pl-lado > :not([data-pl="aparelhos"]) { display: none; }
+  html:not(.tablet):not(.pp) #player .pl-lado { padding: 0; }
+  html:not(.tablet):not(.pp) #player .pl-lado [data-pl="aparelhos"] { display: grid; width: 40px; height: 40px; color: #fff; }
+  html:not(.tablet):not(.pp) #player .pl-lado [data-pl="aparelhos"] svg { width: 22px; height: 22px; }
+  html:not(.tablet):not(.pp) #player .pl-salva:not([hidden]) { display: inline-grid; grid-area: salva; width: 24px; height: 24px; margin: 0 8px;
+    border-color: rgb(255 255 255 / 0.85); color: #fff; }
+  html:not(.tablet):not(.pp) #player .pl-salva.salva { border-color: var(--accent); color: var(--on-accent); }
+  html:not(.tablet):not(.pp) #player .pl-salva svg { width: 14px; height: 14px; }
+  html:not(.tablet):not(.pp) #player .pl-play { width: 44px; height: 44px; }
+  html:not(.tablet):not(.pp) #player .pl-play svg { width: 24px; height: 24px; }
+  /* (a linha não recebe o toque: ali embaixo o dedo é para os botões; para ir a um ponto, a barra do Tocando agora) */
+  html:not(.tablet):not(.pp) #player .pl-tempo { position: absolute; left: 8px; right: 8px; bottom: 0; margin: 0; pointer-events: none; }
+  html:not(.tablet):not(.pp) #player .pl-t0, html:not(.tablet):not(.pp) #player .pl-t1 { display: none; }
+  html:not(.tablet):not(.pp) #player .pl-prog { height: 2px; border-radius: 1px; background: rgb(255 255 255 / 0.25); }
+}

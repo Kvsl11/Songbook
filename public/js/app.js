@@ -2212,7 +2212,10 @@ const semLinhasDeAcordes = (sinc) => {
     // cifra e a marcação entra onde a parte muda (a frase sem par fica na parte de antes)
     const partes = song ? partesCantadas(song.content).map((p) => ({ ...p, linhas: p.linhas.map(linhaSemCifra).filter(Boolean) })).filter((p) => p.linhas.length) : [];
     const daCifra = partes.flatMap((p) => p.linhas);
-    const linhas = sinc ? semCensura(sinc.linhas, daCifra) : daCifra;
+    // (a cifra sem a letra e a letra sincronizada guardada de outra versão da música, o clipe ou outro áudio: ela
+    // aparece, sem acompanhar, em vez de o cartão da letra sumir)
+    const soltas = !sinc && !daCifra.length ? (semLinhasDeAcordes(song?.sincronia)?.linhas || []).filter((l) => l && !soAcordes(l)) : [];
+    const linhas = sinc ? semCensura(sinc.linhas, daCifra) : soltas.length ? soltas : daCifra;
     const parteDaLinha = partes.flatMap((p, n) => p.linhas.map(() => n));
     const casadas = linhas === daCifra ? daCifra.map((_, i) => i) : casarLinhas(linhas, daCifra);
     const marcas = new Map();
@@ -3864,8 +3867,10 @@ const semLinhasDeAcordes = (sinc) => {
   el.addEventListener('pointermove', (e) => {
     if (!puxada || e.pointerId !== puxada.id) return;
     const dy = e.clientY - puxada.y;
-    // (o card sobe um pouco junto com o dedo)
-    el.style.translate = dy < 0 && Math.abs(dy) > Math.abs(e.clientX - puxada.x) ? `0 ${Math.max(dy, -60) / 2}px` : '';
+    const dx = e.clientX - puxada.x;
+    // (o card sobe um pouco junto com o dedo; numa fila, para o lado ele anda junto, como no Spotify)
+    el.style.translate = dy < 0 && Math.abs(dy) > Math.abs(dx) ? `0 ${Math.max(dy, -60) / 2}px`
+      : el.classList.contains('com-fila') && Math.abs(dx) > Math.abs(dy) ? `${Math.max(-80, Math.min(80, dx)) / 2}px 0` : '';
   });
   const soltarPuxada = (e) => {
     if (!puxada || e.pointerId !== puxada.id) return;
@@ -3873,6 +3878,15 @@ const semLinhasDeAcordes = (sinc) => {
     const dx = e.clientX - puxada.x;
     puxada = null;
     el.style.translate = '';
+    // passar o dedo para o lado, numa fila (repertório, playlist): para a esquerda vai para a próxima, para a direita
+    // volta para a anterior (no celular o mini player não tem mais esses botões, como no Spotify)
+    if (e.type === 'pointerup' && ehMini() && el.classList.contains('com-fila') && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      engolirClique = true;
+      setTimeout(() => { engolirClique = false; }, 400);
+      const b = $(`.pl-ctrl [data-pl="${dx < 0 ? 'proxima' : 'anterior'}"]`, el);
+      if (b && !b.disabled) { engolirClique = false; b.click(); engolirClique = true; }
+      return;
+    }
     if (e.type !== 'pointerup' || dy > -40 || Math.abs(dy) < Math.abs(dx) * 1.2 || !ehMini()) return;
     engolirClique = true; // (o clique que vem depois do arraste não aperta o botão onde o dedo saiu)
     setTimeout(() => { engolirClique = false; }, 400);
