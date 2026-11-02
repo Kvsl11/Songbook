@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 398, data: '2026-11-01', titulo: 'Orações e Hinários com visual novo',
+    itens: [
+      { tipo: 'melhoria', texto: 'Os cartões das Orações estão mais limpos: fundo discreto com um toque de cor, um selo com o número (I, II, III…) ou a inicial da oração, e o nome inteiro, sem palavras cortadas ao meio nem o “Oração” repetido em todos.' },
+      { tipo: 'melhoria', texto: 'Em Hinários e formação, cada seção virou uma lista só, com linhas finas entre os itens, e a cor do ícone diz o tipo: arquivo, site, no app, ouvir ou cifra.' },
+    ],
+  },
+  {
     versao: 397, data: '2026-11-01', titulo: 'Versões dos cantos à vista e a marca da Cindy na Liturgia',
     itens: [
       { tipo: 'melhoria', texto: 'Na Liturgia (Missa popular), cada opção mostra embaixo do título de quem é a versão (Marcus Lima, Esther Bimbato, Pe Weber…): as várias versões do mesmo salmo pareciam repetidas, porque o nome ficava cortado no fim. As versões da mesma pessoa (Melodia 1 e 2) ficam juntas.' },
@@ -63,12 +70,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'Quem não tem foto (como o “Belief” nos créditos de Perfect) fica com o desenho do app, a pessoa com a nota, em vez da foto de um violão: era a imagem que o Cifra Club põe no lugar da foto de quem não tem. As músicas que já tinham guardado essa imagem também passam a mostrar o desenho.' },
       { tipo: 'correcao', texto: 'Um nome que existe no Deezer de vários artistas pouco conhecidos (ou só parecido, como “Belief Defect” para “Belief”) não traz mais a foto de outra pessoa: fica o desenho.' },
-    ],
-  },
-  {
-    versao: 388, data: '2026-11-01', titulo: 'A letra volta nas músicas em que o clipe é a própria gravação',
-    itens: [
-      { tipo: 'correcao', texto: 'A letra volta a aparecer no modo música quando o clipe é a própria gravação da música (como em Company): o app guardava o clipe também como a versão de música e o Tocando agora achava que estava no modo vídeo, escondendo a letra. Vale também para as músicas que já estavam baixadas.' },
     ],
   },
 ];
