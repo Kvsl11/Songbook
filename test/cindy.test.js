@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import '../server/node-dom.js';
-import { parseCanto, parseRepertorio, score, slugFromUrl, titulosAlvo, wpChordsToChordPro } from '../public/js/lib/cindy.js';
+import { parseCanto, parseRepertorio, rank, score, slugFromUrl, titulosAlvo, wpChordsToChordPro } from '../public/js/lib/cindy.js';
 import { chaveDaParte, montarEstrutura, salmoChordPro } from '../public/js/lib/missa.js';
 
 test('converte WP Chords em ChordPro, com refrão em negrito', () => {
@@ -40,15 +40,31 @@ test('lê as abas do repertório da missa', () => {
 });
 
 test('gera os títulos de busca a partir da liturgia', () => {
-  // festa: também o nome curto que a Cindy usa no título
-  assert.deepEqual(titulosAlvo({ data_extenso: 'Segunda-feira, 2 de Novembro de 2026', celebracao: 'Comemoração de Todos os Fiéis Defuntos', ano: 'Ano A' }).map((a) => a.consulta),
-    ['Comemoração de Todos os Fiéis Defuntos', 'Fiéis Defuntos']);
-  assert.deepEqual(titulosAlvo({ data_extenso: 'Domingo, 1 de Novembro de 2026', celebracao: 'Todos os Santos', ano: 'Ano A' }).map((a) => a.consulta), ['Todos os Santos']);
+  // festa: o nome completo, o nome que a Cindy usa e só as palavras próprias da festa
+  const consultas = (celebracao, data_extenso) => titulosAlvo({ data_extenso, celebracao, ano: 'Ano A' }).map((a) => a.consulta);
+  assert.deepEqual(consultas('Comemoração de Todos os Fiéis Defuntos', 'Segunda-feira, 2 de Novembro de 2026'),
+    ['Fiéis Defuntos', 'Comemoração de Todos os Fiéis Defuntos', 'Todos Fiéis Defuntos']);
+  assert.deepEqual(consultas('Todos os Santos', 'Domingo, 1 de Novembro de 2026'), ['Todos os Santos', 'Todos Santos']);
+  assert.deepEqual(consultas('Nosso Senhor Jesus Cristo, Rei do Universo', 'Domingo, 22 de Novembro de 2026')[0], 'Cristo Rei');
+  assert.deepEqual(consultas('Bem-aventurada Virgem Maria da Conceição Aparecida', 'Segunda-feira, 12 de Outubro de 2026')[0], 'Nossa Senhora Aparecida');
+  assert.deepEqual(consultas('Domingo de Pentecostes', 'Domingo, 24 de Maio de 2026'), ['Domingo de Pentecostes', 'Pentecostes']);
+  assert.equal(titulosAlvo({ data_extenso: 'Sexta-feira, 25 de Dezembro de 2026', celebracao: 'Natal de Nosso Senhor Jesus Cristo', ano: 'Ano B' })[0].alvo, 'Dia de Natal 25 Ano B');
   assert.deepEqual(titulosAlvo({ data_extenso: 'Domingo, 18 de Outubro de 2026', celebracao: '29º Domingo do Tempo Comum', ano: 'Ano A' }).map((a) => a.consulta), ['29º Domingo']);
   assert.deepEqual(titulosAlvo({ data_extenso: 'Sexta-feira, 16 de Outubro de 2026', celebracao: '28ª Semana do Tempo Comum', semana: '28ª Semana do Tempo Comum' }).map((a) => a.alvo),
     ['6ª Feira da 28ª Semana do Tempo Comum']);
-  assert.deepEqual(titulosAlvo({ data_extenso: 'Sábado, 17 de Outubro de 2026', celebracao: 'Santo Inácio de Antioquia, bispo e mártir', semana: '28ª Semana do Tempo Comum' }).map((a) => a.tipo),
+  assert.deepEqual(titulosAlvo({ data_extenso: 'Sábado, 17 de Outubro de 2026', celebracao: 'Santo Inácio de Antioquia, bispo e mártir', semana: '28ª Semana do Tempo Comum' }).map((a) => a.tipo).filter((t, i, l) => t !== l[i - 1]),
     ['festa', 'semana']);
+});
+
+test('repertório da festa: só posts de repertório, sem os de dia de semana, e números na ordem certa', () => {
+  const post = (titulo, date = '2025-01-01') => ({ id: titulo, title: { rendered: titulo }, link: 'https://cindyferrarezi.com/x', date });
+  const natal = rank([post('Cantos Músicas 6ª Feira do Natal Depois da Epifania', '2025-12-25'), post('Músicas Cantos Missa 6º Dia da Oitava de Natal'),
+    post('Cantos Músicas Missa da Noite de Natal – Dia 24 de Dezembro'), post('Músicas Cantos Missa do Dia de Natal Dia 25 de Dezembro')], 'Dia de Natal 25 Ano B', { tipo: 'festa' });
+  assert.deepEqual(natal.map((p) => p.titulo), ['Músicas Cantos Missa do Dia de Natal Dia 25 de Dezembro']);
+  assert.deepEqual(rank([post('Santíssima Trindade Senhor e Criador (Veni Creator)'), post('Músicas Cantos Missa Solenidade da Santíssima Trindade')], 'Santíssima Trindade Ano A', { tipo: 'festa' })
+    .map((p) => p.titulo), ['Músicas Cantos Missa Solenidade da Santíssima Trindade']);
+  assert.equal(score('Cantos Músicas Missa 2ª Feira da 3ª Semana do Advento', '3ª Feira da 2ª Semana do Advento'), -1);
+  assert.ok(score('Cantos Músicas Missa 3ª Feira da 2ª Semana do Advento', '3ª Feira da 2ª Semana do Advento') > 0);
 });
 
 test('pontuação rejeita domingo e ano diferentes', () => {

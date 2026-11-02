@@ -6,7 +6,8 @@ export const NOVIDADES = [
   {
     versao: 396, data: '2026-11-01', titulo: 'Sugestões da Cindy Ferrarezi de volta nas festas',
     itens: [
-      { tipo: 'correcao', texto: 'Na Liturgia, as festas e solenidades (como Todos os Santos e Finados) voltam a trazer as sugestões de cantos da Cindy Ferrarezi: o app não achava o repertório dela nesses dias e mostrava só as do Músicas para Missa. Quem já tinha aberto o dia recebe as sugestões dela ao abrir de novo.' },
+      { tipo: 'correcao', texto: 'Na Liturgia, as festas e solenidades voltam a trazer as sugestões de cantos da Cindy Ferrarezi (antes vinham só as do Músicas para Missa): Todos os Santos, Finados, Cristo Rei, Natal, Pentecostes, Santíssima Trindade, Nossa Senhora Aparecida, Imaculada Conceição e as outras. Quem já tinha aberto o dia recebe as sugestões dela ao abrir de novo.' },
+      { tipo: 'correcao', texto: 'Nos dias de semana, o repertório da Cindy é sempre o do dia certo: a 3ª Feira da 2ª Semana não pega mais o da 2ª Feira da 3ª Semana. E nas festas não vem mais um canto avulso no lugar do repertório.' },
     ],
   },
   {
