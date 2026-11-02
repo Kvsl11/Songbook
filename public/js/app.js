@@ -24,6 +24,7 @@ import { apagarAudio, chavesDosAudios, duracaoDoArquivo, guardarAudio, lerAudio,
 import { escolherAudio, mesmaSincronia, paresPelaDuracao, paresPelaLegenda, paresPelasLetras, tempoNoAudio, tempoNoVideo } from './lib/versoes.js';
 import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { embaralharIndices, moverIndice } from './lib/fila.js';
+import { tituloEVersao } from './lib/html.js';
 import { audioDbDoArtista, audioDoVideo, buscarYoutube, ehImagemPadrao, legendasDoVideo, semCensura, cifraComoCantada, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -11318,8 +11319,15 @@ function momentoAntes(partes, i) {
 // fonte preferida das sugestões: 'cindy' (Cindy Ferrarezi) ou 'mpm' (Músicas para Missa)
 const fontePreferida = () => (db.prefs().fonteSugestoes === 'mpm' ? 'mpm' : 'cindy');
 const daFonte = (c, f) => (f === 'mpm' ? c.fonte === 'mpm' : c.fonte !== 'mpm');
-// cantos da fonte preferida primeiro (mantendo a ordem dentro de cada fonte)
-const ordenarCantos = (cantos, f = fontePreferida()) => [...cantos].sort((a, b) => Number(daFonte(b, f)) - Number(daFonte(a, f)));
+// para agrupar as versões da mesma pessoa: "Melodia 2 - Esther Bimbato" fica junto da "Melodia 1 - Esther Bimbato"
+const chaveVersao = (c) => { const v = tituloEVersao(c.titulo)[1]; const m = /^melodia\s*(\d+)\s*[–—-]\s*(.+)$/i.exec(v); return m ? `${m[2]} ${m[1]}` : v; };
+// cantos da fonte preferida primeiro (mantendo a ordem dentro de cada fonte); as versões da mesma pessoa juntas
+const ordenarCantos = (cantos, f = fontePreferida()) => {
+  const pos = new Map();
+  for (const c of cantos) { const k = (c.fonte || '') + '|' + chaveVersao(c).replace(/\s\d+$/, ''); if (!pos.has(k)) pos.set(k, pos.size); }
+  const grupo = (c) => pos.get((c.fonte || '') + '|' + chaveVersao(c).replace(/\s\d+$/, ''));
+  return [...cantos].sort((a, b) => Number(daFonte(b, f)) - Number(daFonte(a, f)) || grupo(a) - grupo(b) || chaveVersao(a).localeCompare(chaveVersao(b)));
+};
 
 function escolhaPadrao(parte) {
   const cantos = ordenarCantos(parte.cantos);
@@ -11429,7 +11437,8 @@ async function viewLiturgia(data) {
   };
   const tagFonte = (c) => (c?.fonte === 'mpm' ? ' <span class="tag mpm" title="Sugestão do site Músicas para Missa">MpM</span>'
     : c?.fonte === 'hinario' ? ' <span class="tag cnbb" title="Hinário Litúrgico da CNBB">Hinário</span>'
-      : c?.fonte === 'acervo' ? ' <span class="tag" title="Arquivo do acervo litúrgico">Acervo</span>' : '');
+      : c?.fonte === 'acervo' ? ' <span class="tag" title="Arquivo do acervo litúrgico">Acervo</span>'
+        : !c?.fonte && /cindyferrarezi\.com/.test(c?.url || '') ? ` <span class="tag cindy" title="${c.sugestao ? 'Cindy Ferrarezi · achado pela busca do refrão do dia' : 'Sugestão do repertório da Cindy Ferrarezi'}">Cindy</span>` : '');
   const resumo = (p) => {
     const n = nomeEscolha(p);
     const cont = p.cantos.length > 1 ? `<small class="cont">${contagem(p)}</small>` : '';
@@ -11486,7 +11495,7 @@ async function viewLiturgia(data) {
           ${(p.chordpro || p.cantos.length) ? `<div class="opcoes-titulo">Escolha o canto</div><div class="opcoes">
             <label class="opcao"><input type="radio" name="op-${p.chave}" value="" ${!sel[p.chave] ? 'checked' : ''}><span class="lbl">Nenhum</span></label>
             ${p.chordpro ? `<label class="opcao"><input type="radio" name="op-${p.chave}" value="cnbb" ${sel[p.chave] === 'cnbb' ? 'checked' : ''}><div class="cover gen" style="--h:130">${icon('cross', 18)}</div><span class="lbl">Texto oficial (sem cifra)</span><span class="tag cnbb">CNBB</span><button class="icon-btn" data-ver="cnbb" aria-label="Ver">${icon('next', 18)}</button></label>` : ''}
-            ${ordenarCantos(p.cantos).map((c) => `<label class="opcao"><input type="radio" name="op-${p.chave}" value="${esc(c.url)}" ${sel[p.chave] === c.url ? 'checked' : ''}>${capaDoCanto(c, p.chave)}<span class="lbl">${esc(c.titulo)}</span>${c.sugestao ? '<span class="tag">busca</span>' : ''}${tagFonte(c)}${c.partitura ? `<span class="tag-partitura" title="Tem partitura">${icon('score', 14)}</span>` : ''}<button class="icon-btn" data-ver="${esc(c.url)}" aria-label="Ver">${icon('next', 18)}</button></label>`).join('')}
+            ${ordenarCantos(p.cantos).map((c) => { const [titulo, versao] = tituloEVersao(c.titulo); return `<label class="opcao"><input type="radio" name="op-${p.chave}" value="${esc(c.url)}" ${sel[p.chave] === c.url ? 'checked' : ''}>${capaDoCanto(c, p.chave)}<span class="lbl" title="${esc(c.titulo)}">${esc(titulo)}${versao ? `<small>${esc(versao)}</small>` : ''}</span>${tagFonte(c)}${c.partitura ? `<span class="tag-partitura" title="Tem partitura">${icon('score', 14)}</span>` : ''}<button class="icon-btn" data-ver="${esc(c.url)}" aria-label="Ver">${icon('next', 18)}</button></label>`; }).join('')}
           </div>` : ''}
         </div>
       </details>`).join('')}

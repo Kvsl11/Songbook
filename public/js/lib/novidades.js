@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 397, data: '2026-11-01', titulo: 'Versões dos cantos à vista e a marca da Cindy na Liturgia',
+    itens: [
+      { tipo: 'melhoria', texto: 'Na Liturgia (Missa popular), cada opção mostra embaixo do título de quem é a versão (Marcus Lima, Esther Bimbato, Pe Weber…): as várias versões do mesmo salmo pareciam repetidas, porque o nome ficava cortado no fim. As versões da mesma pessoa (Melodia 1 e 2) ficam juntas.' },
+      { tipo: 'melhoria', texto: 'Os cantos da Cindy Ferrarezi ganharam a marca “Cindy”, como os do Músicas para Missa têm a “MpM”. A marca “busca” saiu: os achados pela busca do refrão do dia dizem isso ao segurar o dedo ou passar o mouse sobre a marca “Cindy”.' },
+    ],
+  },
+  {
     versao: 396, data: '2026-11-01', titulo: 'Sugestões da Cindy Ferrarezi de volta nas festas',
     itens: [
       { tipo: 'correcao', texto: 'Na Liturgia, as festas e solenidades voltam a trazer as sugestões de cantos da Cindy Ferrarezi (antes vinham só as do Músicas para Missa): Todos os Santos, Finados, Cristo Rei, Natal, Pentecostes, Santíssima Trindade, Nossa Senhora Aparecida, Imaculada Conceição e as outras. Quem já tinha aberto o dia recebe as sugestões dela ao abrir de novo.' },
@@ -62,14 +69,6 @@ export const NOVIDADES = [
     versao: 388, data: '2026-11-01', titulo: 'A letra volta nas músicas em que o clipe é a própria gravação',
     itens: [
       { tipo: 'correcao', texto: 'A letra volta a aparecer no modo música quando o clipe é a própria gravação da música (como em Company): o app guardava o clipe também como a versão de música e o Tocando agora achava que estava no modo vídeo, escondendo a letra. Vale também para as músicas que já estavam baixadas.' },
-    ],
-  },
-  {
-    versao: 387, data: '2026-11-01', titulo: 'Mini player do celular como o do Spotify e a letra que não some',
-    itens: [
-      { tipo: 'melhoria', texto: 'No celular, o mini player fica mais limpo, como o do Spotify: a capa, o nome e o artista e, à direita, só ouvir em outro aparelho, o ✓ da biblioteca e tocar/pausar, com a linha do andamento fina embaixo. Aleatório, voltar, pular e repetir ficam no Tocando agora, e fechar o player fica no ⋯ dele.' },
-      { tipo: 'novo', texto: 'Numa playlist ou repertório, passar o dedo no mini player para a esquerda vai para a próxima música, e para a direita volta para a anterior.' },
-      { tipo: 'correcao', texto: 'O cartão da letra não some mais do Tocando agora quando a cifra guardada não tem a letra e a letra sincronizada é de outra versão da música (o clipe ou outro áudio): ela aparece, mesmo sem acompanhar.' },
     ],
   },
 ];

@@ -76,6 +76,9 @@ function usaGloria(lit) {
   return /solenidade|festa/i.test(lit.grau || '') || (dom && !/advento|quaresma/i.test(lit.tempo || ''));
 }
 
+// o mesmo canto publicado de novo pela Cindy (mesmo título, outro ano) aparecia duas vezes: fica o mais recente (o 1º da busca)
+const repetido = (lista, c) => lista.some((x) => x.url === c.url || (!x.fonte && normalize(x.titulo) === normalize(c.titulo)));
+
 export function montarEstrutura(lit, repertorio, extras = {}) {
   const missa = lit.missas[0] || {};
   const porChave = new Map();
@@ -113,11 +116,11 @@ export function montarEstrutura(lit, repertorio, extras = {}) {
     if (leitura) parte.liturgia = leitura;
     if (def.chave === 'salmo' && leitura) {
       parte.chordpro = salmoChordPro(leitura, lit);
-      for (const c of extras.salmo || []) if (!parte.cantos.some((x) => x.url === c.url)) parte.cantos.push({ ...c, sugestao: 'busca' });
+      for (const c of extras.salmo || []) if (!repetido(parte.cantos, c)) parte.cantos.push({ ...c, sugestao: 'busca' });
     }
     if (def.chave === 'aclamacao' && leitura) {
       parte.chordpro = aclamacaoChordPro(leitura, lit);
-      for (const c of extras.aclamacao || []) if (!parte.cantos.some((x) => x.url === c.url)) parte.cantos.push({ ...c, sugestao: 'busca' });
+      for (const c of extras.aclamacao || []) if (!repetido(parte.cantos, c)) parte.cantos.push({ ...c, sugestao: 'busca' });
     }
     partes.push(parte);
   }
