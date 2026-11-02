@@ -4,9 +4,15 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
-    versao: 407, data: '2026-11-01', titulo: 'Diagrama dos acordes com ícone e nome novos',
+    versao: 408, data: '2026-11-01', titulo: '“Diagrama dos acordes”',
     itens: [
-      { tipo: 'melhoria', texto: 'O botão do diagrama dos acordes (na cifra em tela cheia e nos Ajustes) ganhou um ícone que é o próprio diagrama de um acorde: o braço do violão com as 6 cordas, as casas e os dedos (um Lá menor), no lugar dos quadradinhos. Nos Ajustes, a opção se chama agora “Diagrama dos acordes”.' },
+      { tipo: 'melhoria', texto: 'Nos Ajustes, a opção “Desenho dos acordes” agora se chama “Diagrama dos acordes” (também nos avisos de ligar e desligar e no botão da cifra).' },
+    ],
+  },
+  {
+    versao: 407, data: '2026-11-01', titulo: 'Ícone novo para o desenho dos acordes',
+    itens: [
+      { tipo: 'melhoria', texto: 'O botão do desenho dos acordes (na cifra em tela cheia e nos Ajustes) ganhou um ícone que é o próprio desenho de um acorde: o braço do violão com as 6 cordas, as casas e os dedos (um Lá menor), no lugar dos quadradinhos.' },
     ],
   },
   {
@@ -58,13 +64,6 @@ export const NOVIDADES = [
     versao: 399, data: '2026-11-01', titulo: 'A cifra acompanha a música como a letra',
     itens: [
       { tipo: 'correcao', texto: 'Na letra em tela cheia com a cifra, a frase cantada acende no tempo certo, uma por vez, igual à letra sem cifra: os acordes passam para as frases da letra sincronizada. Antes a cifra juntava várias frases numa linha só, e o destaque ficava parado, atrasava e voltava para trás nos refrões. Tocar numa linha da cifra leva a música até ela.' },
-    ],
-  },
-  {
-    versao: 398, data: '2026-11-01', titulo: 'Orações e Hinários com visual novo',
-    itens: [
-      { tipo: 'melhoria', texto: 'Os cartões das Orações estão mais limpos: fundo discreto com um toque de cor, um selo com o número (I, II, III…) ou a inicial da oração, e o nome inteiro, sem palavras cortadas ao meio nem o “Oração” repetido em todos.' },
-      { tipo: 'melhoria', texto: 'Em Hinários e formação, cada seção virou uma lista só, com linhas finas entre os itens, e a cor do ícone diz o tipo: arquivo, site, no app, ouvir ou cifra.' },
     ],
   },
 ];
