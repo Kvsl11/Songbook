@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 407, data: '2026-11-01', titulo: 'Ícone novo para o desenho dos acordes',
+    itens: [
+      { tipo: 'melhoria', texto: 'O botão do desenho dos acordes (na cifra em tela cheia e nos Ajustes) ganhou um ícone que é o próprio desenho de um acorde: o braço do violão com as casas e os dedos, no lugar dos quadradinhos.' },
+    ],
+  },
+  {
     versao: 406, data: '2026-11-01', titulo: 'Acorde que soa na hora',
     itens: [
       { tipo: 'correcao', texto: 'O som do acorde sai na hora do toque: as notas do violão dos acordes da música já vão sendo preparadas quando a faixa dos desenhos aparece, e o silêncio do começo de cada gravação foi tirado.' },
@@ -59,13 +65,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'melhoria', texto: 'Os cartões das Orações estão mais limpos: fundo discreto com um toque de cor, um selo com o número (I, II, III…) ou a inicial da oração, e o nome inteiro, sem palavras cortadas ao meio nem o “Oração” repetido em todos.' },
       { tipo: 'melhoria', texto: 'Em Hinários e formação, cada seção virou uma lista só, com linhas finas entre os itens, e a cor do ícone diz o tipo: arquivo, site, no app, ouvir ou cifra.' },
-    ],
-  },
-  {
-    versao: 397, data: '2026-11-01', titulo: 'Versões dos cantos à vista e a marca da Cindy na Liturgia',
-    itens: [
-      { tipo: 'melhoria', texto: 'Na Liturgia (Missa popular), cada opção mostra embaixo do título de quem é a versão (Marcus Lima, Esther Bimbato, Pe Weber…): as várias versões do mesmo salmo pareciam repetidas, porque o nome ficava cortado no fim. As versões da mesma pessoa (Melodia 1 e 2) ficam juntas.' },
-      { tipo: 'melhoria', texto: 'Os cantos da Cindy Ferrarezi ganharam a marca “Cindy”, como os do Músicas para Missa têm a “MpM”. A marca “busca” saiu: os achados pela busca do refrão do dia dizem isso ao segurar o dedo ou passar o mouse sobre a marca “Cindy”.' },
     ],
   },
 ];

@@ -44,6 +44,8 @@ const P = {
   enviar: '<path d="M12 19V5M5 12l7-7 7 7"/>',
   mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/>',
   more: '<circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/>',
+  // o desenho de um acorde: o braço do violão de frente (pestana em cima, 4 cordas, 3 casas) com dois dedos
+  diagrama: '<path d="M5 4.5h14" stroke-width="2.8"/><path d="M5 4.5V20M9.67 4.5V20M14.33 4.5V20M19 4.5V20M5 9.67h14M5 14.83h14M5 20h14" stroke-width="1.5"/><circle cx="14.33" cy="7.1" r="2.1" fill="currentColor" stroke="none"/><circle cx="9.67" cy="12.25" r="2.1" fill="currentColor" stroke="none"/>',
   grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
   rows: '<path d="M3 6h18M3 12h18M3 18h18"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
