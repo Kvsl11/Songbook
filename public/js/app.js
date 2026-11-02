@@ -3929,7 +3929,8 @@ const semLinhasDeAcordes = (sinc) => {
   };
   let toque = null;
   $('.pl-letra', el).addEventListener('touchstart', (e) => {
-    toque = letraDoRepertorio() && e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() } : null;
+    // (arrastar as faixas que rolam de lado, a dos acordes e a das ferramentas, não troca de música)
+    toque = letraDoRepertorio() && e.touches.length === 1 && !e.target.closest('.pl-acordes, .pl-ferr') ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() } : null;
   }, { passive: true });
   $('.pl-letra', el).addEventListener('touchend', (e) => {
     if (!toque) return;
