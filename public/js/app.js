@@ -2560,7 +2560,8 @@ const semLinhasDeAcordes = (sinc) => {
         pop.innerHTML = `${svg}<b>${esc(nome)}</b>`;
         pop.title = 'Tocar de novo';
         pop.onclick = () => somDoAcorde(nome, pop);
-        document.body.append(pop);
+        // dentro da letra na tela toda: o balão pega a cor da música, como os cartões da faixa dos diagramas
+        ($('.pl-letra', el) || document.body).append(pop);
         somDoAcorde(nome, pop);
         const w = pop.offsetWidth;
         pop.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
