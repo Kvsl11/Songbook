@@ -1535,7 +1535,7 @@ const player = (() => {
       <span class="pl-ferr-g so-cifra"><button data-pl="capo-" aria-label="Capotraste uma casa abaixo" title="Capotraste: uma casa abaixo">−</button><b class="pl-capo"></b><button data-pl="capo+" aria-label="Capotraste uma casa acima" title="Capotraste: uma casa acima">+</button></span>
       <span class="pl-ferr-g"><button data-pl="fonte-" aria-label="Letra menor" title="Letra menor"><span class="a-menor">A</span></button><button data-pl="fonte+" aria-label="Letra maior" title="Letra maior"><span class="a-maior">A</span></button></span>
       <button class="pl-ferr-rolar so-cifra" data-pl="rolar" aria-pressed="false" aria-label="Rolagem automática" title="Rolagem automática">${icon('down', 16)}<span>Rolar</span></button>
-      <button class="pl-ferr-acordes so-cifra" data-pl="acordes" aria-pressed="false" aria-label="Desenho dos acordes" title="Desenho dos acordes">${icon('diagrama', 18)}</button></div><div class="pl-acordes" hidden></div><div class="pl-cifra"></div><div class="pl-linhas"></div>
+      <button class="pl-ferr-acordes so-cifra" data-pl="acordes" aria-pressed="false" aria-label="Diagrama dos acordes" title="Diagrama dos acordes">${icon('diagrama', 18)}</button></div><div class="pl-acordes" hidden></div><div class="pl-cifra"></div><div class="pl-linhas"></div>
       <div class="pl-letra-pe"><div class="pl-letra-bts2"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 22)}</button><span class="grow"></span><button class="icon-btn pl-mais" data-pl="menu" aria-label="Mais opções" title="Mais opções">${icon('more', 22)}</button></div>
         <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" role="slider" tabindex="0" aria-label="Tempo da música" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
         <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button></div></section>
@@ -2338,7 +2338,7 @@ const semLinhasDeAcordes = (sinc) => {
   let modoCifra = db.prefs().letraModo === 'cifra';
   let mapaCifra = null; // linha cantada (sincronia) -> linha da cifra na tela
   let rolando = 0;
-  // o desenho dos acordes (Ajustes → Desenho dos acordes, ou o botão ao lado do Rolar): uma faixa com os acordes da
+  // o desenho dos acordes (Ajustes → Diagrama dos acordes, ou o botão ao lado do Rolar): uma faixa com os acordes da
   // música, na ordem em que aparecem e no tom e capo da tela, entre as ferramentas e a cifra. Antes ficava só na página
   // antiga da música, escondida embaixo da letra na tela toda: ligado, não aparecia em lugar nenhum
   const desenharDiagramas = () => {
@@ -4110,7 +4110,7 @@ const semLinhasDeAcordes = (sinc) => {
       const ligar = !db.prefs().diagramas;
       db.setPref('diagramas', ligar);
       desenharDiagramas();
-      toast(ligar ? 'Desenho dos acordes ligado' : 'Desenho dos acordes desligado');
+      toast(ligar ? 'Diagrama dos acordes ligado' : 'Diagrama dos acordes desligado');
       return;
     }
     if (b.dataset.pl === 'explorar-creditos' && dadosCreditos) { explorarCreditos(dadosCreditos); return; }
@@ -9863,11 +9863,11 @@ function viewSong(id, ctx = {}) {
     const box = $('#acordes-musica');
     const lista = comCifra && db.prefs().diagramas ? acordesDaMusica().map((c) => [c, diagramaSvg(c)]).filter(([, svg]) => svg) : [];
     box.hidden = !lista.length;
-    box.innerHTML = lista.length ? `<div class="acordes-head"><b>Acordes${capo ? ` (capo ${capo})` : ''}</b><button class="link-btn" id="esconder-diagramas" title="Desligar o desenho dos acordes (volta em Ajustes)">Ocultar</button></div>
+    box.innerHTML = lista.length ? `<div class="acordes-head"><b>Acordes${capo ? ` (capo ${capo})` : ''}</b><button class="link-btn" id="esconder-diagramas" title="Desligar o diagrama dos acordes (volta em Ajustes)">Ocultar</button></div>
       <div class="acordes-lista">${lista.map(([c, svg]) => `<figure class="acorde-card" data-acorde="${esc(c)}" title="Ouvir o acorde">${svg}<figcaption>${esc(c)}</figcaption></figure>`).join('')}</div>` : '';
     if (lista.length) prepararAcordes(lista.map(([c]) => c), { capo });
     box.querySelectorAll('.acorde-card').forEach((f) => { f.onclick = () => { if (tocarAcorde(f.dataset.acorde, { capo })) { f.classList.remove('soando'); void f.offsetWidth; f.classList.add('soando'); } }; });
-    $('#esconder-diagramas')?.addEventListener('click', () => { db.setPref('diagramas', false); fecharPop(); desenharAcordes(); toast('Desenho dos acordes desligado (religue em Ajustes)'); });
+    $('#esconder-diagramas')?.addEventListener('click', () => { db.setPref('diagramas', false); fecharPop(); desenharAcordes(); toast('Diagrama dos acordes desligado (religue em Ajustes)'); });
   }
   // tocar num acorde da letra mostra o desenho dele
   const fecharPop = () => document.querySelector('.acorde-pop')?.remove();
@@ -11881,7 +11881,7 @@ function viewQualidade() {
 // um abre a sua página (antes ficava tudo junto numa tela só, comprida)
 const TOPICOS_AJUSTES = [
   { id: 'aparencia', secao: 'Aparência', ic: 'palette', t: 'Aparência', s: 'Modo escuro ou claro · Cor de destaque' },
-  { id: 'musica', secao: 'Música', ic: 'chord', t: 'Música e cifra', s: 'Destaque e desenho dos acordes · Capa animada' },
+  { id: 'musica', secao: 'Música', ic: 'chord', t: 'Música e cifra', s: 'Destaque e diagrama dos acordes · Capa animada' },
   { id: 'qualidade', href: '#/qualidade', ic: 'gauge', t: 'Qualidade de mídia', s: 'Qualidade do download do áudio e do vídeo' },
   { id: 'offline', href: '#/offline', ic: 'baixar', t: 'Downloads e economia de dados', s: 'Músicas baixadas · Armazenamento · Cache' },
   { id: 'powerpoint', secao: 'PowerPoint', ic: 'columns', t: 'PowerPoint', s: 'Modelo da apresentação da missa' },
@@ -11929,7 +11929,7 @@ function viewSettings(topico) {
     <div class="settings-group">
       <div class="setting wrap"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
-      ${chave('diagramas', 'diagrama', 'Desenho dos acordes', 'Como montar cada acorde no violão', p.diagramas)}
+      ${chave('diagramas', 'diagrama', 'Diagrama dos acordes', 'Como montar cada acorde no violão', p.diagramas)}
       ${chave('video-fundo', 'video', 'Capa animada', 'Trechos do clipe passam atrás da música, sem som, como o Canvas do Spotify (nas músicas baixadas, o próprio vídeo)', p.videoFundo !== false)}
     </div>`)}
 
@@ -12019,7 +12019,7 @@ function viewSettings(topico) {
   };
   infoModelo();
   $('#instalar')?.addEventListener('click', instalarApp);
-  $('#diagramas').onchange = (e) => { db.setPref('diagramas', e.target.checked); toast(e.target.checked ? 'Desenho dos acordes ligado' : 'Desenho dos acordes desligado'); };
+  $('#diagramas').onchange = (e) => { db.setPref('diagramas', e.target.checked); toast(e.target.checked ? 'Diagrama dos acordes ligado' : 'Diagrama dos acordes desligado'); };
   $('#destaque').onclick = (e) => {
     const b = e.target.closest('[data-v]');
     if (!b) return;

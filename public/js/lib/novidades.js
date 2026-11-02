@@ -4,9 +4,9 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
-    versao: 407, data: '2026-11-01', titulo: 'Ícone novo para o desenho dos acordes',
+    versao: 407, data: '2026-11-01', titulo: 'Diagrama dos acordes com ícone e nome novos',
     itens: [
-      { tipo: 'melhoria', texto: 'O botão do desenho dos acordes (na cifra em tela cheia e nos Ajustes) ganhou um ícone que é o próprio desenho de um acorde: o braço do violão com as 6 cordas, as casas e os dedos (um Lá menor), no lugar dos quadradinhos.' },
+      { tipo: 'melhoria', texto: 'O botão do diagrama dos acordes (na cifra em tela cheia e nos Ajustes) ganhou um ícone que é o próprio diagrama de um acorde: o braço do violão com as 6 cordas, as casas e os dedos (um Lá menor), no lugar dos quadradinhos. Nos Ajustes, a opção se chama agora “Diagrama dos acordes”.' },
     ],
   },
   {
