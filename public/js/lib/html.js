@@ -42,3 +42,14 @@ export function tituloBonito(t) {
     return min[0].toUpperCase() + min.slice(1);
   });
 }
+
+// Título e versão de um canto: as versões do mesmo salmo só mudam no fim ("… Senhor. (Melodia 1 - Esther Bimbato)",
+// "… Senhor - Pe Weber"), que a tela cortava. A versão vai para uma segunda linha.
+export function tituloEVersao(t) {
+  const s = String(t || '').trim();
+  const par = /^(.*\S)\s*\(([^()]{2,60})\)$/.exec(s);
+  if (par) return [par[1].replace(/[\s.!,;:–—-]+$/, ''), par[2].trim()];
+  const tra = /^(.*\S)\s+[–—-]\s+([^–—-]{2,30})$/.exec(s);
+  if (tra && tra[2].trim().split(/\s+/).length <= 4 && tra[1].length >= 8) return [tra[1], tra[2].trim()];
+  return [s, ''];
+}

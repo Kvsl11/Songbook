@@ -93,3 +93,11 @@ test('estrutura da missa combina CNBB + Cindy', () => {
   assert.ok(partes.some((p) => p.chave === 'gloria'), 'domingo do Tempo Comum tem Glória');
   assert.match(salmoChordPro(lit.missas[0].salmo, lit), /\{start_of_chorus: Refrão\}\nÓ família\n\{end_of_chorus\}\n\na \*\nb\n\{chorus\}/);
 });
+
+test('separa o título da versão do canto', async () => {
+  const { tituloEVersao } = await import('../public/js/lib/html.js');
+  assert.deepEqual(tituloEVersao('Salmo 23 (24) - É Assim a Geração dos que Procuram o Senhor. (Melodia 1 - Esther Bimbato)'),
+    ['Salmo 23 (24) - É Assim a Geração dos que Procuram o Senhor', 'Melodia 1 - Esther Bimbato']);
+  assert.deepEqual(tituloEVersao('Salmo 23 É Assim a Geração dos que Procuram o Senhor - Pe Weber'), ['Salmo 23 É Assim a Geração dos que Procuram o Senhor', 'Pe Weber']);
+  assert.deepEqual(tituloEVersao('Salmo 23 Ao Senhor Pertence a Terra e o que Ela Encerra.'), ['Salmo 23 Ao Senhor Pertence a Terra e o que Ela Encerra.', '']);
+});
