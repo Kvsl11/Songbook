@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 399, data: '2026-11-01', titulo: 'A cifra acompanha a música como a letra',
+    itens: [
+      { tipo: 'correcao', texto: 'Na letra em tela cheia com a cifra, a frase cantada acende no tempo certo, uma por vez, igual à letra sem cifra: os acordes passam para as frases da letra sincronizada. Antes a cifra juntava várias frases numa linha só, e o destaque ficava parado, atrasava e voltava para trás nos refrões. Tocar numa linha da cifra leva a música até ela.' },
+    ],
+  },
+  {
     versao: 398, data: '2026-11-01', titulo: 'Orações e Hinários com visual novo',
     itens: [
       { tipo: 'melhoria', texto: 'Os cartões das Orações estão mais limpos: fundo discreto com um toque de cor, um selo com o número (I, II, III…) ou a inicial da oração, e o nome inteiro, sem palavras cortadas ao meio nem o “Oração” repetido em todos.' },
@@ -63,13 +69,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'Na Liturgia, os cantos sem capa ganham a imagem do vídeo do canto (a mesma que aparece ao abrir) e, até ela chegar, um desenho do momento da missa na cor litúrgica do dia: a porta da Entrada, a estrela do Glória, a lira do Salmo, o cálice das Oferendas, a hóstia da Comunhão.' },
       { tipo: 'novo', texto: 'No “Sobre o artista”, tocar numa foto abre ela em tela cheia, inteira: passe o dedo para o lado para ver as outras (no computador, as setas da tela ou do teclado) e puxe para baixo, toque no X ou use o voltar para fechar.' },
       { tipo: 'melhoria', texto: 'O ícone de partitura nas listas fica cinza, como os de cifra e vídeo.' },
-    ],
-  },
-  {
-    versao: 389, data: '2026-11-01', titulo: 'Sem a foto do violão para quem não tem foto',
-    itens: [
-      { tipo: 'correcao', texto: 'Quem não tem foto (como o “Belief” nos créditos de Perfect) fica com o desenho do app, a pessoa com a nota, em vez da foto de um violão: era a imagem que o Cifra Club põe no lugar da foto de quem não tem. As músicas que já tinham guardado essa imagem também passam a mostrar o desenho.' },
-      { tipo: 'correcao', texto: 'Um nome que existe no Deezer de vários artistas pouco conhecidos (ou só parecido, como “Belief Defect” para “Belief”) não traz mais a foto de outra pessoa: fica o desenho.' },
     ],
   },
 ];

@@ -25,6 +25,7 @@ import { escolherAudio, mesmaSincronia, paresPelaDuracao, paresPelaLegenda, pare
 import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { embaralharIndices, moverIndice } from './lib/fila.js';
 import { tituloEVersao } from './lib/html.js';
+import { cifraNasLinhas } from './lib/cifra-sincronizada.js';
 import { audioDbDoArtista, audioDoVideo, buscarYoutube, ehImagemPadrao, legendasDoVideo, semCensura, cifraComoCantada, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -2359,8 +2360,17 @@ const semLinhasDeAcordes = (sinc) => {
     if (!modoCifra || !song?.content || semAcordes) { box.innerHTML = ''; return; }
     const transpose = song.transpose || 0;
     const capo = song.capo || 0;
-    const r = renderSong(song.content, { transpose, capo, key: song.key || '' });
+    // com a letra sincronizada, os acordes da cifra vão para as frases dela: uma linha por frase, que acende no tempo
+    // dela como na letra sem cifra (ver cifraNasLinhas). Sem a sincronia, ou se a cifra não bate com a letra, a cifra como é
+    const sincronizada = tempos && linhasDaLetra.length === tempos.length ? cifraNasLinhas(song.content, linhasDaLetra) : null;
+    let r = renderSong(sincronizada?.content || song.content, { transpose, capo, key: song.key || '' });
     box.innerHTML = `<div class="song lyrics-mode with-chords">${r.html}</div>`;
+    let porFrase = [...box.querySelectorAll('.line:not(.chords-only)')];
+    if (sincronizada && porFrase.length !== linhasDaLetra.length) {
+      r = renderSong(song.content, { transpose, capo, key: song.key || '' });
+      box.innerHTML = `<div class="song lyrics-mode with-chords">${r.html}</div>`;
+      porFrase = null;
+    } else if (!sincronizada) porFrase = null;
     soltarAcordes(box);
     $('.pl-tom', el).innerHTML = `<small>Tom</small>${esc(r.key || (transpose ? (transpose > 0 ? '+' : '') + transpose : '—'))}`;
     $('.pl-capo', el).innerHTML = `<small>Capo</small>${capo || '—'}`;
@@ -2368,7 +2378,10 @@ const semLinhasDeAcordes = (sinc) => {
     // (as mesmas frases da letra, na mesma ordem dos tempos: sem as linhas só de acordes e sem os asteriscos. Antes
     // eram as da sincronia guardada, com as linhas só de acordes que a letra tira: a partir delas, a frase k da cifra
     // não era a k dos tempos, e acendia a linha errada)
-    if (tempos && linhasDaLetra.length === tempos.length) {
+    if (porFrase) {
+      mapaCifra = porFrase;
+      porFrase.forEach((l, k) => { l.dataset.k = k; });
+    } else if (tempos && linhasDaLetra.length === tempos.length) {
       const linhasTela = [...box.querySelectorAll('.line:not(.chords-only)')];
       const textos = linhasTela.map((l) => [...l.querySelectorAll('.lyric')].map((x) => x.textContent).join(''));
       mapaCifra = casarLinhas(linhasDaLetra, textos).map((i) => (i >= 0 ? linhasTela[i] : null));
@@ -2507,7 +2520,7 @@ const semLinhasDeAcordes = (sinc) => {
   }, 80);
   el.addEventListener('click', (e) => {
     // no cartão, tocar na letra abre ela na tela toda; na tela toda, tocar numa linha leva o vídeo para ela
-    const frase = e.target.closest('.pl-linhas p[data-k]');
+    const frase = e.target.closest('.pl-linhas p[data-k]') || (el.classList.contains('letra-cheia') && !rolando ? e.target.closest('.pl-cifra .line[data-k]') : null);
     if (e.target.closest('.pl-linhas') && !el.classList.contains('letra-cheia')) { letraCheia(true); return; }
     const p = frase;
     if (p && tempos?.[p.dataset.k]) api.irPara(Math.max(0, tempos[p.dataset.k].inicio - 0.3));
