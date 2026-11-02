@@ -1533,7 +1533,8 @@ const player = (() => {
       <span class="pl-ferr-g so-cifra"><button data-pl="tom-" aria-label="Baixar meio tom" title="Baixar meio tom">−</button><b class="pl-tom"></b><button data-pl="tom+" aria-label="Subir meio tom" title="Subir meio tom">+</button></span>
       <span class="pl-ferr-g so-cifra"><button data-pl="capo-" aria-label="Capotraste uma casa abaixo" title="Capotraste: uma casa abaixo">−</button><b class="pl-capo"></b><button data-pl="capo+" aria-label="Capotraste uma casa acima" title="Capotraste: uma casa acima">+</button></span>
       <span class="pl-ferr-g"><button data-pl="fonte-" aria-label="Letra menor" title="Letra menor"><span class="a-menor">A</span></button><button data-pl="fonte+" aria-label="Letra maior" title="Letra maior"><span class="a-maior">A</span></button></span>
-      <button class="pl-ferr-rolar so-cifra" data-pl="rolar" aria-pressed="false" aria-label="Rolagem automática" title="Rolagem automática">${icon('down', 16)}<span>Rolar</span></button></div><div class="pl-cifra"></div><div class="pl-linhas"></div>
+      <button class="pl-ferr-rolar so-cifra" data-pl="rolar" aria-pressed="false" aria-label="Rolagem automática" title="Rolagem automática">${icon('down', 16)}<span>Rolar</span></button>
+      <button class="pl-ferr-acordes so-cifra" data-pl="acordes" aria-pressed="false" aria-label="Desenho dos acordes" title="Desenho dos acordes">${icon('grid', 16)}</button></div><div class="pl-acordes" hidden></div><div class="pl-cifra"></div><div class="pl-linhas"></div>
       <div class="pl-letra-pe"><div class="pl-letra-bts2"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 22)}</button><span class="grow"></span><button class="icon-btn pl-mais" data-pl="menu" aria-label="Mais opções" title="Mais opções">${icon('more', 22)}</button></div>
         <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" role="slider" tabindex="0" aria-label="Tempo da música" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
         <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button></div></section>
@@ -2336,6 +2337,21 @@ const semLinhasDeAcordes = (sinc) => {
   let modoCifra = db.prefs().letraModo === 'cifra';
   let mapaCifra = null; // linha cantada (sincronia) -> linha da cifra na tela
   let rolando = 0;
+  // o desenho dos acordes (Ajustes → Desenho dos acordes, ou o botão ao lado do Rolar): uma faixa com os acordes da
+  // música, na ordem em que aparecem e no tom e capo da tela, entre as ferramentas e a cifra. Antes ficava só na página
+  // antiga da música, escondida embaixo da letra na tela toda: ligado, não aparecia em lugar nenhum
+  const desenharDiagramas = () => {
+    const faixa = $('.pl-acordes', el);
+    const ligado = Boolean(db.prefs().diagramas);
+    $('.pl-ferr-acordes', el)?.setAttribute('aria-pressed', String(ligado));
+    if (!faixa) return;
+    const nomes = modoCifra && ligado ? [...new Set([...$('.pl-cifra', el).querySelectorAll('.chord')].map((c) => c.textContent.trim()).filter(Boolean))] : [];
+    const lista = nomes.map((c) => [c, diagramaSvg(c, { largura: 64 })]).filter(([, svg]) => svg);
+    faixa.hidden = !lista.length;
+    faixa.innerHTML = lista.map(([c, svg]) => `<figure class="pl-acorde" data-acorde="${esc(c)}">${svg}<figcaption>${esc(c)}</figcaption></figure>`).join('');
+  };
+  const fecharPopAcorde = () => document.querySelector('.acorde-pop.no-player')?.remove();
+  $('.pl-cifra', el)?.addEventListener('scroll', fecharPopAcorde, { passive: true });
   const definirModoCifra = (ligar) => {
     modoCifra = ligar;
     db.setPref('letraModo', ligar ? 'cifra' : 'letra');
@@ -2358,7 +2374,7 @@ const semLinhasDeAcordes = (sinc) => {
     const semAcordes = Boolean(song?.content) && !temCifra(song.content);
     el.classList.toggle('sem-acordes', semAcordes);
     if (semAcordes) { el.classList.remove('cifra-on'); pararRolagem(); }
-    if (!modoCifra || !song?.content || semAcordes) { box.innerHTML = ''; return; }
+    if (!modoCifra || !song?.content || semAcordes) { box.innerHTML = ''; desenharDiagramas(); return; }
     const transpose = song.transpose || 0;
     const capo = song.capo || 0;
     // com a letra sincronizada, os acordes da cifra vão para as frases dela: uma linha por frase, que acende no tempo
@@ -2373,6 +2389,7 @@ const semLinhasDeAcordes = (sinc) => {
       porFrase = null;
     } else if (!sincronizada) porFrase = null;
     soltarAcordes(box);
+    desenharDiagramas();
     $('.pl-tom', el).innerHTML = `<small>Tom</small>${esc(r.key || (transpose ? (transpose > 0 ? '+' : '') + transpose : '—'))}`;
     $('.pl-capo', el).innerHTML = `<small>Capo</small>${capo || '—'}`;
     // com a letra sincronizada, a linha cantada acende também na cifra
@@ -2520,6 +2537,25 @@ const semLinhasDeAcordes = (sinc) => {
     rolarLetra();
   }, 80);
   el.addEventListener('click', (e) => {
+    // tocar num acorde da cifra (com o desenho dos acordes ligado) mostra o desenho dele num balão, sem levar a música
+    fecharPopAcorde();
+    const acorde = e.target.closest('.pl-cifra .chord');
+    if (acorde && acorde.textContent.trim() && db.prefs().diagramas && el.classList.contains('letra-cheia')) {
+      const nome = acorde.textContent.trim();
+      const svg = diagramaSvg(nome);
+      if (svg) {
+        const r = acorde.getBoundingClientRect();
+        const pop = document.createElement('div');
+        pop.className = 'acorde-pop no-player';
+        pop.innerHTML = `${svg}<b>${esc(nome)}</b>`;
+        document.body.append(pop);
+        const w = pop.offsetWidth;
+        pop.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
+        pop.style.top = (r.top - pop.offsetHeight - 8 > 8 ? r.top - pop.offsetHeight - 8 : r.bottom + 8) + 'px';
+        e.stopPropagation();
+        return;
+      }
+    }
     // no cartão, tocar na letra abre ela na tela toda; na tela toda, tocar numa linha leva o vídeo para ela
     const frase = e.target.closest('.pl-linhas p[data-k]') || (el.classList.contains('letra-cheia') && !rolando ? e.target.closest('.pl-cifra .line[data-k]') : null);
     if (e.target.closest('.pl-linhas') && !el.classList.contains('letra-cheia')) { letraCheia(true); return; }
@@ -4056,6 +4092,13 @@ const semLinhasDeAcordes = (sinc) => {
     if (b.dataset.pl === 'fonte-') { mudarFonte(-0.1); return; }
     if (b.dataset.pl === 'fonte+') { mudarFonte(0.1); return; }
     if (b.dataset.pl === 'rolar') { rolar(); return; }
+    if (b.dataset.pl === 'acordes') {
+      const ligar = !db.prefs().diagramas;
+      db.setPref('diagramas', ligar);
+      desenharDiagramas();
+      toast(ligar ? 'Desenho dos acordes ligado' : 'Desenho dos acordes desligado');
+      return;
+    }
     if (b.dataset.pl === 'explorar-creditos' && dadosCreditos) { explorarCreditos(dadosCreditos); return; }
     if (b.dataset.pl === 'artista' && dadosCreditos?.pessoas[b.dataset.i]) { irParaArtista(dadosCreditos.pessoas[b.dataset.i].nome); return; }
     if (b.dataset.pl === 'leitura') { definirLeitura(!el.classList.contains('so-letra')); return; }
