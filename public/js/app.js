@@ -7054,8 +7054,7 @@ async function viewParteDoSetor(setor, pk) {
     <div style="height:14px"></div>
     ${completas ? `<div id="missa-sugerida"><div class="loading-note"><span class="spin"></span>Montando a missa de hoje…</div></div>
       <div class="shelf-head"><h2>Missas completas do acervo</h2></div>` : ''}
-    ${pk === 'creio' ? `<div class="shelf-head"><h2>Rezar o Creio</h2></div><div class="grade-oe">${CREIO_TEXTOS.map(([slug, nome, sub], k) => `<a class="cartao-oe texto" href="#/oracao/${slug}" style="--h:${265 + k * 12}">
-      <small>Profissão de fé</small><b>${esc(nome)}</b><span>${esc(sub)}</span></a>`).join('')}</div>
+    ${pk === 'creio' ? `<div class="shelf-head"><h2>Rezar o Creio</h2></div><div class="grade-oe">${CREIO_TEXTOS.map(([slug, nome, sub], k) => cartaoOracao({ href: `#/oracao/${slug}`, h: 265 + k * 12, selo: inicial(nome), small: 'Profissão de fé', titulo: nome, sub })).join('')}</div>
       <div class="shelf-head" id="creio-cantado" style="margin-top:18px" hidden><h2>Creio cantado</h2></div>` : ''}
     <div id="cantos"><div class="loading-note"><span class="spin"></span>Carregando as músicas…</div></div>
     ${sentidoHTML(pk)}`;
@@ -12056,7 +12055,8 @@ function cartoesOracoes(cat, itens) {
       const nome = (rom ? cab.slice(0, rom.index) : cab).replace(/^(da|do|das|dos|de)\s+/i, '');
       x = rom && rom[1] ? { small: nome, big: rom[1], sub: resto.join(' - ') } : { small: 'Prefácio', nome, sub: resto.join(' - ') };
     } else {
-      x = { small: cat === 'oracoes-em-latim' ? 'Latim' : /^ladainha/.test(n) ? 'Ladainha' : cat === 'oracoes-para-o-dia-a-dia' ? 'Dia a dia' : 'Oração', nome: t.replace(/:$/, '') };
+      // sem rótulo repetido ("Oração", "Latim", "Dia a dia"): a categoria e o grupo já dizem
+      x = { small: '', nome: t.replace(/:$/, '') };
     }
     saida[k][2].push({ item, ...x });
   }
@@ -12073,6 +12073,12 @@ function partesDaOE(titulo) {
   const nome = /ou\s+(.+)$/i.exec(resto)?.[1] || (grupo === 'Principais' ? '' : grupo);
   return { grupo, numero, nome };
 }
+
+// cartão das orações: um selo pequeno (o número romano ou a inicial, em serifa) com o tom do grupo, o título e um detalhe
+const inicial = (t) => (String(t || '').replace(/^(o|a|os|as|ao|à|do|da|de|ato de|ato)\s+/i, '').trim()[0] || '✠').toUpperCase();
+const cartaoOracao = ({ href, h, selo, small, titulo, sub }) => `<a class="cartao-oe" href="${href}" style="--h:${h}">
+  <span class="selo${String(selo).length > 2 ? ' longo' : ''}">${esc(selo)}</span>
+  <span class="txt">${small ? `<small>${esc(small)}</small>` : ''}<b>${esc(titulo)}</b>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</span></a>`;
 
 async function viewOracoes() {
   setTab('oracoes');
@@ -12098,12 +12104,14 @@ async function viewOracoes() {
   const eucaristicas = (itens) => {
     const grupos = new Map();
     for (const i of itens) { const p = partesDaOE(i.titulo); if (!grupos.has(p.grupo)) grupos.set(p.grupo, []); grupos.get(p.grupo).push({ ...i, ...p }); }
-    return [...grupos].map(([g, xs]) => `<h3 class="grupo-oe">${esc(g)}</h3><div class="grade-oe">${xs.map((i, k) => `<a class="cartao-oe" href="${link(i)}" style="--h:${(k * 28 + (g === 'Principais' ? 265 : g.startsWith('Para missas') ? 190 : g.startsWith('Para diversas') ? 25 : 330)) % 360}">
-      <small>Oração Eucarística</small><b>${esc(i.numero)}</b>${i.nome ? `<span>${esc(i.nome)}</span>` : ''}</a>`).join('')}</div>`).join('');
+    return [...grupos].map(([g, xs]) => `<h3 class="grupo-oe">${esc(g)}<small>${xs.length}</small></h3><div class="grade-oe">${xs.map((i, k) => cartaoOracao({
+      href: link(i), h: (k * 28 + (g === 'Principais' ? 265 : g.startsWith('Para missas') ? 190 : g.startsWith('Para diversas') ? 25 : 330)) % 360,
+      selo: i.numero, titulo: `Oração Eucarística ${i.numero}`, sub: g === 'Principais' ? i.nome : '' })).join('')}</div>`).join('');
   };
   // as outras categorias também em cartões, agrupadas (ver cartoesOracoes)
-  const cartoes = (cat, itens) => cartoesOracoes(cat, itens).map(([g, h, xs]) => `<h3 class="grupo-oe">${esc(g)}</h3><div class="grade-oe">${xs.map((x, k) => `<a class="cartao-oe ${x.big ? '' : 'texto'}" href="${link(x.item)}" style="--h:${(h + k * 9) % 360}">
-      <small>${esc(x.small)}</small><b>${esc(x.big || x.nome)}</b>${x.big && x.nome ? `<span>${esc(x.nome)}</span>` : ''}${x.sub ? `<span>${esc(x.sub)}</span>` : ''}</a>`).join('')}</div>`).join('');
+  const cartoes = (cat, itens) => cartoesOracoes(cat, itens).map(([g, h, xs]) => `<h3 class="grupo-oe">${esc(g)}<small>${xs.length}</small></h3><div class="grade-oe">${xs.map((x, k) => cartaoOracao({
+      href: link(x.item), h: (h + k * 9) % 360, selo: x.big || inicial(x.nome || x.small),
+      small: x.big || x.small === 'Prefácio' ? '' : x.small, titulo: x.big ? `${x.small} ${x.big}` : x.nome, sub: [x.big ? x.nome : '', x.sub].filter(Boolean).join(' · ') })).join('')}</div>`).join('');
   const desenhar = (termo = '') => {
     const t = normalizar(termo);
     const palavras = t.split(' ').filter(Boolean);
@@ -12215,9 +12223,11 @@ async function viewFontes() {
   const linkBtn = (l, extra = '', sec = null) => {
     const a = acaoDoLink(l);
     const k = todos.push({ l, sec }) - 1;
+    // a cor do ícone diz o tipo: arquivo, site, no app, ouvir, cifra
+    const seta = extra === 'mini' ? '' : `<span class="seta">${icon(a.acao === 'site' ? 'external' : 'next', 16)}</span>`;
     return a.acao === 'site'
-      ? `<a class="fonte-item ${extra}" href="${esc(l.url)}" target="_blank" rel="noopener"><span class="ico">${icon(a.ic, 18)}</span><span class="txt"><b>${esc(bonito(l.texto) || host(l.url))}</b><small>${esc(host(l.url))} ${icon('external', 11)}</small></span></a>`
-      : `<button class="fonte-item ${extra}" data-l="${k}"><span class="ico">${icon(a.ic, 18)}</span><span class="txt"><b>${esc((extra === 'mini' && { tocar: 'Ouvir', cifra: 'Cifra' }[a.acao]) || bonito(l.texto) || a.rotulo)}</b><small>${esc(a.rotulo)}</small></span></button>`;
+      ? `<a class="fonte-item ${extra}" data-acao="site" href="${esc(l.url)}" target="_blank" rel="noopener"><span class="ico">${icon(a.ic, 18)}</span><span class="txt"><b>${esc(bonito(l.texto) || host(l.url))}</b><small>${esc(host(l.url))}</small></span>${seta}</a>`
+      : `<button class="fonte-item ${extra}" data-acao="${a.acao}" data-l="${k}"><span class="ico">${icon(a.ic, 18)}</span><span class="txt"><b>${esc((extra === 'mini' && { tocar: 'Ouvir', cifra: 'Cifra' }[a.acao]) || bonito(l.texto) || a.rotulo)}</b><small>${esc(a.rotulo)}</small></span>${seta}</button>`;
   };
   const desenhar = (termo = '') => {
     todos.length = 0;
@@ -12233,9 +12243,9 @@ async function viewFontes() {
       const outras = secoes.filter((x) => !ehCanto(x));
       total += secoes.reduce((n, x) => n + x.links.length, 0);
       return `${palavras.length ? `<h3 class="fontes-pag">${esc(p.nome)}</h3>` : ''}
-        ${outras.map((sec) => `<section class="fonte-sec"><h4>${esc(sec.nome || 'Outros')}<span class="chip sm">${sec.links.length}</span></h4>
+        ${outras.map((sec) => `<section class="fonte-sec"><h4>${esc(sec.nome || 'Outros')}<small>${sec.links.length}</small></h4>
           <div class="fonte-itens">${sec.links.map((l) => linkBtn(l, '', sec)).join('')}</div></section>`).join('')}
-        ${cantos.length ? `<section class="fonte-sec"><h4>Cantos — ouvir, cifra e partitura<span class="chip sm">${cantos.length}</span></h4>
+        ${cantos.length ? `<section class="fonte-sec"><h4>Cantos — ouvir, cifra e partitura<small>${cantos.length}</small></h4>
           <ul class="fonte-cantos">${cantos.map((sec) => `<li><span class="nome">${icon('music', 16)}<b>${esc(sec.nome || 'Canto')}</b></span><span class="bts">${sec.links.map((l) => linkBtn(l, 'mini', sec)).join('')}</span></li>`).join('')}</ul></section>` : ''}`;
     }).join('');
     $('#fontes').innerHTML = palavras.length && !total ? '<p class="muted">Nada encontrado. Tente outra palavra.</p>' : (palavras.length ? `<p class="muted" style="margin:0 0 10px">${total} resultado(s)</p>` : '') + html;
