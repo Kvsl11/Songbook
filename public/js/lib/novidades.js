@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 400, data: '2026-11-01', titulo: 'Tela da conta do YouTube mais simples',
+    itens: [
+      { tipo: 'melhoria', texto: 'A tela de conectar o YouTube ficou curta e clara: o estado num cartão só (conectado, com quantos cookies e quando foi enviado), o botão Trocar para enviar outro arquivo e os passos mais curtos. O texto dos cookies não aparece mais na tela; colar o texto fica num link, para quem preferir.' },
+    ],
+  },
+  {
     versao: 399, data: '2026-11-01', titulo: 'A cifra acompanha a música como a letra',
     itens: [
       { tipo: 'correcao', texto: 'Na letra em tela cheia com a cifra, a frase cantada acende no tempo certo, uma por vez, igual à letra sem cifra: os acordes passam para as frases da letra sincronizada. Antes a cifra juntava várias frases numa linha só, e o destaque ficava parado, atrasava e voltava para trás nos refrões. Tocar numa linha da cifra leva a música até ela.' },
@@ -60,15 +66,6 @@ export const NOVIDADES = [
     versao: 391, data: '2026-11-01', titulo: 'Fotos do artista sem repetir, e mais fotos',
     itens: [
       { tipo: 'correcao', texto: 'No “Sobre o artista”, a mesma foto não aparece mais repetida (o Michael Jackson vinha com a mesma foto três vezes, de sites diferentes): ela é reconhecida pela própria imagem e fica uma só, a maior. E vêm mais fotos dele, as do artigo da Wikipédia em que ele aparece.' },
-    ],
-  },
-  {
-    versao: 390, data: '2026-11-01', titulo: 'Artistas certos nas músicas da missa, capas na Liturgia e fotos em tela cheia',
-    itens: [
-      { tipo: 'correcao', texto: 'Nas músicas da missa (acervo litúrgico, Hinário e textos da CNBB, Cindy Ferrarezi, Músicas para Missa), o “Sobre o artista” e os créditos não trazem mais a foto e a história de um xará famoso (o “José Alves” de Salve Rainha vinha com um cantor de funk): a foto e a apresentação vêm só de quem é com certeza do meio católico — Padre, Frei, Irmã, Dom, Ministério, Comunidade, procurados com o título por extenso (“Pe. Zezinho” → “Padre Zezinho”), e os artistas católicos conhecidos. Os outros ficam com o desenho do app. As fotos erradas já guardadas saem sozinhas.' },
-      { tipo: 'melhoria', texto: 'Na Liturgia, os cantos sem capa ganham a imagem do vídeo do canto (a mesma que aparece ao abrir) e, até ela chegar, um desenho do momento da missa na cor litúrgica do dia: a porta da Entrada, a estrela do Glória, a lira do Salmo, o cálice das Oferendas, a hóstia da Comunhão.' },
-      { tipo: 'novo', texto: 'No “Sobre o artista”, tocar numa foto abre ela em tela cheia, inteira: passe o dedo para o lado para ver as outras (no computador, as setas da tela ou do teclado) e puxe para baixo, toque no X ou use o voltar para fechar.' },
-      { tipo: 'melhoria', texto: 'O ícone de partitura nas listas fica cinza, como os de cifra e vídeo.' },
     ],
   },
 ];
