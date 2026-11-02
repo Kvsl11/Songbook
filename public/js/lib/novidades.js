@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 402, data: '2026-11-01', titulo: 'Cifra sem buraco quando a linha quebra',
+    itens: [
+      { tipo: 'correcao', texto: 'Na cifra, quando a frase não cabe e o fim desce para a linha de baixo, ele fica logo embaixo, sem o espaço grande em cima (o lugar de um acorde que não tem). Vale na página da música, na letra em tela cheia e no PDF.' },
+    ],
+  },
+  {
     versao: 401, data: '2026-11-01', titulo: 'Botões da letra e da cifra mais limpos',
     itens: [
       { tipo: 'melhoria', texto: 'Na letra em tela cheia, os botões do topo ficaram mais limpos: Letra e Cifra viraram um seletor de duas opções (a escolhida em branco, deslizando de uma para a outra), e o olho (só a letra) ganhou uma bolinha do mesmo jeito, branca quando ligado. Tom, Capo, o tamanho da letra (um A pequeno e um A grande) e o Rolar ficaram no mesmo estilo, mais finos e numa linha só.' },
@@ -60,12 +66,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'novo', texto: 'Nas fotos do artista em tela cheia, dá para dar zoom: no celular e no tablet, abrindo os dois dedos (ou com dois toques); no computador, com a roda do mouse (ou clique duplo). Ampliada, a foto anda com o dedo ou arrastando o mouse; dois toques voltam ao tamanho normal.' },
       { tipo: 'correcao', texto: 'O “Sobre o artista” não mostra mais quadros de clipes (com o “VEVO” e o título escritos por cima, como os do Michael Jackson): ficam só as fotos do artista.' },
-    ],
-  },
-  {
-    versao: 392, data: '2026-11-01', titulo: 'Fotos em tela cheia sem as setas no celular e no tablet',
-    itens: [
-      { tipo: 'melhoria', texto: 'Nas fotos do artista em tela cheia, as setas aparecem só no computador: no celular e no tablet, é só passar o dedo para o lado.' },
     ],
   },
 ];

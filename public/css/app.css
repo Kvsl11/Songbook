@@ -415,6 +415,9 @@ a.chip.sm { cursor: pointer; }
 /* modo Cifra no mesmo painel: acordes por cima da letra, num tom claro da própria cor do fundo */
 /* a letra tem o mesmo tamanho e formato com ou sem cifra: só os acordes aparecem por cima */
 .song.lyrics-mode.with-chords .chord { display: block; color: var(--tint-cifra, #9be7b4); font-size: 0.78em; font-weight: 800; min-height: 1.2em; padding-right: 0.35em; }
+/* a palavra sem acorde não guarda a altura da linha dos acordes: quebrando a linha ("…with the / pain"), a que desce
+   sozinha ficava com um buraco em cima. Na mesma linha, as palavras continuam alinhadas por baixo (align-items: flex-end) */
+.song .chord:empty, .song.lyrics-mode.with-chords .chord:empty, .pdf-letra .chord:empty { min-height: 0; }
 .song.lyrics-mode.with-chords .line.chords-only { display: flex; }
 .song.lyrics-mode.with-chords .comment { display: block; color: rgb(255 255 255 / 0.6); font-weight: 600; font-size: 0.75em; }
 .song.lyrics-mode.with-chords .chunk { display: inline-flex; flex-direction: column; white-space: pre-wrap; max-width: 100%; }
