@@ -69,15 +69,42 @@ export function slugFromUrl(url) {
 
 const DIAS = { 'segunda-feira': '2ª Feira', 'terca-feira': '3ª Feira', 'quarta-feira': '4ª Feira', 'quinta-feira': '5ª Feira', 'sexta-feira': '6ª Feira', sabado: 'Sábado', domingo: 'Domingo' };
 
+// Palavras que não identificam a festa (a CNBB e a Cindy escrevem o nome de jeitos diferentes:
+// "Bem-aventurada Virgem Maria da Conceição Aparecida" x "Nossa Senhora Aparecida").
+const GENERICAS = new Set(['bem', 'aventurada', 'aventurado', 'virgem', 'maria', 'nosso', 'nossa', 'senhor', 'senhora', 'jesus',
+  'cristo', 'solenidade', 'comemoracao', 'festa', 'memoria', 'domingo', 'sao', 'santo', 'santa', 'os', 'as', 'no', 'na', 'em']);
+// Festas que a Cindy chama por outro nome
+const APELIDOS = [
+  [/rei do universo/i, 'Cristo Rei'],
+  [/^natal d[eo] (nosso )?senhor/i, 'Dia de Natal'],
+  [/fi[eé]is defuntos/i, 'Fiéis Defuntos'],
+  [/concei[cç][aã]o aparecida/i, 'Nossa Senhora Aparecida'],
+];
+
 // Títulos que a Cindy costuma usar para a celebração do dia, em ordem de preferência
 // (festa/domingo primeiro; depois o dia de semana correspondente como alternativa).
 export function titulosAlvo(lit) {
   const dia = normalize((lit.data_extenso || '').split(',')[0]).replace(' ', '-');
   const cel = lit.celebracao || '';
+  const ano = lit.ano || '';
   const alvos = [];
   const dom = /(\d+)º\s+Domingo/i.exec(cel);
-  if (dom) alvos.push({ consulta: `${dom[1]}º Domingo`, alvo: `${cel} ${lit.ano || ''}`.trim(), tipo: 'domingo' });
-  else if (!/semana/i.test(cel) && cel) alvos.push({ consulta: cel.replace(/,.*$/, ''), alvo: `${cel.replace(/,.*$/, '')} ${lit.ano || ''}`.trim(), tipo: 'festa' });
+  if (dom) alvos.push({ consulta: `${dom[1]}º Domingo`, alvo: `${cel} ${ano}`.trim(), tipo: 'domingo' });
+  else if (!/semana/i.test(cel) && cel) {
+    const festa = (consulta, alvo, minimo) => {
+      if (consulta && !alvos.some((x) => normalize(x.consulta) === normalize(consulta))) alvos.push({ consulta, alvo, tipo: 'festa', minimo });
+    };
+    // no Natal, o dia (25) separa a missa do dia da da noite (Dia 24)
+    const diaDoMes = /natal/i.test(cel) ? ` ${Number(/\d+/.exec(lit.data_extenso || '')?.[0]) || ''}` : '';
+    for (const [re, apelido] of APELIDOS) if (re.test(cel)) festa(apelido, `${apelido}${diaDoMes} ${ano}`.trim());
+    let nome = cel.replace(/,.*$/, '');
+    const proprias = (t) => t.split(/[\s-]+/).filter((w) => { const n = normalize(w); return n && !STOP.has(n) && !GENERICAS.has(n); });
+    if (!proprias(nome).length) nome = cel;
+    festa(nome, `${nome} ${ano}`.trim());
+    // só as palavras próprias da festa: "Imaculada Conceição", "Pentecostes"
+    const chaves = [...new Set(proprias(nome))];
+    if (chaves.length) festa(chaves.join(' '), `${chaves.join(' ')} ${ano}`.trim(), chaves.length);
+  }
   const semana = /(\d+)ª\s+Semana\s+(d[oa]\s+.+)$/i.exec(lit.semana || cel);
   if (dia !== 'domingo' && semana && DIAS[dia]) {
     alvos.push({ consulta: `${DIAS[dia]} da ${semana[1]}ª Semana`, alvo: `${DIAS[dia]} da ${semana[1]}ª Semana ${semana[2]}`, tipo: 'semana' });
@@ -87,6 +114,7 @@ export function titulosAlvo(lit) {
 
 const STOP = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o', 'para', 'missa', 'cantos', 'musicas', 'repertorio', 'completo', 'tempo', 'letra', 'cifra', 'cifrada', 'melodia', 'canto']);
 const tokens = (s) => normalize(s).split(' ').filter((t) => t && !STOP.has(t));
+const unicos = (l) => [...new Set(l)];
 
 export function score(titulo, alvo) {
   const a = tokens(alvo);
@@ -94,10 +122,10 @@ export function score(titulo, alvo) {
   if (!a.length) return 0;
   let s = 0;
   for (const tok of a) if (t.has(tok)) s += /\d/.test(tok) ? 3 : 1;
-  // números (29º, 5ª...) divergentes eliminam o candidato
-  const numsA = a.filter((x) => /\d/.test(x));
+  // números (29º, 5ª...) divergentes, ou em outra ordem (3ª Feira da 2ª Semana x 2ª Feira da 3ª Semana), eliminam o candidato
+  const numsA = unicos(a.filter((x) => /\d/.test(x)));
   const numsT = [...t].filter((x) => /\d/.test(x));
-  if (numsA.length && numsT.length && !numsA.every((n) => numsT.includes(n))) return -1;
+  if (numsA.length && numsT.length && numsA.join() !== numsT.filter((n) => numsA.includes(n)).join()) return -1;
   // "Ano A/B/C" diferente penaliza
   const anoA = /\bano ([abc])\b/.exec(normalize(alvo));
   const anoT = /\bano ([abc])\b/.exec(normalize(titulo));
@@ -106,20 +134,29 @@ export function score(titulo, alvo) {
   return s;
 }
 
-function rank(posts, alvo) {
+// a categoria "Cantos, Músicas para Missa" mistura os repertórios com cantos avulsos: repertório tem "Cantos"/"Músicas" no título
+const EH_REPERTORIO = /\b(cantos|musicas)\b/;
+// numa festa, o repertório de um dia de semana ou da oitava é de outra missa
+const DIA_DE_SEMANA = /\b(feira|sabado|semana|oitava)\b/;
+
+export function rank(posts, alvo, { tipo, minimo } = {}) {
   const max = tokens(alvo).reduce((acc, t) => acc + (/\d/.test(t) ? 3 : 1), 0);
-  const minimo = Math.max(1, Math.ceil(max * 0.6));
+  const min = Math.max(1, minimo ?? Math.ceil(max * 0.6));
   return posts
-    .map((p) => ({ id: p.id, titulo: decodeEntities(p.title?.rendered || ''), url: p.link, data: p.date, score: score(decodeEntities(p.title?.rendered || ''), alvo) }))
-    .filter((p) => p.score >= minimo)
+    .map((p) => ({ id: p.id, titulo: decodeEntities(p.title?.rendered || ''), url: p.link, data: p.date }))
+    .filter((p) => EH_REPERTORIO.test(normalize(p.titulo)) && !(tipo === 'festa' && DIA_DE_SEMANA.test(normalize(p.titulo))))
+    .map((p) => ({ ...p, score: score(p.titulo, alvo) }))
+    .filter((p) => p.score >= min)
     .sort((x, y) => y.score - x.score || y.data.localeCompare(x.data));
 }
 
 export async function buscarRepertorio(lit, fetchImpl) {
   const tentativas = [];
-  for (const { consulta, alvo, tipo } of titulosAlvo(lit)) {
-    const posts = await wpPosts({ search: consulta, categories: CATEGORIAS.repertorio, per_page: 20, _fields: 'id,date,link,title' }, fetchImpl);
-    const candidatos = rank(posts, alvo);
+  for (const { consulta, alvo, tipo, minimo } of titulosAlvo(lit)) {
+    // busca só no título: a busca normal olha também o texto, e as missas da semana que citam
+    // "todos" e "santos" empurram o repertório da festa para fora da primeira página
+    const posts = await wpPosts({ search: consulta, search_columns: 'post_title', categories: CATEGORIAS.repertorio, per_page: 20, _fields: 'id,date,link,title' }, fetchImpl);
+    const candidatos = rank(posts, alvo, { tipo, minimo });
     tentativas.push({ consulta, alvo, tipo, candidatos });
     if (candidatos.length) return { consulta, alvo, tipo, candidatos, tentativas };
   }

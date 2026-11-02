@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 396, data: '2026-11-01', titulo: 'Sugestões da Cindy Ferrarezi de volta nas festas',
+    itens: [
+      { tipo: 'correcao', texto: 'Na Liturgia, as festas e solenidades voltam a trazer as sugestões de cantos da Cindy Ferrarezi (antes vinham só as do Músicas para Missa): Todos os Santos, Finados, Cristo Rei, Natal, Pentecostes, Santíssima Trindade, Nossa Senhora Aparecida, Imaculada Conceição e as outras. Quem já tinha aberto o dia recebe as sugestões dela ao abrir de novo.' },
+      { tipo: 'correcao', texto: 'Nos dias de semana, o repertório da Cindy é sempre o do dia certo: a 3ª Feira da 2ª Semana não pega mais o da 2ª Feira da 3ª Semana. E nas festas não vem mais um canto avulso no lugar do repertório.' },
+    ],
+  },
+  {
     versao: 395, data: '2026-11-01', titulo: 'Cantos do repertório fora da biblioteca e troca de vídeo mais certa',
     itens: [
       { tipo: 'correcao', texto: 'A troca entre a música e o vídeo (e o contrário) cai no ponto certo também nos clipes longos com o refrão repetido (como Speed Demon): um trecho que o app tinha achado na outra vez do refrão no clipe fazia a troca, só ali, ir para o lugar errado. Vale também para as músicas já baixadas.' },
@@ -63,13 +70,6 @@ export const NOVIDADES = [
       { tipo: 'melhoria', texto: 'No celular, o mini player fica mais limpo, como o do Spotify: a capa, o nome e o artista e, à direita, só ouvir em outro aparelho, o ✓ da biblioteca e tocar/pausar, com a linha do andamento fina embaixo. Aleatório, voltar, pular e repetir ficam no Tocando agora, e fechar o player fica no ⋯ dele.' },
       { tipo: 'novo', texto: 'Numa playlist ou repertório, passar o dedo no mini player para a esquerda vai para a próxima música, e para a direita volta para a anterior.' },
       { tipo: 'correcao', texto: 'O cartão da letra não some mais do Tocando agora quando a cifra guardada não tem a letra e a letra sincronizada é de outra versão da música (o clipe ou outro áudio): ela aparece, mesmo sem acompanhar.' },
-    ],
-  },
-  {
-    versao: 386, data: '2026-11-01', titulo: 'Mini player do tablet sem a capinha cortada e a versão com a data certa',
-    itens: [
-      { tipo: 'correcao', texto: 'No tablet, a capinha do vídeo, o nome e o andamento do mini player não sobem mais nem ficam cortados na borda de cima: minimizando o Tocando agora rolado para baixo, o mini player ficava rolado por dentro.' },
-      { tipo: 'correcao', texto: 'A versão mostrada nos Ajustes e nas Novidades tem a data do Brasil (antes vinha a do dia seguinte, perto da meia-noite), e o número do fim conta as versões do mês: recomeça do 1 a cada mês novo.' },
     ],
   },
 ];
