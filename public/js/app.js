@@ -1529,10 +1529,10 @@ const player = (() => {
       <button class="icon-btn" data-pl="compartilhar" aria-label="Compartilhar" title="Compartilhar">${icon('share', 20)}</button>
       <button class="icon-btn" data-pl="fila" aria-label="Fila" title="Fila">${icon('queue', 20)}</button>
     </div>
-    <section class="pl-letra" hidden><div class="pl-letra-topo"><button class="icon-btn" data-pl="letra-fechar" aria-label="Fechar a letra" title="Fechar">${icon('down', 24)}</button><span class="pl-letra-nome"><b></b><small></small></span><span class="pl-letra-dir"><button class="icon-btn pl-leitura" data-pl="leitura" aria-pressed="false" aria-label="Só a letra, para ler" title="Só a letra (tira o resto da tela)">${icon('eye', 18)}</button><button class="pl-ver-cifra" data-pl="ver-cifra" aria-pressed="false" aria-label="Mostrar os acordes" title="Mostrar os acordes">${icon('chord', 15)}<span>Cifra</span></button></span></div><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-ferr">
+    <section class="pl-letra" hidden><div class="pl-letra-topo"><button class="icon-btn" data-pl="letra-fechar" aria-label="Fechar a letra" title="Fechar">${icon('down', 24)}</button><span class="pl-letra-nome"><b></b><small></small></span><span class="pl-letra-dir"><button class="icon-btn pl-leitura" data-pl="leitura" aria-pressed="false" aria-label="Só a letra, para ler" title="Só a letra (tira o resto da tela)">${icon('eye', 18)}</button><button class="pl-ver-cifra" data-pl="ver-cifra" aria-pressed="false" aria-label="Mostrar os acordes" title="Mostrar os acordes"><span class="seg-letra">Letra</span><span class="seg-cifra">Cifra</span></button></span></div><div class="pl-letra-cab"><h3>Letra</h3><span class="pl-letra-bts"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 16)}</button><button class="icon-btn" data-pl="cheio" aria-label="Letra na tela toda" title="Letra na tela toda">${icon('expand', 16)}</button></span></div><div class="pl-ferr">
       <span class="pl-ferr-g so-cifra"><button data-pl="tom-" aria-label="Baixar meio tom" title="Baixar meio tom">−</button><b class="pl-tom"></b><button data-pl="tom+" aria-label="Subir meio tom" title="Subir meio tom">+</button></span>
       <span class="pl-ferr-g so-cifra"><button data-pl="capo-" aria-label="Capotraste uma casa abaixo" title="Capotraste: uma casa abaixo">−</button><b class="pl-capo"></b><button data-pl="capo+" aria-label="Capotraste uma casa acima" title="Capotraste: uma casa acima">+</button></span>
-      <span class="pl-ferr-g"><button data-pl="fonte-" aria-label="Letra menor" title="Letra menor">A−</button><button data-pl="fonte+" aria-label="Letra maior" title="Letra maior">A+</button></span>
+      <span class="pl-ferr-g"><button data-pl="fonte-" aria-label="Letra menor" title="Letra menor"><span class="a-menor">A</span></button><button data-pl="fonte+" aria-label="Letra maior" title="Letra maior"><span class="a-maior">A</span></button></span>
       <button class="pl-ferr-rolar so-cifra" data-pl="rolar" aria-pressed="false" aria-label="Rolagem automática" title="Rolagem automática">${icon('down', 16)}<span>Rolar</span></button></div><div class="pl-cifra"></div><div class="pl-linhas"></div>
       <div class="pl-letra-pe"><div class="pl-letra-bts2"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 22)}</button><span class="grow"></span><button class="icon-btn pl-mais" data-pl="menu" aria-label="Mais opções" title="Mais opções">${icon('more', 22)}</button></div>
         <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" role="slider" tabindex="0" aria-label="Tempo da música" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
@@ -2348,8 +2348,9 @@ const semLinhasDeAcordes = (sinc) => {
     el.classList.toggle('cifra-on', modoCifra);
     const bt = $('.pl-ver-cifra', el);
     bt.setAttribute('aria-pressed', String(modoCifra));
-    bt.innerHTML = modoCifra ? `${icon('text', 15)}<span>Letra</span>` : `${icon('chord', 15)}<span>Cifra</span>`;
+    // (um seletor de duas opções, Letra | Cifra: a ativa fica destacada)
     bt.title = modoCifra ? 'Mostrar só a letra' : 'Mostrar os acordes';
+    bt.setAttribute('aria-label', bt.title);
     const song = musicaTocando();
     mapaCifra = null;
     acesaChave = '';

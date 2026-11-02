@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 401, data: '2026-11-01', titulo: 'Botões da letra e da cifra mais limpos',
+    itens: [
+      { tipo: 'melhoria', texto: 'Na letra em tela cheia, os botões do topo ficaram mais limpos: Letra e Cifra viraram um seletor de duas opções (a escolhida em branco, deslizando de uma para a outra), e o olho (só a letra) ganhou uma bolinha do mesmo jeito, branca quando ligado. Tom, Capo, o tamanho da letra (um A pequeno e um A grande) e o Rolar ficaram no mesmo estilo, mais finos e numa linha só.' },
+    ],
+  },
+  {
     versao: 400, data: '2026-11-01', titulo: 'Tela da conta do YouTube mais simples',
     itens: [
       { tipo: 'melhoria', texto: 'A tela de conectar o YouTube ficou curta e clara: o estado num cartão só (conectado, com quantos cookies e quando foi enviado), o botão Trocar para enviar outro arquivo e os passos mais curtos. O texto dos cookies não aparece mais na tela; colar o texto fica num link, para quem preferir.' },
@@ -60,12 +66,6 @@ export const NOVIDADES = [
     versao: 392, data: '2026-11-01', titulo: 'Fotos em tela cheia sem as setas no celular e no tablet',
     itens: [
       { tipo: 'melhoria', texto: 'Nas fotos do artista em tela cheia, as setas aparecem só no computador: no celular e no tablet, é só passar o dedo para o lado.' },
-    ],
-  },
-  {
-    versao: 391, data: '2026-11-01', titulo: 'Fotos do artista sem repetir, e mais fotos',
-    itens: [
-      { tipo: 'correcao', texto: 'No “Sobre o artista”, a mesma foto não aparece mais repetida (o Michael Jackson vinha com a mesma foto três vezes, de sites diferentes): ela é reconhecida pela própria imagem e fica uma só, a maior. E vêm mais fotos dele, as do artigo da Wikipédia em que ele aparece.' },
     ],
   },
 ];
