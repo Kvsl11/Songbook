@@ -4,6 +4,13 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 406, data: '2026-11-01', titulo: 'Acorde que soa na hora',
+    itens: [
+      { tipo: 'correcao', texto: 'O som do acorde sai na hora do toque: as notas do violão dos acordes da música já vão sendo preparadas quando a faixa dos desenhos aparece, e o silêncio do começo de cada gravação foi tirado.' },
+      { tipo: 'correcao', texto: 'Rolando a faixa dos desenhos até o fim, o último acorde aparece inteiro (antes ficava meio apagado na borda).' },
+    ],
+  },
+  {
     versao: 405, data: '2026-11-01', titulo: 'Violão de verdade nos acordes',
     itens: [
       { tipo: 'melhoria', texto: 'O som do acorde agora é de um violão de nylon de verdade, gravado nota por nota, no lugar do som feito pelo aparelho (que tinha chiado). Na primeira vez que um acorde toca, as notas dele são baixadas; depois ficam guardadas e tocam também sem internet.' },
@@ -59,13 +66,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'melhoria', texto: 'Na Liturgia (Missa popular), cada opção mostra embaixo do título de quem é a versão (Marcus Lima, Esther Bimbato, Pe Weber…): as várias versões do mesmo salmo pareciam repetidas, porque o nome ficava cortado no fim. As versões da mesma pessoa (Melodia 1 e 2) ficam juntas.' },
       { tipo: 'melhoria', texto: 'Os cantos da Cindy Ferrarezi ganharam a marca “Cindy”, como os do Músicas para Missa têm a “MpM”. A marca “busca” saiu: os achados pela busca do refrão do dia dizem isso ao segurar o dedo ou passar o mouse sobre a marca “Cindy”.' },
-    ],
-  },
-  {
-    versao: 396, data: '2026-11-01', titulo: 'Sugestões da Cindy Ferrarezi de volta nas festas',
-    itens: [
-      { tipo: 'correcao', texto: 'Na Liturgia, as festas e solenidades voltam a trazer as sugestões de cantos da Cindy Ferrarezi (antes vinham só as do Músicas para Missa): Todos os Santos, Finados, Cristo Rei, Natal, Pentecostes, Santíssima Trindade, Nossa Senhora Aparecida, Imaculada Conceição e as outras. Quem já tinha aberto o dia recebe as sugestões dela ao abrir de novo.' },
-      { tipo: 'correcao', texto: 'Nos dias de semana, o repertório da Cindy é sempre o do dia certo: a 3ª Feira da 2ª Semana não pega mais o da 2ª Feira da 3ª Semana. E nas festas não vem mais um canto avulso no lugar do repertório.' },
     ],
   },
 ];
