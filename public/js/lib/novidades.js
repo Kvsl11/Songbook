@@ -4,9 +4,9 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
-    versao: 401, data: '2026-11-01', titulo: 'Letra e Cifra num seletor',
+    versao: 401, data: '2026-11-01', titulo: 'Botões da letra e da cifra mais limpos',
     itens: [
-      { tipo: 'melhoria', texto: 'Na letra em tela cheia, os botões do topo ficaram mais limpos: Letra e Cifra viraram um seletor de duas opções (a escolhida em branco, deslizando de uma para a outra), e o olho (só a letra) ganhou uma bolinha do mesmo jeito, branca quando ligado.' },
+      { tipo: 'melhoria', texto: 'Na letra em tela cheia, os botões do topo ficaram mais limpos: Letra e Cifra viraram um seletor de duas opções (a escolhida em branco, deslizando de uma para a outra), e o olho (só a letra) ganhou uma bolinha do mesmo jeito, branca quando ligado. Tom, Capo, o tamanho da letra (um A pequeno e um A grande) e o Rolar ficaram no mesmo estilo, mais finos e numa linha só.' },
     ],
   },
   {
