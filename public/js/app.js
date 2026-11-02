@@ -12305,69 +12305,79 @@ function viewConectarYoutube() {
   setTab('inicio');
   setTint('#5a1a1a');
   setHeader('Conectar o YouTube', { back: '#/ajustes/avancado' });
-  const salvo = cookiesSalvos();
   const passoN = (n, t, d) => `<li><span class="cy-n">${n}</span><div><b>${t}</b><small>${d}</small></div></li>`;
+  // Uma tela curta: o estado da conexão num cartão só (com o arquivo enviado e quando); a área de envio aparece quando
+  // ainda não está conectado, ou ao tocar em "Trocar a conexão"; colar o texto fica num link (o texto dos cookies não
+  // aparece mais na tela, nem já preenchido)
   view.innerHTML = `<div class="conectar-yt">
-    <section class="cy-hero">
-      <span class="cy-ic">${icon('youtube', 30)}</span>
-      <span class="kind">Conta do YouTube</span>
-      <h2>Conecte uma vez, e o app faz o resto</h2>
-      <p>Com uma conta logada, o app baixa o áudio dos vídeos sozinho para gerar a partitura e sincronizar a letra.</p>
-      <div class="cy-estado" id="cy-estado"><i></i>Verificando…</div>
-    </section>
-    <section class="cy-card">
-      <div class="cy-card-cab"><h3>Arquivo de cookies</h3><small class="muted">cookies.txt exportado pela extensão</small></div>
-      <div id="cy-arq"></div>
+    <section class="cy-topo"><span class="cy-ic">${icon('youtube', 26)}</span>
+      <div><h2>YouTube</h2><p>Com uma conta conectada, o app baixa o áudio dos vídeos para a partitura e a letra sincronizada.</p></div></section>
+    <section class="cy-card cy-status" id="cy-status" data-estado="verificando">
+      <span class="cy-ponto"></span><div class="cy-status-txt"><b id="cy-estado-t">Verificando…</b><small id="cy-estado-d"></small></div>
+      <button class="btn small" id="cy-trocar" type="button" hidden>Trocar</button></section>
+    <section class="cy-card" id="cy-enviar" hidden>
       <button class="cy-solta" id="cy-arquivo" type="button"><span class="cy-solta-ic">${icon('upload', 22)}</span>
-        <span><b id="cy-arquivo-txt">Escolher o arquivo cookies.txt</b><small>ou arraste o arquivo para cá</small></span></button>
-      <div class="cy-ou"><span>ou cole o texto</span></div>
-      <textarea class="input" id="cy-texto" rows="4" spellcheck="false" placeholder="# Netscape HTTP Cookie File…"></textarea>
-      <button class="btn primary" id="cy-conectar">${icon('check', 16)} Conectar</button>
-    </section>
-    <details class="cy-como"${salvo ? '' : ' open'}><summary>${icon('info', 16)}<b>Como pegar o arquivo</b><span class="muted">4 passos</span>${icon('down', 18)}</summary>
+        <span><b>Enviar o arquivo cookies.txt</b><small>ou arraste o arquivo para cá</small></span></button>
+      <button class="cy-colar" id="cy-colar" type="button" aria-expanded="false">Colar o texto em vez do arquivo</button>
+      <div class="cy-colar-box" id="cy-colar-box" hidden>
+        <textarea class="input" id="cy-texto" rows="4" spellcheck="false" autocomplete="off" placeholder="# Netscape HTTP Cookie File…"></textarea>
+        <button class="btn primary" id="cy-conectar" type="button">${icon('check', 16)} Conectar</button></div></section>
+    <details class="cy-como"><summary>${icon('info', 16)}<b>Como pegar o arquivo</b><span class="muted">4 passos</span>${icon('down', 18)}</summary>
       <ol class="cy-passos">
-        ${passoN(1, 'Instale a extensão “Get cookies.txt LOCALLY”', 'No celular Android, use o <a href="https://addons.mozilla.org/firefox/addon/get-cookies-txt-locally/" target="_blank" rel="noopener">Firefox</a>; no computador, o <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener">Chrome</a> ou o Firefox.')}
-        ${passoN(2, 'Numa janela anônima, entre no youtube.com', 'Abra uma <b>janela anônima (privada)</b> e entre com uma conta Google, de preferência uma só para isso. Assim a conexão não vence: o YouTube troca os cookies das janelas comuns a todo momento.')}
-        ${passoN(3, 'Exporte os cookies e feche a janela', 'Ainda na janela anônima, toque na extensão → <b>Export</b> (baixa o cookies.txt) ou <b>Copy</b> (copia o texto). Depois <b>feche a janela anônima</b> sem sair da conta. (No Firefox, permita a extensão nas janelas privadas.)')}
-        ${passoN(4, 'Mande para o app', 'Escolha o arquivo baixado ou cole o texto acima e toque em Conectar. Se um dia o YouTube pedir de novo, é só repetir.')}
+        ${passoN(1, 'Instale a extensão “Get cookies.txt LOCALLY”', 'No Android, no <a href="https://addons.mozilla.org/firefox/addon/get-cookies-txt-locally/" target="_blank" rel="noopener">Firefox</a>; no computador, no <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener">Chrome</a> ou no Firefox.')}
+        ${passoN(2, 'Entre no youtube.com numa janela anônima', 'Use uma conta Google só para isso, se puder. Na janela anônima a conexão não vence.')}
+        ${passoN(3, 'Exporte e feche a janela', 'Toque na extensão → <b>Export</b> e feche a janela anônima <b>sem sair da conta</b>. (No Firefox, permita a extensão nas janelas privadas.)')}
+        ${passoN(4, 'Envie o arquivo aqui', 'Se um dia o YouTube pedir de novo, é só repetir.')}
       </ol></details>
-    <p class="muted cy-nota">${icon('info', 14)} O arquivo vai só para o servidor do Songbook, que o usa apenas para baixar o áudio dos vídeos, e fica guardado neste aparelho para você ver depois. Para desconectar, saia da conta nesse navegador ou troque a senha.</p></div>`;
+    <p class="muted cy-nota">${icon('lock', 14)} O arquivo vai só para o servidor do Songbook, que o usa para baixar o áudio.</p></div>`;
   const texto = $('#cy-texto');
-  const quando = (t) => new Date(t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  // o arquivo guardado: nome, quantos cookies e quando foi enviado
-  const desenharArquivo = () => {
+  const quando = (t) => new Date(t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às');
+  const enviar = $('#cy-enviar');
+  const mostrarEnvio = (sim) => { enviar.hidden = !sim; $('#cy-trocar').textContent = sim ? 'Cancelar' : 'Trocar'; };
+  // o cartão do estado: conectado (com o arquivo e quando foi enviado), não conectado ou o erro do servidor
+  const desenharEstado = (estado, detalhe = '') => {
+    $('#cy-status').dataset.estado = estado;
+    $('#cy-estado-t').textContent = { ok: 'Conectado', nao: 'Não conectado', erro: 'Servidor indisponível', verificando: 'Verificando…' }[estado];
+    $('#cy-estado-d').textContent = detalhe;
+    $('#cy-trocar').hidden = estado !== 'ok';
+    mostrarEnvio(estado !== 'ok' && estado !== 'verificando');
+    $('.cy-como').open = estado === 'nao';
+  };
+  const resumo = (info) => {
     const c = cookiesSalvos();
-    $('#cy-arq').innerHTML = c ? `<div class="cy-arq"><span class="cy-arq-ic">${icon('file', 20)}</span>
-      <div><b>${esc(c.nome || 'Texto colado')}</b><small>${contarCookies(c.texto)} cookies · ${c.enviado ? `enviado em ${quando(c.enviado)}` : 'ainda não enviado'}</small></div></div>` : '';
-    $('#cy-arquivo-txt').textContent = c ? 'Trocar o arquivo' : 'Escolher o arquivo cookies.txt';
-    $('#cy-conectar').lastChild.textContent = c?.enviado ? ' Conectar de novo' : ' Conectar';
+    if (c?.enviado) return `${contarCookies(c.texto)} cookies · enviado em ${quando(c.enviado)}`;
+    if (info?.em) return `${info.n ? `${info.n} cookies · ` : ''}enviado de outro aparelho em ${quando(info.em * 1000)}`;
+    return '';
   };
-  if (salvo) texto.value = salvo.texto || '';
-  desenharArquivo();
-  const estado = $('#cy-estado');
   const verEstado = () => chamar(servidorIA(), '/saude', { tempo: 60e3 })
-    .then((r) => {
-      estado.className = `cy-estado ${r.cookies ? 'ok' : 'nao'}`;
-      estado.innerHTML = `<i></i>${r.cookies ? 'Conectado' : 'Ainda não conectado'}`;
-      // a conexão fica no servidor e vale para todos os aparelhos: enviada de outro, o resumo vem de lá
-      const info = r.cookiesInfo;
-      if (r.cookies && info?.em && !cookiesSalvos()?.enviado) {
-        $('#cy-arq').innerHTML = `<div class="cy-arq"><span class="cy-arq-ic">${icon('file', 20)}</span>
-          <div><b>Arquivo enviado de outro aparelho</b><small>${info.n ? `${info.n} cookies · ` : ''}enviado em ${quando(info.em * 1000)}</small></div></div>`;
-        $('#cy-conectar').lastChild.textContent = ' Conectar de novo';
-        $('.cy-como').open = false;
-      }
-    })
-    .catch((e) => { estado.className = 'cy-estado erro'; estado.innerHTML = `<i></i>${esc(e.message)}`; });
+    .then((r) => desenharEstado(r.cookies ? 'ok' : 'nao', r.cookies ? resumo(r.cookiesInfo) : 'Envie o arquivo de cookies para conectar'))
+    .catch((e) => desenharEstado('erro', e.message));
   carregarServidor().then(verEstado);
-  // escolher ou arrastar o arquivo: o texto aparece no campo, fica guardado e já envia
-  const usarArquivo = async (f) => {
-    if (!f) return;
-    texto.value = await f.text();
-    salvarCookies({ nome: f.name, texto: texto.value, enviado: 0 });
-    desenharArquivo();
-    $('#cy-conectar').click();
+  $('#cy-trocar').onclick = () => mostrarEnvio(enviar.hidden);
+  $('#cy-colar').onclick = () => {
+    const box = $('#cy-colar-box');
+    box.hidden = !box.hidden;
+    $('#cy-colar').setAttribute('aria-expanded', String(!box.hidden));
+    if (!box.hidden) texto.focus();
   };
+  const conectar = async (t, nome = '') => {
+    t = String(t || '').trim();
+    if (!t) { toast('Escolha o arquivo ou cole o texto dos cookies'); return; }
+    const b = $('#cy-conectar');
+    b.disabled = true;
+    $('#cy-arquivo').disabled = true;
+    desenharEstado('verificando');
+    try {
+      await chamar(servidorIA(), '/youtube/conectar', { json: { cookies: t }, tempo: 60e3 });
+      salvarCookies({ nome, texto: t, enviado: Date.now() });
+      texto.value = '';
+      $('#cy-colar-box').hidden = true;
+      toast('YouTube conectado: agora a partitura e a letra baixam sozinhas', { tipo: 'sucesso' });
+      tentouSincronizar.clear();
+    } catch (e) { toast(e.message, { tipo: 'erro' }); } finally { b.disabled = false; $('#cy-arquivo').disabled = false; verEstado(); }
+  };
+  // escolher ou arrastar o arquivo: já envia
+  const usarArquivo = async (f) => { if (f) conectar(await f.text(), f.name); };
   $('#cy-arquivo').onclick = () => {
     const inp = document.createElement('input');
     inp.type = 'file';
@@ -12379,22 +12389,7 @@ function viewConectarYoutube() {
   solta.addEventListener('dragover', (e) => { e.preventDefault(); solta.classList.add('sobre'); });
   solta.addEventListener('dragleave', () => solta.classList.remove('sobre'));
   solta.addEventListener('drop', (e) => { e.preventDefault(); solta.classList.remove('sobre'); usarArquivo(e.dataTransfer.files[0]); });
-  $('#cy-conectar').onclick = async () => {
-    const t = texto.value.trim();
-    if (!t) { toast('Escolha o arquivo ou cole o texto dos cookies'); return; }
-    const b = $('#cy-conectar');
-    b.disabled = true;
-    try {
-      await chamar(servidorIA(), '/youtube/conectar', { json: { cookies: t }, tempo: 60e3 });
-      const ant = cookiesSalvos();
-      salvarCookies({ nome: ant?.texto?.trim() === t ? ant.nome : '', texto: t, enviado: Date.now() });
-      desenharArquivo();
-      toast('YouTube conectado: agora a partitura e a letra baixam sozinhas', { tipo: 'sucesso' });
-      
-      tentouSincronizar.clear();
-      verEstado();
-    } catch (e) { toast(e.message, { tipo: 'erro' }); } finally { b.disabled = false; }
-  };
+  $('#cy-conectar').onclick = () => conectar(texto.value);
 }
 
 // ---------------------------------------------------------------- Lumen, o assistente litúrgico (tirar dúvidas)
