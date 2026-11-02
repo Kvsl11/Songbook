@@ -3248,6 +3248,14 @@ html.pp #player .pl-acorde .diagrama { color: #fff; }
 html.pp #player .pl-acorde .diagrama .dedo { fill: var(--tint-cifra, #9be7b4); }
 html.pp #player .pl-acorde figcaption { font-size: 13px; font-weight: 900; color: var(--tint-cifra, #9be7b4); }
 .acorde-pop.no-player { z-index: 1000; }
+/* o balão do acorde na cifra em tela cheia: o mesmo fundo dos cartões da faixa (a cor da música escurecida), as linhas
+   brancas e os dedos e o nome na cor dos acordes */
+html.pp #player .pl-letra .acorde-pop.no-player {
+  background: linear-gradient(rgb(0 0 0 / 0.22), rgb(0 0 0 / 0.22)), color-mix(in srgb, var(--cor-musica, var(--tint)) 75%, #000);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1), 0 12px 30px rgb(0 0 0 / 0.45); color: #fff; }
+html.pp #player .pl-letra .acorde-pop.no-player .diagrama { color: #fff; }
+html.pp #player .pl-letra .acorde-pop.no-player .diagrama .dedo { fill: var(--tint-cifra, #9be7b4); }
+html.pp #player .pl-letra .acorde-pop.no-player b { color: var(--tint-cifra, #9be7b4); }
 /* o som do acorde: o desenho tocado dá um pulso; os desenhos são botões (cursor de mão) */
 .pl-acorde, .acorde-card, .acorde-pop { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .soando { animation: acorde-soa 0.45s ease; }

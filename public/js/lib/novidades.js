@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 409, data: '2026-11-01', titulo: 'Balão do acorde na cor da música',
+    itens: [
+      { tipo: 'melhoria', texto: 'Na cifra em tela cheia, o balão que abre ao tocar num acorde tem agora o mesmo fundo dos diagramas da faixa (a cor da música), com o desenho em branco e os dedos e o nome na cor dos acordes, no lugar do fundo cinza.' },
+    ],
+  },
+  {
     versao: 408, data: '2026-11-01', titulo: '“Diagrama dos acordes”',
     itens: [
       { tipo: 'melhoria', texto: 'Nos Ajustes, a opção “Desenho dos acordes” agora se chama “Diagrama dos acordes” (também nos avisos de ligar e desligar e no botão da cifra).' },
@@ -58,12 +64,6 @@ export const NOVIDADES = [
     versao: 400, data: '2026-11-01', titulo: 'Tela da conta do YouTube mais simples',
     itens: [
       { tipo: 'melhoria', texto: 'A tela de conectar o YouTube ficou curta e clara: o estado num cartão só (conectado, com quantos cookies e quando foi enviado), o botão Trocar para enviar outro arquivo e os passos mais curtos. O texto dos cookies não aparece mais na tela; colar o texto fica num link, para quem preferir.' },
-    ],
-  },
-  {
-    versao: 399, data: '2026-11-01', titulo: 'A cifra acompanha a música como a letra',
-    itens: [
-      { tipo: 'correcao', texto: 'Na letra em tela cheia com a cifra, a frase cantada acende no tempo certo, uma por vez, igual à letra sem cifra: os acordes passam para as frases da letra sincronizada. Antes a cifra juntava várias frases numa linha só, e o destaque ficava parado, atrasava e voltava para trás nos refrões. Tocar numa linha da cifra leva a música até ela.' },
     ],
   },
 ];
