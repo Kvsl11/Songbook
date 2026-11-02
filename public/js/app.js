@@ -26,7 +26,7 @@ import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { embaralharIndices, moverIndice } from './lib/fila.js';
 import { tituloEVersao } from './lib/html.js';
 import { cifraNasLinhas } from './lib/cifra-sincronizada.js';
-import { tocarAcorde } from './lib/violao.js';
+import { prepararAcordes, tocarAcorde } from './lib/violao.js';
 import { audioDbDoArtista, audioDoVideo, buscarYoutube, ehImagemPadrao, legendasDoVideo, semCensura, cifraComoCantada, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -2350,6 +2350,8 @@ const semLinhasDeAcordes = (sinc) => {
     const lista = nomes.map((c) => [c, diagramaSvg(c, { largura: 64 })]).filter(([, svg]) => svg);
     faixa.hidden = !lista.length;
     faixa.innerHTML = lista.map(([c, svg]) => `<figure class="pl-acorde" data-acorde="${esc(c)}">${svg}<figcaption>${esc(c)}</figcaption></figure>`).join('');
+    // as gravações do violão desses acordes já vão chegando: no toque, o som sai na hora
+    if (lista.length) prepararAcordes(lista.map(([c]) => c), { capo: musicaTocando()?.capo || 0 });
   };
   const fecharPopAcorde = () => document.querySelector('.acorde-pop.no-player')?.remove();
   // o som do acorde (no tom real: a forma do desenho mais o capotraste da música), com um pulso no desenho tocado
@@ -9863,6 +9865,7 @@ function viewSong(id, ctx = {}) {
     box.hidden = !lista.length;
     box.innerHTML = lista.length ? `<div class="acordes-head"><b>Acordes${capo ? ` (capo ${capo})` : ''}</b><button class="link-btn" id="esconder-diagramas" title="Desligar o desenho dos acordes (volta em Ajustes)">Ocultar</button></div>
       <div class="acordes-lista">${lista.map(([c, svg]) => `<figure class="acorde-card" data-acorde="${esc(c)}" title="Ouvir o acorde">${svg}<figcaption>${esc(c)}</figcaption></figure>`).join('')}</div>` : '';
+    if (lista.length) prepararAcordes(lista.map(([c]) => c), { capo });
     box.querySelectorAll('.acorde-card').forEach((f) => { f.onclick = () => { if (tocarAcorde(f.dataset.acorde, { capo })) { f.classList.remove('soando'); void f.offsetWidth; f.classList.add('soando'); } }; });
     $('#esconder-diagramas')?.addEventListener('click', () => { db.setPref('diagramas', false); fecharPop(); desenharAcordes(); toast('Desenho dos acordes desligado (religue em Ajustes)'); });
   }

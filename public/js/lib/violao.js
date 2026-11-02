@@ -28,49 +28,72 @@ export function gravacaoPara(midi) {
 }
 
 let ctx = null;
-const gravacoes = new Map(); // arquivo → Promise<AudioBuffer|null>
+const AC = () => typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext);
+const contexto = () => { const C = AC(); if (C && !ctx) ctx = new C({ latencyHint: 'interactive' }); return ctx; };
+// as gravações: arquivo → Promise (baixando) e arquivo → { buf, inicio } (prontas: o acorde toca na hora, sem esperar)
+const gravacoes = new Map();
+const prontas = new Map();
+// onde a nota começa de verdade: as gravações têm uns 30 ms de silêncio antes da palhetada (o som parecia atrasar)
+function inicioDoSom(buf) {
+  const x = buf.getChannelData(0);
+  let pico = 0;
+  for (let i = 0; i < Math.min(x.length, buf.sampleRate * 0.3); i++) pico = Math.max(pico, Math.abs(x[i]));
+  const i = x.findIndex((v) => Math.abs(v) > pico * 0.05);
+  return Math.max(0, i / buf.sampleRate - 0.003);
+}
 function baixar(arquivo) {
   if (!gravacoes.has(arquivo)) {
     gravacoes.set(arquivo, fetch(BASE + arquivo)
       .then((r) => { if (!r.ok) throw new Error(`violão: ${r.status}`); return r.arrayBuffer(); })
-      .then((b) => ctx.decodeAudioData(b))
+      .then((b) => contexto().decodeAudioData(b))
+      .then((buf) => { const g = { buf, inicio: inicioDoSom(buf) }; prontas.set(arquivo, g); return g; })
       .catch(() => { gravacoes.delete(arquivo); return null; })); // sem internet: tenta de novo da próxima vez
   }
   return gravacoes.get(arquivo);
 }
 
+// deixa prontas as gravações dos acordes (os da música, quando a faixa dos desenhos aparece): no toque, o som sai na hora
+export function prepararAcordes(nomes, { capo = 0 } = {}) {
+  if (!AC()) return;
+  for (const nome of nomes || []) for (const m of notasNoViolao(nome, capo)) baixar(gravacaoPara(m).arquivo);
+}
+
 let saida = null; // o volume do acorde que está tocando (um acorde novo abafa o anterior)
-// toca o acorde: true se ele vai soar (as gravações chegam e tocam; na primeira vez, um instante depois), false se o
-// aparelho não tem áudio na web ou o acorde não é conhecido
-export function tocarAcorde(nome, { capo = 0, intervalo = 0.032 } = {}) {
-  const notas = notasNoViolao(nome, capo);
-  const AC = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext);
-  if (!notas.length || !AC) return false;
-  ctx = ctx || new AC();
-  if (ctx.state === 'suspended') ctx.resume();
-  const vozes = notas.map((m) => ({ m, g: gravacaoPara(m) }));
-  Promise.all(vozes.map((v) => baixar(v.g.arquivo))).then((bufs) => {
-    if (bufs.some((b) => !b)) return;
-    // abafa o acorde anterior, como a mão na corda
-    if (saida) { saida.gain.setTargetAtTime(0, ctx.currentTime, 0.04); }
-    const g = ctx.createGain();
-    g.gain.value = 0.55;
-    g.connect(ctx.destination);
-    saida = g;
-    const t0 = ctx.currentTime + 0.02;
-    vozes.forEach((v, i) => {
-      const src = ctx.createBufferSource();
-      src.buffer = bufs[i];
-      src.playbackRate.value = v.g.afinacao;
-      // as cordas agudas um pouco mais leves (a batida para baixo começa forte no bordão)
-      const corda = ctx.createGain();
-      corda.gain.value = 1 - i * 0.06;
-      src.connect(corda).connect(g);
-      src.start(t0 + i * intervalo);
-      src.stop(t0 + i * intervalo + Math.min(4, bufs[i].duration / v.g.afinacao));
-    });
-    // o som vai morrendo, sem cortar de repente
-    g.gain.setTargetAtTime(0, t0 + 2.6, 0.5);
+function soar(vozes, grav, intervalo) {
+  const c = contexto();
+  // abafa o acorde anterior, como a mão na corda
+  if (saida) saida.gain.setTargetAtTime(0, c.currentTime, 0.03);
+  const g = c.createGain();
+  g.gain.value = 0.55;
+  g.connect(c.destination);
+  saida = g;
+  const t0 = c.currentTime;
+  vozes.forEach((v, i) => {
+    const { buf, inicio } = grav[i];
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = v.afinacao;
+    // as cordas agudas um pouco mais leves (a batida para baixo começa forte no bordão)
+    const corda = c.createGain();
+    corda.gain.value = 1 - i * 0.06;
+    src.connect(corda).connect(g);
+    src.start(t0 + i * intervalo, inicio);
+    src.stop(t0 + i * intervalo + Math.min(4, (buf.duration - inicio) / v.afinacao));
   });
+  // o som vai morrendo, sem cortar de repente
+  g.gain.setTargetAtTime(0, t0 + 2.6, 0.5);
+}
+
+// toca o acorde: true se ele vai soar (com as gravações prontas, na hora; senão, assim que chegarem), false se o
+// aparelho não tem áudio na web ou o acorde não é conhecido
+export function tocarAcorde(nome, { capo = 0, intervalo = 0.028 } = {}) {
+  const notas = notasNoViolao(nome, capo);
+  if (!notas.length || !AC()) return false;
+  const c = contexto();
+  if (c.state === 'suspended') c.resume();
+  const vozes = notas.map((m) => gravacaoPara(m));
+  const ja = vozes.map((v) => prontas.get(v.arquivo));
+  if (ja.every(Boolean)) { soar(vozes, ja, intervalo); return true; }
+  Promise.all(vozes.map((v) => baixar(v.arquivo))).then((grav) => { if (grav.every(Boolean)) soar(vozes, grav, intervalo); });
   return true;
 }
