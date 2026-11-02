@@ -26,6 +26,7 @@ import { TAXA as TAXA_CASAMENTO } from './lib/casamento.js';
 import { embaralharIndices, moverIndice } from './lib/fila.js';
 import { tituloEVersao } from './lib/html.js';
 import { cifraNasLinhas } from './lib/cifra-sincronizada.js';
+import { tocarAcorde } from './lib/violao.js';
 import { audioDbDoArtista, audioDoVideo, buscarYoutube, ehImagemPadrao, legendasDoVideo, semCensura, cifraComoCantada, canalDoArtista, duracaoDoVideo, fotoDoCanal, fotosDosVideos, cifraTextoParaChordPro, ehCifraClub, letraParaChordPro, letraSincronizada, repararCifraInvisivel, tituloDoVideo, youtubeOEmbed } from './lib/web.js';
 import { buscarArtistasCifraClub, getArtistaCifraClub, getDiscografiaCifraClub, getTodasMusicasCifraClub, buscarCifraClub, buscarLetras, getCifraClub, getLetra, letraReserva, buscarCindy, carregarCantos, carregarHinario, diretorioJunior, getCanto, getLiturgiaDoDia, getMissa, getOracao, indiceMusicasParaMissa, indiceOracoes, liturgiaGuardada, missalDoDia, missaGuardada, prepararOffline } from './fonte.js';
 
@@ -2351,6 +2352,11 @@ const semLinhasDeAcordes = (sinc) => {
     faixa.innerHTML = lista.map(([c, svg]) => `<figure class="pl-acorde" data-acorde="${esc(c)}">${svg}<figcaption>${esc(c)}</figcaption></figure>`).join('');
   };
   const fecharPopAcorde = () => document.querySelector('.acorde-pop.no-player')?.remove();
+  // o som do acorde (no tom real: a forma do desenho mais o capotraste da música), com um pulso no desenho tocado
+  const somDoAcorde = (nome, alvo) => {
+    if (!tocarAcorde(nome, { capo: musicaTocando()?.capo || 0 })) return;
+    alvo?.classList.remove('soando'); void alvo?.offsetWidth; alvo?.classList.add('soando');
+  };
   $('.pl-cifra', el)?.addEventListener('scroll', fecharPopAcorde, { passive: true });
   const definirModoCifra = (ligar) => {
     modoCifra = ligar;
@@ -2538,6 +2544,8 @@ const semLinhasDeAcordes = (sinc) => {
   }, 80);
   el.addEventListener('click', (e) => {
     // tocar num acorde da cifra (com o desenho dos acordes ligado) mostra o desenho dele num balão, sem levar a música
+    const cartao = e.target.closest('.pl-acorde');
+    if (cartao) { somDoAcorde(cartao.dataset.acorde, cartao); return; }
     fecharPopAcorde();
     const acorde = e.target.closest('.pl-cifra .chord');
     if (acorde && acorde.textContent.trim() && db.prefs().diagramas && el.classList.contains('letra-cheia')) {
@@ -2548,7 +2556,10 @@ const semLinhasDeAcordes = (sinc) => {
         const pop = document.createElement('div');
         pop.className = 'acorde-pop no-player';
         pop.innerHTML = `${svg}<b>${esc(nome)}</b>`;
+        pop.title = 'Tocar de novo';
+        pop.onclick = () => somDoAcorde(nome, pop);
         document.body.append(pop);
+        somDoAcorde(nome, pop);
         const w = pop.offsetWidth;
         pop.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
         pop.style.top = (r.top - pop.offsetHeight - 8 > 8 ? r.top - pop.offsetHeight - 8 : r.bottom + 8) + 'px';
@@ -9850,7 +9861,8 @@ function viewSong(id, ctx = {}) {
     const lista = comCifra && db.prefs().diagramas ? acordesDaMusica().map((c) => [c, diagramaSvg(c)]).filter(([, svg]) => svg) : [];
     box.hidden = !lista.length;
     box.innerHTML = lista.length ? `<div class="acordes-head"><b>Acordes${capo ? ` (capo ${capo})` : ''}</b><button class="link-btn" id="esconder-diagramas" title="Desligar o desenho dos acordes (volta em Ajustes)">Ocultar</button></div>
-      <div class="acordes-lista">${lista.map(([c, svg]) => `<figure class="acorde-card">${svg}<figcaption>${esc(c)}</figcaption></figure>`).join('')}</div>` : '';
+      <div class="acordes-lista">${lista.map(([c, svg]) => `<figure class="acorde-card" data-acorde="${esc(c)}" title="Ouvir o acorde">${svg}<figcaption>${esc(c)}</figcaption></figure>`).join('')}</div>` : '';
+    box.querySelectorAll('.acorde-card').forEach((f) => { f.onclick = () => { if (tocarAcorde(f.dataset.acorde, { capo })) { f.classList.remove('soando'); void f.offsetWidth; f.classList.add('soando'); } }; });
     $('#esconder-diagramas')?.addEventListener('click', () => { db.setPref('diagramas', false); fecharPop(); desenharAcordes(); toast('Desenho dos acordes desligado (religue em Ajustes)'); });
   }
   // tocar num acorde da letra mostra o desenho dele
@@ -9867,7 +9879,11 @@ function viewSong(id, ctx = {}) {
     const pop = document.createElement('div');
     pop.className = 'acorde-pop';
     pop.innerHTML = `${svg}<b>${esc(c.textContent.trim())}</b>`;
+    pop.title = 'Tocar de novo';
+    const nomeAcorde = c.textContent.trim();
+    pop.onclick = () => tocarAcorde(nomeAcorde, { capo });
     document.body.append(pop);
+    tocarAcorde(nomeAcorde, { capo });
     rolagemPop = view.scrollTop;
     const w = pop.offsetWidth;
     pop.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';

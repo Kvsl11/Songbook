@@ -4,6 +4,12 @@
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
+    versao: 404, data: '2026-11-01', titulo: 'Ouça o acorde no violão',
+    itens: [
+      { tipo: 'novo', texto: 'Tocar no desenho de um acorde faz ele soar no violão, corda por corda, como uma batida para baixo: na faixa dos acordes da cifra em tela cheia, no balão que abre ao tocar num acorde da cifra (que já toca ao abrir) e nos desenhos da página da música. Com capotraste, soa no tom de verdade.' },
+    ],
+  },
+  {
     versao: 403, data: '2026-11-01', titulo: 'Desenho dos acordes na cifra',
     itens: [
       { tipo: 'correcao', texto: 'O desenho dos acordes (Ajustes) volta a aparecer: na letra com a cifra em tela cheia, uma faixa logo abaixo dos botões mostra como montar cada acorde da música, no tom e no capotraste escolhidos. Tocar num acorde da cifra mostra o desenho dele.' },
@@ -60,12 +66,6 @@ export const NOVIDADES = [
     itens: [
       { tipo: 'correcao', texto: 'A troca entre a música e o vídeo (e o contrário) cai no ponto certo também nos clipes longos com o refrão repetido (como Speed Demon): um trecho que o app tinha achado na outra vez do refrão no clipe fazia a troca, só ali, ir para o lugar errado. Vale também para as músicas já baixadas.' },
       { tipo: 'melhoria', texto: 'Os cantos que o “Montar repertório” traz (a missa do dia) ficam só no repertório: não aparecem mais nas Músicas da biblioteca. Para guardar um deles na biblioteca, toque no + dele. Apagado o repertório (ou tirado o canto dele), o canto sai do aparelho. Os que já tinham sido trazidos assim também saem das Músicas.' },
-    ],
-  },
-  {
-    versao: 394, data: '2026-11-01', titulo: 'Dois toques ampliam a foto no celular e no tablet',
-    itens: [
-      { tipo: 'correcao', texto: 'Nas fotos do artista em tela cheia, dois toques no celular e no tablet voltam a ampliar a foto (e dois toques de novo voltam ao normal): o navegador mandava também um clique duplo, o do computador, que desfazia o zoom na hora.' },
     ],
   },
 ];
