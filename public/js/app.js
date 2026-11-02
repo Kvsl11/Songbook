@@ -1535,7 +1535,7 @@ const player = (() => {
       <span class="pl-ferr-g so-cifra"><button data-pl="capo-" aria-label="Capotraste uma casa abaixo" title="Capotraste: uma casa abaixo">−</button><b class="pl-capo"></b><button data-pl="capo+" aria-label="Capotraste uma casa acima" title="Capotraste: uma casa acima">+</button></span>
       <span class="pl-ferr-g"><button data-pl="fonte-" aria-label="Letra menor" title="Letra menor"><span class="a-menor">A</span></button><button data-pl="fonte+" aria-label="Letra maior" title="Letra maior"><span class="a-maior">A</span></button></span>
       <button class="pl-ferr-rolar so-cifra" data-pl="rolar" aria-pressed="false" aria-label="Rolagem automática" title="Rolagem automática">${icon('down', 16)}<span>Rolar</span></button>
-      <button class="pl-ferr-acordes so-cifra" data-pl="acordes" aria-pressed="false" aria-label="Desenho dos acordes" title="Desenho dos acordes">${icon('grid', 16)}</button></div><div class="pl-acordes" hidden></div><div class="pl-cifra"></div><div class="pl-linhas"></div>
+      <button class="pl-ferr-acordes so-cifra" data-pl="acordes" aria-pressed="false" aria-label="Desenho dos acordes" title="Desenho dos acordes">${icon('diagrama', 18)}</button></div><div class="pl-acordes" hidden></div><div class="pl-cifra"></div><div class="pl-linhas"></div>
       <div class="pl-letra-pe"><div class="pl-letra-bts2"><button class="icon-btn" data-pl="compartilhar-letra" aria-label="Compartilhar a letra" title="Compartilhar a letra">${icon('share', 22)}</button><span class="grow"></span><button class="icon-btn pl-mais" data-pl="menu" aria-label="Mais opções" title="Mais opções">${icon('more', 22)}</button></div>
         <div class="pl-tempo"><span class="pl-t0"></span><div class="pl-prog" role="slider" tabindex="0" aria-label="Tempo da música" title="Ir para este ponto"><i></i></div><span class="pl-t1"></span></div>
         <button class="icon-btn pl-play" data-pl="play" aria-label="Tocar/pausar">${icon('play', 20)}</button></div></section>
@@ -11929,7 +11929,7 @@ function viewSettings(topico) {
     <div class="settings-group">
       <div class="setting wrap"><span class="ico">${icon('chord', 18)}</span><div class="grow"><div class="t">Destaque dos acordes</div></div>
         <div class="seg" id="destaque">${[['suave', 'Suave'], ['forte', 'Forte'], ['maximo', 'Máximo']].map(([v, n]) => `<button data-v="${v}" aria-pressed="${(p.destaqueCifra || 'forte') === v}">${n}</button>`).join('')}</div></div>
-      ${chave('diagramas', 'grid', 'Desenho dos acordes', 'Como montar cada acorde no violão', p.diagramas)}
+      ${chave('diagramas', 'diagrama', 'Desenho dos acordes', 'Como montar cada acorde no violão', p.diagramas)}
       ${chave('video-fundo', 'video', 'Capa animada', 'Trechos do clipe passam atrás da música, sem som, como o Canvas do Spotify (nas músicas baixadas, o próprio vídeo)', p.videoFundo !== false)}
     </div>`)}
 
