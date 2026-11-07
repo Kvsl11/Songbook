@@ -10552,7 +10552,9 @@ function viewSearch() {
   setHeader('Buscar', { actions: [{ icon: 'upload', label: 'Importar cifra ou letra da internet', onClick: () => importarDaInternet() }] });
   const q = sessionStorage.getItem('busca') || '';
   // (os vídeos não ficam mais à parte: entram nas músicas, cada um junto da sua)
-  const FILTROS = [['tudo', 'Tudo'], ['musicas', 'Músicas'], ['acervo', 'Acervo litúrgico'], ['artistas', 'Artistas'], ['biblioteca', 'Biblioteca']];
+  // (sem a seção "Na sua biblioteca" nem o filtro Biblioteca: a busca é para achar o que ainda não está nela; a
+  // biblioteca tem a busca dela)
+  const FILTROS = [['tudo', 'Tudo'], ['musicas', 'Músicas'], ['acervo', 'Acervo litúrgico'], ['artistas', 'Artistas']];
   let filtro = sessionStorage.getItem('buscaFiltro') || 'tudo';
   if (!FILTROS.some(([k]) => k === filtro)) filtro = 'tudo';
   view.innerHTML = `
@@ -10584,7 +10586,7 @@ function viewSearch() {
   // Enquanto procura, sem uma bolinha girando em cada seção: o resultado anterior continua na tela (mais apagado) e uma
   // linha fina corre embaixo da barra de busca. Quando chega o primeiro resultado da busca nova, a tela troca de uma vez;
   // as seções que ainda faltam ficam com o contorno das linhas (o "esqueleto"), no lugar exato em que vão aparecer.
-  // A ordem é a de importância: biblioteca, músicas, artistas e o acervo
+  // A ordem é a de importância: músicas, artistas e o acervo
   const esqueleto = (id) => (id === 'ar-res'
     ? `<div class="shelf esq-artistas">${'<span class="esq-artista"><i class="esq"></i><i class="esq esq-l2"></i></span>'.repeat(4)}</div>`
     : `<ul class="tracks esq-lista">${'<li><i class="esq esq-capa"></i><span><i class="esq esq-l1"></i><i class="esq esq-l2"></i></span></li>'.repeat(id === 'mu-res' ? 5 : 3)}</ul>`);
@@ -10663,10 +10665,7 @@ function viewSearch() {
       return;
     }
     const meu = ++seq;
-    const t = normalizar(term);
-    const locais = db.songs().filter((s) => !s.soNoRepertorio && normalizar(s.title + ' ' + s.artist + ' ' + s.content).includes(t)).slice(0, filtro === 'biblioteca' ? 50 : 6);
     const blocos = [];
-    if (mostra('biblioteca') && (locais.length || filtro === 'biblioteca')) blocos.push(`<section class="bs-sec"><div class="shelf-head"><h2>Na sua biblioteca</h2></div>${locais.length ? `<ul class="tracks">${locais.map((s) => linhaMusica(s, s.key ? `<span class="chip sm key">${esc(s.key)}</span>` : '')).join('')}</ul>` : '<p class="muted">Nada na biblioteca.</p>'}</section>`);
     if (mostra('musicas')) blocos.push(caixa('mu-res', 'Músicas', '<span class="muted" style="font-size:13px">com cifra, letra e vídeo</span>'));
     if (mostra('artistas')) blocos.push(caixa('ar-res', 'Artistas'));
     if (mostra('acervo')) blocos.push(caixa('ac-res', 'No acervo litúrgico', filtro === 'acervo' ? '' : `<a href="#/setor/busca/${encodeURIComponent(term)}">Ver tudo</a>`));

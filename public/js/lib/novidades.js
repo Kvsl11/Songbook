@@ -1,80 +1,82 @@
-// O que mudou em cada versão do app, em palavras de quem usa. A primeira da lista é a versão atual (a mesma do
+// O que mudou em cada versão do app, em registro técnico e formal (a causa, o que foi alterado e o efeito, com os
+// números medidos quando houver; impessoal, sem gíria). A primeira da lista é a versão atual (a mesma do
 // VERSION do sw.js: um teste confere). As mudanças ficam disponíveis na tela Novidades.
 // Cada item: { tipo: 'novo' | 'melhoria' | 'correcao', texto }. Ficam só as 10 últimas versões (um teste confere):
 // ao escrever uma nova, apague a mais antiga. A data é a do Brasil (horário de Brasília), não a do servidor.
 export const NOVIDADES = [
   {
-    versao: 596, data: '2026-11-07', titulo: 'No app de Android, os pedidos à internet sem fila',
+    versao: 597, data: '2026-11-07', titulo: 'Busca restrita a conteúdo externo e notas de versão em registro técnico',
     itens: [
-      { tipo: 'melhoria', texto: 'No app de Android, tudo o que vinha da internet (a busca do Cifra Club, os vídeos, as letras, as fotos e as informações dos artistas) passava, um pedido de cada vez, por uma fila só da parte do Android, e o que a tela precisava esperava atrás de páginas grandes. Agora os serviços que deixam são pedidos direto, como no site, e a fila fica só para as páginas que precisam dela (o Cifra Club, o YouTube, o Deezer). O Android também passou a reaproveitar a conexão com cada site, em vez de abrir uma nova a cada pedido. Vem com a atualização do app.' },
-      { tipo: 'melhoria', texto: 'No app de Android, as páginas dos artistas do Cifra Club (a principal, a discografia e todas as músicas) ficam guardadas por 1 hora, em vez de 5 minutos: abrir o artista ou a música de novo não baixa tudo outra vez.' },
+      { tipo: 'melhoria', texto: 'A tela Buscar deixou de exibir a seção "Na sua biblioteca" e o filtro Biblioteca: os resultados passam a se limitar a conteúdo externo (músicas, artistas e acervo litúrgico), e a consulta ao conteúdo já salvo permanece disponível na busca da própria Biblioteca. Aplica-se à versão web e ao aplicativo Android.' },
+      { tipo: 'melhoria', texto: 'As notas de versão exibidas em Novidades passaram a adotar registro técnico e formal, com a descrição objetiva da causa, da alteração implementada e do efeito obtido. As entradas das nove versões anteriores foram revisadas segundo o mesmo padrão.' },
     ],
   },
   {
-    versao: 595, data: '2026-11-07', titulo: 'A busca, a música e o artista abrindo bem mais rápido',
+    versao: 596, data: '2026-11-07', titulo: 'Android: requisições de rede fora da fila nativa e reutilização de conexões',
     itens: [
-      { tipo: 'melhoria', texto: 'O app baixava muito mais do que precisava: só abrir o app e fazer uma busca puxava uns 57 MB da internet, em quase 500 pedidos (as páginas inteiras do Cifra Club de vários artistas só para pegar a foto deles, e páginas do YouTube de 560 kB para cada música da lista). No celular isso entupia a internet e tudo esperava na fila. Agora a mesma busca baixa uns 3 MB: os resultados aparecem em menos de 1 segundo (eram quase 4) e a música abre na metade do tempo.' },
-      { tipo: 'melhoria', texto: 'As fotos e as informações dos artistas (a apresentação, os fãs, o canal) já guardadas no aparelho valem por um dia sem perguntar à internet de novo: a biblioteca e o "Sobre o artista" abrem com tudo na hora.' },
-      { tipo: 'melhoria', texto: 'No "Sobre o artista", a apresentação embaixo do nome aparece assim que chega, sem esperar as outras fontes, e o "ver mais" aparece logo, mesmo com a internet lenta.' },
-      { tipo: 'correcao', texto: 'Tocar no + do player para salvar nas curtidas a música aberta da busca às vezes não salvava (dizia "Abra a música para salvar" ou só abria a página). Agora salva.' },
-      { tipo: 'melhoria', texto: 'As orações e o missal do dia (do Pocket Terço) já guardados no aparelho abrem na hora; a versão nova chega em segundo plano.' },
+      { tipo: 'melhoria', texto: 'No aplicativo Android, todas as requisições externas eram encaminhadas à camada nativa e processadas em uma fila única, de modo que consultas leves aguardavam a conclusão de páginas extensas. Os serviços que admitem CORS (busca de artistas do Cifra Club, Piped, LRCLIB, Wikipédia, TheAudioDB, iTunes, MusicBrainz e oEmbed do YouTube) passaram a ser consultados diretamente pelo WebView, como na versão web. A camada nativa fica reservada às origens sem CORS (páginas do Cifra Club e do YouTube, Deezer) e atua como contingência. Em simulação, o volume na fila nativa caiu de cerca de 210 para 85 requisições, sem tempo de espera. Disponível mediante atualização do aplicativo.' },
+      { tipo: 'melhoria', texto: 'A camada nativa deixou de encerrar a conexão HTTP após cada resposta: a conexão retorna ao pool e é reutilizada nas requisições seguintes à mesma origem, o que elimina um novo handshake TLS por requisição. Disponível mediante atualização do aplicativo.' },
+      { tipo: 'melhoria', texto: 'No aplicativo Android, a validade do cache das páginas de artista do Cifra Club (página principal, discografia e lista completa, com cerca de 500 kB cada) foi ampliada de 5 minutos para 1 hora, evitando novo download a cada acesso.' },
     ],
   },
   {
-    versao: 594, data: '2026-11-07', titulo: 'As fotos dos artistas que não carregavam',
+    versao: 595, data: '2026-11-07', titulo: 'Redução do tráfego de rede na busca, na abertura de músicas e nos dados de artistas',
     itens: [
-      { tipo: 'correcao', texto: 'Na biblioteca, alguns artistas ficavam sem foto (só com o desenho) porque o site da foto recusava mostrá-la dentro do app, e a procura de novo trazia a mesma foto. Agora a foto é pedida sem dizer de qual site vem o pedido e, se ainda assim não carregar, o app tenta as outras fontes (YouTube, Cifra Club, Deezer e Wikipédia), uma depois da outra, até achar uma que carregue.' },
-      { tipo: 'correcao', texto: 'O artista sem foto mostra só o desenho do artista, sem a nota da música junto ou no lugar dele. Se ainda aparecer a nota e o microfone juntos, é a versão antiga: feche e abra o app para ele se atualizar.' },
+      { tipo: 'melhoria', texto: 'Foi identificado consumo excessivo de rede: abrir o aplicativo e realizar uma busca gerava cerca de 500 requisições e 57 MB de tráfego. As causas eram o download integral de três páginas do Cifra Club por artista apenas para obter a foto e o download da página de resultados do YouTube (cerca de 560 kB) em cada consulta de vídeo. A foto passou a ser obtida pelo índice de busca de artistas (cerca de 2 kB), com a página do artista como alternativa, e a página do YouTube passou a ser consultada somente quando o Piped não responde em 1,5 s. Instâncias do Piped indisponíveis ou com resposta inválida (403/404 em HTML) são excluídas após a primeira falha, e as requisições simultâneas aguardam a sondagem inicial. O mesmo fluxo passou a gerar cerca de 3 MB; o tempo até os resultados da busca caiu de 3,8 s para 0,8 s, e o de abertura da música, de 1,6 s para 0,9 s.' },
+      { tipo: 'melhoria', texto: 'A pré-carga automática dos três primeiros resultados da busca deixou de incluir a localização do áudio oficial (cinco consultas ao YouTube por música). A preparação completa ocorre apenas para a música selecionada.' },
+      { tipo: 'melhoria', texto: 'Os dados de artistas armazenados no aparelho (foto, apresentação, canal e dados da TheAudioDB) passaram a ter validade de 24 horas, sem nova consulta à rede nesse período. O canal do YouTube passou a ser consultado uma única vez por artista em cada sessão.' },
+      { tipo: 'melhoria', texto: 'Na seção "Sobre o artista", a apresentação é exibida assim que recebida, sem aguardar a fonte complementar (TheAudioDB). O acesso a "ver mais" é disponibilizado em até 2,5 s, e a consulta à Wikipédia passou a ter tempo limite.' },
+      { tipo: 'correcao', texto: 'O botão de salvar do player não reconhecia a música aberta pela busca enquanto o vídeo ainda não estava registrado na prévia, exibindo "Abra a música para salvar" ou apenas navegando até a página. A verificação foi corrigida, e a música passa a ser salva na biblioteca.' },
+      { tipo: 'melhoria', texto: 'As orações e o missal do dia (Pocket Terço) já armazenados no aparelho passaram a ser exibidos imediatamente, com a atualização do arquivo realizada em segundo plano.' },
     ],
   },
   {
-    versao: 593, data: '2026-11-07', titulo: 'Downloads na qualidade de verdade, até 4K, e as fotos dos artistas',
+    versao: 594, data: '2026-11-07', titulo: 'Correção no carregamento de fotos de artistas',
     itens: [
-      { tipo: 'correcao', texto: 'O vídeo baixado podia vir em 360p mesmo com a "Muito alta" escolhida: quando o YouTube não dava a imagem boa por um caminho, o app aceitava a de 360p calado. Agora ele tenta pelos outros caminhos do YouTube e fica com a maior imagem que o vídeo tem. Os vídeos já baixados em 360p são baixados de novo sozinhos. Vem com a atualização do app.' },
-      { tipo: 'novo', texto: 'Em Ajustes → Qualidade de mídia, o vídeo vai agora até 4K: Normal (480p), Alta (720p), Muito alta (1080p), 2K (1440p) e 4K (2160p). No áudio, com os valores de verdade: Normal (AAC 48 kb/s), Alta (AAC 128 kb/s), Muito alta (Opus 160 kb/s, a melhor que o YouTube costuma ter) e Máxima (AAC 256 kb/s, quando o vídeo tem).' },
-      { tipo: 'melhoria', texto: 'Trocar a qualidade baixa de novo, sozinho, as músicas já baixadas em outra (maior ou menor), sem precisar tocar em "Atualizar". Cada uma continua tocando sem internet até a nova chegar.' },
-      { tipo: 'correcao', texto: 'Na biblioteca, o artista cuja foto não carregava ficava com a nota e o microfone um em cima do outro, ou com a nota no lugar da foto. Agora aparece só o desenho do artista, a foto quebrada é esquecida e outra é procurada.' },
-      { tipo: 'melhoria', texto: 'As prévias das playlists começam com a imagem do vídeo em HD (antes era uma imagem pequena esticada na tela, borrada) e pedem o vídeo em HD ao YouTube.' },
+      { tipo: 'correcao', texto: 'Algumas fotos de artistas não eram exibidas na biblioteca, e a nova tentativa retornava o mesmo endereço inválido. As imagens passaram a ser solicitadas sem o cabeçalho Referer (referrerpolicy="no-referrer"), o que contorna a proteção contra hotlink de alguns servidores. Em caso de falha, as fontes alternativas (YouTube, Cifra Club, Deezer e Wikipédia) são consultadas sequencialmente até que uma imagem seja carregada com sucesso.' },
+      { tipo: 'correcao', texto: 'Artistas sem foto exibem exclusivamente o ícone de artista, sem sobreposição com o ícone de música. Instalações que ainda apresentem os dois ícones sobrepostos estão em versão anterior e são atualizadas ao reiniciar o aplicativo.' },
     ],
   },
   {
-    versao: 592, data: '2026-11-07', titulo: 'No app de Android, a partitura é sempre gerada pela IA',
+    versao: 593, data: '2026-11-07', titulo: 'Downloads na resolução configurada (até 4K), fotos de artistas e prévias em HD',
     itens: [
-      { tipo: 'melhoria', texto: 'No app de Android, gerar a partitura não pede mais para escolher um arquivo de áudio: a IA do próprio celular gera sempre com o áudio da música. Quando ela não consegue (a música sem vídeo, por exemplo), as opções são tentar de novo ou criar do zero, no editor. O "Abrir MusicXML" também saiu do começo do editor no app.' },
+      { tipo: 'correcao', texto: 'Downloads de vídeo podiam ser concluídos em 360p mesmo com a qualidade "Muito alta" selecionada: quando um cliente do YouTube não disponibilizava a resolução solicitada, o formato de 360p era aceito sem aviso. O downloader passou a consultar os demais clientes do YouTube e a selecionar a maior resolução disponível. Vídeos já baixados em 360p são baixados novamente de forma automática. Disponível mediante atualização do aplicativo.' },
+      { tipo: 'novo', texto: 'Em Ajustes → Qualidade de mídia, as opções de vídeo foram ampliadas até 4K: Normal (480p), Alta (720p), Muito alta (1080p), 2K (1440p) e 4K (2160p). As opções de áudio passaram a indicar os parâmetros reais: Normal (AAC 48 kb/s), Alta (AAC 128 kb/s), Muito alta (Opus 160 kb/s, a maior taxa usual no YouTube) e Máxima (AAC 256 kb/s, quando disponível).' },
+      { tipo: 'melhoria', texto: 'A alteração da qualidade configurada passou a disparar automaticamente um novo download das músicas já baixadas em outra qualidade, superior ou inferior, sem necessidade de acionar "Atualizar". Cada música permanece disponível offline até a conclusão da nova versão.' },
+      { tipo: 'correcao', texto: 'Na biblioteca, artistas cuja foto falhava ao carregar exibiam os ícones de música e de microfone sobrepostos, ou o ícone de música no lugar da foto. Passou a ser exibido apenas o ícone de artista; o endereço inválido é descartado e uma nova foto é buscada.' },
+      { tipo: 'melhoria', texto: 'As prévias das playlists passaram a iniciar com a miniatura do vídeo em alta definição (antes, uma imagem de baixa resolução ampliada) e a solicitar ao YouTube a reprodução em HD.' },
     ],
   },
   {
-    versao: 591, data: '2026-11-07', titulo: 'A partitura e o karaokê feitos mais rápido, com a mesma qualidade',
+    versao: 592, data: '2026-11-07', titulo: 'Android: geração de partitura exclusivamente por IA no aparelho',
     itens: [
-      { tipo: 'melhoria', texto: 'A partitura gerada no aparelho sai bem mais rápido, com as mesmas notas: a IA passou a fazer as contas num motor muito mais rápido (no teste, 15 segundos de música em 2 segundos, contra 28 antes), solta a memória de cada trecho (o celular não vai mais ficando lento até o fim da música) e, nas músicas mais longas, não passa mais do limite da placa de vídeo.' },
-      { tipo: 'melhoria', texto: 'No app de Android, o karaokê feito no celular sai mais rápido, com o mesmo som: enquanto o modelo separa a voz de um trecho, o celular já prepara o próximo e grava o anterior (antes era um de cada vez); as contas dos dois lados do estéreo são feitas juntas; e o modelo fica carregado entre uma música e outra. Vem com a atualização do app.' },
+      { tipo: 'melhoria', texto: 'No aplicativo Android, a geração de partitura deixou de solicitar a seleção de um arquivo de áudio: o modelo de IA executado no aparelho utiliza sempre o áudio da própria música. Em caso de falha (por exemplo, música sem vídeo), são oferecidas as opções de nova tentativa ou de criação manual no editor. A opção "Abrir MusicXML" foi removida da tela inicial do editor no aplicativo.' },
     ],
   },
   {
-    versao: 590, data: '2026-11-07', titulo: 'As telas de partitura repaginadas',
+    versao: 591, data: '2026-11-07', titulo: 'Desempenho na geração de partituras e de karaokê',
     itens: [
-      { tipo: 'melhoria', texto: 'As telas de partitura ganharam um visual mais moderno e limpo. Na lista, o "Gerar com IA" vem em destaque, com a "Nova partitura" e o acervo em cartões logo abaixo. Ao gerar, um anel mostra o andamento em porcentagem e o tempo, e as etapas aparecem numa linha do tempo. Na partitura pronta, as vozes (Coral, Coral do áudio, Melodia) ficam logo embaixo da prévia, e os botões Editar e Salvar ficam presos no pé da tela.' },
+      { tipo: 'melhoria', texto: 'A transcrição de partituras no aparelho passou a utilizar um motor de inferência mais eficiente, com resultado idêntico: em teste, 15 segundos de áudio foram processados em 2 segundos (antes, 28). A memória de cada segmento passou a ser liberada após o processamento, o que elimina a degradação progressiva de desempenho, e as músicas longas deixaram de exceder o limite de memória da GPU.' },
+      { tipo: 'melhoria', texto: 'No aplicativo Android, a separação de voz para o karaokê passou a operar em pipeline: enquanto o modelo processa um segmento, o seguinte é preparado e o anterior é gravado (antes, as etapas eram sequenciais). Os dois canais estéreo passaram a ser processados em conjunto, e o modelo permanece carregado entre uma música e outra. O resultado sonoro é o mesmo. Disponível mediante atualização do aplicativo.' },
     ],
   },
   {
-    versao: 589, data: '2026-11-07', titulo: 'Salvar da busca de primeira, e a música da busca no "Tocou por último"',
+    versao: 590, data: '2026-11-07', titulo: 'Reformulação visual das telas de partitura',
     itens: [
-      { tipo: 'correcao', texto: 'Na busca, tocar no + para salvar uma música às vezes abria a música (com a tela de carregamento) e não salvava: o círculo é pequeno, e o toque um pouco fora dele caía na música. Agora a área do toque é maior, os toques seguintes enquanto salva não abrem a música, e salvar aproveita o que já começou a ser trazido (fica mais rápido). Se não der para salvar, o app avisa.' },
-      { tipo: 'correcao', texto: 'O "Tocou por último", na gaveta do perfil, mostra também a música aberta pela busca que está tocando, mesmo antes de ser salva (antes aparecia a anterior).' },
+      { tipo: 'melhoria', texto: 'As telas de partitura receberam nova interface. Na listagem, a opção "Gerar com IA" passou a ter destaque, seguida de "Nova partitura" e do acervo, em cartões. Durante a geração, um indicador circular informa o progresso percentual e o tempo decorrido, e as etapas são apresentadas em linha do tempo. Na partitura concluída, as vozes (Coral, Coral do áudio e Melodia) ficam logo abaixo da prévia, e os botões Editar e Salvar permanecem fixos no rodapé.' },
     ],
   },
   {
-    versao: 588, data: '2026-11-07', titulo: 'O "Conexão lenta" só quando está mesmo lenta',
+    versao: 589, data: '2026-11-07', titulo: 'Correções ao salvar músicas pela busca e no histórico de reprodução',
     itens: [
-      { tipo: 'correcao', texto: 'Nos dados móveis, o aviso "Conexão lenta" aparecia o tempo todo, mesmo com a internet boa: ele vinha da estimativa de velocidade do celular, que nos dados móveis costuma ser baixa e fixa. Agora o app confirma com uma medida de verdade (pedidos pequenos à internet, cronometrados) e só avisa quando a conexão está mesmo lenta; quando melhora, o aviso sai sozinho.' },
+      { tipo: 'correcao', texto: 'Na busca, o toque no botão de salvar podia ser interpretado como toque na linha da música, que era aberta em vez de salva, devido à área de toque reduzida do botão. A área de toque foi ampliada, os toques repetidos durante o salvamento deixaram de abrir a música, e o salvamento passou a reaproveitar os dados já em carregamento, o que o torna mais rápido. Em caso de falha, uma mensagem é exibida.' },
+      { tipo: 'correcao', texto: 'A seção "Tocou por último", na gaveta do perfil, passou a exibir também a música aberta pela busca que está em reprodução, ainda que não salva (antes era exibida a música anterior).' },
     ],
   },
   {
-    versao: 587, data: '2026-11-07', titulo: 'Os avisos da conexão em branco e os downloads sempre com o vídeo',
+    versao: 588, data: '2026-11-07', titulo: 'Detecção de conexão lenta baseada em medição real',
     itens: [
-      { tipo: 'correcao', texto: 'No app de Android, a tela Ajustes → Avançado mostrava um pedaço de cartão vazio em cima do "Apagar tudo". Saiu.' },
-      { tipo: 'melhoria', texto: 'Em Ajustes → Downloads, saiu a escolha "O que baixar": as músicas são baixadas sempre com o áudio e o clipe. Quem tinha escolhido "Só o áudio" recebe sozinho, em segundo plano, o clipe das músicas já baixadas.' },
-      { tipo: 'melhoria', texto: 'Os avisos "Conexão lenta" e "Conectado novamente", embaixo do menu, aparecem em branco, como o "Você está offline" (antes eram laranja e verde).' },
+      { tipo: 'correcao', texto: 'Em dados móveis, o aviso "Conexão lenta" era exibido continuamente mesmo com boa conexão, por se basear na estimativa de banda do sistema, que nessas redes tende a ser baixa e fixa. O aplicativo passou a confirmar a lentidão por medição efetiva (requisições leves cronometradas) e só exibe o aviso quando ela é constatada; o aviso é removido automaticamente quando a conexão se normaliza.' },
     ],
   },
 ];

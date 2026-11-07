@@ -5,7 +5,7 @@
 //   (a anterior continua) e tenta de novo depois;
 // - dados (liturgia, músicas, partituras, API): "rede primeiro", com a cópia local como reserva offline;
 // - ao publicar uma versão nova, mude VERSION: o app baixa o pacote novo e recarrega sozinho com ele.
-const VERSION = 'songbook-v596';
+const VERSION = 'songbook-v597';
 const SHELL = ['./', 'index.html', 'css/app.css', 'karaoke-teste.m4a', 'js/app.js', 'js/store.js', 'js/conta.js', 'js/lib/sincronia-conta.js', 'js/render.js', 'js/chordpro.js', 'js/icons.js', 'js/pdf.js', 'js/powerpoint.js', 'js/lib/pptx-missa.js', 'js/lib/pptx-simples.js', 'js/fonte.js', 'js/lib/html.js', 'js/lib/cnbb.js', 'js/lib/cindy.js', 'js/lib/missa.js', 'js/lib/mpm.js', 'js/lib/pocket.js', 'js/lib/web.js', 'js/lib/hashtags.js', 'js/lib/acervo.js', 'js/lib/hinario.js', 'js/lib/sugestoes-liturgicas.js', 'js/lib/revisor.js', 'js/lib/ensaio.js', 'js/lib/partitura.js', 'js/lib/alinhamento.js', 'js/lib/harmonizar.js', 'js/lib/transcricao.js', 'js/lib/cores.js', 'js/lib/avisos.js', 'js/lib/novidades.js', 'js/lib/versoes.js', 'js/lib/cifra-sincronizada.js', 'js/lib/violao.js', 'js/lib/casamento.js', 'js/lib/fila.js', 'js/lib/artistas.js', 'js/lib/tom.js', 'js/lib/cifras.js', 'js/lib/estatisticas.js', 'js/lib/automix.js', 'js/lib/capas.js', 'js/lib/transferir.js', 'js/lib/casamento-worker.js', 'js/lib/baixador-aparelho.js', 'js/lib/lumen-local.js', 'js/lib/conexao.js', 'js/audios.js', 'js/lib/piano.js', 'js/acordes.js', 'icon.svg', 'badge-96.png', 'icon-192-v10.png', 'icon-512-v10.png', 'apple-touch-icon-v10.png', 'manifest.webmanifest'];
 
 // caminhos (absolutos) dos arquivos do pacote, para reconhecer as requisições

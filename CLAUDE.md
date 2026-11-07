@@ -17,4 +17,8 @@ Correções só de comportamento da tela (o que não fica guardado) não precisa
 - Escreva o que mudou em `public/js/lib/novidades.js`, com a data do Brasil (a primeira entrada é a versão atual; ficam
   só as 10 últimas). A versão mostrada no app (`APP_VERSAO`) sai dali: a data e o número da versão no mês. Na primeira
   versão de um mês novo, acrescente o mês em `PRIMEIRA_DO_MES`.
+- O texto das Novidades (o título e cada item) é escrito em registro técnico e formal, como uma nota de versão: a
+  causa do problema, o que foi alterado e o efeito obtido, com os números medidos quando houver; impessoal ("passou a",
+  "foi corrigido"), sem gíria nem tom de conversa. O que só chega com o APK novo termina com "Disponível mediante
+  atualização do aplicativo."
 - `npm test` precisa passar.
